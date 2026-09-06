@@ -1,16 +1,32 @@
 import React from "react";
 
 const styles = {
-  in_stock:    { bg: "var(--green-light)",  color: "var(--green)",  label: "In Stock" },
-  low_stock:   { bg: "var(--yellow-light)", color: "#b45309",       label: "Low Stock" },
-  out_of_stock:{ bg: "var(--red-light)",    color: "var(--red)",    label: "Out of Stock" },
-  overstock:   { bg: "var(--purple-light)", color: "var(--purple)", label: "Overstock" },
-  critical:    { bg: "var(--red-light)",    color: "var(--red)",    label: "Critical" },
-  warning:     { bg: "var(--yellow-light)", color: "#b45309",       label: "Warning" },
-  info:        { bg: "var(--blue-light)",   color: "var(--blue)",   label: "Info" },
+  // Health statuses
+  GREEN:        { bg: "#f0fdf4", color: "#16a34a", label: "Healthy" },
+  YELLOW:       { bg: "#fffbeb", color: "#b45309", label: "Watch" },
+  ORANGE:       { bg: "#fff7ed", color: "#c2410c", label: "Action Required" },
+  RED:          { bg: "#fef2f2", color: "#dc2626", label: "Critical" },
+  // Movement classes
+  "Fast Moving":  { bg: "#eff6ff", color: "#2563eb", label: "Fast Moving" },
+  "Normal":       { bg: "#f8fafc", color: "#475569", label: "Normal" },
+  "Slow Moving":  { bg: "#fffbeb", color: "#b45309", label: "Slow Moving" },
+  "Idle":         { bg: "#fef2f2", color: "#dc2626", label: "Idle" },
+  // Ageing statuses
+  Fresh:        { bg: "#f0fdf4", color: "#16a34a", label: "Fresh" },
+  Normal_age:   { bg: "#f8fafc", color: "#475569", label: "Normal" },
+  Ageing:       { bg: "#fffbeb", color: "#b45309", label: "Ageing" },
+  "At Risk":    { bg: "#fef2f2", color: "#dc2626", label: "At Risk" },
+  // Alert severities
+  critical:     { bg: "#fef2f2", color: "#dc2626", label: "Critical" },
+  warning:      { bg: "#fffbeb", color: "#b45309", label: "Warning" },
+  info:         { bg: "#eff6ff", color: "#2563eb", label: "Info" },
+  // Velocity trends
+  accelerating: { bg: "#f0fdf4", color: "#16a34a", label: "↑ Accelerating" },
+  stable:       { bg: "#f8fafc", color: "#475569", label: "→ Stable" },
+  decelerating: { bg: "#fef2f2", color: "#dc2626", label: "↓ Decelerating" },
 };
 
-export default function Badge({ type }) {
+export default function Badge({ type, label: overrideLabel }) {
   const s = styles[type] || { bg: "#f1f5f9", color: "#64748b", label: type };
   return (
     <span
@@ -23,9 +39,10 @@ export default function Badge({ type }) {
         color: s.color,
         fontSize: 12,
         fontWeight: 600,
+        whiteSpace: "nowrap",
       }}
     >
-      {s.label}
+      {overrideLabel || s.label}
     </span>
   );
 }

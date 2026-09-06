@@ -45,9 +45,10 @@ CREATE TABLE skus (
   safety_stock_pct REAL DEFAULT 20,
   lead_time_days   INTEGER DEFAULT 45,
   unit_cost_sgd    REAL DEFAULT 0,
-  max_holding_days INTEGER DEFAULT 270,
-  active           INTEGER DEFAULT 1,
-  created_at       TEXT DEFAULT (datetime('now'))
+  max_holding_days     INTEGER DEFAULT 270,
+  active               INTEGER DEFAULT 1,
+  strategic_adjustment REAL DEFAULT 0,  -- Phase 2 placeholder: price intelligence adjustment (MT)
+  created_at           TEXT DEFAULT (datetime('now'))
 );
 ```
 
@@ -90,6 +91,36 @@ CREATE TABLE purchase_orders (
   eta              TEXT,
   status           TEXT DEFAULT 'open',
   FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
+);
+```
+
+### Table: decisions
+```sql
+CREATE TABLE decisions (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  sku_id            TEXT NOT NULL,
+  trigger_type      TEXT,
+  ai_recommendation TEXT,
+  ai_quantity       REAL,
+  manager_action    TEXT,    -- approved / modified / rejected
+  manager_quantity  REAL,
+  manager_reason    TEXT,
+  decided_by        TEXT,
+  decided_at        TEXT DEFAULT (datetime('now')),
+  outcome_notes     TEXT,
+  strategic_adjustment REAL DEFAULT 0  -- Phase 2 placeholder, always 0 in MVP 1
+);
+```
+
+### Table: audit_log
+```sql
+CREATE TABLE audit_log (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_type   TEXT NOT NULL,   -- e.g. LLM_CALL, ALERT_TRIGGERED, RESTOCK
+  sku_id       TEXT,
+  input_data   TEXT,            -- JSON string of inputs used
+  output_data  TEXT,            -- JSON string of result/response
+  created_at   TEXT DEFAULT (datetime('now'))
 );
 ```
 

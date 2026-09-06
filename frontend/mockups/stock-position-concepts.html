@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Stock Position — 4 Visual Concepts</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Inter", sans-serif; background: #f0f2f5; color: #1a202c; padding: 40px 32px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: #64748b; margin-bottom: 48px; }
+  .concept { background: #fff; border-radius: 16px; padding: 32px; margin-bottom: 40px; border: 1px solid #e2e6ea; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .concept-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .concept-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #3b82f6; background: #eff6ff; padding: 2px 10px; border-radius: 99px; }
+  .concept-title { font-size: 18px; font-weight: 700; }
+  .concept-desc { font-size: 13px; color: #64748b; margin-bottom: 28px; line-height: 1.6; max-width: 680px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #64748b; background: #f8f9fb; border-bottom: 1px solid #e2e6ea; white-space: nowrap; }
+  td { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafbfd; }
+  .sku-name { font-weight: 600; font-size: 13px; }
+  .sku-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+  /* Shared badge */
+  .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-red    { background: #fef2f2; color: #dc2626; }
+  .badge-orange { background: #fff7ed; color: #c2410c; }
+  .badge-yellow { background: #fffbeb; color: #b45309; }
+  .badge-green  { background: #f0fdf4; color: #16a34a; }
+
+  /* ── CONCEPT A — Segmented zone bar ── */
+  .zone-bar-wrap { display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
+  .zone-bar-track { position: relative; height: 10px; border-radius: 99px; background: #e2e6ea; overflow: visible; }
+  .zone-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
+  .zone-marker { position: absolute; top: -4px; width: 3px; height: 18px; border-radius: 2px; background: #1e293b; }
+  .zone-labels { display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; }
+  .zone-value { font-size: 14px; font-weight: 800; }
+  .zone-meta { font-size: 11px; color: #64748b; }
+
+  /* ── CONCEPT B — Gauge dial ── */
+  .gauge-wrap { display: flex; align-items: center; gap: 14px; min-width: 180px; }
+  .gauge-svg { flex-shrink: 0; }
+  .gauge-text { }
+  .gauge-main { font-size: 14px; font-weight: 800; line-height: 1.2; }
+  .gauge-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .gauge-gap { font-size: 12px; font-weight: 700; margin-top: 4px; }
+
+  /* ── CONCEPT C — Stacked pill bands ── */
+  .pill-wrap { min-width: 210px; }
+  .pill-track { display: flex; height: 20px; border-radius: 99px; overflow: hidden; width: 100%; margin-bottom: 6px; border: 1px solid rgba(0,0,0,0.06); }
+  .pill-segment { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.9); white-space: nowrap; overflow: hidden; transition: width 0.3s; }
+  .pill-legend { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill-legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #64748b; }
+  .pill-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .pill-numbers { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+  .pill-numbers span { color: #64748b; }
+  .pill-numbers strong { color: #1a202c; }
+
+  /* ── CONCEPT D — Numeric delta card ── */
+  .delta-wrap { display: flex; align-items: stretch; gap: 0; min-width: 220px; border-radius: 10px; overflow: hidden; border: 1px solid #e2e6ea; }
+  .delta-left { padding: 10px 14px; display: flex; flex-direction: column; justify-content: center; min-width: 90px; }
+  .delta-divider { width: 1px; background: #e2e6ea; }
+  .delta-right { padding: 10px 14px; display: flex; flex-direction: column; justify-content: center; flex: 1; }
+  .delta-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #94a3b8; margin-bottom: 3px; }
+  .delta-val { font-size: 18px; font-weight: 800; line-height: 1; }
+  .delta-sub { font-size: 10px; color: #94a3b8; margin-top: 3px; }
+  .delta-gap-positive { color: #16a34a; }
+  .delta-gap-negative { color: #dc2626; }
+  .delta-gap-warn { color: #c2410c; }
+  .delta-micro-bar { height: 4px; border-radius: 99px; background: #e2e6ea; margin-top: 6px; width: 100%; }
+  .delta-micro-fill { height: 100%; border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<h1>Stock Position — 4 Visual Concepts</h1>
+<p class="subtitle">
+  Each concept shows Available stock / Reorder Point / Gap in a single table column.<br>
+  Pick the one that makes sense at a glance, or mix elements from multiple concepts.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CONCEPT A — Segmented Zone Bar
+     Like a fuel gauge. Shows where your stock sits relative to Min / Reorder / Target / Max.
+     The bar fills up; coloured zones show danger, warning, healthy.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <span class="concept-label">Concept A</span>
+    <div class="concept-title">Zone Bar — "Fuel gauge"</div>
+  </div>
+  <p class="concept-desc">
+    The bar is divided into coloured zones: red (danger), orange (reorder zone), green (healthy), purple (overstock).
+    A black tick mark shows the reorder point. The fill colour shows the zone you're currently in.
+    Best for: managers who think visually and want to see the full range at once.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Stock Position</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- TJ-25KG: 160 MT available, reorder at 302, max 700 → BELOW reorder -->
+      <tr>
+        <td><div class="sku-name">Thai Jasmine 25KG</div><div class="sku-sub">TJ-25KG · Fast Moving</div></td>
+        <td>
+          <div class="zone-bar-wrap">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+              <span class="zone-value" style="color:#dc2626">160 MT</span>
+              <span class="zone-meta">of 700 MT max</span>
+            </div>
+            <div class="zone-bar-track">
+              <!-- Zones: red 0→20%, orange 20→43%, green 43→85%, purple 85→100% -->
+              <div style="position:absolute;left:0;top:0;width:20%;height:100%;background:#fecaca;border-radius:99px 0 0 99px;"></div>
+              <div style="position:absolute;left:20%;top:0;width:23%;height:100%;background:#fed7aa;"></div>
+              <div style="position:absolute;left:43%;top:0;width:42%;height:100%;background:#bbf7d0;"></div>
+              <div style="position:absolute;left:85%;top:0;width:15%;height:100%;background:#ddd6fe;border-radius:0 99px 99px 0;"></div>
+              <!-- Available fill -->
+              <div class="zone-bar-fill" style="position:absolute;left:0;top:0;width:23%;height:100%;background:#ef4444;border-radius:99px;opacity:0.9;"></div>
+              <!-- Reorder marker at 302/700 = 43% -->
+              <div class="zone-marker" style="left:calc(43% - 1.5px);"></div>
+            </div>
+            <div class="zone-labels">
+              <span>0</span>
+              <span>▲ Reorder: 302 MT</span>
+              <span>Max: 700 MT</span>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-red">▼ 142 MT below trigger</span></td>
+      </tr>
+
+      <!-- VF-10KG: 580 MT available, reorder at 120, max 400 → OVERSTOCK -->
+      <tr>
+        <td><div class="sku-name">Vietnam Fragrant 10KG</div><div class="sku-sub">VF-10KG · Normal</div></td>
+        <td>
+          <div class="zone-bar-wrap">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+              <span class="zone-value" style="color:#7c3aed">580 MT</span>
+              <span class="zone-meta">of 400 MT max</span>
+            </div>
+            <div class="zone-bar-track">
+              <div style="position:absolute;left:0;top:0;width:10%;height:100%;background:#fecaca;border-radius:99px 0 0 99px;"></div>
+              <div style="position:absolute;left:10%;top:0;width:20%;height:100%;background:#fed7aa;"></div>
+              <div style="position:absolute;left:30%;top:0;width:55%;height:100%;background:#bbf7d0;"></div>
+              <div style="position:absolute;left:85%;top:0;width:15%;height:100%;background:#ddd6fe;border-radius:0 99px 99px 0;"></div>
+              <!-- Available at 580/700 effective = 100% (overstock, capped at bar width + overflow indicator) -->
+              <div class="zone-bar-fill" style="position:absolute;left:0;top:0;width:100%;height:100%;background:#8b5cf6;border-radius:99px;opacity:0.85;"></div>
+              <!-- Reorder marker at 120/600 = 20% -->
+              <div class="zone-marker" style="left:calc(20% - 1.5px);"></div>
+            </div>
+            <div class="zone-labels">
+              <span>0</span>
+              <span>▲ Reorder: 120 MT</span>
+              <span>Max: 400 MT</span>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge" style="background:#f5f3ff;color:#7c3aed">180 MT above max</span></td>
+      </tr>
+
+      <!-- TJ-10KG: 250 MT available, reorder at 140, max 380 → HEALTHY -->
+      <tr>
+        <td><div class="sku-name">Thai Jasmine 10KG</div><div class="sku-sub">TJ-10KG · Fast Moving</div></td>
+        <td>
+          <div class="zone-bar-wrap">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+              <span class="zone-value" style="color:#16a34a">250 MT</span>
+              <span class="zone-meta">of 380 MT max</span>
+            </div>
+            <div class="zone-bar-track">
+              <div style="position:absolute;left:0;top:0;width:15%;height:100%;background:#fecaca;border-radius:99px 0 0 99px;"></div>
+              <div style="position:absolute;left:15%;top:0;width:22%;height:100%;background:#fed7aa;"></div>
+              <div style="position:absolute;left:37%;top:0;width:48%;height:100%;background:#bbf7d0;"></div>
+              <div style="position:absolute;left:85%;top:0;width:15%;height:100%;background:#ddd6fe;border-radius:0 99px 99px 0;"></div>
+              <!-- 250/380 = 66% fill -->
+              <div class="zone-bar-fill" style="position:absolute;left:0;top:0;width:66%;height:100%;background:#22c55e;border-radius:99px;opacity:0.9;"></div>
+              <!-- Reorder at 140/380 = 37% -->
+              <div class="zone-marker" style="left:calc(37% - 1.5px);"></div>
+            </div>
+            <div class="zone-labels">
+              <span>0</span>
+              <span>▲ Reorder: 140 MT</span>
+              <span>Max: 380 MT</span>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-green">+ 110 MT above trigger</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CONCEPT B — SVG Half-Gauge Dial
+     Like a speedometer. Sweeps from 0 (empty) to max. Reorder point is a needle position.
+     Best for: executives / management who think in "how full is the tank"
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <span class="concept-label">Concept B</span>
+    <div class="concept-title">Half-Gauge Dial — "Speedometer"</div>
+  </div>
+  <p class="concept-desc">
+    A half-circle gauge shows stock level from empty to max. The arc is colour-coded by zone.
+    A needle marks the reorder point. The number in the centre shows available stock.
+    Best for: high-impact at-a-glance reading, especially for RED/ORANGE items on a management screen.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Stock Position</th>
+        <th>Gap to Reorder</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><div class="sku-name">Thai Jasmine 25KG</div><div class="sku-sub">TJ-25KG · 6.2 MT/day</div></td>
+        <td>
+          <!-- available=160, reorder=302, max=700 → pct=23%, reorder_pct=43% -->
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" width="90" height="52" viewBox="0 0 90 52">
+              <!-- Background arc -->
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#e2e6ea" stroke-width="8" stroke-linecap="round"/>
+              <!-- Zone arcs: red 0-20%, orange 20-43%, green 43-85% -->
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#fecaca" stroke-width="8" stroke-dasharray="116 116" stroke-dashoffset="0" stroke-linecap="round"/>
+              <!-- Coloured fill up to available (23% of 116px arc = 27px) -->
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#ef4444" stroke-width="8" stroke-dasharray="27 116" stroke-dashoffset="0" stroke-linecap="round"/>
+              <!-- Reorder needle at 43% = 50px -->
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#1e293b" stroke-width="2.5" stroke-dasharray="1 116" stroke-dashoffset="-49" stroke-linecap="round"/>
+              <!-- Centre text -->
+              <text x="45" y="44" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="800" fill="#dc2626">160</text>
+              <text x="45" y="54" text-anchor="middle" font-family="Inter,sans-serif" font-size="7" fill="#94a3b8">MT avail.</text>
+            </svg>
+            <div class="gauge-text">
+              <div class="gauge-main" style="color:#dc2626">160 MT</div>
+              <div class="gauge-sub">Reorder at 302 MT</div>
+              <div class="gauge-gap" style="color:#dc2626">▼ 142 MT short</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-red">Order now</span></td>
+      </tr>
+
+      <tr>
+        <td><div class="sku-name">Thai Jasmine 10KG</div><div class="sku-sub">TJ-10KG · 4.7 MT/day</div></td>
+        <td>
+          <!-- available=250, reorder=140, max=380 → pct=66%, reorder_pct=37% -->
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" width="90" height="52" viewBox="0 0 90 52">
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#e2e6ea" stroke-width="8" stroke-linecap="round"/>
+              <!-- Green fill 66% = 77px -->
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#22c55e" stroke-width="8" stroke-dasharray="77 116" stroke-dashoffset="0" stroke-linecap="round"/>
+              <!-- Reorder needle at 37% = 43px -->
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#1e293b" stroke-width="2.5" stroke-dasharray="1 116" stroke-dashoffset="-42" stroke-linecap="round"/>
+              <text x="45" y="44" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="800" fill="#16a34a">250</text>
+              <text x="45" y="54" text-anchor="middle" font-family="Inter,sans-serif" font-size="7" fill="#94a3b8">MT avail.</text>
+            </svg>
+            <div class="gauge-text">
+              <div class="gauge-main" style="color:#16a34a">250 MT</div>
+              <div class="gauge-sub">Reorder at 140 MT</div>
+              <div class="gauge-gap" style="color:#16a34a">+ 110 MT buffer</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-green">Healthy</span></td>
+      </tr>
+
+      <tr>
+        <td><div class="sku-name">Thai White Rice 25KG</div><div class="sku-sub">TW-25KG · 4.6 MT/day</div></td>
+        <td>
+          <!-- available=260, reorder=250, max=650 → pct=40%, reorder_pct=38% — very tight -->
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" width="90" height="52" viewBox="0 0 90 52">
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#e2e6ea" stroke-width="8" stroke-linecap="round"/>
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#f97316" stroke-width="8" stroke-dasharray="46 116" stroke-dashoffset="0" stroke-linecap="round"/>
+              <path d="M 8 46 A 37 37 0 0 1 82 46" fill="none" stroke="#1e293b" stroke-width="2.5" stroke-dasharray="1 116" stroke-dashoffset="-44" stroke-linecap="round"/>
+              <text x="45" y="44" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" font-weight="800" fill="#c2410c">260</text>
+              <text x="45" y="54" text-anchor="middle" font-family="Inter,sans-serif" font-size="7" fill="#94a3b8">MT avail.</text>
+            </svg>
+            <div class="gauge-text">
+              <div class="gauge-main" style="color:#c2410c">260 MT</div>
+              <div class="gauge-sub">Reorder at 250 MT</div>
+              <div class="gauge-gap" style="color:#c2410c">+ 10 MT — near trigger</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-orange">Review this week</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CONCEPT C — Stacked Pill Band
+     A single wide pill divided into labelled segments: Reserved | Safety | Reorder Buffer | Available | Overstock.
+     Shows the full inventory composition at a glance.
+     Best for: analysts who want to see the breakdown of what's "locked" vs "free"
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <span class="concept-label">Concept C</span>
+    <div class="concept-title">Stacked Pill — "What's in the tank, broken down"</div>
+  </div>
+  <p class="concept-desc">
+    A single wide pill shows the full stock composition: reserved orders (dark), safety stock buffer (orange),
+    free available stock (green), and overstock (purple). Numbers annotate each segment.
+    Best for: understanding <em>why</em> the available number looks the way it does.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Stock Breakdown</th>
+        <th>Net Available</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- TJ-25KG: physical=240, reserved=80, hold=0, safety≈54, reorder=302 -->
+      <tr>
+        <td><div class="sku-name">Thai Jasmine 25KG</div><div class="sku-sub">TJ-25KG</div></td>
+        <td>
+          <div class="pill-wrap">
+            <div class="pill-numbers">
+              <span>Physical: <strong>240 MT</strong></span>
+              <span>Reorder point: <strong>302 MT</strong></span>
+            </div>
+            <div class="pill-track">
+              <!-- Reserved: 80/240 = 33% -->
+              <div class="pill-segment" style="width:33%;background:#475569;">RES 80</div>
+              <!-- Safety stock 54/240 = 23% -->
+              <div class="pill-segment" style="width:23%;background:#f97316;">SS 54</div>
+              <!-- Free available: 106/240 = 44% -->
+              <div class="pill-segment" style="width:44%;background:#ef4444;">FREE 106</div>
+            </div>
+            <div class="pill-legend">
+              <div class="pill-legend-item"><div class="pill-dot" style="background:#475569"></div>Reserved (customer orders)</div>
+              <div class="pill-legend-item"><div class="pill-dot" style="background:#f97316"></div>Safety stock buffer</div>
+              <div class="pill-legend-item"><div class="pill-dot" style="background:#ef4444"></div>Free available (danger zone)</div>
+            </div>
+          </div>
+        </td>
+        <td><div style="font-size:18px;font-weight:800;color:#dc2626;">160 MT</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Need 302 MT</div></td>
+      </tr>
+
+      <!-- TJ-10KG: physical=310, reserved=60, safety≈ 56, available=250 -->
+      <tr>
+        <td><div class="sku-name">Thai Jasmine 10KG</div><div class="sku-sub">TJ-10KG</div></td>
+        <td>
+          <div class="pill-wrap">
+            <div class="pill-numbers">
+              <span>Physical: <strong>310 MT</strong></span>
+              <span>Reorder point: <strong>140 MT</strong></span>
+            </div>
+            <div class="pill-track">
+              <!-- Reserved: 60/310 = 19% -->
+              <div class="pill-segment" style="width:19%;background:#475569;">RES 60</div>
+              <!-- Safety buffer: 56/310 = 18% -->
+              <div class="pill-segment" style="width:18%;background:#22c55e;opacity:0.6;">SS 56</div>
+              <!-- Buffer above reorder: 94/310 = 30% -->
+              <div class="pill-segment" style="width:30%;background:#22c55e;opacity:0.8;">BUF 94</div>
+              <!-- Above target remaining: 100/310 = 33% -->
+              <div class="pill-segment" style="width:33%;background:#22c55e;">FREE 100</div>
+            </div>
+            <div class="pill-legend">
+              <div class="pill-legend-item"><div class="pill-dot" style="background:#475569"></div>Reserved</div>
+              <div class="pill-legend-item"><div class="pill-dot" style="background:#22c55e;opacity:0.6"></div>Safety stock</div>
+              <div class="pill-legend-item"><div class="pill-dot" style="background:#22c55e"></div>Free available</div>
+            </div>
+          </div>
+        </td>
+        <td><div style="font-size:18px;font-weight:800;color:#16a34a;">250 MT</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">+110 MT above trigger</div></td>
+      </tr>
+
+      <!-- VF-10KG: physical=620, reserved=40, max=400 → overstock -->
+      <tr>
+        <td><div class="sku-name">Vietnam Fragrant 10KG</div><div class="sku-sub">VF-10KG</div></td>
+        <td>
+          <div class="pill-wrap">
+            <div class="pill-numbers">
+              <span>Physical: <strong>620 MT</strong></span>
+              <span>Max: <strong>400 MT</strong></span>
+            </div>
+            <div class="pill-track">
+              <div class="pill-segment" style="width:7%;background:#475569;">RES</div>
+              <div class="pill-segment" style="width:28%;background:#22c55e;opacity:0.7;">SAFE</div>
+              <div class="pill-segment" style="width:29%;background:#22c55e;">GOOD</div>
+              <!-- Overstock: 220/620 = 35% -->
+              <div class="pill-segment" style="width:36%;background:#8b5cf6;">OVER +220</div>
+            </div>
+            <div class="pill-legend">
+              <div class="pill-legend-item"><div class="pill-dot" style="background:#475569"></div>Reserved</div>
+              <div class="pill-legend-item"><div class="pill-dot" style="background:#22c55e"></div>Healthy range</div>
+              <div class="pill-legend-item"><div class="pill-dot" style="background:#8b5cf6"></div>Overstock (above max)</div>
+            </div>
+          </div>
+        </td>
+        <td><div style="font-size:18px;font-weight:800;color:#7c3aed;">580 MT</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">180 MT above max</div></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CONCEPT D — Numeric Delta Card (compact, table-friendly)
+     Two-part card: left shows Available MT with a mini bar,
+     right shows the Gap as a large signed number with colour.
+     Most compact — best for dense tables with many SKUs.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="concept">
+  <div class="concept-header">
+    <span class="concept-label">Concept D</span>
+    <div class="concept-title">Delta Card — "The number that matters, front and centre"</div>
+  </div>
+  <p class="concept-desc">
+    A two-part compact card. Left side: available stock with a tiny bar showing position between reorder and max.
+    Right side: the gap as a large bold signed number (+ or −). Colour does the rest.
+    Best for: dense tables with 20+ SKUs where you need to scan fast. The signed gap number is the only thing you read.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Available · Gap to Reorder</th>
+        <th>Movement</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><div class="sku-name">Thai Jasmine 25KG</div><div class="sku-sub">TJ-25KG · 6.2 MT/day · 26d cover</div></td>
+        <td>
+          <div class="delta-wrap">
+            <div class="delta-left" style="background:#fff5f5;">
+              <div class="delta-label">Available</div>
+              <div class="delta-val" style="color:#dc2626;">160 MT</div>
+              <div class="delta-sub">of 302 trigger</div>
+              <div class="delta-micro-bar"><div class="delta-micro-fill" style="width:23%;background:#ef4444;"></div></div>
+            </div>
+            <div class="delta-divider"></div>
+            <div class="delta-right" style="background:#fef2f2;">
+              <div class="delta-label">Gap</div>
+              <div class="delta-val delta-gap-negative">▼ 142</div>
+              <div class="delta-sub" style="color:#dc2626;font-weight:600;">BELOW trigger</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge" style="background:#eff6ff;color:#2563eb;">Fast Moving</span></td>
+      </tr>
+
+      <tr>
+        <td><div class="sku-name">Thai White Rice 25KG</div><div class="sku-sub">TW-25KG · 4.6 MT/day · 57d cover</div></td>
+        <td>
+          <div class="delta-wrap">
+            <div class="delta-left" style="background:#fff8f0;">
+              <div class="delta-label">Available</div>
+              <div class="delta-val" style="color:#c2410c;">260 MT</div>
+              <div class="delta-sub">of 250 trigger</div>
+              <div class="delta-micro-bar"><div class="delta-micro-fill" style="width:40%;background:#f97316;"></div></div>
+            </div>
+            <div class="delta-divider"></div>
+            <div class="delta-right" style="background:#fff7ed;">
+              <div class="delta-label">Gap</div>
+              <div class="delta-val delta-gap-warn">+ 10</div>
+              <div class="delta-sub" style="color:#c2410c;font-weight:600;">Near trigger</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-yellow">Normal</span></td>
+      </tr>
+
+      <tr>
+        <td><div class="sku-name">Thai Jasmine 10KG</div><div class="sku-sub">TJ-10KG · 4.7 MT/day · 53d cover</div></td>
+        <td>
+          <div class="delta-wrap">
+            <div class="delta-left" style="background:#f8fffe;">
+              <div class="delta-label">Available</div>
+              <div class="delta-val" style="color:#16a34a;">250 MT</div>
+              <div class="delta-sub">of 140 trigger</div>
+              <div class="delta-micro-bar"><div class="delta-micro-fill" style="width:66%;background:#22c55e;"></div></div>
+            </div>
+            <div class="delta-divider"></div>
+            <div class="delta-right" style="background:#f0fdf4;">
+              <div class="delta-label">Gap</div>
+              <div class="delta-val delta-gap-positive">+ 110</div>
+              <div class="delta-sub" style="color:#16a34a;font-weight:600;">Above trigger</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge" style="background:#eff6ff;color:#2563eb;">Fast Moving</span></td>
+      </tr>
+
+      <tr>
+        <td><div class="sku-name">Japonica 5KG</div><div class="sku-sub">JP-5KG · 0 MT/day · Idle</div></td>
+        <td>
+          <div class="delta-wrap">
+            <div class="delta-left" style="background:#fafafa;">
+              <div class="delta-label">Available</div>
+              <div class="delta-val" style="color:#64748b;">78 MT</div>
+              <div class="delta-sub">no recent demand</div>
+              <div class="delta-micro-bar"><div class="delta-micro-fill" style="width:100%;background:#94a3b8;"></div></div>
+            </div>
+            <div class="delta-divider"></div>
+            <div class="delta-right" style="background:#fef2f2;">
+              <div class="delta-label">Gap</div>
+              <div class="delta-val" style="color:#dc2626;">N/A</div>
+              <div class="delta-sub" style="color:#dc2626;font-weight:600;">Idle — no demand</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-red">Idle</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Summary -->
+<div style="background:#fff;border-radius:16px;padding:28px 32px;border:1px solid #e2e6ea;margin-top:8px;">
+  <div style="font-size:16px;font-weight:700;margin-bottom:16px;">Quick comparison</div>
+  <table style="width:100%;">
+    <thead>
+      <tr style="border-bottom:2px solid #e2e6ea;">
+        <th style="padding:8px 12px;text-align:left;font-size:12px;">Concept</th>
+        <th style="padding:8px 12px;text-align:left;font-size:12px;">Best for</th>
+        <th style="padding:8px 12px;text-align:left;font-size:12px;">Column width needed</th>
+        <th style="padding:8px 12px;text-align:left;font-size:12px;">Glanceability</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:10px 12px;font-weight:600;">A — Zone Bar</td>
+        <td style="padding:10px 12px;font-size:13px;color:#64748b;">Visual managers, seeing full range</td>
+        <td style="padding:10px 12px;font-size:13px;">Wide (220px+)</td>
+        <td style="padding:10px 12px;">⭐⭐⭐⭐</td>
+      </tr>
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:10px 12px;font-weight:600;">B — Gauge Dial</td>
+        <td style="padding:10px 12px;font-size:13px;color:#64748b;">Executive dashboards, big visual impact</td>
+        <td style="padding:10px 12px;font-size:13px;">Wide (200px+)</td>
+        <td style="padding:10px 12px;">⭐⭐⭐⭐⭐</td>
+      </tr>
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:10px 12px;font-weight:600;">C — Stacked Pill</td>
+        <td style="padding:10px 12px;font-size:13px;color:#64748b;">Analysts who need composition breakdown</td>
+        <td style="padding:10px 12px;font-size:13px;">Very wide (280px+)</td>
+        <td style="padding:10px 12px;">⭐⭐⭐</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;font-weight:600;">D — Delta Card</td>
+        <td style="padding:10px 12px;font-size:13px;color:#64748b;">Dense tables, fast scanning, 20+ SKUs</td>
+        <td style="padding:10px 12px;font-size:13px;">Medium (200px)</td>
+        <td style="padding:10px 12px;">⭐⭐⭐⭐⭐</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

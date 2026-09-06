@@ -1,5 +1,9 @@
 const express = require("express");
 const cors = require("cors");
+const { initDb } = require("./db/init");
+
+// Initialise database on startup (creates tables if not exist)
+initDb();
 
 const productRoutes = require("./routes/products");
 

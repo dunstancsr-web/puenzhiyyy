@@ -13,7 +13,7 @@ export default function StatCard({ label, value, icon: Icon, color = "blue", sub
   return (
     <div
       style={{
-        background: "var(--surface)",
+        background: "var(--card-bg)",
         border: "1px solid var(--border)",
         borderRadius: "var(--radius-lg)",
         padding: "20px 24px",

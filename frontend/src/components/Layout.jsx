@@ -11,6 +11,7 @@ export default function Layout({ children }) {
           padding: "28px 32px",
           overflowY: "auto",
           background: "var(--bg)",
+          minHeight: "100vh",
         }}
       >
         {children}
