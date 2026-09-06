@@ -145,3 +145,88 @@ input, select, textarea {
 [style*="transform"], [style*="opacity"] {
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
+
+/* ── Modal surface — opaque enough to host a form in every theme ──────────── */
+:root                { --modal-bg: #ffffff; }
+[data-theme="dark"]  { --modal-bg: #1e293b; }
+[data-theme="glass"] { --modal-bg: #161b22; }
+
+/* ── Inventory table ─────────────────────────────────────────────────────── */
+.inv-table tbody tr:hover { background: var(--surface-2); }
+
+/* ── Modal entry animations ─────────────────────────────────────────────── */
+@keyframes inv-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes inv-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+.inv-overlay {
+  animation: inv-overlay-in 0.15s ease;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.inv-modal { animation: inv-modal-in 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .inv-overlay, .inv-modal { animation: none !important; }
+}
+
+/* ── Hover-hint affordance (HoverHint) ──────────────────────────────────── */
+.hint-trigger { cursor: help; }
+.hint-trigger:hover {
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: 3px;
+}
+.hint-trigger--box:hover {
+  outline: 1px dotted var(--text-muted);
+  outline-offset: 3px;
+}
+
+/* ── Range sliders (SliderField) ────────────────────────────────────────── */
+input[type="range"].sf-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+input[type="range"].sf-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--border);
+}
+input[type="range"].sf-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 0 2px var(--card-bg), 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+input[type="range"].sf-range::-moz-range-track {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--border);
+}
+input[type="range"].sf-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 0 2px var(--card-bg), 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+input[type="range"].sf-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--card-bg), 0 0 0 4px var(--blue);
+}
+input[type="range"].sf-range:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 2px var(--card-bg), 0 0 0 4px var(--blue);
+}
+input[type="range"].sf-range:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

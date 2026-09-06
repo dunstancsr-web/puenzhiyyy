@@ -1,3 +1,5 @@
+import { computeSkuAnalytics, computePortfolioAnalytics, DEFAULT_EXTRAS } from "./analytics";
+
 // Mock rice SKU data with all computed fields pre-set.
 // Deliberately includes all 4 health statuses and all 4 movement classes
 // so every UI state is visible during validation (TASK-06).
@@ -421,10 +423,49 @@ export const mockSkus = [
   },
 ];
 
-// Lookup helper used by other components
+// ─────────────────────────────────────────────────────────────────────────────
+// INDUSTRY-STANDARD ANALYTICS LAYER
+// Additional per-SKU inputs that MVP1 needs but the original mock lacked:
+//  - unit_price_sgd          → margin, GMROI, lost-sales valuation
+//  - demand_cv               → XYZ classification (coefficient of variation)
+//  - annual_carrying_rate_pct→ cost of holding excess stock
+//  - obsolescence_risk_pct   → risk-adjusted E&O valuation
+//  - target_service_level    → statistical safety stock (Z-score)
+//  - lost_sales_30d          → fill rate / OTIF
+//  - incoming_eta_days       → whether an open PO already covers a stockout
+// When the backend is built (TASK-08), these become real columns / seed data.
+// ─────────────────────────────────────────────────────────────────────────────
+const SKU_EXTRAS = {
+  "TJ-25KG": { unit_price_sgd: 1620, demand_cv: 0.18, annual_carrying_rate_pct: 22, obsolescence_risk_pct: 5,  target_service_level: 0.98, lost_sales_30d: 8, incoming_eta_days: null },
+  "VF-10KG": { unit_price_sgd: 1150, demand_cv: 0.22, annual_carrying_rate_pct: 24, obsolescence_risk_pct: 12, target_service_level: 0.95, lost_sales_30d: 0, incoming_eta_days: 12 },
+  "BM-5KG":  { unit_price_sgd: 2560, demand_cv: 0.55, annual_carrying_rate_pct: 20, obsolescence_risk_pct: 18, target_service_level: 0.92, lost_sales_30d: 0, incoming_eta_days: null },
+  "JP-5KG":  { unit_price_sgd: 3950, demand_cv: 1.20, annual_carrying_rate_pct: 20, obsolescence_risk_pct: 35, target_service_level: 0.90, lost_sales_30d: 0, incoming_eta_days: null },
+  "TJ-10KG": { unit_price_sgd: 1740, demand_cv: 0.28, annual_carrying_rate_pct: 22, obsolescence_risk_pct: 5,  target_service_level: 0.98, lost_sales_30d: 2, incoming_eta_days: 20 },
+  "VF-25KG": { unit_price_sgd: 1090, demand_cv: 0.16, annual_carrying_rate_pct: 24, obsolescence_risk_pct: 8,  target_service_level: 0.97, lost_sales_30d: 3, incoming_eta_days: 15 },
+  "BM-25KG": { unit_price_sgd: 2180, demand_cv: 0.48, annual_carrying_rate_pct: 20, obsolescence_risk_pct: 15, target_service_level: 0.93, lost_sales_30d: 0, incoming_eta_days: null },
+  "TW-25KG": { unit_price_sgd: 970,  demand_cv: 0.20, annual_carrying_rate_pct: 24, obsolescence_risk_pct: 6,  target_service_level: 0.97, lost_sales_30d: 5, incoming_eta_days: null },
+  "PH-25KG": { unit_price_sgd: 1250, demand_cv: 0.24, annual_carrying_rate_pct: 24, obsolescence_risk_pct: 7,  target_service_level: 0.96, lost_sales_30d: 1, incoming_eta_days: 9 },
+  "BR-10KG": { unit_price_sgd: 2020, demand_cv: 0.60, annual_carrying_rate_pct: 20, obsolescence_risk_pct: 20, target_service_level: 0.90, lost_sales_30d: 0, incoming_eta_days: null },
+};
+
+// Derive every computed field from the seed rows. Health is recomputed from the
+// same rule engine the Inventory page uses on edit/restock, so a SKU's badge and
+// its stock-position bar never disagree. (Only TW-25KG shifts vs the hand-authored
+// seed: ORANGE → GREEN, since available sits above the statistical reorder point.)
+mockSkus.forEach((s) => {
+  Object.assign(s, { ...DEFAULT_EXTRAS, ...(SKU_EXTRAS[s.sku_id] || {}) });
+  Object.assign(s, computeSkuAnalytics(s, { recomputeHealth: true }));
+});
+computePortfolioAnalytics(mockSkus).forEach((row, i) => {
+  mockSkus[i].abc_class = row.abc_class;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 export const getSkuById = (id) => mockSkus.find((s) => s.sku_id === id);
 
-// Health status counts (used by dashboard pie chart)
+// Health status counts
 export const getHealthCounts = () =>
   mockSkus.reduce(
     (acc, s) => {
@@ -433,6 +474,25 @@ export const getHealthCounts = () =>
     },
     { GREEN: 0, YELLOW: 0, ORANGE: 0, RED: 0 }
   );
+
+// Health distribution weighted by inventory value — 2 RED SKUs may be 3% or 40%
+// of working capital. Count alone hides that.
+export const getHealthByValue = () => {
+  const base = { RED: 0, ORANGE: 0, YELLOW: 0, GREEN: 0 };
+  const value = { ...base };
+  const count = { ...base };
+  mockSkus.forEach((s) => {
+    value[s.health_status] += s.inventory_value;
+    count[s.health_status] += 1;
+  });
+  const total = Object.values(value).reduce((a, b) => a + b, 0) || 1;
+  return ["RED", "ORANGE", "YELLOW", "GREEN"].map((k) => ({
+    status: k,
+    value: value[k],
+    count: count[k],
+    pct: +((value[k] / total) * 100).toFixed(1),
+  }));
+};
 
 // Movement class counts
 export const getMovementCounts = () =>
@@ -443,3 +503,37 @@ export const getMovementCounts = () =>
     },
     { "Fast Moving": 0, Normal: 0, "Slow Moving": 0, Idle: 0 }
   );
+
+// ABC × XYZ matrix — the foundational inventory segmentation.
+// Rows A/B/C (value), columns X/Y/Z (predictability). Each cell: SKU count + value.
+export const getAbcXyzMatrix = () => {
+  const rows = ["A", "B", "C"];
+  const cols = ["X", "Y", "Z"];
+  const cells = {};
+  rows.forEach((r) => cols.forEach((c) => (cells[`${r}${c}`] = { count: 0, value: 0, skus: [] })));
+  mockSkus.forEach((s) => {
+    const key = `${s.abc_class}${s.xyz_class}`;
+    if (!cells[key]) return;
+    cells[key].count += 1;
+    cells[key].value += s.inventory_value;
+    cells[key].skus.push(s.sku_id);
+  });
+  return { rows, cols, cells };
+};
+
+// Coverage band summary, weighted by value
+export const getCoverageBandSummary = () => {
+  const bands = { below: { count: 0, value: 0 }, in: { count: 0, value: 0 }, above: { count: 0, value: 0 }, idle: { count: 0, value: 0 } };
+  mockSkus.forEach((s) => {
+    bands[s.coverage_band].count += 1;
+    bands[s.coverage_band].value += s.inventory_value;
+  });
+  const total = Object.values(bands).reduce((a, b) => a + b.value, 0) || 1;
+  return {
+    ...bands,
+    total,
+    inBandPct: +((bands.in.value / total) * 100).toFixed(1),
+    abovePct: +((bands.above.value / total) * 100).toFixed(1),
+    belowPct: +((bands.below.value / total) * 100).toFixed(1),
+  };
+};

@@ -1,33 +1,35 @@
 import React from "react";
 
+// Colours resolve from theme CSS vars so badges stay legible in Dark / Liquid
+// Glass. ORANGE keeps a fixed dark amber text (there is no --orange var).
 const styles = {
   // Health statuses
-  GREEN:        { bg: "#f0fdf4", color: "#16a34a", label: "Healthy" },
-  YELLOW:       { bg: "#fffbeb", color: "#b45309", label: "Watch" },
-  ORANGE:       { bg: "#fff7ed", color: "#c2410c", label: "Action Required" },
-  RED:          { bg: "#fef2f2", color: "#dc2626", label: "Critical" },
+  GREEN:        { bg: "var(--green-light)",  color: "var(--green)",          label: "Healthy" },
+  YELLOW:       { bg: "var(--yellow-light)", color: "var(--yellow)",         label: "Watch" },
+  ORANGE:       { bg: "var(--yellow-light)", color: "#c2410c",               label: "Action Required" },
+  RED:          { bg: "var(--red-light)",    color: "var(--red)",            label: "Critical" },
   // Movement classes
-  "Fast Moving":  { bg: "#eff6ff", color: "#2563eb", label: "Fast Moving" },
-  "Normal":       { bg: "#f8fafc", color: "#475569", label: "Normal" },
-  "Slow Moving":  { bg: "#fffbeb", color: "#b45309", label: "Slow Moving" },
-  "Idle":         { bg: "#fef2f2", color: "#dc2626", label: "Idle" },
+  "Fast Moving":  { bg: "var(--blue-light)",   color: "var(--blue)",          label: "Fast Moving" },
+  "Normal":       { bg: "var(--surface-2)",    color: "var(--text-secondary)", label: "Normal" },
+  "Slow Moving":  { bg: "var(--yellow-light)", color: "var(--yellow)",        label: "Slow Moving" },
+  "Idle":         { bg: "var(--red-light)",    color: "var(--red)",           label: "Idle" },
   // Ageing statuses
-  Fresh:        { bg: "#f0fdf4", color: "#16a34a", label: "Fresh" },
-  Normal_age:   { bg: "#f8fafc", color: "#475569", label: "Normal" },
-  Ageing:       { bg: "#fffbeb", color: "#b45309", label: "Ageing" },
-  "At Risk":    { bg: "#fef2f2", color: "#dc2626", label: "At Risk" },
+  Fresh:        { bg: "var(--green-light)",  color: "var(--green)",          label: "Fresh" },
+  Normal_age:   { bg: "var(--surface-2)",    color: "var(--text-secondary)", label: "Normal" },
+  Ageing:       { bg: "var(--yellow-light)", color: "var(--yellow)",         label: "Ageing" },
+  "At Risk":    { bg: "var(--red-light)",    color: "var(--red)",            label: "At Risk" },
   // Alert severities
-  critical:     { bg: "#fef2f2", color: "#dc2626", label: "Critical" },
-  warning:      { bg: "#fffbeb", color: "#b45309", label: "Warning" },
-  info:         { bg: "#eff6ff", color: "#2563eb", label: "Info" },
+  critical:     { bg: "var(--red-light)",    color: "var(--red)",            label: "Critical" },
+  warning:      { bg: "var(--yellow-light)", color: "var(--yellow)",         label: "Warning" },
+  info:         { bg: "var(--blue-light)",   color: "var(--blue)",           label: "Info" },
   // Velocity trends
-  accelerating: { bg: "#f0fdf4", color: "#16a34a", label: "↑ Accelerating" },
-  stable:       { bg: "#f8fafc", color: "#475569", label: "→ Stable" },
-  decelerating: { bg: "#fef2f2", color: "#dc2626", label: "↓ Decelerating" },
+  accelerating: { bg: "var(--green-light)",  color: "var(--green)",          label: "↑ Accelerating" },
+  stable:       { bg: "var(--surface-2)",    color: "var(--text-secondary)", label: "→ Stable" },
+  decelerating: { bg: "var(--red-light)",    color: "var(--red)",            label: "↓ Decelerating" },
 };
 
 export default function Badge({ type, label: overrideLabel }) {
-  const s = styles[type] || { bg: "#f1f5f9", color: "#64748b", label: type };
+  const s = styles[type] || { bg: "var(--surface-2)", color: "var(--text-secondary)", label: type };
   return (
     <span
       style={{

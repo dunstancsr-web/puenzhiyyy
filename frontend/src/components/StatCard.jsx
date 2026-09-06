@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function StatCard({ label, value, icon: Icon, color = "blue", sub }) {
+export default function StatCard({ label, value, icon: Icon, color = "blue", sub, target, trend }) {
   const colors = {
     blue:   { bg: "var(--blue-light)",   icon: "var(--blue)",   border: "#bfdbfe" },
     green:  { bg: "var(--green-light)",  icon: "var(--green)",  border: "#bbf7d0" },
@@ -38,15 +38,35 @@ export default function StatCard({ label, value, icon: Icon, color = "blue", sub
       >
         <Icon size={20} color={c.icon} />
       </div>
-      <div>
+      <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 500 }}>
           {label}
         </div>
-        <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.2, marginTop: 2 }}>
-          {value}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 2, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.2 }}>
+            {value}
+          </div>
+          {trend && (
+            <span
+              title="vs last month"
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: trend.good ? "var(--green)" : "var(--red)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {trend.dir === "up" ? "▲" : trend.dir === "down" ? "▼" : "▬"} {trend.text}
+            </span>
+          )}
         </div>
         {sub && (
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{sub}</div>
+        )}
+        {target && (
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
+            Target&nbsp;{target}
+          </div>
         )}
       </div>
     </div>

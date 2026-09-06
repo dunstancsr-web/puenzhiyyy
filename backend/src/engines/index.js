@@ -1,0 +1,150 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ANALYTICS ORCHESTRATOR
+// Single entry point the API routes call. Runs every engine in dependency
+// order and returns the fully enriched SKU list + portfolio KPIs + alerts —
+// the same shape the frontend mock (riceData.js / statsData.js) exposes.
+//
+//   const { skus, stats, alerts, primaryExceptions, abcXyzMatrix } =
+//       buildAnalytics(db);
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { computeVelocity, daysAgo } = require("./velocity");
+const { computePosition } = require("./position");
+const { computeSafetyStock } = require("./safetystock");
+const { classifyPortfolio } = require("./classification");
+const { segmentPortfolio, buildMatrix } = require("./segmentation");
+const { computeHealth } = require("./health");
+const { skuFinancials, portfolioStats } = require("./financials");
+const { generateAlerts } = require("./alerts");
+
+function ageingStatus(ageDays, maxHoldingDays) {
+  if (ageDays == null) return "Fresh";
+  const ratio = ageDays / (maxHoldingDays || 270);
+  if (ratio < 0.34) return "Fresh";
+  if (ratio < 0.67) return "Normal";
+  if (ratio < 0.9) return "Ageing";
+  return "At Risk";
+}
+
+function buildAnalytics(db, asOf = Date.now()) {
+  const now = asOf instanceof Date ? asOf.getTime() : asOf;
+  const masters = db.prepare(`SELECT * FROM skus WHERE active = 1`).all();
+
+  const lostStmt = db.prepare(
+    `SELECT COALESCE(SUM(quantity_mt), 0) AS lost
+       FROM sales_transactions
+      WHERE sku_id = ? AND status = 'lost' AND sale_date >= ?`
+  );
+
+  // ── Pass 1: velocity, position, safety stock, coverage primitives ──────────
+  let skus = masters.map((m) => {
+    const v = computeVelocity(db, m.sku_id, now);
+    const p = computePosition(db, m.sku_id, now);
+
+    const demandCv = v.demand_cv > 0 ? v.demand_cv : m.demand_cv;
+    const ss = computeSafetyStock({
+      avgDailyDemand: v.blended_daily_usage,
+      demandCv,
+      leadTimeDays: m.lead_time_days,
+      leadTimeStdDays: m.lead_time_std_days,
+      serviceLevel: m.target_service_level,
+    });
+
+    const blended = v.blended_daily_usage;
+    const days_of_stock = blended > 0 ? Math.round(p.available_stock / blended) : null;
+    const months_of_stock = days_of_stock != null ? round1(days_of_stock / 30) : null;
+    const target_days = blended > 0 ? Math.round(m.target_stock / blended) : null;
+
+    const covered_by_po =
+      p.on_order > 0 &&
+      p.incoming_eta_days != null &&
+      days_of_stock != null &&
+      p.incoming_eta_days <= days_of_stock;
+
+    const lost_30d = lostStmt.get(m.sku_id, daysAgo(30, now)).lost;
+
+    return {
+      ...m,
+      ...v,
+      ...p,
+      demand_cv: demandCv,
+      safety_stock_days: ss.safety_stock_days,
+      safety_stock_mt: ss.safety_stock_mt,
+      reorder_point_calc: ss.reorder_point_mt,
+      lead_time_demand_mt: ss.lead_time_demand_mt,
+      service_z: ss.z,
+      days_of_stock,
+      months_of_stock,
+      target_days,
+      covered_by_po,
+      lost_30d,
+      ageing_status: ageingStatus(p.inventory_age_days, m.max_holding_days),
+      annual_cogs: Math.round(blended * 365 * m.unit_cost_sgd),
+    };
+  });
+
+  // ── Portfolio passes: movement class + ABC/XYZ ────────────────────────────
+  const movement = classifyPortfolio(skus);
+  skus.forEach((s) => (s.movement_class = movement.get(s.sku_id)));
+
+  const segments = segmentPortfolio(skus);
+  skus.forEach((s) => Object.assign(s, segments.get(s.sku_id)));
+
+  // ── Pass 2: coverage band, financials, health ─────────────────────────────
+  skus = skus.map((s) => {
+    let coverage_band;
+    if (s.days_of_stock == null) coverage_band = "idle";
+    else if (s.days_of_stock < s.lead_time_days + s.safety_stock_days) coverage_band = "below";
+    else if (s.target_days != null && s.days_of_stock > s.target_days) coverage_band = "above";
+    else coverage_band = "in";
+
+    const withBand = { ...s, coverage_band };
+    const fin = skuFinancials(withBand);
+    const enriched = { ...withBand, ...fin };
+    enriched.health_status = computeHealth(enriched);
+    enriched.recommended_action = recommend(enriched);
+    return enriched;
+  });
+
+  // ── Roll-ups ─────────────────────────────────────────────────────────────
+  const demand = skus.reduce(
+    (acc, s) => {
+      acc.lost_30d += s.lost_30d || 0;
+      acc.demand_30d += (s.sales_30d || 0) + (s.lost_30d || 0);
+      return acc;
+    },
+    { lost_30d: 0, demand_30d: 0 }
+  );
+
+  const stats = portfolioStats(skus, demand);
+  const abcXyzMatrix = buildMatrix(skus);
+  const { alerts, primaryExceptions } = generateAlerts(skus);
+
+  stats.abcXyzMatrix = abcXyzMatrix;
+  stats.openExceptions = {
+    count: primaryExceptions.length,
+    critical: primaryExceptions.filter((a) => a.severity === "critical").length,
+    rawAlertCount: alerts.length,
+  };
+
+  return { skus, stats, alerts, primaryExceptions, abcXyzMatrix, asOf: new Date(now).toISOString() };
+}
+
+// Short rule-based recommended action for the SKU detail view.
+function recommend(s) {
+  if (s.health_status === "RED" && s.movement_class === "Idle")
+    return "Stop replenishment. Initiate disposition review — discount, alternative channel, or CSR evaluation.";
+  if (s.health_status === "RED")
+    return `Place replenishment order immediately. Projected ${s.stockout_gap_days}-day stockout before resupply.`;
+  if (s.excess_mt > 0)
+    return `Suspend purchasing. ${Math.round(s.excess_mt)} MT above max — carrying cost ≈ SGD $${Math.round(s.excess_carrying_cost)}/yr.`;
+  if (s.movement_class === "Slow Moving")
+    return "Reduce next order quantity. Stock coverage well above target — review demand.";
+  if (s.coverage_band === "below")
+    return "Approaching reorder point. Initiate procurement review within the lead-time window.";
+  return "No action required. Stock position within the healthy band.";
+}
+
+const round1 = (n) => Math.round(n * 10) / 10;
+
+module.exports = { buildAnalytics, ageingStatus };

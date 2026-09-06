@@ -5,7 +5,9 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "seed": "node src/db/seed.js",
+    "analytics": "node src/engines/smoke.js"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

@@ -1,81 +1,149 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
-import { Search, Filter, Plus, ChevronUp, ChevronDown, X, HelpCircle } from "lucide-react";
+import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { Search, Filter, Plus, ChevronUp, ChevronDown, X } from "lucide-react";
 import Badge from "../components/Badge";
+import ColHint from "../components/ColHint";
+import StockPositionBar from "../components/StockPositionBar";
+import { TextField, NumberField, SliderField, niceCeil } from "../components/FormField";
 import { mockSkus } from "../mock/riceData";
+import { computeSkuAnalytics, computePortfolioAnalytics, DEFAULT_EXTRAS } from "../mock/analytics";
 
 const HEALTH_STATUSES = ["All", "RED", "ORANGE", "YELLOW", "GREEN"];
 const MOVEMENT_CLASSES = ["All", "Fast Moving", "Normal", "Slow Moving", "Idle"];
 const ORIGINS = ["All", ...new Set(mockSkus.map((s) => s.country_of_origin)).values()];
 
 const HEALTH_DOT = { RED: "#ef4444", ORANGE: "#f97316", YELLOW: "#f59e0b", GREEN: "#22c55e" };
+const HEALTH_ORDER = { RED: 0, ORANGE: 1, YELLOW: 2, GREEN: 3 };
 
-// ── Column definitions with tooltips ────────────────────────────────────────
+// ── Column definitions ──────────────────────────────────────────────────────
 const COLS = [
   {
-    key: "health_status",
-    label: "Status",
+    key: "health_status", label: "Status", width: "11%",
     tip: {
       what: "The overall health of this SKU's inventory position.",
       how: "🔴 RED — Critical. Either you'll run out before the next shipment arrives, or stock has been sitting idle too long.\n🟠 ORANGE — Action needed soon. You're approaching your reorder point or you're holding too much stock.\n🟡 YELLOW — Watch this one. It's slow-moving or drifting toward a problem.\n🟢 GREEN — You're in good shape. No action needed right now.",
     },
   },
   {
-    key: "product_name",
-    label: "Product",
+    key: "product_name", label: "Product", width: "23%",
     tip: {
       what: "The rice SKU name, internal SKU code, country of origin, and supplier.",
-      how: "Use the search bar above to find a specific product by name, SKU code, or supplier.",
+      how: "Use the search bar above to find a specific product by name, SKU code, or supplier. Click a product to open its full record.",
     },
   },
   {
-    key: "available_stock",
-    label: "Available (MT)",
+    key: "available_stock", label: "Stock Position", width: "30%",
     tip: {
-      what: "How much stock you can actually sell or ship right now, in metric tonnes (MT).",
-      how: "Available = Physical stock on hand − Stock reserved for customer orders − Stock on quality hold.\n\nExample: You have 500 MT in the warehouse, but 80 MT is already promised to a customer and 20 MT is being held for QA inspection. You can only actually sell 400 MT.\n\nThis is the number that drives every replenishment decision — not the raw warehouse quantity.",
+      what: "Where this SKU's available stock sits against its reorder point and maximum.",
+      how: "The coloured bar is available stock; its colour is the health status — red below the reorder point, amber just above it, green healthy, purple overstock.\n\nThe two tick marks are the reorder point and the maximum, labelled with their values beneath. Grey shading marks the ranges to avoid: below the reorder point (order now) or above the maximum (overstock). Aim to keep the bar between the two ticks.\n\nAvailable = physical stock − reserved for orders − quality hold.",
     },
   },
   {
-    key: "reorder_point",
-    label: "Reorder Point",
-    tip: {
-      what: "The minimum available stock level at which you should place a new purchase order.",
-      how: "Formula: Reorder Point = (Daily demand × Supplier lead time) + Safety stock buffer.\n\nExample: You sell 6 MT/day and your supplier takes 45 days to deliver. You need 270 MT just to cover the waiting period. Add a 20% buffer for delays and you get a reorder point of ~324 MT.\n\nWhen your available stock drops to this number, it's time to order — not before you run out.",
-    },
-  },
-  {
-    key: "gap_to_reorder",
-    label: "Gap to Reorder",
-    tip: {
-      what: "How far above or below your reorder point you currently are.",
-      how: "Formula: Gap = Available stock − Reorder point.\n\n▼ Negative (red) — You've already passed your reorder trigger. Order immediately.\n+ Near zero (orange) — You're close. Review within the next few days.\n+ Positive (green) — You have a comfortable buffer.\n\nThis is the fastest column to scan when you open the app each morning. Any red number = immediate action.",
-    },
-  },
-  {
-    key: "days_of_stock",
-    label: "Coverage vs Lead Time",
+    key: "days_of_stock", label: "Coverage vs Lead Time", width: "14%",
     tip: {
       what: "How many days your current stock will last, compared to how long it takes to get more.",
       how: "Formula: Days of stock = Available stock ÷ Average daily sales (last 30 days).\n\nThe grey marker on the mini bar shows your supplier's lead time. If the coloured bar doesn't reach the marker — you will run out before new stock arrives.\n\nExample: 26 days of stock, 45-day lead time = 19-day gap. Red bar, order now.\n\nIf no demand is shown, this SKU hasn't sold anything recently and is classified as Idle.",
     },
   },
   {
-    key: "movement_class",
-    label: "Movement",
+    key: "movement_class", label: "Movement", width: "12%",
     tip: {
-      what: "How quickly this SKU is selling, based on the last 30 days of sales data.",
-      how: "🔵 Fast Moving — High daily sales. Priority: prevent stockouts.\n⚫ Normal — Steady demand. Maintain target stock.\n🟡 Slow Moving — Sales are low relative to stock on hand. Likely more than 4 months of stock. Consider reducing next order.\n🔴 Idle — No meaningful sales in 90+ days. Stop ordering and review whether to discount, redirect to another channel, or dispose.\n\nThe number below shows average daily consumption in MT.",
+      what: "How quickly this SKU is selling, based on recent sales data.",
+      how: "🔵 Fast Moving — High daily sales. Priority: prevent stockouts.\n⚫ Normal — Steady demand. Maintain target stock.\n🟡 Slow Moving — Low sales relative to stock on hand. Consider reducing the next order.\n🔴 Idle — No meaningful sales in 90+ days. Stop ordering and review whether to discount, redirect, or dispose.\n\nThe number below is average daily consumption in MT.",
     },
   },
   {
-    key: null,
-    label: "Actions",
+    key: null, label: "Actions", width: "10%",
     tip: {
       what: "Quick actions you can take on this SKU.",
-      how: "Restock — Record a new incoming quantity (e.g. a shipment just arrived).\nDetail — Open the full SKU profile: all stock figures, velocity data, inventory policy thresholds, and the system's recommended action.",
+      how: "Restock — record a new incoming quantity (e.g. a shipment just arrived).\nEdit — open the full SKU record to change policy thresholds, supplier, costs, lead time, and stock adjustments.",
     },
   },
 ];
+
+// Which fields the edit form writes, grouped for layout.
+const EDIT_GROUPS = [
+  {
+    title: "Identity",
+    fields: [
+      ["product_name", "text", "Product name", true],
+      ["rice_variety", "text", "Rice variety"],
+      ["grade", "text", "Grade"],
+      ["country_of_origin", "text", "Country of origin"],
+      ["brand", "text", "Brand"],
+      ["supplier", "text", "Supplier"],
+      ["packaging_size", "text", "Packaging size"],
+    ],
+  },
+  {
+    title: "Inventory Policy",
+    fields: [
+      ["min_stock", "num", "Min stock", false, "MT"],
+      ["target_stock", "num", "Target stock", false, "MT"],
+      ["max_stock", "num", "Max stock", false, "MT"],
+      ["reorder_point", "num", "Reorder point", false, "MT"],
+      ["lead_time_days", "num", "Lead time", false, "days"],
+      ["target_service_level_pct", "num", "Target service level", false, "%"],
+      ["safety_stock_pct", "num", "Safety stock", false, "%"],
+      ["min_order_qty", "num", "Min order qty", false, "MT"],
+    ],
+  },
+  {
+    title: "Costs",
+    fields: [
+      ["unit_cost_sgd", "num", "Unit cost", false, "SGD"],
+      ["unit_price_sgd", "num", "Unit price", false, "SGD"],
+    ],
+  },
+  {
+    title: "Stock Adjustments",
+    fields: [
+      ["reserved_qty", "num", "Reserved for orders", false, "MT"],
+      ["quality_hold_qty", "num", "Quality hold", false, "MT"],
+    ],
+  },
+];
+
+const NUMERIC_EDIT_KEYS = EDIT_GROUPS.flatMap((g) =>
+  g.fields.filter(([, t]) => t === "num").map(([k]) => k)
+);
+
+// Which numeric fields render as a slider (+ number), and how their range is set.
+// Keys absent here (unit cost / price, min order qty) stay plain number inputs.
+const SLIDER_SPECS = {
+  min_stock: { kind: "stock" },
+  reorder_point: { kind: "stock" },
+  target_stock: { kind: "stock" },
+  max_stock: { kind: "stock" },
+  reserved_qty: { kind: "physical" },
+  quality_hold_qty: { kind: "physical" },
+  target_service_level_pct: { min: 50, max: 99.9, step: 0.5 },
+  safety_stock_pct: { min: 0, max: 50, step: 1 },
+  lead_time_days: { min: 1, max: 120, step: 1 },
+};
+
+function resolveSpec(spec, { axisMax, physicalStock }) {
+  if (spec.kind === "stock") return { min: 0, max: axisMax, step: 5 };
+  if (spec.kind === "physical")
+    return { min: 0, max: Math.max(1, physicalStock || 0), step: 1, disabled: !physicalStock };
+  return spec;
+}
+
+const STOCK_SLIDER_KEYS = ["min_stock", "reorder_point", "target_stock", "max_stock"];
+const stockAxisMax = (form, physicalStock = 0) =>
+  niceCeil(
+    Math.max(...STOCK_SLIDER_KEYS.map((k) => Number(form[k]) || 0), Number(physicalStock) || 0) * 1.15
+  );
+
+const NEW_SKU_DEFAULTS = {
+  physical_stock: 0, reserved_qty: 0, quality_hold_qty: 0,
+  incoming_stock: 0, sales_30d: 0, sales_60d: 0, sales_90d: 0,
+  avg_daily_usage_30d: 0, avg_daily_usage_90d: 0,
+  velocity_trend: "stable", movement_class: "Normal",
+  ageing_status: "Fresh", inventory_age_days: 0,
+  last_received_date: new Date().toISOString().split("T")[0],
+  recommended_action: "New SKU — monitor initial demand.",
+};
 
 export default function Inventory() {
   const [skus, setSkus] = useState(mockSkus);
@@ -90,9 +158,7 @@ export default function Inventory() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSku, setSelectedSku] = useState(null);
 
-  // ── Sort + filter ────────────────────────────────────────────────────────────
-  const HEALTH_ORDER = { RED: 0, ORANGE: 1, YELLOW: 2, GREEN: 3 };
-
+  // ── Sort + filter ──────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let result = skus;
     if (search) {
@@ -111,7 +177,6 @@ export default function Inventory() {
 
     return [...result].sort((a, b) => {
       let av = a[sortKey], bv = b[sortKey];
-      // Health status sort by severity order
       if (sortKey === "health_status") {
         av = HEALTH_ORDER[av] ?? 9;
         bv = HEALTH_ORDER[bv] ?? 9;
@@ -127,42 +192,50 @@ export default function Inventory() {
   }, [skus, search, healthFilter, movementFilter, originFilter, sortKey, sortDir]);
 
   const handleSort = (key) => {
+    if (!key) return;
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("asc"); }
   };
 
-  // ── Restock ──────────────────────────────────────────────────────────────────
+  // ── Mutations — all routed through the shared analytics recompute ──────────
+  const applyPatch = (skuId, patch) =>
+    setSkus((prev) => {
+      const next = prev.map((s) =>
+        s.sku_id === skuId ? computeSkuAnalytics({ ...s, ...patch }) : s
+      );
+      return computePortfolioAnalytics(next);
+    });
+
   const handleRestock = () => {
     const qty = parseFloat(restockQty);
     if (!qty || qty <= 0) return;
-    setSkus((prev) =>
-      prev.map((s) => {
-        if (s.sku_id !== restockTarget.sku_id) return s;
-        const newPhysical = s.physical_stock + qty;
-        const newAvailable = newPhysical - s.reserved_qty - s.quality_hold_qty;
-        const newDays = s.avg_daily_usage_30d > 0 ? Math.round(newAvailable / s.avg_daily_usage_30d) : null;
-        return {
-          ...s,
-          physical_stock: newPhysical,
-          available_stock: newAvailable,
-          days_of_stock: newDays,
-          months_of_stock: newDays ? +(newDays / 30).toFixed(1) : null,
-          last_received_date: new Date().toISOString().split("T")[0],
-          inventory_age_days: 0,
-          ageing_status: "Fresh",
-        };
-      })
-    );
+    applyPatch(restockTarget.sku_id, {
+      physical_stock: (Number(restockTarget.physical_stock) || 0) + qty,
+      last_received_date: new Date().toISOString().split("T")[0],
+      inventory_age_days: 0,
+      ageing_status: "Fresh",
+    });
     setRestockTarget(null);
     setRestockQty("");
+  };
+
+  const handleSkuSave = (patch) => {
+    applyPatch(selectedSku.sku_id, patch);
+    setSelectedSku(null);
+  };
+
+  const handleAddSku = (data) => {
+    setSkus((prev) => {
+      const created = computeSkuAnalytics({ ...NEW_SKU_DEFAULTS, ...DEFAULT_EXTRAS, ...data });
+      return computePortfolioAnalytics([...prev, created]);
+    });
+    setShowAddModal(false);
   };
 
   const SortIcon = ({ col }) =>
     sortKey !== col ? null : sortDir === "asc"
       ? <ChevronUp size={12} style={{ flexShrink: 0 }} />
       : <ChevronDown size={12} style={{ flexShrink: 0 }} />;
-
-  const cols = COLS;
 
   return (
     <div>
@@ -189,13 +262,12 @@ export default function Inventory() {
 
       {/* ── Filters ── */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-        {/* Search */}
         <div style={{ position: "relative", flex: "1 1 220px" }}>
           <Search size={13} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
           <input
             value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search SKU, variety, supplier…"
-            style={{ width: "100%", padding: "8px 12px 8px 32px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, background: "#fff" }}
+            style={{ width: "100%", padding: "8px 12px 8px 32px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, background: "var(--surface)", color: "var(--text-primary)" }}
           />
         </div>
         <Select value={healthFilter}   onChange={setHealthFilter}   options={HEALTH_STATUSES}  placeholder="Health Status" />
@@ -204,24 +276,33 @@ export default function Inventory() {
       </div>
 
       {/* ── Table ── */}
-      <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow)", overflow: "hidden" }}>
+      <div
+        className="glass-blur"
+        style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow)", overflow: "hidden" }}
+      >
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="inv-table" style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", minWidth: 980 }}>
+            <colgroup>
+              {COLS.map(({ label, width }) => (
+                <col key={label} style={width ? { width } : undefined} />
+              ))}
+            </colgroup>
             <thead>
-              <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
-                {cols.map(({ key, label, tip }) => (
+              <tr style={{ background: "var(--table-head-bg)", borderBottom: "1px solid var(--border)" }}>
+                {COLS.map(({ key, label, tip }) => (
                   <th key={label}
-                    onClick={key ? () => handleSort(key) : undefined}
+                    onClick={() => handleSort(key)}
                     style={{
-                      padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 600,
+                      padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 600,
                       color: "var(--text-secondary)", cursor: key ? "pointer" : "default",
-                      userSelect: "none", whiteSpace: "nowrap",
+                      userSelect: "none", lineHeight: 1.3,
+                      textTransform: "uppercase", letterSpacing: "0.03em",
                     }}
                   >
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
                       {label}
                       {key && <SortIcon col={key} />}
-                      {tip && <ColTooltip tip={tip} />}
+                      {tip && <ColHint label={label} what={tip.what} how={tip.how} />}
                     </span>
                   </th>
                 ))}
@@ -230,110 +311,108 @@ export default function Inventory() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
+                  <td colSpan={COLS.length} style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
                     No SKUs match your filters.
                   </td>
                 </tr>
               ) : (
                 filtered.map((sku, i) => (
                   <tr key={sku.sku_id}
-                    style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none", cursor: "pointer" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+                    style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}
                   >
                     {/* Status */}
-                    <td style={{ padding: "12px 14px" }}>
+                    <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: HEALTH_DOT[sku.health_status], flexShrink: 0 }} />
                         <Badge type={sku.health_status} />
                       </div>
                     </td>
-                    {/* Product name + SKU + origin */}
-                    <td style={{ padding: "12px 14px" }}>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{sku.product_name}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        {sku.sku_id} · {sku.country_of_origin} · {sku.supplier}
+
+                    {/* Product — click to open the record */}
+                    <td
+                      onClick={() => setSelectedSku(sku)}
+                      style={{ padding: "13px 16px", cursor: "pointer" }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.35 }}>{sku.product_name}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>
+                        {sku.sku_id} · {sku.rice_variety}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: 10, color: "var(--text-muted)" }}>
+                        {sku.abc_class && sku.xyz_class && (
+                          <span style={{
+                            fontWeight: 700, letterSpacing: "0.04em",
+                            padding: "1px 6px", borderRadius: 5,
+                            background: "var(--surface-2)", border: "1px solid var(--border)",
+                            color: "var(--text-secondary)",
+                          }}>
+                            {sku.abc_class}{sku.xyz_class}
+                          </span>
+                        )}
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {sku.country_of_origin} · {sku.supplier}
+                        </span>
                       </div>
                     </td>
-                    {/* Available stock */}
-                    <td style={{ padding: "12px 14px" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{sku.available_stock} MT</div>
-                      <StockBar value={sku.available_stock} max={sku.max_stock} status={sku.health_status} />
-                      {sku.reserved_qty > 0 && (
-                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{sku.reserved_qty} MT reserved</div>
-                      )}
+
+                    {/* Stock position */}
+                    <td style={{ padding: "13px 16px" }}>
+                      <StockPositionBar
+                        available={sku.available_stock}
+                        minStock={sku.min_stock}
+                        reorder={sku.reorder_point_calc}
+                        maxStock={sku.max_stock}
+                        reservedQty={sku.reserved_qty}
+                        idle={sku.days_of_stock === null}
+                      />
                     </td>
-                    {/* Reorder point */}
-                    <td style={{ padding: "12px 14px", fontSize: 13, color: "var(--text-secondary)" }}>
-                      <div style={{ fontWeight: 600 }}>{sku.reorder_point} MT</div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>min {sku.min_stock} MT</div>
-                    </td>
-                    {/* Gap to reorder — primary decision column */}
-                    <td style={{ padding: "12px 14px" }}>
-                      {(() => {
-                        const gap = sku.available_stock - sku.reorder_point;
-                        const isNeg = gap < 0;
-                        const isWarn = gap >= 0 && gap < sku.reorder_point * 0.2;
-                        return (
-                          <div>
-                            <span style={{
-                              fontSize: 14, fontWeight: 800,
-                              color: isNeg ? "#dc2626" : isWarn ? "#c2410c" : "#16a34a",
-                            }}>
-                              {isNeg ? "▼ " : "+ "}{Math.abs(gap)} MT
-                            </span>
-                            <div style={{ fontSize: 11, color: isNeg ? "#dc2626" : "var(--text-muted)", fontWeight: isNeg ? 600 : 400 }}>
-                              {isNeg ? "BELOW trigger" : isWarn ? "Near trigger" : "Above trigger"}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    {/* Coverage vs Lead Time */}
-                    <td style={{ padding: "12px 14px" }}>
+
+                    {/* Coverage vs lead time */}
+                    <td style={{ padding: "13px 16px" }}>
                       {sku.days_of_stock === null ? (
-                        <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 700 }}>No demand</span>
+                        <span style={{ fontSize: 12, color: "var(--red)", fontWeight: 700 }}>No demand</span>
                       ) : (
                         <div>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                             <span style={{
                               fontSize: 14, fontWeight: 800,
-                              color: sku.days_of_stock < sku.lead_time_days ? "#dc2626"
-                                : sku.days_of_stock < sku.lead_time_days * 1.5 ? "#c2410c"
-                                : "#16a34a",
+                              color: sku.days_of_stock < sku.lead_time_days ? "var(--red)"
+                                : sku.days_of_stock < sku.lead_time_days * 1.5 ? "var(--yellow)"
+                                : "var(--green)",
                             }}>
                               {sku.days_of_stock}d
                             </span>
                             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>/ {sku.lead_time_days}d LT</span>
                           </div>
-                          <div style={{ marginTop: 4, width: 80, height: 5, background: "var(--border)", borderRadius: 99, position: "relative" }}>
+                          <div style={{ marginTop: 4, width: 84, height: 5, background: "var(--border)", borderRadius: 99, position: "relative" }}>
                             <div style={{
                               position: "absolute",
                               left: `${Math.min((sku.lead_time_days / Math.max(sku.days_of_stock, sku.lead_time_days + 5)) * 100, 98)}%`,
-                              top: -2, width: 2, height: 9, background: "#94a3b8", borderRadius: 1,
+                              top: -2, width: 2, height: 9, background: "var(--text-muted)", borderRadius: 1,
                             }} />
                             <div style={{
                               width: `${Math.min((sku.days_of_stock / Math.max(sku.days_of_stock, sku.lead_time_days + 5)) * 100, 100)}%`,
                               height: "100%",
-                              background: sku.days_of_stock < sku.lead_time_days ? "#ef4444" : "#22c55e",
+                              background: sku.days_of_stock < sku.lead_time_days ? "var(--red)" : "var(--green)",
                               borderRadius: 99,
                             }} />
                           </div>
                         </div>
                       )}
                     </td>
-                    {/* Movement — single badge, daily rate below */}
-                    <td style={{ padding: "12px 14px" }}>
+
+                    {/* Movement */}
+                    <td style={{ padding: "13px 16px" }}>
                       <Badge type={sku.movement_class} />
                       <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
                         {sku.avg_daily_usage_30d} MT/day
                       </div>
                     </td>
+
                     {/* Actions */}
-                    <td style={{ padding: "12px 14px" }}>
+                    <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", gap: 6 }}>
                         <ActionBtn label="Restock" onClick={() => { setRestockTarget(sku); setRestockQty(""); }} />
-                        <ActionBtn label="Detail" onClick={() => setSelectedSku(sku)} variant="ghost" />
+                        <ActionBtn label="Edit" onClick={() => setSelectedSku(sku)} variant="ghost" />
                       </div>
                     </td>
                   </tr>
@@ -359,7 +438,7 @@ export default function Inventory() {
             type="number" min={0.1} step={0.1} value={restockQty}
             onChange={(e) => setRestockQty(e.target.value)}
             placeholder="e.g. 200"
-            style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, marginBottom: 18 }}
+            style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, marginBottom: 18, background: "var(--surface)", color: "var(--text-primary)" }}
             autoFocus
           />
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -369,122 +448,31 @@ export default function Inventory() {
         </Modal>
       )}
 
-      {/* ── SKU detail modal ── */}
+      {/* ── SKU edit modal ── */}
       {selectedSku && (
         <Modal title={selectedSku.product_name} onClose={() => setSelectedSku(null)} wide>
-          <SkuDetail sku={selectedSku} />
+          <SkuEditForm sku={selectedSku} onSave={handleSkuSave} onCancel={() => setSelectedSku(null)} />
         </Modal>
       )}
 
       {/* ── Add SKU modal ── */}
       {showAddModal && (
         <Modal title="Add New Rice SKU" onClose={() => setShowAddModal(false)} wide>
-          <AddSkuForm
-            onSave={(data) => {
-              setSkus((prev) => [...prev, { ...data, id: Date.now() }]);
-              setShowAddModal(false);
-            }}
-            onCancel={() => setShowAddModal(false)}
-          />
+          <AddSkuForm onSave={handleAddSku} onCancel={() => setShowAddModal(false)} />
         </Modal>
       )}
     </div>
   );
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-// ── Column header tooltip (portal-based, never clips) ────────────────────────
-function ColTooltip({ tip }) {
-  const [pos, setPos] = useState(null); // { x, y } in viewport coords
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!pos) return;
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setPos(null);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [pos]);
-
-  const handleClick = (e) => {
-    e.stopPropagation();
-    if (pos) { setPos(null); return; }
-    const rect = e.currentTarget.getBoundingClientRect();
-    // Place below the icon, centred; clamp so it never goes off-screen
-    const tooltipWidth = 300;
-    let x = rect.left + rect.width / 2 - tooltipWidth / 2;
-    x = Math.max(12, Math.min(x, window.innerWidth - tooltipWidth - 12));
-    setPos({ x, y: rect.bottom + 8 });
-  };
-
-  return (
-    <>
-      <span
-        ref={ref}
-        onClick={handleClick}
-        style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}
-      >
-        <HelpCircle size={12} color={pos ? "#3b82f6" : "#94a3b8"} style={{ flexShrink: 0 }} />
-      </span>
-
-      {pos && (
-        <div
-          style={{
-            position: "fixed",
-            top: pos.y,
-            left: pos.x,
-            zIndex: 9999,
-            width: 300,
-            background: "#1e293b",
-            color: "#f1f5f9",
-            borderRadius: 10,
-            padding: "14px 16px",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
-            pointerEvents: "auto",
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-            What is this?
-          </div>
-          <div style={{ fontSize: 12, lineHeight: 1.65, marginBottom: 12, color: "#e2e8f0" }}>
-            {tip.what}
-          </div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-            How to read it
-          </div>
-          <div style={{ fontSize: 12, lineHeight: 1.75, color: "#e2e8f0", whiteSpace: "pre-line" }}>
-            {tip.how}
-          </div>
-          <button
-            onClick={() => setPos(null)}
-            style={{ marginTop: 12, fontSize: 11, color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-          >
-            close ✕
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
-function StockBar({ value, max, status }) {
-  const pct = max > 0 ? Math.min((value / max) * 100, 120) : 0;
-  const color = { RED: "#ef4444", ORANGE: "#f97316", YELLOW: "#f59e0b", GREEN: "#22c55e" }[status] || "#94a3b8";
-  return (
-    <div style={{ width: 80, height: 4, background: "var(--border)", borderRadius: 99, marginTop: 4 }}>
-      <div style={{ width: `${Math.min(pct, 100)}%`, height: "100%", background: color, borderRadius: 99 }} />
-    </div>
-  );
-}
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function Select({ value, onChange, options, placeholder }) {
   return (
     <div style={{ position: "relative" }}>
       <Filter size={12} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
       <select value={value} onChange={(e) => onChange(e.target.value)}
-        style={{ padding: "8px 12px 8px 26px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "#fff", fontSize: 13, color: "var(--text-primary)", cursor: "pointer", appearance: "none" }}>
+        style={{ padding: "8px 12px 8px 26px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", fontSize: 13, color: "var(--text-primary)", cursor: "pointer", appearance: "none" }}>
         {options.map((o) => <option key={o} value={o}>{o === "All" ? placeholder || "All" : o}</option>)}
       </select>
     </div>
@@ -496,7 +484,7 @@ function ActionBtn({ label, onClick, variant }) {
     <button onClick={onClick} style={{
       padding: "5px 11px", borderRadius: 6, fontSize: 12, fontWeight: 500,
       border: "1px solid var(--border)",
-      background: variant === "ghost" ? "transparent" : "#fff",
+      background: variant === "ghost" ? "transparent" : "var(--surface)",
       color: "var(--text-primary)", cursor: "pointer",
     }}>
       {label}
@@ -505,16 +493,32 @@ function ActionBtn({ label, onClick, variant }) {
 }
 
 function Modal({ title, onClose, children, wide }) {
-  return (
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  return createPortal(
     <div
+      className="inv-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}
     >
-      <div style={{
-        background: "#fff", borderRadius: "var(--radius-lg)", padding: "28px 30px",
-        width: wide ? 680 : 460, maxHeight: "90vh", overflowY: "auto",
-        boxShadow: "var(--shadow-md)",
-      }}>
+      <div
+        className="inv-modal"
+        style={{
+          background: "var(--modal-bg)", border: "1px solid var(--border)",
+          borderRadius: "var(--radius-lg)", padding: "28px 30px",
+          width: wide ? 680 : 460, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto",
+          boxShadow: "var(--shadow-md)",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>{title}</div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}>
@@ -523,17 +527,20 @@ function Modal({ title, onClose, children, wide }) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
-function ModalBtn({ label, onClick, primary }) {
+function ModalBtn({ label, onClick, primary, type = "button", disabled }) {
   return (
-    <button onClick={onClick} style={{
+    <button type={type} onClick={onClick} disabled={disabled} style={{
       padding: "8px 20px", borderRadius: "var(--radius)", fontSize: 13, fontWeight: 600,
       border: "1px solid var(--border)",
-      background: primary ? "var(--blue)" : "#fff",
-      color: primary ? "#fff" : "var(--text-primary)", cursor: "pointer",
+      background: primary ? "var(--blue)" : "var(--surface)",
+      color: primary ? "#fff" : "var(--text-primary)",
+      cursor: disabled ? "not-allowed" : "pointer",
+      opacity: disabled ? 0.5 : 1,
     }}>
       {label}
     </button>
@@ -549,119 +556,242 @@ function InfoRow({ label, value }) {
   );
 }
 
-function SkuDetail({ sku }) {
-  const sections = [
-    { title: "Product Info", rows: [
-      ["SKU ID", sku.sku_id], ["Variety", sku.rice_variety], ["Grade", sku.grade],
-      ["Origin", sku.country_of_origin], ["Packaging", sku.packaging_size], ["Supplier", sku.supplier],
-    ]},
-    { title: "Stock Position", rows: [
-      ["Physical Stock", `${sku.physical_stock} MT`],
-      ["Reserved", `${sku.reserved_qty} MT`],
-      ["Quality Hold", `${sku.quality_hold_qty} MT`],
-      ["Available Stock", `${sku.available_stock} MT`],
-      ["Incoming Stock", `${sku.incoming_stock} MT`],
-    ]},
-    { title: "Velocity & Coverage", rows: [
-      ["30-day Sales", `${sku.sales_30d} MT`],
-      ["90-day Sales", `${sku.sales_90d} MT`],
-      ["Avg Daily Usage (30d)", `${sku.avg_daily_usage_30d} MT/day`],
-      ["Velocity Trend", sku.velocity_trend],
-      ["Days of Stock", sku.days_of_stock ? `${sku.days_of_stock} days` : "No recent demand"],
-      ["Months of Stock", sku.months_of_stock ? `${sku.months_of_stock} months` : "—"],
-    ]},
-    { title: "Inventory Policy", rows: [
-      ["Lead Time", `${sku.lead_time_days} days`],
-      ["Reorder Point", `${sku.reorder_point} MT`],
-      ["Min Stock", `${sku.min_stock} MT`],
-      ["Target Stock", `${sku.target_stock} MT`],
-      ["Max Stock", `${sku.max_stock} MT`],
-      ["Safety Stock %", `${sku.safety_stock_pct}%`],
-    ]},
-  ];
-
+function FormSection({ title, children }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-      {sections.map(({ title, rows }) => (
-        <div key={title}>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 10 }}>
-            {title}
-          </div>
-          {rows.map(([l, v]) => <InfoRow key={l} label={l} value={v} />)}
-        </div>
-      ))}
-      <div style={{ gridColumn: "1 / -1", marginTop: 4, padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", borderLeft: "3px solid var(--blue)" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 6 }}>Recommended Action</div>
-        <div style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.6 }}>{sku.recommended_action}</div>
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 10 }}>
+        {title}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 16px" }}>
+        {children}
       </div>
     </div>
   );
 }
 
+// ── Edit an existing SKU ─────────────────────────────────────────────────────
+function SkuEditForm({ sku, onSave, onCancel }) {
+  const initial = useMemo(() => {
+    const f = {};
+    for (const g of EDIT_GROUPS) {
+      for (const [k] of g.fields) {
+        if (k === "target_service_level_pct") {
+          f[k] = String(Math.round((sku.target_service_level ?? 0.95) * 100));
+        } else {
+          f[k] = sku[k] == null ? "" : String(sku[k]);
+        }
+      }
+    }
+    return f;
+  }, [sku]);
+
+  const [form, setForm] = useState(initial);
+  const set = (k) => (val) => setForm((f) => ({ ...f, [k]: val }));
+
+  const errors = {};
+  if (!String(form.product_name || "").trim()) errors.product_name = "Required";
+  for (const k of NUMERIC_EDIT_KEYS) {
+    const n = Number(form[k]);
+    if (form[k] === "" || !Number.isFinite(n) || n < 0) errors[k] = "Must be ≥ 0";
+  }
+  const valid = Object.keys(errors).length === 0;
+
+  const coerce = () => {
+    const out = {};
+    for (const g of EDIT_GROUPS) for (const [k, t] of g.fields) {
+      if (k === "target_service_level_pct") continue;
+      out[k] = t === "num" ? Number(form[k]) : form[k];
+    }
+    out.target_service_level = Math.min(0.999, Math.max(0.5, Number(form.target_service_level_pct) / 100));
+    return out;
+  };
+
+  const preview = useMemo(() => {
+    try { return computeSkuAnalytics({ ...sku, ...coerce() }); }
+    catch { return sku; }
+  }, [form, sku]);
+
+  const warnings = [];
+  const p = coerce();
+  if (!(p.min_stock <= p.reorder_point && p.reorder_point <= p.max_stock)) {
+    warnings.push("Expected min ≤ reorder point ≤ max.");
+  }
+  if (p.reserved_qty + p.quality_hold_qty > Number(sku.physical_stock)) {
+    warnings.push("Reserved + quality hold exceeds physical stock.");
+  }
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (valid) onSave(coerce());
+  };
+
+  const physicalStock = Number(sku.physical_stock) || 0;
+  const axisMax = stockAxisMax(form, physicalStock);
+  const previewAvailable =
+    physicalStock - (Number(form.reserved_qty) || 0) - (Number(form.quality_hold_qty) || 0);
+
+  return (
+    <form onSubmit={submit}>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 18 }}>
+        {sku.sku_id} · {sku.rice_variety}
+      </div>
+
+      {EDIT_GROUPS.map((g) => (
+        <FormSection key={g.title} title={g.title}>
+          {g.title === "Inventory Policy" && (
+            <div style={{ gridColumn: "span 2", marginBottom: 6 }}>
+              <StockPositionBar
+                axisMax={axisMax}
+                animateFill={false}
+                available={previewAvailable}
+                minStock={Number(form.min_stock) || 0}
+                reorder={Number(form.reorder_point) || 0}
+                target={Number(form.target_stock) || 0}
+                maxStock={Number(form.max_stock) || 0}
+                reservedQty={Number(form.reserved_qty) || 0}
+                idle={sku.days_of_stock === null}
+              />
+            </div>
+          )}
+          {g.fields.map(([k, t, label, required, suffix]) => {
+            if (t === "text") {
+              return (
+                <TextField key={k} half label={label} required={required}
+                  value={form[k]} onChange={set(k)} error={errors[k]} />
+              );
+            }
+            const spec = SLIDER_SPECS[k];
+            if (!spec) {
+              return (
+                <NumberField key={k} half label={label} suffix={suffix}
+                  value={form[k]} onChange={set(k)} error={errors[k]} min={0} />
+              );
+            }
+            const r = resolveSpec(spec, { axisMax, physicalStock });
+            return (
+              <SliderField key={k} half label={label} suffix={suffix}
+                value={form[k]} onChange={set(k)} error={errors[k]}
+                min={r.min} max={r.max} step={r.step} disabled={r.disabled} />
+            );
+          })}
+        </FormSection>
+      ))}
+
+      {/* Read-only context */}
+      <FormSection title="Current position (read-only)">
+        <div style={{ gridColumn: "span 2" }}>
+          <InfoRow label="Physical stock" value={`${sku.physical_stock} MT`} />
+          <InfoRow label="Avg daily usage (30d)" value={`${sku.avg_daily_usage_30d} MT/day`} />
+          <InfoRow label="Days of stock" value={sku.days_of_stock != null ? `${sku.days_of_stock} days` : "No recent demand"} />
+          <InfoRow label="Movement" value={sku.movement_class} />
+          <InfoRow label="Coverage band" value={sku.coverage_band} />
+        </div>
+      </FormSection>
+
+      {/* Live recompute preview */}
+      <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", borderLeft: "3px solid var(--blue)", marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 8 }}>
+          After save
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", fontSize: 12, alignItems: "center" }}>
+          <span>Available <strong>{preview.available_stock} MT</strong></span>
+          <span>Days of stock <strong>{preview.days_of_stock ?? "—"}</strong></span>
+          <span>Reorder point (calc) <strong>{preview.reorder_point_calc} MT</strong></span>
+          <span>Gross margin <strong>{preview.gross_margin_pct}%</strong></span>
+          <Badge type={preview.health_status} />
+        </div>
+      </div>
+
+      {warnings.length > 0 && (
+        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 12, color: "var(--yellow)", marginBottom: 16 }}>
+          {warnings.map((w) => <div key={w}>⚠ {w}</div>)}
+        </div>
+      )}
+
+      {sku.recommended_action && (
+        <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", borderLeft: "3px solid var(--blue)", marginBottom: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 6 }}>Recommended action</div>
+          <div style={{ fontSize: 13, lineHeight: 1.6 }}>{sku.recommended_action}</div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <ModalBtn label="Cancel" type="button" onClick={onCancel} />
+        <ModalBtn label="Save changes" type="submit" primary disabled={!valid} />
+      </div>
+    </form>
+  );
+}
+
+// ── Add a new SKU ────────────────────────────────────────────────────────────
 function AddSkuForm({ onSave, onCancel }) {
   const [form, setForm] = useState({
     sku_id: "", product_name: "", rice_variety: "", grade: "", country_of_origin: "",
-    brand: "", packaging_size: "", supplier: "", lead_time_days: 45,
-    unit_cost_sgd: "", min_order_qty: "", reorder_point: "",
-    min_stock: "", target_stock: "", max_stock: "", safety_stock_pct: 20,
-    physical_stock: 0, reserved_qty: 0, quality_hold_qty: 0,
-    available_stock: 0, incoming_stock: 0,
-    sales_30d: 0, sales_60d: 0, sales_90d: 0,
-    avg_daily_usage_30d: 0, avg_daily_usage_90d: 0,
-    velocity_trend: "stable", days_of_stock: null, months_of_stock: null,
-    movement_class: "Normal", health_status: "GREEN",
-    ageing_status: "Fresh", inventory_age_days: 0,
-    last_received_date: new Date().toISOString().split("T")[0],
-    recommended_action: "New SKU — monitor initial demand.",
-    inventory_position: 0,
+    brand: "", packaging_size: "", supplier: "",
+    unit_cost_sgd: "", unit_price_sgd: "", lead_time_days: "45",
+    min_order_qty: "", reorder_point: "", min_stock: "", target_stock: "", max_stock: "",
+    safety_stock_pct: "20",
   });
+  const set = (k) => (val) => setForm((f) => ({ ...f, [k]: val }));
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const required = ["sku_id", "product_name"];
+  const numeric = ["unit_cost_sgd", "unit_price_sgd", "lead_time_days", "min_order_qty", "reorder_point", "min_stock", "target_stock", "max_stock", "safety_stock_pct"];
+  const valid =
+    required.every((k) => String(form[k]).trim()) &&
+    numeric.every((k) => form[k] === "" || Number.isFinite(Number(form[k])));
 
-  const handleSubmit = (e) => {
+  const submit = (e) => {
     e.preventDefault();
-    onSave({
-      ...form,
-      lead_time_days: Number(form.lead_time_days),
-      unit_cost_sgd: Number(form.unit_cost_sgd),
-      min_order_qty: Number(form.min_order_qty),
-      reorder_point: Number(form.reorder_point),
-      min_stock: Number(form.min_stock),
-      target_stock: Number(form.target_stock),
-      max_stock: Number(form.max_stock),
-      safety_stock_pct: Number(form.safety_stock_pct),
-    });
+    if (!valid) return;
+    const out = { ...form };
+    for (const k of numeric) out[k] = Number(form[k]) || 0;
+    onSave(out);
   };
 
-  const Field = ({ label, k, type = "text", placeholder, half }) => (
-    <div style={{ gridColumn: half ? "span 1" : "span 2" }}>
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 4, color: "var(--text-secondary)" }}>{label}</label>
-      <input required type={type} value={form[k]} onChange={set(k)} placeholder={placeholder}
-        style={{ width: "100%", padding: "8px 11px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13 }} />
-    </div>
-  );
+  const axisMax = Math.max(200, stockAxisMax(form, 0)); // floor so empty sliders have a usable range
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 16px", marginBottom: 20 }}>
-        <Field label="SKU ID *"          k="sku_id"           placeholder="e.g. TJ-25KG"        half />
-        <Field label="Product Name *"    k="product_name"     placeholder="e.g. Thai Jasmine 25KG" half />
-        <Field label="Rice Variety"      k="rice_variety"     placeholder="e.g. Thai Hom Mali"  half />
-        <Field label="Grade"             k="grade"            placeholder="e.g. Grade A"        half />
-        <Field label="Country of Origin" k="country_of_origin" placeholder="e.g. Thailand"     half />
-        <Field label="Packaging Size"    k="packaging_size"   placeholder="e.g. 25KG"           half />
-        <Field label="Supplier"          k="supplier"         placeholder="Supplier name"       half />
-        <Field label="Brand"             k="brand"            placeholder="Brand name"          half />
-        <Field label="Unit Cost (SGD)" k="unit_cost_sgd" type="number" placeholder="0.00" half />
-        <Field label="Lead Time (days)"  k="lead_time_days"   type="number" placeholder="45"   half />
-        <Field label="Reorder Point (MT)" k="reorder_point"  type="number" placeholder="0"     half />
-        <Field label="Min Stock (MT)"    k="min_stock"        type="number" placeholder="0"     half />
-        <Field label="Target Stock (MT)" k="target_stock"     type="number" placeholder="0"     half />
-        <Field label="Max Stock (MT)"    k="max_stock"        type="number" placeholder="0"     half />
-      </div>
+    <form onSubmit={submit}>
+      <FormSection title="Identity">
+        <TextField half label="SKU ID" required value={form.sku_id} onChange={set("sku_id")} placeholder="e.g. TJ-25KG" />
+        <TextField half label="Product name" required value={form.product_name} onChange={set("product_name")} placeholder="e.g. Thai Jasmine 25KG" />
+        <TextField half label="Rice variety" value={form.rice_variety} onChange={set("rice_variety")} placeholder="e.g. Thai Hom Mali" />
+        <TextField half label="Grade" value={form.grade} onChange={set("grade")} placeholder="e.g. Grade A" />
+        <TextField half label="Country of origin" value={form.country_of_origin} onChange={set("country_of_origin")} placeholder="e.g. Thailand" />
+        <TextField half label="Packaging size" value={form.packaging_size} onChange={set("packaging_size")} placeholder="e.g. 25KG" />
+        <TextField half label="Supplier" value={form.supplier} onChange={set("supplier")} placeholder="Supplier name" />
+        <TextField half label="Brand" value={form.brand} onChange={set("brand")} placeholder="Brand name" />
+      </FormSection>
+
+      <FormSection title="Costs & Policy">
+        {Number(form.max_stock) > 0 && (
+          <div style={{ gridColumn: "span 2", marginBottom: 6 }}>
+            <StockPositionBar
+              axisMax={axisMax}
+              animateFill={false}
+              available={Number(form.target_stock) || 0}
+              minStock={Number(form.min_stock) || 0}
+              reorder={Number(form.reorder_point) || 0}
+              target={Number(form.target_stock) || 0}
+              maxStock={Number(form.max_stock) || 0}
+              reservedQty={0}
+              idle={false}
+            />
+          </div>
+        )}
+        <NumberField half label="Unit cost" suffix="SGD" value={form.unit_cost_sgd} onChange={set("unit_cost_sgd")} min={0} />
+        <NumberField half label="Unit price" suffix="SGD" value={form.unit_price_sgd} onChange={set("unit_price_sgd")} min={0} />
+        <SliderField half label="Lead time" suffix="days" value={form.lead_time_days} onChange={set("lead_time_days")} min={1} max={120} step={1} />
+        <NumberField half label="Min order qty" suffix="MT" value={form.min_order_qty} onChange={set("min_order_qty")} min={0} />
+        <SliderField half label="Min stock" suffix="MT" value={form.min_stock} onChange={set("min_stock")} min={0} max={axisMax} step={5} />
+        <SliderField half label="Reorder point" suffix="MT" value={form.reorder_point} onChange={set("reorder_point")} min={0} max={axisMax} step={5} />
+        <SliderField half label="Target stock" suffix="MT" value={form.target_stock} onChange={set("target_stock")} min={0} max={axisMax} step={5} />
+        <SliderField half label="Max stock" suffix="MT" value={form.max_stock} onChange={set("max_stock")} min={0} max={axisMax} step={5} />
+      </FormSection>
+
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <ModalBtn label="Cancel" onClick={onCancel} />
-        <ModalBtn label="Add SKU" onClick={() => {}} primary />
+        <ModalBtn label="Cancel" type="button" onClick={onCancel} />
+        <ModalBtn label="Add SKU" type="submit" primary disabled={!valid} />
       </div>
     </form>
   );
