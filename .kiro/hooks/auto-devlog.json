@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Auto DevLog Writer",
+      "trigger": "Stop",
+      "description": "Automatically appends a timestamped entry to DEVLOG.md when a Kiro session ends. Logs branch, changed files, and new files. Zero tokens — pure shell.",
+      "action": {
+        "type": "command",
+        "command": "cd /Users/stan/Documents/GitHub/puenzhiyyy && TIMESTAMP=$(date \"+%Y-%m-%d %H:%M\") && BRANCH=$(git branch --show-current 2>/dev/null || echo \"unknown\") && CHANGED=$(git diff --name-only HEAD 2>/dev/null | head -20 | tr '\\n' ', ' | sed 's/,$//') && UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null | head -10 | tr '\\n' ', ' | sed 's/,$//') && LOGFILE=\"DEVLOG.md\" && if [ ! -f \"$LOGFILE\" ]; then echo \"# Dev Log\\n\\nAuto-generated session log for StockSense / Rice Inventory MVP.\\n\\n---\\n\" > \"$LOGFILE\"; fi && printf \"\\n## Session: %s\\n- **Branch:** %s\\n- **Files changed:** %s\\n- **New files:** %s\\n- **Notes:** _(add manual notes here)_\\n\\n---\\n\" \"$TIMESTAMP\" \"$BRANCH\" \"${CHANGED:-none}\" \"${UNTRACKED:-none}\" >> \"$LOGFILE\" && echo \"DevLog updated at $LOGFILE\"",
+        "timeout": 15
+      }
+    }
+  ]
+}

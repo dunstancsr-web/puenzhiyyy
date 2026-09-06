@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Commit Reminder",
+      "trigger": "PostTaskExec",
+      "description": "After a spec task completes, checks for uncommitted changes and prints a reminder to commit and push. Zero tokens.",
+      "action": {
+        "type": "command",
+        "command": "cd /Users/stan/Documents/GitHub/puenzhiyyy && CHANGED=$(git status --short 2>/dev/null | wc -l | tr -d ' ') && if [ \"$CHANGED\" -gt \"0\" ]; then echo \"\"; echo \"⚠️  You have $CHANGED uncommitted change(s). Consider running:\"; echo \"   git add . && git commit -m 'your message here' && git push\"; echo \"\"; fi",
+        "timeout": 10
+      }
+    }
+  ]
+}

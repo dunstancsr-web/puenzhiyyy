@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Lint on Save",
+      "trigger": "PostFileSave",
+      "description": "Runs ESLint on any saved JS/JSX file in the frontend. No tokens used.",
+      "matcher": "\\.(jsx|js)$",
+      "action": {
+        "type": "command",
+        "command": "cd /Users/stan/Documents/GitHub/puenzhiyyy && FILE=$(echo \"$KIRO_HOOK_INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get('file',''))\" 2>/dev/null || echo \"\"); if [ -n \"$FILE\" ] && [ -f \"$FILE\" ]; then cd frontend && node_modules/.bin/eslint \"$FILE\" --max-warnings=0 2>&1 || true; fi",
+        "timeout": 30
+      }
+    }
+  ]
+}
