@@ -8,6 +8,23 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { api } from "../api/inventory";
 
+// Escape-to-close + body-scroll-lock while a modal is open. Inventory.jsx's
+// Modal component already does this; AiModal/ApprovalModal below didn't —
+// pressing Escape closed the SKU edit/Add SKU/Restock modals but silently
+// did nothing here, and the alert list behind these two could still scroll.
+function useModalEscape(onClose) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+}
+
 // ── Config ─────────────────────────────────────────────────────────────────────
 // Colors now token-based (was hardcoded light-mode-only hex) — the direct
 // cause of this page never respecting Dark/Glass (visual overhaul, 2026-09).
@@ -379,6 +396,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
 // ── AI explanation modal ───────────────────────────────────────────────────────
 function AiModal({ aiModal, onClose }) {
   const { alert, explanation } = aiModal;
+  useModalEscape(onClose);
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
@@ -425,6 +443,9 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  // Guarded like the Cancel button: don't let Escape yank the modal away
+  // mid-save (same reasoning as disabling Cancel while saving).
+  useModalEscape(() => { if (!saving) onClose(); });
 
   // The label shows a required "*" on Reason for modify/reject, but nothing
   // actually enforced it — a Reject could be recorded with an empty reason,

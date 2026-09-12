@@ -462,6 +462,20 @@ Continued the reiteration into the Restock flow, table sort/filter, and backend 
 
 ---
 
+## TASK-20 — Fourth bug-finding pass: modal keyboard/scroll consistency (2026-09-12)
+- [x] Fixed a real UX inconsistency: `Inventory.jsx`'s `Modal` component (SKU edit, Add SKU, Restock)
+      closes on Escape and locks background scroll while open; `Alerts.jsx`'s two custom modals
+      (`AiModal`, `ApprovalModal`) had neither — Escape silently did nothing on the Alerts page, and
+      the alert list behind them could still scroll. Extracted the same behavior into a
+      `useModalEscape(onClose)` hook and applied it to both; `ApprovalModal`'s is guarded to no-op
+      while `saving` is true, matching its Cancel button already being disabled mid-save.
+- [x] Verified via browser: Escape now closes both the AI Explanation and Manager Decision modals.
+- [x] Verified the Inventory table's empty-filter state (a search matching zero SKUs) renders a clean
+      "No SKUs match your filters." row rather than a broken/empty table — no bug found.
+- [x] `npx vite build` clean
+
+---
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy
