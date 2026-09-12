@@ -105,6 +105,36 @@
   background-attachment: fixed;
 }
 
+/* ── Design system foundation (visual overhaul, 2026-09) ─────────────────────
+   Linear-style: hairline dividers instead of boxed-and-shadowed cards, one
+   consistent spacing/type scale, color reserved for state — never decoration.
+   Not a hard migration of every existing inline style; applied to whichever
+   components are touched going forward. ───────────────────────────────────── */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 13px;
+  --text-md:   14px;
+  --text-lg:   16px;
+  --text-xl:   22px;
+  --text-2xl:  32px;
+}
+
+/* Default in-page surface: no border, no shadow — content separates via
+   .divider, not boxes. --shadow/--shadow-md stay reserved for things that
+   should genuinely float above content (modals, popovers). */
+.surface-flat { background: var(--card-bg); }
+.divider { border-bottom: 1px solid var(--border); }
+
 /* ── Base styles ─────────────────────────────────────────────────────────── */
 body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
@@ -169,6 +199,31 @@ input, select, textarea {
 
 @media (prefers-reduced-motion: reduce) {
   .inv-overlay, .inv-modal { animation: none !important; }
+}
+
+/* ── Modal tabs (SkuEditForm) ─────────────────────────────────────────────── */
+.modal-tabs {
+  display: flex;
+  gap: var(--space-5);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-4);
+}
+.modal-tab {
+  background: none;
+  border: none;
+  padding: var(--space-2) 0 var(--space-3);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  position: relative;
+  top: 1px;
+}
+.modal-tab:hover { color: var(--text-secondary); }
+.modal-tab.active {
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom: 2px solid var(--blue);
 }
 
 /* ── Hover-hint affordance (HoverHint) ──────────────────────────────────── */

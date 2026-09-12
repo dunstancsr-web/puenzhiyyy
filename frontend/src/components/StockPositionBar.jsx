@@ -18,12 +18,23 @@ const fmt = (n) => Math.round(n).toLocaleString("en-SG");
 // ── Explanatory copy ───────────────────────────────────────────────────────
 const AVAIL_COPY =
   "Available stock — physical stock minus what's reserved for confirmed orders and held for quality checks. This is what you can actually sell or ship today. Its colour is the health status.";
-const TRACK_COPY =
-  "The coloured bar is available stock. The tick marks are your reorder point and your maximum. Grey shading marks the ranges to avoid — below the reorder point (order now) or above the maximum (overstock). Aim to keep the bar between the two ticks.";
 const MAX_LABEL_COPY =
   "Maximum stock level. Holding more than this ties up cash and warehouse space — it shows as a purple bar running into the grey zone on the right.";
-const RESERVED_COPY =
-  "Stock already committed to confirmed customer orders. Still in the warehouse, but can't be promised to anyone else.";
+
+const committedPhrase = (reserved, hold) => {
+  const parts = [];
+  if (reserved > 0) parts.push(`${fmt(reserved)} MT reserved for orders`);
+  if (hold > 0) parts.push(`${fmt(hold)} MT on quality hold`);
+  return parts.join(" · ");
+};
+const trackCopy = (committed, reserved, hold) => {
+  let s =
+    "The solid bar is available stock, coloured by health status. The tick marks are your reorder point and your maximum. Grey shading marks the ranges to avoid — below the reorder point (order now) or above the maximum (overstock).";
+  if (committed > 0) {
+    s += `\n\nThe faded tail past the solid bar is stock that's physically here but not available to promise: ${committedPhrase(reserved, hold)}.`;
+  }
+  return s;
+};
 const reorderCopy = (showReorder) =>
   showReorder
     ? "Reorder point — when available stock drops to this tick, place a replenishment order. It's set to cover demand over the supplier's lead time plus a safety buffer."
@@ -46,7 +57,7 @@ function tickLabelStyle(pct, strong) {
 }
 
 export default function StockPositionBar({
-  available, minStock, reorder, maxStock, reservedQty, idle,
+  available, minStock, reorder, maxStock, reservedQty, physicalStock, idle,
   target, axisMax, animateFill = true,
 }) {
   const { theme } = useTheme();
@@ -56,12 +67,16 @@ export default function StockPositionBar({
   const rop = Number(reorder) || 0;
   const max = Number(maxStock) || 0;
   const tgt = Number(target) || 0;
+  const physical = Math.max(Number(physicalStock) || 0, avail);
+  const committed = Math.max(0, +(physical - avail).toFixed(2));
+  const reserved = Math.min(Number(reservedQty) || 0, committed);
+  const hold = Math.max(0, +(committed - reserved).toFixed(2));
   const showReorder = rop > 0;
   const showMax = max > 0;
 
   const finalAxisMax = Number(axisMax) > 0
     ? Number(axisMax)
-    : Math.max(max, avail, rop, tgt) * 1.05;
+    : Math.max(max, avail, rop, tgt, physical) * 1.05;
 
   if (!finalAxisMax || finalAxisMax <= 0) {
     return (
@@ -73,6 +88,7 @@ export default function StockPositionBar({
 
   const pct = (v) => clamp((v / finalAxisMax) * 100, 0, 100);
   const fillPct = pct(avail);
+  const physicalPct = pct(physical);
   const reorderPct = pct(rop);
   const maxPct = pct(max);
   const targetPct = tgt > 0 ? pct(tgt) : null;
@@ -135,7 +151,7 @@ export default function StockPositionBar({
       </HoverHint>
 
       {/* track */}
-      <HoverHint panelWidth={260} content={TRACK_COPY}>
+      <HoverHint panelWidth={260} content={trackCopy(committed, reserved, hold)}>
         <div
           className="hint-trigger--box"
           style={{
@@ -147,6 +163,17 @@ export default function StockPositionBar({
           {/* greyscale "avoid" ranges */}
           {shade(0, belowEnd)}
           {showMax && shade(maxPct, 100)}
+
+          {/* committed tail — physically here but reserved / on hold */}
+          {committed > 0 && (
+            <div style={{
+              position: "absolute", top: 0, height: "100%",
+              left: `${fillPct}%`, width: `${Math.max(0, physicalPct - fillPct)}%`,
+              background: fillColor, opacity: idle ? 0.22 : 0.32,
+              borderRadius: "0 99px 99px 0",
+              transition: animateFill ? "left 0.4s ease, width 0.4s ease" : "none",
+            }} />
+          )}
 
           {/* measure bar */}
           <div style={{
@@ -209,12 +236,6 @@ export default function StockPositionBar({
       {gapText && (
         <HoverHint panelWidth={260} content={gapCopy(idle)}>
           <div style={{ fontSize: 12, fontWeight: gapWeight, color: gapColor }}>{gapText}</div>
-        </HoverHint>
-      )}
-
-      {reservedQty > 0 && (
-        <HoverHint panelWidth={260} content={RESERVED_COPY}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{fmt(reservedQty)} MT reserved</div>
         </HoverHint>
       )}
     </div>

@@ -9,7 +9,7 @@ export const mockAlerts = [
     sku_name: "Thai Jasmine 25KG",
     alert_type: "STOCKOUT_RISK",
     severity: "critical",
-    triggered_value: 26,        // days of stock
+    triggered_value: 26,        // days of cover
     threshold_value: 45,        // lead time days
     message:
       "Thai Jasmine 25KG has only 26 days of available stock remaining. Supplier lead time is 45 days. A stockout is projected before replenishment can arrive.",
@@ -25,7 +25,7 @@ export const mockAlerts = [
     sku_name: "Thai White Rice 25KG",
     alert_type: "REORDER",
     severity: "warning",
-    triggered_value: 260,       // available stock (MT)
+    triggered_value: 260,       // available stock (MT, vs reorder point)
     threshold_value: 250,       // reorder point (MT)
     message:
       "Thai White Rice 25KG available stock (260 MT) is approaching the reorder point (250 MT). At current consumption rate, the reorder point will be breached within 7 days.",
@@ -41,7 +41,7 @@ export const mockAlerts = [
     sku_name: "Vietnam Fragrant 10KG",
     alert_type: "OVERSTOCK",
     severity: "warning",
-    triggered_value: 620,       // physical stock (MT)
+    triggered_value: 620,       // on-hand stock (MT)
     threshold_value: 400,       // max stock (MT)
     message:
       "Vietnam Fragrant 10KG physical stock (620 MT) exceeds the maximum recommended level (400 MT) by 220 MT. A further 200 MT shipment is inbound.",
@@ -57,7 +57,7 @@ export const mockAlerts = [
     sku_name: "Basmati Premium 5KG",
     alert_type: "SLOW_MOVING",
     severity: "warning",
-    triggered_value: 292,       // days of stock
+    triggered_value: 292,       // days of cover
     threshold_value: 120,       // slow moving threshold (days)
     message:
       "Basmati Premium 5KG has 292 days of stock on hand. Sales velocity has been decelerating — 30-day usage (18 MT) is below the 90-day average (19.3 MT/month).",

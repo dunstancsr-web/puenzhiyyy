@@ -1,16 +1,40 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from "recharts";
 import {
-  DollarSign, AlertTriangle, TrendingUp, Clock,
-  ArrowRight, PackageX, Repeat, Target, ShieldCheck,
+  AlertTriangle, TrendingUp, Clock, ArrowRight, PackageX, Repeat, Target,
+  ShieldCheck, ChevronDown,
 } from "lucide-react";
 import StatCard from "../components/StatCard";
 import Badge from "../components/Badge";
-import { mockStats } from "../mock/statsData";
-import { mockSkus } from "../mock/riceData";
+import LoadingState from "../components/LoadingState";
+import ErrorState from "../components/ErrorState";
+import { api } from "../api/inventory";
+
+// Prior period (last month) — hand-set illustrative comparison, not derived from
+// stored history (this project has no historical snapshots yet). Carried over
+// unchanged from the mock era; feeds the trend arrows via delta() below.
+const PRIOR = {
+  totalInventoryValue: 3_560_000,
+  turnover: 3.3,
+  gmroi: 0.62,
+  fillRate: 96.1,
+  stockoutRiskMargin: 12_000,
+  overstockPct: 6.1,
+  eoPct: 34.0,
+  coverageInBandPct: 41.0,
+};
+
+function delta(cur, prev, { higherIsBetter = true, unit = "", pp = false } = {}) {
+  const diff = +(cur - prev).toFixed(2);
+  const dir = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
+  const good = diff === 0 ? true : higherIsBetter ? diff > 0 : diff < 0;
+  const mag = Math.abs(diff);
+  const text = pp ? `${mag} pp` : `${unit}${mag}`;
+  return { dir, good, text, diff };
+}
 
 const HEALTH_COLORS = { GREEN: "#22c55e", YELLOW: "#f59e0b", ORANGE: "#f97316", RED: "#ef4444" };
 const HEALTH_LABEL = { RED: "Critical", ORANGE: "Action", YELLOW: "Watch", GREEN: "Healthy" };
@@ -29,23 +53,23 @@ const ppTrend = (d) => ({ dir: d.dir, good: d.good, text: `${Math.abs(d.diff).to
 const numTrend = (d, p = "") => ({ dir: d.dir, good: d.good, text: `${p}${Math.abs(d.diff).toFixed(2)}` });
 
 // ── Today's actions — ranked by urgency + financial exposure ─────────────────
-function buildTodayActions() {
+function buildTodayActions(mockSkus) {
   const actions = [];
 
   mockSkus
     .filter((s) => s.stockout_gap_days > 0)
     .forEach((s) => {
-      const qty = Math.max(s.min_order_qty, Math.round(s.target_stock - s.available_stock));
+      const qty = Math.max(s.min_order_qty, Math.round(s.target_stock - s.available_qty));
       actions.push({
         priority: 1,
         sku_id: s.sku_id,
         name: s.product_name,
         action: `Place PO — ${qty} MT`,
-        reason: `${s.days_of_stock}d cover vs ${s.lead_time_days + s.safety_stock_days}d (lead + safety) · ${s.stockout_gap_days}d gap · ${s.on_order > 0 ? `${s.on_order} MT inbound` : "no PO inbound"}`,
+        reason: `${s.days_of_cover}d cover vs ${s.lead_time_days + s.safety_stock_days}d (lead + safety) · ${s.stockout_gap_days}d gap · ${s.expected_incoming_qty > 0 ? `${s.expected_incoming_qty} MT inbound` : "no PO inbound"}`,
         value: s.lost_margin_risk || s.lost_sales_value_risk,
         valueLabel: "lost margin",
         tag: "STOCKOUT RISK",
-        tagColor: "#dc2626", tagBg: "#fef2f2",
+        tagColor: "var(--red)",
       });
     });
 
@@ -57,43 +81,43 @@ function buildTodayActions() {
         sku_id: s.sku_id,
         name: s.product_name,
         action: "Initiate disposition review",
-        reason: `No sales 90+ days · ${s.available_stock} MT · ${s.obsolescence_risk_pct}% write-down risk`,
+        reason: `No sales 90+ days · ${s.available_qty} MT · ${s.obsolescence_risk_pct}% write-down risk`,
         value: s.eo_value_risk_adjusted,
         valueLabel: "risk-adj. value",
         tag: "IDLE STOCK",
-        tagColor: "#b45309", tagBg: "#fffbeb",
+        tagColor: "var(--yellow)",
       });
     });
 
   mockSkus
-    .filter((s) => s.excess_mt > 0)
+    .filter((s) => s.overstock_qty > 0)
     .forEach((s) => {
       actions.push({
         priority: 3,
         sku_id: s.sku_id,
         name: s.product_name,
         action: "Suspend purchasing",
-        reason: `${s.excess_mt} MT above max · ${s.abc_class}${s.xyz_class} class`,
-        value: s.excess_carrying_cost,
+        reason: `${s.overstock_qty} MT above max · ${s.abc_class}${s.xyz_class} class`,
+        value: s.overstock_carrying_cost,
         valueLabel: "carrying cost / yr",
         tag: "OVERSTOCK",
-        tagColor: "#7c3aed", tagBg: "#f5f3ff",
+        tagColor: "var(--purple)",
       });
     });
 
   mockSkus
-    .filter((s) => s.coverage_band === "below" && s.stockout_gap_days === 0 && s.available_stock <= s.reorder_point && s.movement_class !== "Idle")
+    .filter((s) => s.coverage_band === "below" && s.stockout_gap_days === 0 && s.available_qty <= s.reorder_point_policy && s.movement_class !== "Idle")
     .forEach((s) => {
       actions.push({
         priority: 4,
         sku_id: s.sku_id,
         name: s.product_name,
         action: "Procurement review",
-        reason: `Available ${s.available_stock} MT at reorder point ${s.reorder_point} MT`,
-        value: s.available_stock * (s.unit_price_sgd - s.unit_cost_sgd),
+        reason: `Available ${s.available_qty} MT at reorder point ${s.reorder_point_policy} MT`,
+        value: s.available_qty * (s.unit_price_sgd - s.unit_cost_sgd),
         valueLabel: "margin exposed",
         tag: "REORDER",
-        tagColor: "#c2410c", tagBg: "#fff7ed",
+        tagColor: "var(--yellow)",
       });
     });
 
@@ -109,20 +133,20 @@ function buildTodayActions() {
 }
 
 // ── Coverage vs (lead time + safety) chart data ─────────────────────────────
-function buildCoverageData() {
+function buildCoverageData(mockSkus) {
   return [...mockSkus]
-    .filter((s) => s.days_of_stock !== null)
+    .filter((s) => s.days_of_cover !== null)
     .sort((a, b) => {
-      const aGap = a.days_of_stock - (a.lead_time_days + a.safety_stock_days);
-      const bGap = b.days_of_stock - (b.lead_time_days + b.safety_stock_days);
+      const aGap = a.days_of_cover - (a.lead_time_days + a.safety_stock_days);
+      const bGap = b.days_of_cover - (b.lead_time_days + b.safety_stock_days);
       return aGap - bGap;
     })
     .slice(0, 7)
     .map((s) => ({
       name: s.product_name.replace(/ \d+KG$/, "").slice(0, 16),
-      coverage: s.days_of_stock,
+      coverage: s.days_of_cover,
       threshold: s.lead_time_days + s.safety_stock_days,
-      onOrder: s.on_order,
+      onOrder: s.expected_incoming_qty,
       eta: s.incoming_eta_days,
       coveredByPo: s.covered_by_po,
       fill: HEALTH_COLORS[s.health_status],
@@ -134,7 +158,7 @@ const CoverageTooltip = ({ active, payload, label }) => {
   const d = payload[0]?.payload;
   const gap = (d?.coverage ?? 0) - (d?.threshold ?? 0);
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", fontSize: 12 }}>
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", fontSize: "var(--text-sm)" }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
       <div style={{ color: "var(--text-secondary)", marginBottom: 3 }}>Days of cover: <strong>{d?.coverage}d</strong></div>
       <div style={{ color: "var(--text-secondary)", marginBottom: 3 }}>Lead + safety: <strong>{d?.threshold}d</strong></div>
@@ -143,7 +167,7 @@ const CoverageTooltip = ({ active, payload, label }) => {
           On order: <strong>{d.onOrder} MT</strong>{d.eta != null ? ` · ETA ${d.eta}d` : ""}
         </div>
       )}
-      <div style={{ color: gap < 0 && !d?.coveredByPo ? "#dc2626" : "#16a34a", fontWeight: 700 }}>
+      <div style={{ color: gap < 0 && !d?.coveredByPo ? "var(--red)" : "var(--green)", fontWeight: 700 }}>
         {gap < 0
           ? d?.coveredByPo ? `⚠ ${Math.abs(gap)}d short — covered by inbound PO` : `⚠ ${Math.abs(gap)}d SHORTFALL`
           : `✓ ${gap}d buffer`}
@@ -153,102 +177,156 @@ const CoverageTooltip = ({ active, payload, label }) => {
 };
 
 export default function Dashboard() {
-  const s = mockStats;
-  const t = s.trends;
-  const todayActions = buildTodayActions();
-  const coverageData = buildCoverageData();
-  const ageingItems = s.ageingItems;
+  const [skus, setSkus] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [error, setError] = useState(null);
+  const [showMore, setShowMore] = useState(false);
+
+  const load = useCallback(() => {
+    setError(null);
+    setSkus(null);
+    setStats(null);
+    Promise.all([api.getSkus(), api.getDashboardStats()])
+      .then(([skusData, statsData]) => { setSkus(skusData); setStats(statsData); })
+      .catch((err) => setError(err.message || "Failed to load dashboard"));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (error) return <ErrorState message={error} onRetry={load} />;
+  if (!skus || !stats) return <LoadingState label="Loading dashboard…" />;
+
+  const s = stats;
+  const t = {
+    inventoryValue: delta(s.totalInventoryValue, PRIOR.totalInventoryValue, { higherIsBetter: false, unit: "$" }),
+    turnover: delta(s.turnover, PRIOR.turnover, { higherIsBetter: true }),
+    gmroi: delta(s.gmroi, PRIOR.gmroi, { higherIsBetter: true, unit: "$" }),
+    fillRate: delta(s.fillRate, PRIOR.fillRate, { higherIsBetter: true, pp: true }),
+    stockoutRiskMargin: delta(s.stockoutRiskMargin, PRIOR.stockoutRiskMargin, { higherIsBetter: false, unit: "$" }),
+    overstockPct: delta(s.overstockPct, PRIOR.overstockPct, { higherIsBetter: false, pp: true }),
+    eoPct: delta(s.eoPct, PRIOR.eoPct, { higherIsBetter: false, pp: true }),
+    coverageInBandPct: delta(s.coverageInBandPct, PRIOR.coverageInBandPct, { higherIsBetter: true, pp: true }),
+  };
+  const todayActions = buildTodayActions(skus);
+  const coverageData = buildCoverageData(skus);
+  const ageingItems = skus.filter((sk) => sk.ageing_status === "Ageing" || sk.ageing_status === "At Risk");
 
   return (
     <div>
       <PageHeader
         title="Inventory Dashboard"
-        subtitle={`${new Date().toLocaleDateString("en-SG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} · ${s.totalSkus} active SKUs · data as of 06:00 SGT`}
+        subtitle={`${new Date().toLocaleDateString("en-SG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} · ${s.totalSkus} active SKUs · data as of ${new Date(s.asOf).toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}`}
       />
 
-      {/* ── KPI cards — working-capital metrics paired with their service counter-metric ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 24 }}>
-        <StatCard label="Inventory Value" value={`SGD ${fmt$(s.totalInventoryValue)}`} icon={DollarSign} color="blue"
-          trend={moneyTrend(t.inventoryValue)} sub="Physical stock at cost" />
-        <StatCard label="Inventory Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} color="green"
-          trend={numTrend(t.turnover)} sub={`${s.dio}d of supply · value-weighted`} target="6.0×" />
-        <StatCard label="Service Level (Fill Rate)" value={`${s.fillRate}%`} icon={ShieldCheck} color="green"
-          trend={ppTrend(t.fillRate)} sub={`${s.lostSales30d} MT unfilled / 30d`} target="≥ 98%" />
-        <StatCard label="GMROI" value={`$${s.gmroi.toFixed(2)}`} icon={Target} color="blue"
-          trend={numTrend(t.gmroi, "$")} sub="Gross margin per $1 of stock" target="≥ $1.50" />
-        <StatCard label="Stockout-Risk Value" value={`SGD ${fmt$(s.stockoutRiskMargin)}`} icon={AlertTriangle} color="red"
-          trend={moneyTrend(t.stockoutRiskMargin)} sub={`Lost margin · ${s.stockoutSkuCount} SKU · ${fmt$(s.stockoutRiskSales)} sales`} />
-        <StatCard label="Excess Stock" value={`SGD ${fmt$(s.excessValue)}`} icon={TrendingUp} color="purple"
-          trend={ppTrend(t.excessPct)} sub={`${s.excessPct}% of inventory · ${s.excessSkuCount} SKUs · ${fmt$(s.excessCarryingCost)}/yr to hold`} target="≤ 5%" />
-        <StatCard label="Slow + Idle (E&O)" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX} color="yellow"
-          trend={ppTrend(t.eoPct)} sub={`${s.eoPct}% of inventory · risk-adj. ${fmt$(s.eoValueRiskAdjusted)}`} target="≤ 15%" />
-        <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} color="blue"
-          trend={ppTrend(t.coverageInBandPct)} sub={`${s.coverage.abovePct}% overstocked · ${s.coverage.belowPct}% at risk`} target="≥ 80%" />
+      {/* ── Hero: the one number that summarizes the business state ── */}
+      <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)" }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, marginBottom: 2 }}>
+          Total Inventory Value
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap" }}>
+          <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
+            SGD {fmt$(s.totalInventoryValue)}
+          </div>
+          <span style={{ fontSize: "var(--text-base)", fontWeight: 700, color: t.inventoryValue.good ? "var(--green)" : "var(--red)" }}>
+            {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs last month
+          </span>
+        </div>
       </div>
 
+      {/* ── Secondary strip: core numbers, demoted but never hidden ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--space-5)", marginBottom: "var(--space-3)" }}>
+        <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat}
+          status={s.turnover < 6.0 ? "warn" : "ok"} trend={numTrend(t.turnover)} sub={`${s.dio}d of supply`} />
+        <StatCard label="Fill Rate" value={`${s.fillRate}%`} icon={ShieldCheck}
+          status={s.fillRate < 90 ? "bad" : s.fillRate < 98 ? "warn" : "ok"} trend={ppTrend(t.fillRate)} sub={`${s.lostSales30d} MT unfilled`} />
+        <StatCard label="GMROI" value={`$${s.gmroi.toFixed(2)}`} icon={Target}
+          status={s.gmroi < 1.5 ? "warn" : "ok"} trend={numTrend(t.gmroi, "$")} sub="per $1 of stock" />
+        <StatCard label="Stockout Risk" value={`SGD ${fmt$(s.stockoutRiskMargin)}`} icon={AlertTriangle}
+          status={s.stockoutSkuCount > 0 ? "bad" : "ok"} trend={moneyTrend(t.stockoutRiskMargin)} sub={`${s.stockoutSkuCount} SKU`} />
+        <StatCard label="Overstock" value={`SGD ${fmt$(s.overstockValue)}`} icon={TrendingUp}
+          status={s.overstockPct > 5 ? "warn" : "ok"} trend={ppTrend(t.overstockPct)} sub={`${s.overstockPct}% of inventory`} />
+        <StatCard label="Excess & Obsolete" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX}
+          status={s.eoPct > 15 ? "warn" : "ok"} trend={ppTrend(t.eoPct)} sub={`${s.eoPct}% of inventory`} />
+      </div>
+
+      {/* ── One real disclosure: situational numbers, not daily-glance ── */}
+      <button
+        onClick={() => setShowMore((v) => !v)}
+        style={{
+          display: "flex", alignItems: "center", gap: 6, background: "none", border: "none",
+          color: "var(--text-muted)", fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
+          padding: "var(--space-2) 0", marginBottom: showMore ? "var(--space-3)" : "var(--space-5)",
+        }}
+      >
+        <ChevronDown size={13} style={{ transform: showMore ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+        {showMore ? "Hide" : "Show"} more metrics
+      </button>
+      {showMore && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-5)", marginBottom: "var(--space-5)" }}>
+          <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock}
+            status={s.coverageInBandPct < 80 ? "warn" : "ok"} trend={ppTrend(t.coverageInBandPct)}
+            sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
+          <StatCard label="Compliance Position" value={`${s.compliancePosition >= 0 ? "+" : ""}${fmt$(s.compliancePosition)}`}
+            icon={ShieldCheck} status={s.compliancePosition < 0 ? "bad" : "ok"}
+            sub="Illustrative rice-stockpile buffer · pending governance approval" />
+        </div>
+      )}
+
       {/* ── TODAY'S TOP ACTIONS ── */}
-      <div style={{ marginBottom: 20 }}>
-        <Card title="Today's Top Actions" subtitle="One row per SKU · ranked by urgency then financial exposure" accent="#3b82f6">
+      <div style={{ marginBottom: "var(--space-5)" }}>
+        <Section title="Today's Top Actions" subtitle="One row per SKU · ranked by urgency then financial exposure">
           {todayActions.length === 0 ? (
-            <div style={{ padding: "16px 0", textAlign: "center", color: "#16a34a", fontWeight: 600, fontSize: 13 }}>
+            <div style={{ padding: "var(--space-4) 0", textAlign: "center", color: "var(--green)", fontWeight: 600, fontSize: "var(--text-base)" }}>
               ✓ No urgent actions required — portfolio is healthy.
             </div>
           ) : (
             <div>
               {todayActions.map((a, i) => (
                 <div key={a.sku_id + a.tag} style={{
-                  display: "flex", alignItems: "center", gap: 14, padding: "12px 0",
+                  display: "flex", alignItems: "center", gap: "var(--space-4)", padding: "var(--space-3) 0",
                   borderBottom: i < todayActions.length - 1 ? "1px solid var(--border)" : "none",
                 }}>
-                  <div style={{
-                    width: 26, height: 26, borderRadius: "50%",
-                    background: i === 0 ? "#fef2f2" : i === 1 ? "#fff7ed" : "var(--surface-2)",
-                    color: i === 0 ? "#dc2626" : i === 1 ? "#c2410c" : "var(--text-muted)",
-                    fontWeight: 700, fontSize: 12,
-                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  }}>
+                  <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-muted)", width: 14, flexShrink: 0 }}>
                     {i + 1}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: 13 }}>{a.name}</span>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: a.tagColor, background: a.tagBg, padding: "1px 8px", borderRadius: 99 }}>
-                        {a.tag}
-                      </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: 3, flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 700, fontSize: "var(--text-base)" }}>{a.name}</span>
+                      <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: a.tagColor }}>{a.tag}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
                       <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{a.action}</span>
                       {" · "}{a.reason}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>SGD {fmt$(a.value)}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{a.valueLabel}</div>
+                    <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)" }}>SGD {fmt$(a.value)}</div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{a.valueLabel}</div>
                   </div>
                   <ArrowRight size={14} color="var(--text-muted)" />
                 </div>
               ))}
             </div>
           )}
-        </Card>
+        </Section>
       </div>
 
       {/* ── Health by value + Exceptions ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, marginBottom: 20 }}>
-        <Card title="Inventory Health by Value" subtitle="Share of working capital in each health status — not SKU count">
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "var(--space-5)", marginBottom: "var(--space-5)" }}>
+        <Section title="Inventory Health by Value" subtitle="Share of working capital in each health status — not SKU count">
           <HealthByValueBar data={s.healthByValue} />
-        </Card>
+        </Section>
 
-        <Card title="Open Exceptions" subtitle={`${s.openExceptions.count} SKUs · ${s.openExceptions.critical} critical`}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        <Section title="Open Exceptions" subtitle={`${s.openExceptions.count} SKUs · ${s.openExceptions.critical} critical`}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
             {s.primaryExceptions.map((a) => <ExceptionRow key={a.sku_id} alert={a} />)}
           </div>
-        </Card>
+        </Section>
       </div>
 
       {/* ── Coverage chart + ABC/XYZ matrix ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 16, marginBottom: 20 }}>
-        <Card title="Cover vs Lead Time + Safety Stock" subtitle="Coloured bar = days of cover · grey outline = lead time + statistical safety stock">
+      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "var(--space-5)", marginBottom: "var(--space-5)" }}>
+        <Section title="Cover vs Lead Time + Safety Stock" subtitle="Coloured bar = days of cover · grey outline = lead time + statistical safety stock">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={coverageData} margin={{ top: 8, right: 16, bottom: 0, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -258,45 +336,44 @@ export default function Dashboard() {
               <Bar dataKey="coverage" radius={[4, 4, 0, 0]} name="Days of cover">
                 {coverageData.map((e, i) => <Cell key={i} fill={e.fill} />)}
               </Bar>
-              <Bar dataKey="threshold" fill="transparent" stroke="#94a3b8" strokeWidth={1.5}
+              <Bar dataKey="threshold" fill="transparent" stroke="var(--text-muted)" strokeWidth={1.5}
                 radius={[3, 3, 0, 0]} name="Lead + safety" />
             </BarChart>
           </ResponsiveContainer>
-          <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11, color: "var(--text-muted)", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--text-muted)", flexWrap: "wrap" }}>
             {Object.entries(HEALTH_COLORS).map(([k, c]) => (
               <span key={k} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 2, background: c, display: "inline-block" }} />{HEALTH_LABEL[k]}
               </span>
             ))}
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, border: "1.5px solid #94a3b8", display: "inline-block" }} />Lead + safety stock
+              <span style={{ width: 8, height: 8, borderRadius: 2, border: "1.5px solid var(--text-muted)", display: "inline-block" }} />Lead + safety stock
             </span>
           </div>
-        </Card>
+        </Section>
 
-        <Card title="ABC × XYZ Segmentation" subtitle="Rows: value (Pareto). Columns: demand predictability. Cell = SKUs · stock value">
+        <Section title="ABC × XYZ Segmentation" subtitle="Rows: value (Pareto). Columns: demand predictability. Cell = SKUs · stock value">
           <AbcXyzMatrix matrix={s.abcXyzMatrix} />
-        </Card>
+        </Section>
       </div>
 
       {/* ── Ageing inventory ── */}
       {ageingItems.length > 0 && (
-        <Card title="Ageing Inventory" subtitle="Stock approaching maximum holding limit — action required">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+        <Section title="Ageing Inventory" subtitle="Stock approaching maximum holding limit — action required">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "var(--space-3)" }}>
             {ageingItems.map((it) => (
               <div key={it.sku_id} style={{
-                padding: "12px 14px",
-                background: it.ageing_status === "At Risk" ? "#fef2f2" : "#fffbeb",
-                border: `1px solid ${it.ageing_status === "At Risk" ? "#fecaca" : "#fde68a"}`,
-                borderRadius: "var(--radius)",
+                padding: "var(--space-3) var(--space-4)",
+                borderLeft: `2px solid ${it.ageing_status === "At Risk" ? "var(--red)" : "var(--yellow)"}`,
+                background: "var(--surface-2)",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
               }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{it.product_name}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                    {it.inventory_age_days}d held · {it.available_stock} MT · max {it.max_holding_days}d
+                  <div style={{ fontWeight: 600, fontSize: "var(--text-base)" }}>{it.product_name}</div>
+                  <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 2 }}>
+                    {it.inventory_age_days}d held · {it.available_qty} MT · max {it.max_holding_days}d
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
                     {it.max_holding_days - it.inventory_age_days} days to limit
                   </div>
                 </div>
@@ -304,7 +381,7 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </Card>
+        </Section>
       )}
     </div>
   );
@@ -315,15 +392,15 @@ export default function Dashboard() {
 function HealthByValueBar({ data }) {
   return (
     <div>
-      <div style={{ display: "flex", height: 30, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
+      <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden" }}>
         {data.filter((d) => d.pct > 0).map((d) => (
           <div key={d.status} title={`${HEALTH_LABEL[d.status]}: ${d.pct}%`}
             style={{ width: `${d.pct}%`, background: HEALTH_COLORS[d.status] }} />
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "var(--space-2)", marginTop: "var(--space-4)" }}>
         {data.map((d) => (
-          <div key={d.status} style={{ fontSize: 12 }}>
+          <div key={d.status} style={{ fontSize: "var(--text-sm)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: HEALTH_COLORS[d.status] }} />
               <span style={{ fontWeight: 600 }}>{HEALTH_LABEL[d.status]}</span>
@@ -349,13 +426,13 @@ function AbcXyzMatrix({ matrix }) {
       <div style={{ display: "grid", gridTemplateColumns: "auto repeat(3, 1fr)", gap: 4 }}>
         <div />
         {cols.map((c) => (
-          <div key={c} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: "var(--text-secondary)" }}>
+          <div key={c} style={{ textAlign: "center", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)" }}>
             {c}<div style={{ fontWeight: 400, fontSize: 10, color: "var(--text-muted)" }}>{colHint[c]}</div>
           </div>
         ))}
         {rows.map((r) => (
           <React.Fragment key={r}>
-            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", paddingRight: 6 }}>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", paddingRight: 6 }}>
               {r}<span style={{ fontWeight: 400, fontSize: 10, color: "var(--text-muted)" }}>{rowHint[r]}</span>
             </div>
             {cols.map((c) => {
@@ -364,8 +441,7 @@ function AbcXyzMatrix({ matrix }) {
               return (
                 <div key={c} style={{
                   background: cell.value > 0 ? `rgba(59,130,246,${0.08 + intensity * 0.32})` : "var(--surface-2)",
-                  border: "1px solid var(--border)", borderRadius: 6,
-                  padding: "10px 4px", textAlign: "center",
+                  borderRadius: 6, padding: "var(--space-3) 4px", textAlign: "center",
                 }}>
                   <div style={{ fontSize: 15, fontWeight: 800, color: cell.count ? "var(--text-primary)" : "var(--text-muted)" }}>
                     {cell.count}
@@ -377,7 +453,7 @@ function AbcXyzMatrix({ matrix }) {
           </React.Fragment>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 10, lineHeight: 1.5 }}>
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-3)", lineHeight: 1.5 }}>
         AZ / BZ / CZ carry the hardest-to-plan stock — set higher safety stock and shorter review cycles there.
       </div>
     </div>
@@ -385,21 +461,16 @@ function AbcXyzMatrix({ matrix }) {
 }
 
 function ExceptionRow({ alert }) {
-  const borderColor = { critical: "#ef4444", warning: "#f97316", info: "#3b82f6" }[alert.severity] || "#94a3b8";
+  const borderColor = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--blue)" }[alert.severity] || "var(--text-muted)";
   return (
-    <div style={{
-      padding: "9px 11px",
-      borderLeft: `3px solid ${borderColor}`,
-      background: "var(--surface-2)",
-      borderRadius: "0 var(--radius) var(--radius) 0",
-    }}>
+    <div style={{ padding: "var(--space-2) var(--space-3)", borderLeft: `2px solid ${borderColor}` }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <span style={{ fontWeight: 600, fontSize: 12, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span style={{ fontWeight: 600, fontSize: "var(--text-sm)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {alert.sku_name}
         </span>
         <Badge type={alert.severity} />
       </div>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4 }}>
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4 }}>
         {alert.alert_type.replace(/_/g, " ")} · {alert.message.slice(0, 58)}…
       </div>
     </div>
@@ -408,26 +479,21 @@ function ExceptionRow({ alert }) {
 
 function PageHeader({ title, subtitle }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)" }}>{title}</h1>
-      <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>{subtitle}</p>
+    <div style={{ marginBottom: "var(--space-5)" }}>
+      <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--text-primary)" }}>{title}</h1>
+      <p style={{ fontSize: "var(--text-base)", color: "var(--text-secondary)", marginTop: 4 }}>{subtitle}</p>
     </div>
   );
 }
 
-function Card({ title, subtitle, children, accent }) {
+// Renamed from `Card` — no border/shadow/accent-stripe; a labelled section that
+// separates from its neighbors via spacing, matching the rest of the page.
+function Section({ title, subtitle, children }) {
   return (
-    <div style={{
-      background: "var(--card-bg)",
-      border: "1px solid var(--border)",
-      borderTop: accent ? `3px solid ${accent}` : "1px solid var(--border)",
-      borderRadius: "var(--radius-lg)",
-      padding: "20px 22px",
-      boxShadow: "var(--shadow)",
-    }}>
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontWeight: 600, fontSize: 15 }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{subtitle}</div>}
+    <div>
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <div style={{ fontWeight: 600, fontSize: "var(--text-md)" }}>{title}</div>
+        {subtitle && <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginTop: 2 }}>{subtitle}</div>}
       </div>
       {children}
     </div>

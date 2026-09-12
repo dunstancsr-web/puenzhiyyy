@@ -1,19 +1,27 @@
-import React from "react";
-import { NavLink } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { LayoutDashboard, PackageSearch, Bell, TrendingUp } from "lucide-react";
-import { mockAlerts } from "../mock/alertsData";
 import { useTheme, THEMES } from "../context/ThemeContext";
-
-const unacknowledgedCount = mockAlerts.filter((a) => !a.acknowledged).length;
-
-const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
-  { to: "/inventory", label: "Inventory",  icon: PackageSearch,  badge: null },
-  { to: "/alerts",    label: "Alerts",     icon: Bell,           badge: unacknowledgedCount },
-];
+import { api } from "../api/inventory";
 
 export default function Sidebar() {
   const { theme, setTheme } = useTheme();
+  const location = useLocation();
+  const [alertCount, setAlertCount] = useState(0);
+
+  // Sidebar persists across page navigation (mounted once above <Routes> in
+  // App.jsx) rather than remounting per page, so refetch on every route change
+  // to stay live — e.g. dismissing an alert on /alerts should update the badge
+  // the moment you navigate away, not just on a hard refresh.
+  useEffect(() => {
+    api.getAlerts().then((data) => setAlertCount(data.length)).catch(() => {});
+  }, [location.pathname]);
+
+  const navItems = [
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
+    { to: "/inventory", label: "Inventory",  icon: PackageSearch,  badge: null },
+    { to: "/alerts",    label: "Alerts",     icon: Bell,           badge: alertCount },
+  ];
 
   return (
     <aside

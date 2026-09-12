@@ -111,7 +111,13 @@ export function SliderField({
             inputMode="decimal"
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
-            step={step}
+            // step="any" deliberately, NOT the slider's `step`: this box must accept
+            // whatever value the SKU already has (e.g. a seeded 302 against a step-5
+            // slider). Sharing `step` here means the browser's native HTML5 constraint
+            // validation silently blocks form submission for any pre-existing value
+            // that isn't an exact multiple — no JS error, no network call, nothing
+            // visible. Found via a real Save-button click producing zero effect.
+            step="any"
             min={min}
             max={max}
             disabled={disabled}

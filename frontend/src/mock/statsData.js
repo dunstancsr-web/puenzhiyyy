@@ -32,11 +32,11 @@ const stockoutSkus = activeSkus.filter((s) => s.stockout_gap_days > 0);
 const stockoutRiskMargin = stockoutSkus.reduce((sum, s) => sum + s.lost_margin_risk, 0);
 const stockoutRiskSales = stockoutSkus.reduce((sum, s) => sum + s.lost_sales_value_risk, 0);
 
-// ── Excess stock (above max) ────────────────────────────────────────────────
-const excessSkus = activeSkus.filter((s) => s.excess_mt > 0);
-const excessValue = excessSkus.reduce((sum, s) => sum + s.excess_value, 0);
-const excessCarryingCost = excessSkus.reduce((sum, s) => sum + s.excess_carrying_cost, 0);
-const excessPct = +((excessValue / totalInventoryValue) * 100).toFixed(1);
+// ── Overstock (above max) ────────────────────────────────────────────────────
+const overstockSkus = activeSkus.filter((s) => s.overstock_qty > 0);
+const overstockValue = overstockSkus.reduce((sum, s) => sum + s.overstock_value, 0);
+const overstockCarryingCost = overstockSkus.reduce((sum, s) => sum + s.overstock_carrying_cost, 0);
+const overstockPct = +((overstockValue / totalInventoryValue) * 100).toFixed(1);
 
 // ── Excess & Obsolete (slow + idle) ─────────────────────────────────────────
 const eoSkus = activeSkus.filter((s) => s.eo_value > 0);
@@ -59,27 +59,40 @@ const movementCounts = activeSkus.reduce(
 const healthByValue = getHealthByValue();
 const abcXyzMatrix = getAbcXyzMatrix();
 
-// Legacy: unweighted average days of stock — kept for reference / comparison
-const skusWithDays = activeSkus.filter((s) => s.days_of_stock !== null);
-const avgDaysOfStock = Math.round(
-  skusWithDays.reduce((sum, s) => sum + s.days_of_stock, 0) / skusWithDays.length
+// Unweighted average days of cover — kept for reference / comparison alongside the
+// value-weighted DIO above (glossary #22, Days of Cover).
+const skusWithDays = activeSkus.filter((s) => s.days_of_cover !== null);
+const avgDaysOfCover = Math.round(
+  skusWithDays.reduce((sum, s) => sum + s.days_of_cover, 0) / skusWithDays.length
 );
+
+// ── Compliance Position (REQ-16, glossary #38) — illustrative, portfolio-level ──
+// The real rice-stockpile scheme is company-wide, not per-SKU. Uses demand as an
+// honest stand-in for real import-receipt history, which this project doesn't have.
+const complianceEligibleQty = Math.round(activeSkus.reduce((sum, s) => sum + s.on_hand_qty, 0));
+const complianceRequiredQty = Math.round(2 * activeSkus.reduce((sum, s) => sum + s.blended_daily_usage, 0) * 30);
+const compliancePosition = complianceEligibleQty - complianceRequiredQty;
+
+// ── Data Status (REQ-17, glossary #39) — informational as-of timestamp only; no
+// live staleness detection in MVP1 (that needs spec Step 18A's freshness state
+// machine, deferred — see requirements.md "Explicitly Deferred").
+const asOf = new Date().toISOString();
 
 // ── Top stockout risks ─────────────────────────────────────────────────────
 const stockoutRisks = [...activeSkus]
   .sort((a, b) => {
-    if (a.days_of_stock === null) return 1;
-    if (b.days_of_stock === null) return -1;
-    return (a.days_of_stock - a.lead_time_days) - (b.days_of_stock - b.lead_time_days);
+    if (a.days_of_cover === null) return 1;
+    if (b.days_of_cover === null) return -1;
+    return (a.days_of_cover - a.lead_time_days) - (b.days_of_cover - b.lead_time_days);
   })
   .slice(0, 5)
   .map((s) => ({
     sku_id: s.sku_id,
     product_name: s.product_name,
-    days_of_stock: s.days_of_stock,
+    days_of_cover: s.days_of_cover,
     lead_time_days: s.lead_time_days,
     safety_stock_days: s.safety_stock_days,
-    on_order: s.on_order,
+    expected_incoming_qty: s.expected_incoming_qty,
     covered_by_po: s.covered_by_po,
     health_status: s.health_status,
   }));
@@ -119,7 +132,7 @@ const prior = {
   gmroi: 0.62,
   fillRate: 96.1,
   stockoutRiskMargin: 12_000,
-  excessPct: 6.1,
+  overstockPct: 6.1,
   eoPct: 34.0,
   coverageInBandPct: 41.0,
 };
@@ -136,7 +149,7 @@ function delta(cur, prev, { higherIsBetter = true, unit = "", pp = false } = {})
 export const mockStats = {
   // Counts (kept for existing components)
   totalSkus: activeSkus.length,
-  avgDaysOfStock,
+  avgDaysOfCover,
   redCount: healthCounts.RED,
   orangeCount: healthCounts.ORANGE,
   yellowCount: healthCounts.YELLOW,
@@ -161,13 +174,11 @@ export const mockStats = {
   stockoutRiskSales: Math.round(stockoutRiskSales),
   stockoutSkuCount: stockoutSkus.length,
 
-  overstockedValue: Math.round(excessValue),   // legacy alias
-  excessValue: Math.round(excessValue),
-  excessCarryingCost: Math.round(excessCarryingCost),
-  excessPct,
-  excessSkuCount: excessSkus.length,
+  overstockValue: Math.round(overstockValue),
+  overstockCarryingCost: Math.round(overstockCarryingCost),
+  overstockPct,
+  overstockSkuCount: overstockSkus.length,
 
-  slowIdleValue: Math.round(eoValue),          // legacy alias
   eoValue: Math.round(eoValue),
   eoValueRiskAdjusted: Math.round(eoValueRiskAdjusted),
   eoPct,
@@ -180,6 +191,14 @@ export const mockStats = {
   // Segmentation
   healthByValue,
   abcXyzMatrix,
+
+  // Compliance Position — illustrative, portfolio-level (REQ-16)
+  complianceEligibleQty,
+  complianceRequiredQty,
+  compliancePosition,
+
+  // Data Status — informational as-of timestamp (REQ-17)
+  asOf,
 
   // Exceptions
   openExceptions,
@@ -197,7 +216,7 @@ export const mockStats = {
     gmroi: delta(gmroi, prior.gmroi, { higherIsBetter: true, unit: "$" }),
     fillRate: delta(fillRate, prior.fillRate, { higherIsBetter: true, pp: true }),
     stockoutRiskMargin: delta(stockoutRiskMargin, prior.stockoutRiskMargin, { higherIsBetter: false, unit: "$" }),
-    excessPct: delta(excessPct, prior.excessPct, { higherIsBetter: false, pp: true }),
+    overstockPct: delta(overstockPct, prior.overstockPct, { higherIsBetter: false, pp: true }),
     eoPct: delta(eoPct, prior.eoPct, { higherIsBetter: false, pp: true }),
     coverageInBandPct: delta(coverage.inBandPct, prior.coverageInBandPct, { higherIsBetter: true, pp: true }),
   },

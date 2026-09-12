@@ -1,19 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   AlertTriangle, XCircle, TrendingUp, TrendingDown,
   RefreshCw, X, CheckCircle, Clock, Cpu,
 } from "lucide-react";
 import Badge from "../components/Badge";
-import { mockAlerts } from "../mock/alertsData";
+import LoadingState from "../components/LoadingState";
+import ErrorState from "../components/ErrorState";
+import { api } from "../api/inventory";
 
 // ── Config ─────────────────────────────────────────────────────────────────────
+// Colors now token-based (was hardcoded light-mode-only hex) — the direct
+// cause of this page never respecting Dark/Glass (visual overhaul, 2026-09).
 const TYPE_META = {
-  STOCKOUT_RISK: { icon: XCircle,       color: "#dc2626", bg: "#fef2f2", border: "#fecaca", label: "Stockout Risk" },
-  REORDER:       { icon: AlertTriangle, color: "#c2410c", bg: "#fff7ed", border: "#fed7aa", label: "Reorder" },
-  OVERSTOCK:     { icon: TrendingUp,    color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", label: "Overstock" },
-  SLOW_MOVING:   { icon: TrendingDown,  color: "#b45309", bg: "#fffbeb", border: "#fde68a", label: "Slow Moving" },
-  IDLE:          { icon: Clock,         color: "#dc2626", bg: "#fef2f2", border: "#fecaca", label: "Idle Stock" },
-  AGEING:        { icon: AlertTriangle, color: "#b45309", bg: "#fffbeb", border: "#fde68a", label: "Ageing" },
+  STOCKOUT_RISK: { icon: XCircle,       color: "var(--red)",    bg: "var(--red-light)",    label: "Stockout Risk" },
+  REORDER:       { icon: AlertTriangle, color: "var(--yellow)", bg: "var(--yellow-light)", label: "Reorder" },
+  OVERSTOCK:     { icon: TrendingUp,    color: "var(--purple)", bg: "var(--purple-light)", label: "Overstock" },
+  SLOW_MOVING:   { icon: TrendingDown,  color: "var(--yellow)", bg: "var(--yellow-light)", label: "Slow Moving" },
+  IDLE:          { icon: Clock,         color: "var(--red)",    bg: "var(--red-light)",    label: "Idle Stock" },
+  AGEING:        { icon: AlertTriangle, color: "var(--yellow)", bg: "var(--yellow-light)", label: "Ageing" },
 };
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
@@ -29,14 +33,30 @@ const MOCK_AI_EXPLANATIONS = {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Alerts() {
-  const [alerts, setAlerts] = useState(mockAlerts);
+  const [alerts, setAlerts] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const [filter, setFilter] = useState("ALL");
   const [aiModal, setAiModal] = useState(null);       // { alert, explanation }
   const [approvalModal, setApprovalModal] = useState(null); // alert
   const [decisions, setDecisions] = useState([]);
 
+  const loadAlerts = useCallback(() => {
+    setLoadError(null);
+    setAlerts(null);
+    Promise.all([api.getAlerts(), api.getDecisions()])
+      .then(([alertsData, decisionsData]) => { setAlerts(alertsData); setDecisions(decisionsData); })
+      .catch((err) => setLoadError(err.message || "Failed to load alerts"));
+  }, []);
+
+  useEffect(() => { loadAlerts(); }, [loadAlerts]);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadAlerts} />;
+  if (!alerts) return <LoadingState label="Loading alerts…" />;
+
   // ── Filtering + sorting ──────────────────────────────────────────────────────
-  const active = alerts.filter((a) => !a.acknowledged);
+  // The API already excludes acknowledged alerts (routes/inventory.js materializes
+  // against alerts_log) — no client-side "active" filter needed any more.
+  const active = alerts;
   const filtered = active
     .filter((a) => filter === "ALL" || a.alert_type === filter)
     .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3));
@@ -52,30 +72,42 @@ export default function Alerts() {
   ];
 
   // ── Actions ──────────────────────────────────────────────────────────────────
-  const acknowledge = (id) =>
-    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)));
+  // acknowledge/dismiss and decisions are both wired to the real backend
+  // (alerts_log.status / the decisions table — TASK-10 / TASK-12). handleAskAI
+  // stays local-only for now — Ask AI needs an LLM API key that isn't set up
+  // yet (TASK-11); MOCK_AI_EXPLANATIONS is the known placeholder until then.
+  const acknowledge = async (id) => {
+    try {
+      await api.acknowledgeAlert(id);
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      console.error("Failed to acknowledge alert:", err);
+    }
+  };
 
   const handleAskAI = (alert) => {
     const explanation = MOCK_AI_EXPLANATIONS[alert.id] || "AI explanation not available for this alert.";
     setAiModal({ alert, explanation });
   };
 
-  const handleDecision = (alert, action, qty, reason) => {
-    const decision = {
-      id: Date.now(),
-      sku_id: alert.sku_id,
-      sku_name: alert.sku_name,
-      alert_type: alert.alert_type,
-      ai_recommendation: alert.recommended_action,
-      ai_quantity: alert.ai_recommendation_qty,
-      manager_action: action,
-      manager_quantity: qty,
-      manager_reason: reason,
-      decided_at: new Date().toISOString(),
-    };
-    setDecisions((prev) => [decision, ...prev]);
-    acknowledge(alert.id);
-    setApprovalModal(null);
+  const handleDecision = async (alert, action, qty, reason) => {
+    try {
+      const created = await api.createDecision({
+        sku_id: alert.sku_id,
+        alert_type: alert.alert_type,
+        ai_recommendation: alert.recommended_action,
+        ai_quantity: alert.ai_recommendation_qty,
+        manager_action: action,
+        manager_quantity: qty,
+        manager_reason: reason,
+      });
+      setDecisions((prev) => [created, ...prev]);
+      await acknowledge(alert.id);
+    } catch (err) {
+      console.error("Failed to record decision:", err);
+    } finally {
+      setApprovalModal(null);
+    }
   };
   return (
     <div>
@@ -88,8 +120,8 @@ export default function Alerts() {
           </p>
         </div>
         <button
-          onClick={() => {}}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "#fff", fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}
+          onClick={loadAlerts}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--card-bg)", fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}
         >
           <RefreshCw size={13} /> Refresh
         </button>
@@ -103,8 +135,8 @@ export default function Alerts() {
           return (
             <div key={type} onClick={() => setFilter(filter === type ? "ALL" : type)}
               style={{
-                background: filter === type ? meta.bg : "#fff",
-                border: `1px solid ${filter === type ? meta.border : "var(--border)"}`,
+                background: filter === type ? meta.bg : "var(--card-bg)",
+                border: `1px solid ${filter === type ? meta.color : "var(--border)"}`,
                 borderRadius: "var(--radius-lg)", padding: "14px 16px",
                 cursor: "pointer", transition: "all 0.15s",
               }}
@@ -129,7 +161,7 @@ export default function Alerts() {
               display: "flex", alignItems: "center", gap: 6,
               padding: "6px 14px", borderRadius: 99,
               border: `1px solid ${filter === t.key ? "var(--blue)" : "var(--border)"}`,
-              background: filter === t.key ? "var(--blue-light)" : "#fff",
+              background: filter === t.key ? "var(--blue-light)" : "var(--card-bg)",
               color: filter === t.key ? "var(--blue)" : "var(--text-secondary)",
               fontSize: 13, fontWeight: 500, cursor: "pointer",
             }}
@@ -149,7 +181,7 @@ export default function Alerts() {
       {/* ── Alert cards ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
         {filtered.length === 0 ? (
-          <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+          <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
             {active.length === 0 ? "✓ No active alerts — all inventory levels are healthy." : "No alerts match this filter."}
           </div>
         ) : (
@@ -169,7 +201,7 @@ export default function Alerts() {
       {decisions.length > 0 && (
         <div>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Decision Log</h2>
-          <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+          <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
@@ -185,14 +217,16 @@ export default function Alerts() {
                       {new Date(d.decided_at).toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}
                     </td>
                     <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{d.sku_name}</td>
-                    <td style={{ padding: "10px 14px" }}><Badge type={d.alert_type} label={d.alert_type.replace(/_/g, " ")} /></td>
+                    <td style={{ padding: "10px 14px" }}>
+                      {d.trigger_type && <Badge type={d.trigger_type} label={d.trigger_type.replace(/_/g, " ")} />}
+                    </td>
                     <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--text-secondary)" }}>
                       {d.ai_quantity != null ? `${d.ai_quantity} MT` : "Review"}
                     </td>
                     <td style={{ padding: "10px 14px" }}>
                       <span style={{
                         fontWeight: 700, fontSize: 12,
-                        color: d.manager_action === "approved" ? "#16a34a" : d.manager_action === "rejected" ? "#dc2626" : "#b45309",
+                        color: d.manager_action === "approved" ? "var(--green)" : d.manager_action === "rejected" ? "var(--red)" : "var(--yellow)",
                       }}>
                         {d.manager_action.toUpperCase()}
                       </span>
@@ -237,7 +271,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
 
   return (
     <div style={{
-      background: "#fff", borderRadius: "var(--radius-lg)",
+      background: "var(--card-bg)", borderRadius: "var(--radius-lg)",
       border: "1px solid var(--border)",
       borderLeft: `4px solid ${meta.color}`,
       boxShadow: "var(--shadow)",
@@ -246,7 +280,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
       {/* Main row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 20px" }}>
         {/* Icon */}
-        <div style={{ width: 38, height: 38, borderRadius: 10, background: meta.bg, border: `1px solid ${meta.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: meta.bg, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <Icon size={17} color={meta.color} />
         </div>
 
@@ -271,12 +305,13 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: meta.color }}>{alert.triggered_value}</div>
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>
-            {alert.alert_type === "STOCKOUT_RISK" || alert.alert_type === "REORDER" ? "days" :
-             alert.alert_type === "OVERSTOCK" || alert.alert_type === "SLOW_MOVING" ? "MT" :
+            {/* Matches each alert type's actual triggered_value unit — see backend/src/engines/alerts.js */}
+            {alert.alert_type === "STOCKOUT_RISK" || alert.alert_type === "SLOW_MOVING" ? "days" :
+             alert.alert_type === "REORDER" || alert.alert_type === "OVERSTOCK" ? "MT" :
              alert.alert_type === "IDLE" ? "days idle" : "days held"}
           </div>
           <button onClick={() => onAcknowledge(alert.id)}
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", border: "1px solid var(--border)", borderRadius: 6, background: "#fff", fontSize: 12, cursor: "pointer", color: "var(--text-secondary)" }}>
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--card-bg)", fontSize: 12, cursor: "pointer", color: "var(--text-secondary)" }}>
             <CheckCircle size={12} /> Dismiss
           </button>
         </div>
@@ -301,24 +336,26 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
               style={{
                 display: "flex", alignItems: "center", gap: 6,
                 padding: "6px 14px", borderRadius: "var(--radius)",
-                border: "1px solid #c4b5fd",
-                background: "#f5f3ff", color: "#7c3aed",
+                border: "1px solid var(--border)",
+                background: "var(--purple-light)", color: "var(--purple)",
                 fontSize: 12, fontWeight: 600, cursor: "pointer",
               }}
             >
               <Cpu size={12} /> Ask AI
             </button>
-            {/* Approval buttons */}
-            <button onClick={() => { setApprovalModal(alert); }}
-              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid #bbf7d0", background: "#f0fdf4", color: "#16a34a", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            {/* Approval buttons — fixed: these referenced the out-of-scope
+                `setApprovalModal` directly and threw ReferenceError on click;
+                now correctly call the `onApprove` prop passed down from Alerts(). */}
+            <button onClick={() => onApprove(alert)}
+              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--green-light)", color: "var(--green)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               ✓ Approve
             </button>
-            <button onClick={() => { setApprovalModal({ alert, preAction: "modified" }); }}
-              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid #fde68a", background: "#fffbeb", color: "#b45309", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            <button onClick={() => onApprove({ alert, preAction: "modified" })}
+              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--yellow-light)", color: "var(--yellow)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               ✏ Modify
             </button>
-            <button onClick={() => { setApprovalModal({ alert, preAction: "rejected" }); }}
-              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            <button onClick={() => onApprove({ alert, preAction: "rejected" })}
+              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--red-light)", color: "var(--red)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               ✕ Reject
             </button>
           </div>
@@ -334,12 +371,12 @@ function AiModal({ aiModal, onClose }) {
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "#fff", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "var(--shadow-md)" }}>
+      <div style={{ background: "var(--modal-bg)", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "var(--shadow-md)" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: "#f5f3ff", border: "1px solid #ddd6fe", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Cpu size={15} color="#7c3aed" />
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--purple-light)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Cpu size={15} color="var(--purple)" />
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: 15 }}>AI Explanation</div>
@@ -350,7 +387,7 @@ function AiModal({ aiModal, onClose }) {
         </div>
 
         {/* Disclaimer */}
-        <div style={{ padding: "8px 12px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "var(--radius)", fontSize: 12, color: "#b45309", marginBottom: 16 }}>
+        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 12, color: "var(--yellow)", marginBottom: 16 }}>
           ⚠️ AI-generated analysis · All recommendations require manager review and approval before action is taken.
         </div>
 
@@ -384,7 +421,7 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "#fff", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: 480, boxShadow: "var(--shadow-md)" }}>
+      <div style={{ background: "var(--modal-bg)", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: 480, boxShadow: "var(--shadow-md)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>Manager Decision</div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
@@ -407,15 +444,15 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
             <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>Decision</label>
             <div style={{ display: "flex", gap: 8 }}>
               {[
-                { value: "approved", label: "✓ Approve", activeColor: "#16a34a", activeBg: "#f0fdf4", activeBorder: "#bbf7d0" },
-                { value: "modified", label: "✏ Modify",  activeColor: "#b45309", activeBg: "#fffbeb", activeBorder: "#fde68a" },
-                { value: "rejected", label: "✕ Reject",  activeColor: "#dc2626", activeBg: "#fef2f2", activeBorder: "#fecaca" },
+                { value: "approved", label: "✓ Approve", activeColor: "var(--green)", activeBg: "var(--green-light)" },
+                { value: "modified", label: "✏ Modify",  activeColor: "var(--yellow)", activeBg: "var(--yellow-light)" },
+                { value: "rejected", label: "✕ Reject",  activeColor: "var(--red)", activeBg: "var(--red-light)" },
               ].map((opt) => (
                 <button key={opt.value} type="button" onClick={() => setAction(opt.value)}
                   style={{
                     flex: 1, padding: "8px", borderRadius: "var(--radius)", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                    border: `1px solid ${action === opt.value ? opt.activeBorder : "var(--border)"}`,
-                    background: action === opt.value ? opt.activeBg : "#fff",
+                    border: `1px solid ${action === opt.value ? opt.activeColor : "var(--border)"}`,
+                    background: action === opt.value ? opt.activeBg : "var(--surface)",
                     color: action === opt.value ? opt.activeColor : "var(--text-secondary)",
                   }}>
                   {opt.label}
@@ -438,7 +475,7 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
           {/* Reason */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
-              Reason / Notes {action !== "approved" && <span style={{ color: "#ef4444" }}>*</span>}
+              Reason / Notes {action !== "approved" && <span style={{ color: "var(--red)" }}>*</span>}
             </label>
             <textarea
               value={reason} onChange={(e) => setReason(e.target.value)}
@@ -450,7 +487,7 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button type="button" onClick={onClose}
-              style={{ padding: "8px 18px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "#fff", fontSize: 13, cursor: "pointer" }}>
+              style={{ padding: "8px 18px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, cursor: "pointer" }}>
               Cancel
             </button>
             <button type="submit"

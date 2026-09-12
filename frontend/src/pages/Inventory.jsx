@@ -1,16 +1,24 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
+} from "recharts";
 import { Search, Filter, Plus, ChevronUp, ChevronDown, X } from "lucide-react";
 import Badge from "../components/Badge";
 import ColHint from "../components/ColHint";
 import StockPositionBar from "../components/StockPositionBar";
+import LoadingState from "../components/LoadingState";
+import ErrorState from "../components/ErrorState";
 import { TextField, NumberField, SliderField, niceCeil } from "../components/FormField";
-import { mockSkus } from "../mock/riceData";
-import { computeSkuAnalytics, computePortfolioAnalytics, DEFAULT_EXTRAS } from "../mock/analytics";
+import { api } from "../api/inventory";
+// Used only for the SkuEditForm's instant live-preview strip while dragging sliders
+// (no round-trip per keystroke) — the actual Save always persists via the real API
+// below. Formulas are identical post the domain-alignment rename, so the preview
+// matches what the server will return.
+import { computeSkuAnalytics } from "../mock/analytics";
 
 const HEALTH_STATUSES = ["All", "RED", "ORANGE", "YELLOW", "GREEN"];
 const MOVEMENT_CLASSES = ["All", "Fast Moving", "Normal", "Slow Moving", "Idle"];
-const ORIGINS = ["All", ...new Set(mockSkus.map((s) => s.country_of_origin)).values()];
 
 const HEALTH_DOT = { RED: "#ef4444", ORANGE: "#f97316", YELLOW: "#f59e0b", GREEN: "#22c55e" };
 const HEALTH_ORDER = { RED: 0, ORANGE: 1, YELLOW: 2, GREEN: 3 };
@@ -32,17 +40,17 @@ const COLS = [
     },
   },
   {
-    key: "available_stock", label: "Stock Position", width: "30%",
+    key: "available_qty", label: "Stock Position", width: "30%",
     tip: {
       what: "Where this SKU's available stock sits against its reorder point and maximum.",
-      how: "The coloured bar is available stock; its colour is the health status — red below the reorder point, amber just above it, green healthy, purple overstock.\n\nThe two tick marks are the reorder point and the maximum, labelled with their values beneath. Grey shading marks the ranges to avoid: below the reorder point (order now) or above the maximum (overstock). Aim to keep the bar between the two ticks.\n\nAvailable = physical stock − reserved for orders − quality hold.",
+      how: "The coloured bar is available stock; its colour is the health status — red below the reorder point, amber just above it, green healthy, purple overstock.\n\nThe two tick marks are the reorder point and the maximum, labelled with their values beneath. Grey shading marks the ranges to avoid: below the reorder point (order now) or above the maximum (overstock). Aim to keep the bar between the two ticks.\n\nAvailable = on-hand stock − reserved for orders − quality hold.",
     },
   },
   {
-    key: "days_of_stock", label: "Coverage vs Lead Time", width: "14%",
+    key: "days_of_cover", label: "Coverage vs Lead Time", width: "14%",
     tip: {
       what: "How many days your current stock will last, compared to how long it takes to get more.",
-      how: "Formula: Days of stock = Available stock ÷ Average daily sales (last 30 days).\n\nThe grey marker on the mini bar shows your supplier's lead time. If the coloured bar doesn't reach the marker — you will run out before new stock arrives.\n\nExample: 26 days of stock, 45-day lead time = 19-day gap. Red bar, order now.\n\nIf no demand is shown, this SKU hasn't sold anything recently and is classified as Idle.",
+      how: "Formula: Days of cover = Available stock ÷ Average daily sales (last 30 days).\n\nThe grey marker on the mini bar shows your supplier's lead time. If the coloured bar doesn't reach the marker — you will run out before new stock arrives.\n\nExample: 26 days of cover, 45-day lead time = 19-day gap. Red bar, order now.\n\nIf no demand is shown, this SKU hasn't sold anything recently and is classified as Idle.",
     },
   },
   {
@@ -81,7 +89,7 @@ const EDIT_GROUPS = [
       ["min_stock", "num", "Min stock", false, "MT"],
       ["target_stock", "num", "Target stock", false, "MT"],
       ["max_stock", "num", "Max stock", false, "MT"],
-      ["reorder_point", "num", "Reorder point", false, "MT"],
+      ["reorder_point_policy", "num", "Reorder point", false, "MT"],
       ["lead_time_days", "num", "Lead time", false, "days"],
       ["target_service_level_pct", "num", "Target service level", false, "%"],
       ["safety_stock_pct", "num", "Safety stock", false, "%"],
@@ -108,11 +116,26 @@ const NUMERIC_EDIT_KEYS = EDIT_GROUPS.flatMap((g) =>
   g.fields.filter(([, t]) => t === "num").map(([k]) => k)
 );
 
+// Which SkuEditForm tab each EDIT_GROUPS section renders under (visual overhaul,
+// 2026-09) — "Overview" (the default tab) has no EDIT_GROUPS section at all;
+// it's built from read-only SKU data instead. See SkuEditForm below.
+const TAB_FOR_GROUP = {
+  "Inventory Policy": "policy",
+  "Identity": "details",
+  "Costs": "details",
+  "Stock Adjustments": "details",
+};
+const TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "policy", label: "Policy" },
+  { id: "details", label: "Details" },
+];
+
 // Which numeric fields render as a slider (+ number), and how their range is set.
 // Keys absent here (unit cost / price, min order qty) stay plain number inputs.
 const SLIDER_SPECS = {
   min_stock: { kind: "stock" },
-  reorder_point: { kind: "stock" },
+  reorder_point_policy: { kind: "stock" },
   target_stock: { kind: "stock" },
   max_stock: { kind: "stock" },
   reserved_qty: { kind: "physical" },
@@ -129,24 +152,15 @@ function resolveSpec(spec, { axisMax, physicalStock }) {
   return spec;
 }
 
-const STOCK_SLIDER_KEYS = ["min_stock", "reorder_point", "target_stock", "max_stock"];
+const STOCK_SLIDER_KEYS = ["min_stock", "reorder_point_policy", "target_stock", "max_stock"];
 const stockAxisMax = (form, physicalStock = 0) =>
   niceCeil(
     Math.max(...STOCK_SLIDER_KEYS.map((k) => Number(form[k]) || 0), Number(physicalStock) || 0) * 1.15
   );
 
-const NEW_SKU_DEFAULTS = {
-  physical_stock: 0, reserved_qty: 0, quality_hold_qty: 0,
-  incoming_stock: 0, sales_30d: 0, sales_60d: 0, sales_90d: 0,
-  avg_daily_usage_30d: 0, avg_daily_usage_90d: 0,
-  velocity_trend: "stable", movement_class: "Normal",
-  ageing_status: "Fresh", inventory_age_days: 0,
-  last_received_date: new Date().toISOString().split("T")[0],
-  recommended_action: "New SKU — monitor initial demand.",
-};
-
 export default function Inventory() {
-  const [skus, setSkus] = useState(mockSkus);
+  const [skus, setSkus] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState("");
   const [healthFilter, setHealthFilter] = useState("All");
   const [movementFilter, setMovementFilter] = useState("All");
@@ -158,9 +172,22 @@ export default function Inventory() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSku, setSelectedSku] = useState(null);
 
+  const loadSkus = useCallback(() => {
+    setLoadError(null);
+    setSkus(null);
+    api.getSkus().then(setSkus).catch((err) => setLoadError(err.message || "Failed to load inventory"));
+  }, []);
+
+  useEffect(() => { loadSkus(); }, [loadSkus]);
+
+  const ORIGINS = useMemo(
+    () => ["All", ...new Set((skus || []).map((s) => s.country_of_origin)).values()],
+    [skus]
+  );
+
   // ── Sort + filter ──────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    let result = skus;
+    let result = skus || [];
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -197,38 +224,42 @@ export default function Inventory() {
     else { setSortKey(key); setSortDir("asc"); }
   };
 
-  // ── Mutations — all routed through the shared analytics recompute ──────────
-  const applyPatch = (skuId, patch) =>
-    setSkus((prev) => {
-      const next = prev.map((s) =>
-        s.sku_id === skuId ? computeSkuAnalytics({ ...s, ...patch }) : s
-      );
-      return computePortfolioAnalytics(next);
-    });
+  // ── Mutations — all routed through the real backend (TASK-10); the server's
+  // recomputed SKU (not a client-side recompute) is the source of truth ──────
+  const replaceSku = (updated) =>
+    setSkus((prev) => prev.map((s) => (s.sku_id === updated.sku_id ? updated : s)));
 
-  const handleRestock = () => {
+  const [restockSaving, setRestockSaving] = useState(false);
+  const [restockError, setRestockError] = useState(null);
+
+  const handleRestock = async () => {
     const qty = parseFloat(restockQty);
     if (!qty || qty <= 0) return;
-    applyPatch(restockTarget.sku_id, {
-      physical_stock: (Number(restockTarget.physical_stock) || 0) + qty,
-      last_received_date: new Date().toISOString().split("T")[0],
-      inventory_age_days: 0,
-      ageing_status: "Fresh",
-    });
-    setRestockTarget(null);
-    setRestockQty("");
+    setRestockSaving(true);
+    setRestockError(null);
+    try {
+      const updated = await api.restockSku(restockTarget.sku_id, qty);
+      replaceSku(updated);
+      setRestockTarget(null);
+      setRestockQty("");
+    } catch (err) {
+      setRestockError(err.message || "Failed to restock");
+    } finally {
+      setRestockSaving(false);
+    }
   };
 
-  const handleSkuSave = (patch) => {
-    applyPatch(selectedSku.sku_id, patch);
+  // patch -> Promise, so SkuEditForm can await and surface a server error inline.
+  const handleSkuSave = async (patch) => {
+    const updated = await api.updateSku(selectedSku.sku_id, patch);
+    replaceSku(updated);
     setSelectedSku(null);
   };
 
-  const handleAddSku = (data) => {
-    setSkus((prev) => {
-      const created = computeSkuAnalytics({ ...NEW_SKU_DEFAULTS, ...DEFAULT_EXTRAS, ...data });
-      return computePortfolioAnalytics([...prev, created]);
-    });
+  // data -> Promise, so AddSkuForm can await and surface a server error inline.
+  const handleAddSku = async (data) => {
+    const created = await api.createSku(data);
+    setSkus((prev) => [...prev, created]);
     setShowAddModal(false);
   };
 
@@ -236,6 +267,9 @@ export default function Inventory() {
     sortKey !== col ? null : sortDir === "asc"
       ? <ChevronUp size={12} style={{ flexShrink: 0 }} />
       : <ChevronDown size={12} style={{ flexShrink: 0 }} />;
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadSkus} />;
+  if (!skus) return <LoadingState label="Loading inventory…" />;
 
   return (
     <div>
@@ -357,42 +391,43 @@ export default function Inventory() {
                     {/* Stock position */}
                     <td style={{ padding: "13px 16px" }}>
                       <StockPositionBar
-                        available={sku.available_stock}
+                        available={sku.available_qty}
                         minStock={sku.min_stock}
-                        reorder={sku.reorder_point_calc}
+                        reorder={sku.reorder_point_suggested}
                         maxStock={sku.max_stock}
                         reservedQty={sku.reserved_qty}
-                        idle={sku.days_of_stock === null}
+                        physicalStock={sku.on_hand_qty}
+                        idle={sku.days_of_cover === null}
                       />
                     </td>
 
                     {/* Coverage vs lead time */}
                     <td style={{ padding: "13px 16px" }}>
-                      {sku.days_of_stock === null ? (
+                      {sku.days_of_cover === null ? (
                         <span style={{ fontSize: 12, color: "var(--red)", fontWeight: 700 }}>No demand</span>
                       ) : (
                         <div>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                             <span style={{
                               fontSize: 14, fontWeight: 800,
-                              color: sku.days_of_stock < sku.lead_time_days ? "var(--red)"
-                                : sku.days_of_stock < sku.lead_time_days * 1.5 ? "var(--yellow)"
+                              color: sku.days_of_cover < sku.lead_time_days ? "var(--red)"
+                                : sku.days_of_cover < sku.lead_time_days * 1.5 ? "var(--yellow)"
                                 : "var(--green)",
                             }}>
-                              {sku.days_of_stock}d
+                              {sku.days_of_cover}d
                             </span>
                             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>/ {sku.lead_time_days}d LT</span>
                           </div>
                           <div style={{ marginTop: 4, width: 84, height: 5, background: "var(--border)", borderRadius: 99, position: "relative" }}>
                             <div style={{
                               position: "absolute",
-                              left: `${Math.min((sku.lead_time_days / Math.max(sku.days_of_stock, sku.lead_time_days + 5)) * 100, 98)}%`,
+                              left: `${Math.min((sku.lead_time_days / Math.max(sku.days_of_cover, sku.lead_time_days + 5)) * 100, 98)}%`,
                               top: -2, width: 2, height: 9, background: "var(--text-muted)", borderRadius: 1,
                             }} />
                             <div style={{
-                              width: `${Math.min((sku.days_of_stock / Math.max(sku.days_of_stock, sku.lead_time_days + 5)) * 100, 100)}%`,
+                              width: `${Math.min((sku.days_of_cover / Math.max(sku.days_of_cover, sku.lead_time_days + 5)) * 100, 100)}%`,
                               height: "100%",
-                              background: sku.days_of_stock < sku.lead_time_days ? "var(--red)" : "var(--green)",
+                              background: sku.days_of_cover < sku.lead_time_days ? "var(--red)" : "var(--green)",
                               borderRadius: 99,
                             }} />
                           </div>
@@ -411,7 +446,7 @@ export default function Inventory() {
                     {/* Actions */}
                     <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <ActionBtn label="Restock" onClick={() => { setRestockTarget(sku); setRestockQty(""); }} />
+                        <ActionBtn label="Restock" onClick={() => { setRestockTarget(sku); setRestockQty(""); setRestockError(null); }} />
                         <ActionBtn label="Edit" onClick={() => setSelectedSku(sku)} variant="ghost" />
                       </div>
                     </td>
@@ -426,8 +461,8 @@ export default function Inventory() {
       {/* ── Restock modal ── */}
       {restockTarget && (
         <Modal title={`Restock: ${restockTarget.product_name}`} onClose={() => setRestockTarget(null)}>
-          <InfoRow label="Current physical stock" value={`${restockTarget.physical_stock} MT`} />
-          <InfoRow label="Available stock"         value={`${restockTarget.available_stock} MT`} />
+          <InfoRow label="Current on-hand stock" value={`${restockTarget.on_hand_qty} MT`} />
+          <InfoRow label="Available stock"       value={`${restockTarget.available_qty} MT`} />
           <InfoRow label="Target stock"            value={`${restockTarget.target_stock} MT`} />
           <InfoRow label="Max stock"               value={`${restockTarget.max_stock} MT`} />
           <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
@@ -438,12 +473,15 @@ export default function Inventory() {
             type="number" min={0.1} step={0.1} value={restockQty}
             onChange={(e) => setRestockQty(e.target.value)}
             placeholder="e.g. 200"
-            style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, marginBottom: 18, background: "var(--surface)", color: "var(--text-primary)" }}
+            style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, marginBottom: restockError ? 8 : 18, background: "var(--surface)", color: "var(--text-primary)" }}
             autoFocus
           />
+          {restockError && (
+            <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 12 }}>⚠ {restockError}</div>
+          )}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <ModalBtn label="Cancel" onClick={() => setRestockTarget(null)} />
-            <ModalBtn label="Confirm Restock" onClick={handleRestock} primary />
+            <ModalBtn label="Cancel" onClick={() => setRestockTarget(null)} disabled={restockSaving} />
+            <ModalBtn label={restockSaving ? "Saving…" : "Confirm Restock"} onClick={handleRestock} primary disabled={restockSaving} />
           </div>
         </Modal>
       )}
@@ -569,6 +607,79 @@ function FormSection({ title, children }) {
   );
 }
 
+// ── Projected inventory curve (TASK-07) ─────────────────────────────────────
+// Real 90-day projection from the backend (backend/src/engines/projection.js) —
+// available stock depleting at the blended daily rate, stepped up by open POs
+// on their ETA day. Fetched fresh per SKU; not blocking the rest of the modal.
+function ProjectionChart({ skuId }) {
+  const [projection, setProjection] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setProjection(null);
+    setError(null);
+    api.getSkuProjection(skuId)
+      .then(setProjection)
+      .catch((err) => setError(err.message || "Failed to load projection"));
+  }, [skuId]);
+
+  if (error) {
+    return <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Projection unavailable — {error}</div>;
+  }
+  if (!projection) {
+    return <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "16px 0" }}>Loading projection…</div>;
+  }
+
+  const { curve, first_stockout_date, first_safety_breach_date, lowest_position, lowest_date, reference } = projection;
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, marginBottom: 10 }}>
+        {first_stockout_date ? (
+          <span style={{ color: "var(--red)", fontWeight: 700 }}>⚠ Stockout projected {first_stockout_date}</span>
+        ) : (
+          <span style={{ color: "var(--green)", fontWeight: 700 }}>✓ No stockout projected within 90 days</span>
+        )}
+        {first_safety_breach_date && first_safety_breach_date !== first_stockout_date && (
+          <span style={{ color: "var(--yellow)" }}>Safety stock breached {first_safety_breach_date}</span>
+        )}
+        <span style={{ color: "var(--text-muted)" }}>
+          Lowest point: {Math.round(lowest_position)} MT on {lowest_date}
+        </span>
+      </div>
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={curve} margin={{ top: 8, right: 12, bottom: 0, left: -16 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <XAxis
+            dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false}
+            tickFormatter={(d) => d.slice(5)} interval={Math.ceil(curve.length / 6)}
+          />
+          <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={60} unit=" MT" />
+          <Tooltip
+            contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
+            labelStyle={{ color: "var(--text-primary)", fontWeight: 700 }}
+            formatter={(v) => [`${Math.round(v)} MT`, "Projected available"]}
+          />
+          <ReferenceLine y={0} stroke="var(--text-muted)" />
+          {reference.safety_stock_mt > 0 && (
+            <ReferenceLine y={reference.safety_stock_mt} stroke="var(--yellow)" strokeDasharray="4 4"
+              label={{ value: "Safety stock", position: "insideBottomRight", fontSize: 10, fill: "var(--yellow)" }} />
+          )}
+          {reference.reorder_point_suggested > 0 && (
+            <ReferenceLine y={reference.reorder_point_suggested} stroke="var(--text-secondary)" strokeDasharray="4 4"
+              label={{ value: "Reorder point", position: "insideTopRight", fontSize: 10, fill: "var(--text-secondary)" }} />
+          )}
+          {reference.max_stock > 0 && (
+            <ReferenceLine y={reference.max_stock} stroke="var(--purple)" strokeDasharray="2 2"
+              label={{ value: "Max", position: "insideTopRight", fontSize: 10, fill: "var(--purple)" }} />
+          )}
+          <Line type="monotone" dataKey="projected_available" stroke="var(--blue)" strokeWidth={2} dot={false} name="Projected available" />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // ── Edit an existing SKU ─────────────────────────────────────────────────────
 function SkuEditForm({ sku, onSave, onCancel }) {
   const initial = useMemo(() => {
@@ -613,111 +724,192 @@ function SkuEditForm({ sku, onSave, onCancel }) {
 
   const warnings = [];
   const p = coerce();
-  if (!(p.min_stock <= p.reorder_point && p.reorder_point <= p.max_stock)) {
+  if (!(p.min_stock <= p.reorder_point_policy && p.reorder_point_policy <= p.max_stock)) {
     warnings.push("Expected min ≤ reorder point ≤ max.");
   }
-  if (p.reserved_qty + p.quality_hold_qty > Number(sku.physical_stock)) {
-    warnings.push("Reserved + quality hold exceeds physical stock.");
+  if (p.reserved_qty + p.quality_hold_qty > Number(sku.on_hand_qty)) {
+    warnings.push("Reserved + quality hold exceeds on-hand stock.");
   }
 
-  const submit = (e) => {
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  // Opens on Overview (read-only) — no editable fields visible until the user
+  // deliberately switches to Policy or Details. This is the fix for "a wall
+  // of text-box fields on open."
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const submit = async (e) => {
     e.preventDefault();
-    if (valid) onSave(coerce());
+    if (!valid) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onSave(coerce());
+    } catch (err) {
+      setSaveError(err.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const physicalStock = Number(sku.physical_stock) || 0;
+  const physicalStock = Number(sku.on_hand_qty) || 0;
   const axisMax = stockAxisMax(form, physicalStock);
   const previewAvailable =
     physicalStock - (Number(form.reserved_qty) || 0) - (Number(form.quality_hold_qty) || 0);
 
   return (
     <form onSubmit={submit}>
-      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 18 }}>
+      <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginBottom: "var(--space-3)" }}>
         {sku.sku_id} · {sku.rice_variety}
       </div>
 
-      {EDIT_GROUPS.map((g) => (
-        <FormSection key={g.title} title={g.title}>
-          {g.title === "Inventory Policy" && (
-            <div style={{ gridColumn: "span 2", marginBottom: 6 }}>
-              <StockPositionBar
-                axisMax={axisMax}
-                animateFill={false}
-                available={previewAvailable}
-                minStock={Number(form.min_stock) || 0}
-                reorder={Number(form.reorder_point) || 0}
-                target={Number(form.target_stock) || 0}
-                maxStock={Number(form.max_stock) || 0}
-                reservedQty={Number(form.reserved_qty) || 0}
-                idle={sku.days_of_stock === null}
-              />
-            </div>
-          )}
-          {g.fields.map(([k, t, label, required, suffix]) => {
-            if (t === "text") {
-              return (
-                <TextField key={k} half label={label} required={required}
-                  value={form[k]} onChange={set(k)} error={errors[k]} />
-              );
-            }
-            const spec = SLIDER_SPECS[k];
-            if (!spec) {
-              return (
-                <NumberField key={k} half label={label} suffix={suffix}
-                  value={form[k]} onChange={set(k)} error={errors[k]} min={0} />
-              );
-            }
-            const r = resolveSpec(spec, { axisMax, physicalStock });
-            return (
-              <SliderField key={k} half label={label} suffix={suffix}
-                value={form[k]} onChange={set(k)} error={errors[k]}
-                min={r.min} max={r.max} step={r.step} disabled={r.disabled} />
-            );
-          })}
-        </FormSection>
-      ))}
-
-      {/* Read-only context */}
-      <FormSection title="Current position (read-only)">
-        <div style={{ gridColumn: "span 2" }}>
-          <InfoRow label="Physical stock" value={`${sku.physical_stock} MT`} />
-          <InfoRow label="Avg daily usage (30d)" value={`${sku.avg_daily_usage_30d} MT/day`} />
-          <InfoRow label="Days of stock" value={sku.days_of_stock != null ? `${sku.days_of_stock} days` : "No recent demand"} />
-          <InfoRow label="Movement" value={sku.movement_class} />
-          <InfoRow label="Coverage band" value={sku.coverage_band} />
-        </div>
-      </FormSection>
-
-      {/* Live recompute preview */}
-      <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", borderLeft: "3px solid var(--blue)", marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 8 }}>
-          After save
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", fontSize: 12, alignItems: "center" }}>
-          <span>Available <strong>{preview.available_stock} MT</strong></span>
-          <span>Days of stock <strong>{preview.days_of_stock ?? "—"}</strong></span>
-          <span>Reorder point (calc) <strong>{preview.reorder_point_calc} MT</strong></span>
-          <span>Gross margin <strong>{preview.gross_margin_pct}%</strong></span>
-          <Badge type={preview.health_status} />
-        </div>
+      <div className="modal-tabs">
+        {TABS.map((tb) => (
+          <button key={tb.id} type="button" className={`modal-tab ${activeTab === tb.id ? "active" : ""}`}
+            onClick={() => setActiveTab(tb.id)}>
+            {tb.label}
+          </button>
+        ))}
       </div>
 
-      {warnings.length > 0 && (
-        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 12, color: "var(--yellow)", marginBottom: 16 }}>
-          {warnings.map((w) => <div key={w}>⚠ {w}</div>)}
+      {/* ── Overview: read-only, zero editable fields — what opens by default ── */}
+      {activeTab === "overview" && (
+        <div>
+          <div style={{ marginBottom: "var(--space-5)" }}>
+            <StockPositionBar
+              available={sku.available_qty}
+              minStock={sku.min_stock}
+              reorder={sku.reorder_point_suggested}
+              maxStock={sku.max_stock}
+              reservedQty={sku.reserved_qty}
+              physicalStock={sku.on_hand_qty}
+              idle={sku.days_of_cover === null}
+            />
+          </div>
+
+          <FormSection title="Current position">
+            <div style={{ gridColumn: "span 2" }}>
+              <InfoRow label="On-hand stock" value={`${sku.on_hand_qty} MT`} />
+              <InfoRow label="Avg daily usage (30d)" value={`${sku.avg_daily_usage_30d} MT/day`} />
+              <InfoRow label="Days of cover" value={sku.days_of_cover != null ? `${sku.days_of_cover} days` : "No recent demand"} />
+              <InfoRow label="Movement" value={sku.movement_class} />
+              <InfoRow label="Coverage band" value={sku.coverage_band} />
+            </div>
+          </FormSection>
+
+          <FormSection title="Projected inventory (90 days)">
+            <div style={{ gridColumn: "span 2" }}>
+              <ProjectionChart skuId={sku.sku_id} />
+            </div>
+          </FormSection>
+
+          {sku.recommended_action && (
+            <div style={{ fontSize: "var(--text-base)", lineHeight: 1.6, paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
+              <span style={{ fontWeight: 600 }}>Recommended: </span>{sku.recommended_action}
+            </div>
+          )}
         </div>
       )}
 
-      {sku.recommended_action && (
-        <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", borderLeft: "3px solid var(--blue)", marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 6 }}>Recommended action</div>
-          <div style={{ fontSize: 13, lineHeight: 1.6 }}>{sku.recommended_action}</div>
+      {/* ── Policy: the sliders that actually change operating thresholds ── */}
+      {activeTab === "policy" && (
+        <div>
+          <div style={{ marginBottom: "var(--space-5)" }}>
+            <StockPositionBar
+              axisMax={axisMax}
+              animateFill={false}
+              available={previewAvailable}
+              minStock={Number(form.min_stock) || 0}
+              reorder={Number(form.reorder_point_policy) || 0}
+              target={Number(form.target_stock) || 0}
+              maxStock={Number(form.max_stock) || 0}
+              reservedQty={Number(form.reserved_qty) || 0}
+              physicalStock={physicalStock}
+              idle={sku.days_of_cover === null}
+            />
+          </div>
+
+          {EDIT_GROUPS.filter((g) => TAB_FOR_GROUP[g.title] === "policy").map((g) => (
+            <FormSection key={g.title} title={g.title}>
+              {g.fields.map(([k, t, label, required, suffix]) => {
+                const spec = SLIDER_SPECS[k];
+                if (!spec) {
+                  return (
+                    <NumberField key={k} half label={label} suffix={suffix}
+                      value={form[k]} onChange={set(k)} error={errors[k]} min={0} />
+                  );
+                }
+                const r = resolveSpec(spec, { axisMax, physicalStock });
+                return (
+                  <SliderField key={k} half label={label} suffix={suffix}
+                    value={form[k]} onChange={set(k)} error={errors[k]}
+                    min={r.min} max={r.max} step={r.step} disabled={r.disabled} />
+                );
+              })}
+            </FormSection>
+          ))}
+
+          <div style={{ fontSize: "var(--text-sm)", marginBottom: "var(--space-4)" }}>
+            <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: "var(--space-2)" }}>
+              After save
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px var(--space-4)", alignItems: "center" }}>
+              <span>Available <strong>{preview.available_qty} MT</strong></span>
+              <span>Days of cover <strong>{preview.days_of_cover ?? "—"}</strong></span>
+              <span>Reorder point (suggested) <strong>{preview.reorder_point_suggested} MT</strong></span>
+              <span>Gross margin <strong>{preview.gross_margin_pct}%</strong></span>
+              <Badge type={preview.health_status} />
+            </div>
+          </div>
+
+          {warnings.length > 0 && (
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--yellow)", marginBottom: "var(--space-4)" }}>
+              {warnings.map((w) => <div key={w}>⚠ {w}</div>)}
+            </div>
+          )}
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <ModalBtn label="Cancel" type="button" onClick={onCancel} />
-        <ModalBtn label="Save changes" type="submit" primary disabled={!valid} />
+      {/* ── Details: identity, costs, stock adjustments — least frequently touched ── */}
+      {activeTab === "details" && (
+        <div>
+          {EDIT_GROUPS.filter((g) => TAB_FOR_GROUP[g.title] === "details").map((g) => (
+            <FormSection key={g.title} title={g.title}>
+              {g.fields.map(([k, t, label, required, suffix]) => {
+                if (t === "text") {
+                  return (
+                    <TextField key={k} half label={label} required={required}
+                      value={form[k]} onChange={set(k)} error={errors[k]} />
+                  );
+                }
+                const spec = SLIDER_SPECS[k];
+                if (!spec) {
+                  return (
+                    <NumberField key={k} half label={label} suffix={suffix}
+                      value={form[k]} onChange={set(k)} error={errors[k]} min={0} />
+                  );
+                }
+                const r = resolveSpec(spec, { axisMax, physicalStock });
+                return (
+                  <SliderField key={k} half label={label} suffix={suffix}
+                    value={form[k]} onChange={set(k)} error={errors[k]}
+                    min={r.min} max={r.max} step={r.step} disabled={r.disabled} />
+                );
+              })}
+            </FormSection>
+          ))}
+        </div>
+      )}
+
+      {saveError && (
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginTop: "var(--space-3)" }}>
+          ⚠ {saveError}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end", marginTop: "var(--space-5)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--border)" }}>
+        <ModalBtn label="Cancel" type="button" onClick={onCancel} disabled={saving} />
+        <ModalBtn label={saving ? "Saving…" : "Save changes"} type="submit" primary disabled={!valid || saving} />
       </div>
     </form>
   );
@@ -729,23 +921,34 @@ function AddSkuForm({ onSave, onCancel }) {
     sku_id: "", product_name: "", rice_variety: "", grade: "", country_of_origin: "",
     brand: "", packaging_size: "", supplier: "",
     unit_cost_sgd: "", unit_price_sgd: "", lead_time_days: "45",
-    min_order_qty: "", reorder_point: "", min_stock: "", target_stock: "", max_stock: "",
+    min_order_qty: "", reorder_point_policy: "", min_stock: "", target_stock: "", max_stock: "",
     safety_stock_pct: "20",
   });
   const set = (k) => (val) => setForm((f) => ({ ...f, [k]: val }));
 
   const required = ["sku_id", "product_name"];
-  const numeric = ["unit_cost_sgd", "unit_price_sgd", "lead_time_days", "min_order_qty", "reorder_point", "min_stock", "target_stock", "max_stock", "safety_stock_pct"];
+  const numeric = ["unit_cost_sgd", "unit_price_sgd", "lead_time_days", "min_order_qty", "reorder_point_policy", "min_stock", "target_stock", "max_stock", "safety_stock_pct"];
   const valid =
     required.every((k) => String(form[k]).trim()) &&
     numeric.every((k) => form[k] === "" || Number.isFinite(Number(form[k])));
 
-  const submit = (e) => {
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  const submit = async (e) => {
     e.preventDefault();
     if (!valid) return;
     const out = { ...form };
     for (const k of numeric) out[k] = Number(form[k]) || 0;
-    onSave(out);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onSave(out);
+    } catch (err) {
+      setSaveError(err.message || "Failed to create SKU");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const axisMax = Math.max(200, stockAxisMax(form, 0)); // floor so empty sliders have a usable range
@@ -771,10 +974,11 @@ function AddSkuForm({ onSave, onCancel }) {
               animateFill={false}
               available={Number(form.target_stock) || 0}
               minStock={Number(form.min_stock) || 0}
-              reorder={Number(form.reorder_point) || 0}
+              reorder={Number(form.reorder_point_policy) || 0}
               target={Number(form.target_stock) || 0}
               maxStock={Number(form.max_stock) || 0}
               reservedQty={0}
+              physicalStock={Number(form.target_stock) || 0}
               idle={false}
             />
           </div>
@@ -784,14 +988,20 @@ function AddSkuForm({ onSave, onCancel }) {
         <SliderField half label="Lead time" suffix="days" value={form.lead_time_days} onChange={set("lead_time_days")} min={1} max={120} step={1} />
         <NumberField half label="Min order qty" suffix="MT" value={form.min_order_qty} onChange={set("min_order_qty")} min={0} />
         <SliderField half label="Min stock" suffix="MT" value={form.min_stock} onChange={set("min_stock")} min={0} max={axisMax} step={5} />
-        <SliderField half label="Reorder point" suffix="MT" value={form.reorder_point} onChange={set("reorder_point")} min={0} max={axisMax} step={5} />
+        <SliderField half label="Reorder point" suffix="MT" value={form.reorder_point_policy} onChange={set("reorder_point_policy")} min={0} max={axisMax} step={5} />
         <SliderField half label="Target stock" suffix="MT" value={form.target_stock} onChange={set("target_stock")} min={0} max={axisMax} step={5} />
         <SliderField half label="Max stock" suffix="MT" value={form.max_stock} onChange={set("max_stock")} min={0} max={axisMax} step={5} />
       </FormSection>
 
+      {saveError && (
+        <div style={{ padding: "8px 12px", background: "var(--red-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 12, color: "var(--red)", marginBottom: 16 }}>
+          ⚠ {saveError}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <ModalBtn label="Cancel" type="button" onClick={onCancel} />
-        <ModalBtn label="Add SKU" type="submit" primary disabled={!valid} />
+        <ModalBtn label="Cancel" type="button" onClick={onCancel} disabled={saving} />
+        <ModalBtn label={saving ? "Adding…" : "Add SKU"} type="submit" primary disabled={!valid || saving} />
       </div>
     </form>
   );
