@@ -5,14 +5,50 @@
 
 const BASE = "/api";
 
+// Shown when the request never reached the Express app at all, as opposed to
+// reaching it and being refused. Names the port and the likely cause, because
+// the alternative ("Request failed (500)") sends you debugging the frontend
+// when the actual problem is a dead backend process.
+const UNREACHABLE =
+  "Cannot reach the API on localhost:4000. Check the backend is running (npm run dev in backend/) - if it is, check its log for a crash.";
+
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
-    ...options,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || body.success === false) throw new Error(body.message || `Request failed (${res.status})`);
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      headers: { "Content-Type": "application/json", ...options.headers },
+      ...options,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    // fetch only rejects on a genuine network-level failure (dev server gone,
+    // offline, DNS). An HTTP error status never lands here.
+    throw new Error(UNREACHABLE);
+  }
+
+  // Every real response from this API is JSON, errors included: all the route
+  // handlers and the catch-all in backend/src/index.js return
+  // { success, message }. So a body that will not parse as JSON means the
+  // request never got as far as Express. In dev that is the Vite proxy
+  // failing to connect to :4000 and answering with a bare text/plain 500
+  // (verified: empty body, Content-Type: text/plain).
+  let body;
+  let parsed = true;
+  try {
+    body = await res.json();
+  } catch {
+    parsed = false;
+  }
+
+  if (!parsed) {
+    if (res.ok) return undefined;              // e.g. a legitimate empty 204
+    if (res.status >= 500) throw new Error(UNREACHABLE);
+    throw new Error(`Request failed (${res.status})`);
+  }
+
+  if (!res.ok || body.success === false) {
+    throw new Error(body.message || `Request failed (${res.status})`);
+  }
   return body.data;
 }
 
