@@ -10,6 +10,7 @@ import StatCard from "../components/StatCard";
 import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
+import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
 
 // Prior period (last month) — hand-set illustrative comparison, not derived from
@@ -254,23 +255,6 @@ function buildCoverageData(skus) {
       coveredByPo: s.covered_by_po,
       fill: HEALTH_COLORS[s.health_status],
     }));
-}
-
-// ── Per-section collapse state, persisted so a user's "I don't need this
-// widget" choice survives a reload. Defaults to open — nothing is hidden
-// unless the user chooses to hide it. ──────────────────────────────────────
-function useCollapsed(key, defaultOpen) {
-  const storageKey = `dash-section-open:${key}`;
-  const [open, setOpen] = useState(() => {
-    try {
-      const v = localStorage.getItem(storageKey);
-      return v === null ? defaultOpen : v === "1";
-    } catch { return defaultOpen; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(storageKey, open ? "1" : "0"); } catch { /* private mode etc. */ }
-  }, [storageKey, open]);
-  return [open, setOpen];
 }
 
 const toggleFilter = (setFilter, type, value) =>

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   AlertTriangle, XCircle, TrendingUp, TrendingDown,
-  RefreshCw, X, CheckCircle, Clock, Cpu,
+  RefreshCw, X, CheckCircle, Clock, Cpu, ChevronDown,
 } from "lucide-react";
 import Badge from "../components/Badge";
+import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
+import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
 
 // Escape-to-close + body-scroll-lock while a modal is open. Inventory.jsx's
@@ -39,6 +41,39 @@ const TYPE_META = {
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
 
+// ELI18: plain language, no assumed prior inventory-ops vocabulary — matches
+// the Dashboard's ColHint copy style (visual-consistency pass, 2026-09).
+const TYPE_HINTS = {
+  STOCKOUT_RISK: {
+    what: "Stock on hand won't last until the next shipment arrives, based on how fast it's currently selling.",
+    how: "The number shown is days until it runs out. If that's less than the supplier's lead time, the shelf goes empty before the next delivery lands — place an order now.",
+  },
+  REORDER: {
+    what: "Stock has dropped to the point a normal reorder should be triggered, based on typical sales between shipments.",
+    how: "Not yet as urgent as Stockout Risk, but ignoring it usually turns into one. The number shown is MT currently on hand plus anything already inbound.",
+  },
+  OVERSTOCK: {
+    what: "More stock is on hand than the maximum level set for this SKU — more than normal operations need.",
+    how: "The number shown is how many MT over that maximum. Ties up cash and warehouse space; not automatically a mistake, but should be a deliberate choice.",
+  },
+  SLOW_MOVING: {
+    what: "This SKU is selling much slower than usual, so the stock on hand will last far longer than it should.",
+    how: "The number shown is days of cover — how long it'd last at the current sales pace. A high number means cash sitting on a shelf instead of turning into sales.",
+  },
+  IDLE: {
+    what: "No sales at all for this SKU in 90+ days — it isn't moving, period.",
+    how: "The number shown is days since the last sale. The longer it sits, the more likely it needs a markdown, a different sales channel, or a write-off.",
+  },
+  AGEING: {
+    what: "Stock has been physically sitting in the warehouse a long time, approaching its shelf-life / holding-time limit.",
+    how: "The number shown is days held. Rice doesn't spoil overnight, but quality and sellability drop the longer it sits past that limit.",
+  },
+};
+const DECISION_LOG_HINT = {
+  what: "A permanent record of every Approve, Modify, or Reject decision a manager has made on an AI/rule-based recommendation.",
+  how: "Nothing here can be edited or deleted — it's the audit trail for \"who decided what, and why,\" not a working list. Compare Manager Decision against AI Recommended to see how often recommendations get overridden.",
+};
+
 // Ask AI is a placeholder until TASK-11 wires a real LLM call (blocked on an
 // Anthropic API key). This used to look up a MOCK_AI_EXPLANATIONS dict keyed
 // by numeric alert.id, hand-written against the old mock alert set — but
@@ -62,6 +97,7 @@ export default function Alerts() {
   const [aiModal, setAiModal] = useState(null);       // { alert, explanation }
   const [approvalModal, setApprovalModal] = useState(null); // alert
   const [decisions, setDecisions] = useState([]);
+  const [logOpen, setLogOpen] = useCollapsed("alerts-decision-log", true);
 
   const loadAlerts = useCallback(() => {
     setLoadError(null);
@@ -88,11 +124,6 @@ export default function Alerts() {
     acc[a.alert_type] = (acc[a.alert_type] || 0) + 1;
     return acc;
   }, {});
-
-  const tabs = [
-    { key: "ALL", label: "All", count: active.length },
-    ...Object.entries(TYPE_META).map(([k, v]) => ({ key: k, label: v.label, count: counts[k] || 0 })),
-  ];
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   // acknowledge/dismiss and decisions are both wired to the real backend
@@ -138,7 +169,7 @@ export default function Alerts() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700 }}>Alerts</h1>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>
-            {active.length} active alerts · sorted by severity
+            {filter === "ALL" ? `${active.length} active alerts` : `${filtered.length} of ${active.length} alerts`} · sorted by severity
           </p>
         </div>
         <button
@@ -149,80 +180,88 @@ export default function Alerts() {
         </button>
       </div>
 
-      {/* ── Summary cards ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+      {/* ── Summary tiles — these ARE the filter control (click to filter,
+          click again to clear); a separate row of filter pills used to sit
+          right below repeating the exact same counts and the exact same
+          click target, which was the same "two widgets, one job" pattern
+          fixed on the Dashboard (visual-consistency pass, 2026-09). ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
         {Object.entries(TYPE_META).map(([type, meta]) => {
           const Icon = meta.icon;
           const count = counts[type] || 0;
+          const isActive = filter === type;
           return (
-            <div key={type} onClick={() => setFilter(filter === type ? "ALL" : type)}
+            <button key={type} type="button" onClick={() => setFilter(isActive ? "ALL" : type)}
+              aria-pressed={isActive}
               style={{
-                background: filter === type ? meta.bg : "var(--card-bg)",
-                border: `1px solid ${filter === type ? meta.color : "var(--border)"}`,
+                background: isActive ? meta.bg : "var(--card-bg)",
+                border: `1px solid ${isActive ? meta.color : "var(--border)"}`,
                 borderRadius: "var(--radius-lg)", padding: "14px 16px",
-                cursor: "pointer", transition: "all 0.15s",
+                cursor: "pointer", transition: "all 0.15s", textAlign: "left", font: "inherit",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
                 <Icon size={14} color={meta.color} />
                 <span style={{ fontSize: 11, fontWeight: 600, color: meta.color }}>{meta.label}</span>
+                <ColHint label={meta.label} what={TYPE_HINTS[type].what} how={TYPE_HINTS[type].how} />
               </div>
               <div style={{ fontSize: 26, fontWeight: 700, color: count > 0 ? meta.color : "var(--text-muted)" }}>
                 {count}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
 
-      {/* ── Filter tabs ── */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setFilter(t.key)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "6px 14px", borderRadius: 99,
-              border: `1px solid ${filter === t.key ? "var(--blue)" : "var(--border)"}`,
-              background: filter === t.key ? "var(--blue-light)" : "var(--card-bg)",
-              color: filter === t.key ? "var(--blue)" : "var(--text-secondary)",
-              fontSize: 13, fontWeight: 500, cursor: "pointer",
-            }}
-          >
-            {t.label}
-            <span style={{
-              background: filter === t.key ? "var(--blue)" : "var(--border)",
-              color: filter === t.key ? "#fff" : "var(--text-secondary)",
-              borderRadius: 99, padding: "0 7px", fontSize: 11, fontWeight: 700,
-            }}>
-              {t.count}
-            </span>
+      {filter !== "ALL" && (
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600,
+          background: "var(--blue-light)", color: "var(--blue)", padding: "4px 10px 4px 12px",
+          borderRadius: 99, marginBottom: 18,
+        }}>
+          Filtering by {TYPE_META[filter]?.label}
+          <button type="button" onClick={() => setFilter("ALL")} aria-label="Clear filter"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", display: "flex", padding: 2 }}>
+            <X size={13} />
           </button>
-        ))}
-      </div>
+        </div>
+      )}
 
       {/* ── Alert cards ── */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 32 }}>
         {filtered.length === 0 ? (
           <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
             {active.length === 0 ? "✓ No active alerts — all inventory levels are healthy." : "No alerts match this filter."}
           </div>
         ) : (
-          filtered.map((alert) => (
+          filtered.map((alert, i) => (
             <AlertCard
               key={alert.id}
               alert={alert}
               onAcknowledge={acknowledge}
               onAskAI={handleAskAI}
               onApprove={setApprovalModal}
+              isLast={i === filtered.length - 1}
             />
           ))
         )}
       </div>
 
-      {/* ── Decision log ── */}
+      {/* ── Decision log — collapsible: it only grows, and isn't something
+          you need open on every visit (matches the Dashboard's per-widget
+          collapse pattern, persisted the same way). ── */}
       {decisions.length > 0 && (
         <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Decision Log</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: logOpen ? 14 : 0 }}>
+            <button type="button" onClick={() => setLogOpen((v) => !v)} aria-expanded={logOpen}
+              aria-label={logOpen ? "Collapse Decision Log" : "Expand Decision Log"}
+              style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", padding: 0, color: "inherit" }}>
+              <ChevronDown size={15} color="var(--text-muted)" style={{ transform: logOpen ? "none" : "rotate(-90deg)", transition: "transform 0.15s" }} />
+              <h2 style={{ fontSize: 16, fontWeight: 700 }}>Decision Log</h2>
+            </button>
+            <ColHint label="Decision Log" what={DECISION_LOG_HINT.what} how={DECISION_LOG_HINT.how} />
+          </div>
+          {logOpen && (
           <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -270,6 +309,7 @@ export default function Alerts() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       )}
 
@@ -292,18 +332,20 @@ export default function Alerts() {
 }
 
 // ── Alert card ─────────────────────────────────────────────────────────────────
-function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
+function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
   const meta = TYPE_META[alert.alert_type] || TYPE_META.REORDER;
   const Icon = meta.icon;
   const needsApproval = alert.severity === "critical" || (alert.ai_recommendation_qty != null);
 
+  // Hairline divider, not a bordered-and-shadowed box — matches the rest of
+  // the app's post-overhaul style; the colored left stripe still carries
+  // severity at a glance without needing a full card outline (visual-
+  // consistency pass, 2026-09 — this was the last page still boxing rows).
   return (
     <div style={{
-      background: "var(--card-bg)", borderRadius: "var(--radius-lg)",
-      border: "1px solid var(--border)",
-      borderLeft: `4px solid ${meta.color}`,
-      boxShadow: "var(--shadow)",
-      overflow: "hidden",
+      borderLeft: `3px solid ${meta.color}`,
+      borderBottom: isLast ? "none" : "1px solid var(--border)",
+      paddingBottom: 14,
     }}>
       {/* Main row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 20px" }}>
@@ -408,16 +450,20 @@ function AiModal({ aiModal, onClose }) {
               <Cpu size={15} color="var(--purple)" />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>AI Explanation</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>Explanation</div>
               <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{alert.sku_name} · {alert.alert_type.replace(/_/g, " ")}</div>
             </div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
         </div>
 
-        {/* Disclaimer */}
+        {/* Disclaimer — was "AI-generated analysis", which overstated what
+            this actually is: a rule-based summary of already-computed
+            fields, not a live model call (TASK-11 needs an API key that
+            isn't available yet). Corrected to say so plainly rather than
+            claim a capability that doesn't exist yet. */}
         <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 12, color: "var(--yellow)", marginBottom: 16 }}>
-          ⚠️ AI-generated analysis · All recommendations require manager review and approval before action is taken.
+          ⚠️ Rule-based summary of the numbers already computed for this SKU — not yet a live AI call. All recommendations require manager review and approval before action is taken.
         </div>
 
         {/* Explanation */}

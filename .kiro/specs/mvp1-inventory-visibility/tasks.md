@@ -597,6 +597,37 @@ mean clutter for a user who doesn't want it.
 
 ---
 
+## TASK-24 — Alerts page polish: bring up to the Dashboard's bar (2026-09-12)
+User's own priority pick after "suggest next steps": Alerts still structurally predated the Dashboard's
+visual-consistency and interaction-pattern work (TASK-22/23) — it only ever got a token/color pass
+(TASK-16) since it was explicitly out of scope for restructuring at the time.
+
+- [x] Extracted `useCollapsed` out of `Dashboard.jsx` into a shared `frontend/src/hooks/useCollapsed.js`
+      so Alerts could reuse the exact same persisted-collapse behavior instead of duplicating it.
+- [x] Fixed a real "two widgets, one job" redundancy — the 6 summary tiles and the filter-pill row below
+      them were two separate controls doing the identical thing (filter by alert type, with the same
+      counts). Removed the pill row; the tiles are now the sole filter control (they already toggled on
+      click), with a "Filtering by X ✕" chip appearing when active — the same pattern used for the
+      Dashboard's cross-filter chip, for a consistent interaction language across pages.
+- [x] Added `ColHint` (ELI18 "What is this? / How to read it") to all 6 alert-type tiles and to the
+      Decision Log header, matching the Dashboard's tooltip coverage and copy style.
+- [x] Made the Decision Log section collapsible via the shared hook — it only grows over time and isn't
+      something a user needs open on every visit.
+- [x] Restyled `AlertCard`: removed the bordered-and-shadowed box treatment (the last page still using
+      it) in favor of a hairline-divider row with a colored left accent stripe, matching the rest of the
+      app's post-overhaul style. Alert cards are now a continuous list, not a stack of separate cards.
+- [x] Fixed a real copy-accuracy issue found while in this file: the AI Explanation modal's disclaimer
+      said "AI-generated analysis," which overstates what `buildFallbackExplanation` actually does (a
+      rule-based summary of already-computed fields — TASK-11's real LLM call is still blocked on an
+      API key). Modal title changed from "AI Explanation" to "Explanation"; disclaimer now says
+      "Rule-based summary of the numbers already computed for this SKU — not yet a live AI call."
+- [x] Verified via browser across Light/Dark: tile-click filtering + toggle-off + clear-chip, ColHint
+      content, Decision Log collapse + persistence, the corrected AI-modal copy, and that Dashboard still
+      works correctly after the `useCollapsed` extraction. No console errors.
+- [x] `npx vite build` clean
+
+---
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy
