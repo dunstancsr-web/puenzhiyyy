@@ -72,7 +72,7 @@ export default function Sidebar() {
             <Icon size={17} />
             <span style={{ flex: 1 }}>{label}</span>
             {badge > 0 && (
-              <span style={{ background: "#ef4444", color: "#fff", borderRadius: 99, fontSize: 11, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>
+              <span style={{ background: "var(--red)", color: "#fff", borderRadius: 99, fontSize: 11, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>
                 {badge}
               </span>
             )}

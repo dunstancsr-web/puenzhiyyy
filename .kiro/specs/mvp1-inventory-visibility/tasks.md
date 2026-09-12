@@ -476,6 +476,28 @@ Continued the reiteration into the Restock flow, table sort/filter, and backend 
 
 ---
 
+## TASK-21 — Fifth bug-finding pass: theme tokens + code review of remaining engines (2026-09-12)
+- [x] Fixed a leftover hardcoded color: `Sidebar.jsx`'s alert-count badge used `background: "#ef4444"`
+      directly instead of `var(--red)`. Harmless in Light/Dark (where `--red` happens to equal that
+      exact hex), but Glass theme's `--red` is `#f85149` — a visibly different shade the badge never
+      picked up. Fixed and verified via zoomed screenshot in Glass theme.
+- [x] Checked `Inventory.jsx`'s `HEALTH_DOT` (also hardcoded hex) against this same pattern — left
+      alone: it mirrors `Badge.jsx`'s already-documented, deliberate precedent of fixed severity colors
+      for RED/ORANGE/YELLOW/GREEN (there's no `--orange` token at all, by design), not an oversight.
+- [x] Code-reviewed the four backend engines not yet examined this session (`velocity.js`,
+      `safetystock.js`, `classification.js`, `segmentation.js`) for division-by-zero and empty-input
+      edge cases — all already correctly guarded (`mean === 0` checks, `Math.max(variance, 0)`,
+      `avgDailyDemand > 0` gates, `|| 1` fallback on a zero portfolio total). No bugs found.
+- [x] Verified `ThemeContext.jsx` persists the theme choice to `localStorage` and restores it correctly
+      on load — no bug found.
+- [x] Verified `ErrorState`/`LoadingState` end-to-end against a real backend outage (killed the backend
+      process, confirmed the Dashboard shows "Request failed (500)" — the 500 comes from Vite's dev
+      proxy, not app code — with a working Retry button; restarted the backend and confirmed Retry
+      recovers cleanly). No bug found.
+- [x] `npx vite build` clean
+
+---
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy
