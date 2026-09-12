@@ -15,7 +15,7 @@ const { classifyPortfolio } = require("./classification");
 const { segmentPortfolio, buildMatrix } = require("./segmentation");
 const { computeHealth } = require("./health");
 const { skuFinancials, portfolioStats } = require("./financials");
-const { generateAlerts } = require("./alerts");
+const { generateAlerts, fmt$ } = require("./alerts");
 const { projectInventory } = require("./projection");
 
 function ageingStatus(ageDays, maxHoldingDays) {
@@ -151,7 +151,9 @@ function recommend(s) {
   if (s.health_status === "RED")
     return `Place replenishment order immediately. Projected ${s.stockout_gap_days}-day stockout before resupply.`;
   if (s.overstock_qty > 0)
-    return `Suspend purchasing. ${Math.round(s.overstock_qty)} MT above max - carrying cost ≈ SGD $${Math.round(s.overstock_carrying_cost)}/yr.`;
+    // fmt$ shared with alerts.js so the same figure is not "SGD $12K" on the
+    // alert card and "SGD $11880" on the SKU detail.
+    return `Suspend purchasing. ${Math.round(s.overstock_qty)} MT above max - carrying cost ≈ ${fmt$(s.overstock_carrying_cost)}/yr.`;
   if (s.movement_class === "Slow Moving")
     return "Reduce next order quantity. Stock coverage well above target - review demand.";
   if (s.coverage_band === "below")

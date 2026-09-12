@@ -56,9 +56,38 @@ export function TextField({ label, value, onChange, placeholder, required, half,
   );
 }
 
+// `alignWithSlider` is for a plain number field sitting in a grid row beside
+// SliderFields. Those put their label and input on one line with the track
+// underneath; a default NumberField stacks label over input, so the two
+// controls' inputs landed on different baselines and the row looked broken.
+// This matches the slider's rhythm and reserves the track's height.
 export function NumberField({
   label, value, onChange, placeholder, step = "any", min, max, suffix, half, error,
+  alignWithSlider = false,
 }) {
+  if (alignWithSlider) {
+    return (
+      <div style={wrapStyle(half)}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, gap: 8 }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>{label}</label>
+          <span style={{ display: "inline-flex", alignItems: "baseline", gap: 4, flexShrink: 0 }}>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={value ?? ""}
+              onChange={(e) => onChange(e.target.value)}
+              step={step} min={min} max={max}
+              style={{ ...inputStyle(error), width: 64, padding: "4px 7px", fontSize: 13, textAlign: "right" }}
+            />
+            {suffix && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{suffix}</span>}
+          </span>
+        </div>
+        {/* reserves the vertical space a sibling slider's track occupies */}
+        <div style={{ height: 20 }} aria-hidden />
+        {error && <div style={errorStyle}>{error}</div>}
+      </div>
+    );
+  }
   return (
     <div style={wrapStyle(half)}>
       <label style={labelStyle}>{label}</label>

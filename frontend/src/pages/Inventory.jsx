@@ -186,6 +186,14 @@ export default function Inventory() {
   );
 
   // ── Sort + filter ──────────────────────────────────────────────────────────
+  // Counted across the whole catalogue, not the filtered view: the subtitle
+  // reports the state of the business, which does not change because someone
+  // typed in the search box.
+  const needsAttention = useMemo(
+    () => (skus || []).filter((s) => s.health_status !== "GREEN").length,
+    [skus]
+  );
+
   const filtered = useMemo(() => {
     let result = skus || [];
     if (search) {
@@ -286,7 +294,10 @@ export default function Inventory() {
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700 }}>Inventory</h1>
           <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>
-            {filtered.length} of {skus.length} SKUs · rice inventory management
+            {filtered.length} of {skus.length} SKUs
+            {needsAttention > 0
+              ? ` · ${needsAttention} need${needsAttention === 1 ? "s" : ""} attention`
+              : " · all healthy"}
           </p>
         </div>
         <button
@@ -400,7 +411,8 @@ export default function Inventory() {
                       <StockPositionBar
                         available={sku.available_qty}
                         minStock={sku.min_stock}
-                        reorder={sku.reorder_point_suggested}
+                        reorder={sku.reorder_point_policy}
+                        suggested={sku.reorder_point_suggested}
                         maxStock={sku.max_stock}
                         reservedQty={sku.reserved_qty}
                         physicalStock={sku.on_hand_qty}
@@ -516,7 +528,11 @@ function Select({ value, onChange, options, placeholder }) {
   return (
     <div style={{ position: "relative" }}>
       <Filter size={12} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
+      {/* The placeholder ("Health Status" etc.) is the only thing naming this
+          control, and it lives inside an <option>, so a screen reader
+          announced three unlabelled comboboxes. */}
       <select value={value} onChange={(e) => onChange(e.target.value)}
+        aria-label={`Filter by ${placeholder || "value"}`}
         style={{ padding: "8px 12px 8px 26px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", fontSize: 14, color: "var(--text-primary)", cursor: "pointer", appearance: "none" }}>
         {options.map((o) => <option key={o} value={o}>{o === "All" ? placeholder || "All" : o}</option>)}
       </select>
@@ -553,14 +569,14 @@ function Modal({ title, onClose, children, wide }) {
     <div
       className="inv-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 1000, padding: "5vh 20px 20px" }}
     >
       <div
         className="inv-modal"
         style={{
           background: "var(--modal-bg)", border: "1px solid var(--border)",
           borderRadius: "var(--radius-lg)", padding: "28px 30px",
-          width: wide ? 680 : 460, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto",
+          width: wide ? 680 : 460, maxWidth: "100%", maxHeight: "88vh", overflowY: "auto",
           boxShadow: "var(--shadow-md)",
         }}
       >
@@ -667,7 +683,10 @@ function ProjectionChart({ skuId }) {
             dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={false}
             tickFormatter={(d) => d.slice(5)} interval={Math.ceil(curve.length / 6)}
           />
-          <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={60} unit=" MT" />
+          {/* width was 60, which clipped the leading digit off four-figure
+              ticks ("800 MT" rendered as ":00 MT"). Sized for the widest
+              label this axis can produce rather than a guess. */}
+          <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={78} unit=" MT" />
           <Tooltip
             contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}
             labelStyle={{ color: "var(--text-primary)", fontWeight: 700 }}
@@ -785,6 +804,10 @@ function SkuEditForm({ sku, onSave, onCancel }) {
         ))}
       </div>
 
+      {/* minHeight keeps the dialog a stable size across tabs. Without it the
+          frame resized and re-centred on every tab click, so the tabs
+          themselves moved out from under the pointer. */}
+      <div style={{ minHeight: 380 }}>
       {/* ── Overview: read-only, zero editable fields - what opens by default ── */}
       {activeTab === "overview" && (
         <div>
@@ -792,7 +815,8 @@ function SkuEditForm({ sku, onSave, onCancel }) {
             <StockPositionBar
               available={sku.available_qty}
               minStock={sku.min_stock}
-              reorder={sku.reorder_point_suggested}
+              reorder={sku.reorder_point_policy}
+              suggested={sku.reorder_point_suggested}
               maxStock={sku.max_stock}
               reservedQty={sku.reserved_qty}
               physicalStock={sku.on_hand_qty}
@@ -847,8 +871,11 @@ function SkuEditForm({ sku, onSave, onCancel }) {
               {g.fields.map(([k, t, label, required, suffix]) => {
                 const spec = SLIDER_SPECS[k];
                 if (!spec) {
+                  // Min order qty is the only sliderless field on this tab, so
+                  // it sits beside sliders and has to share their rhythm or
+                  // the two inputs land on different baselines.
                   return (
-                    <NumberField key={k} half label={label} suffix={suffix}
+                    <NumberField key={k} half alignWithSlider label={label} suffix={suffix}
                       value={form[k]} onChange={set(k)} error={errors[k]} min={0} />
                   );
                 }
@@ -914,6 +941,8 @@ function SkuEditForm({ sku, onSave, onCancel }) {
         </div>
       )}
 
+      </div>
+
       {saveError && (
         <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginTop: "var(--space-3)" }}>
           ⚠ {saveError}
@@ -921,8 +950,12 @@ function SkuEditForm({ sku, onSave, onCancel }) {
       )}
 
       <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "flex-end", marginTop: "var(--space-5)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--border)" }}>
-        <ModalBtn label="Cancel" type="button" onClick={onCancel} disabled={saving} />
-        <ModalBtn label={saving ? "Saving…" : "Save changes"} type="submit" primary disabled={!valid || saving} />
+        <ModalBtn label={activeTab === "overview" ? "Close" : "Cancel"} type="button" onClick={onCancel} disabled={saving} />
+        {/* Overview is read-only - there is nothing on it to save, so a primary
+            Save button there is an invitation to a no-op. */}
+        {activeTab !== "overview" && (
+          <ModalBtn label={saving ? "Saving…" : "Save changes"} type="submit" primary disabled={!valid || saving} />
+        )}
       </div>
     </form>
   );

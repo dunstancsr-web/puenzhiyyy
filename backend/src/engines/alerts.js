@@ -129,4 +129,4 @@ function generateAlerts(skus) {
   return { alerts, primaryExceptions };
 }
 
-module.exports = { generateAlerts, alertsForSku, TYPE_PRIORITY };
+module.exports = { generateAlerts, alertsForSku, TYPE_PRIORITY, fmt$};

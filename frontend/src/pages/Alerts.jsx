@@ -83,8 +83,11 @@ const DECISION_LOG_HINT = {
 // alert's. Synthesizing from the alert's own (already-correct) fields
 // guarantees the text always matches what was actually clicked.
 function buildFallbackExplanation(alert) {
-  const qtyLine = alert.ai_recommendation_qty != null
-    ? `\n\nSuggested quantity: ${alert.ai_recommendation_qty} MT.`
+  // > 0, not != null. A quantity of 0 means "no order applies" (overstock,
+  // slow-moving, idle, ageing all report 0), and rendering it produced
+  // "Suggested quantity: 0 MT" on alerts whose whole point is to stop buying.
+  const qtyLine = alert.ai_recommendation_qty > 0
+    ? `\n\nSuggested order quantity: ${alert.ai_recommendation_qty} MT.`
     : "";
   return `${alert.message}\n\nRecommended action: ${alert.recommended_action}${qtyLine}`;
 }
@@ -169,7 +172,9 @@ export default function Alerts() {
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700 }}>Alerts</h1>
           <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>
-            {filter === "ALL" ? `${active.length} active alerts` : `${filtered.length} of ${active.length} alerts`} · sorted by severity
+            {filter === "ALL"
+              ? `${active.length} active alert${active.length === 1 ? "" : "s"}`
+              : `${filtered.length} of ${active.length} alert${active.length === 1 ? "" : "s"}`} · sorted by severity
           </p>
         </div>
         <button
@@ -193,16 +198,21 @@ export default function Alerts() {
           return (
             <button key={type} type="button" onClick={() => setFilter(isActive ? "ALL" : type)}
               aria-pressed={isActive}
+              // A zero tile is still a useful filter target, but it should not
+              // compete with the categories that actually have something in
+              // them. Recede it rather than removing it, so the row stays a
+              // stable, predictable set of six.
               style={{
                 background: isActive ? meta.bg : "var(--card-bg)",
                 border: `1px solid ${isActive ? meta.color : "var(--border)"}`,
                 borderRadius: "var(--radius-lg)", padding: "14px 16px",
                 cursor: "pointer", transition: "all 0.15s", textAlign: "left", font: "inherit",
+                opacity: count === 0 && !isActive ? 0.55 : 1,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-                <Icon size={14} color={meta.color} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: meta.color }}>{meta.label}</span>
+                <Icon size={14} color={count > 0 ? meta.color : "var(--text-muted)"} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: count > 0 ? meta.color : "var(--text-muted)" }}>{meta.label}</span>
                 <ColHint label={meta.label} what={TYPE_HINTS[type].what} how={TYPE_HINTS[type].how} />
               </div>
               <div style={{ fontSize: 26, fontWeight: 700, color: count > 0 ? meta.color : "var(--text-muted)" }}>
@@ -396,9 +406,9 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
         }}>
           <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
             <span style={{ fontWeight: 600 }}>AI Recommendation: </span>
-            {alert.ai_recommendation_qty != null
-              ? `Purchase ${alert.ai_recommendation_qty} MT`
-              : "Initiate inventory review"}
+            {alert.ai_recommendation_qty > 0
+              ? `Order ${alert.ai_recommendation_qty} MT`
+              : "No order required for this alert"}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             {/* Ask AI button */}
@@ -498,10 +508,15 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
   // leaving no audit trail for why. Enforced here to match the label.
   const reasonRequired = action !== "approved";
   const valid = !reasonRequired || reason.trim().length > 0;
+  // Only surface the error once the user has actually engaged with the field
+  // or tried to submit. Opening a fresh modal already showing a red box and
+  // "a reason is required" scolds someone who has not done anything wrong yet.
+  const [reasonTouched, setReasonTouched] = useState(false);
+  const showReasonError = reasonRequired && !reason.trim() && reasonTouched;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!valid || saving) return;
+    if (!valid || saving) { setReasonTouched(true); return; }
     setSaving(true);
     setSubmitError(null);
     try {
@@ -530,9 +545,9 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
         <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", marginBottom: 20, fontSize: 14 }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>{alert.sku_name}</div>
           <div style={{ color: "var(--text-secondary)" }}>{alert.recommended_action}</div>
-          {alert.ai_recommendation_qty != null && (
+          {alert.ai_recommendation_qty > 0 && (
             <div style={{ marginTop: 6, color: "var(--blue)", fontWeight: 600 }}>
-              AI recommendation: {alert.ai_recommendation_qty} MT
+              Suggested order quantity: {alert.ai_recommendation_qty} MT
             </div>
           )}
         </div>
@@ -578,15 +593,16 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
             </label>
             <textarea
               value={reason} onChange={(e) => setReason(e.target.value)}
+              onBlur={() => setReasonTouched(true)}
               placeholder="e.g. Customer contract confirmed, adjusted quantity accordingly…"
               rows={3}
               style={{
                 width: "100%", padding: "9px 12px", borderRadius: "var(--radius)", fontSize: 14,
                 resize: "vertical", fontFamily: "inherit",
-                border: `1px solid ${reasonRequired && !reason.trim() ? "var(--red)" : "var(--border)"}`,
+                border: `1px solid ${showReasonError ? "var(--red)" : "var(--border)"}`,
               }}
             />
-            {reasonRequired && !reason.trim() && (
+            {showReasonError && (
               <div style={{ fontSize: 12, color: "var(--red)", marginTop: 4 }}>
                 A reason is required to {action === "rejected" ? "reject" : "modify"} this recommendation.
               </div>

@@ -35,10 +35,23 @@ const trackCopy = (committed, reserved, hold) => {
   }
   return s;
 };
-const reorderCopy = (showReorder) =>
-  showReorder
-    ? "Reorder point - when available stock drops to this tick, place a replenishment order. It's set to cover demand over the supplier's lead time plus a safety buffer."
-    : "No reorder point yet - it needs a lead time and some sales history before one can be calculated.";
+// The tick is the POLICY reorder point: the approved, editable operating value
+// that the alert engine and the health status actually key off. The system's
+// own calculation is a separate number and is named separately here rather
+// than merged into one figure, per spec Step 8 ("shown side by side, not
+// merged"). Drawing the suggested value here instead was producing red bars on
+// SKUs the status badge called Healthy, because the two disagreed.
+const reorderCopy = (showReorder, suggested) => {
+  if (!showReorder) {
+    return "No reorder point set yet - it needs a lead time and some sales history before one can be calculated.";
+  }
+  let s =
+    "Reorder point (policy) - the approved level this SKU actually operates to. When available stock drops to this tick, place a replenishment order. Alerts and the health status are driven by this number.";
+  if (suggested > 0) {
+    s += `\n\nThe system separately calculates ${fmt(suggested)} MT from current lead time and demand. That is a suggestion for review, not the operating value, so the two can differ.`;
+  }
+  return s;
+};
 const gapCopy = (idle) =>
   idle
     ? "This SKU has had no recent demand, so there's no meaningful gap to the reorder point."
@@ -57,7 +70,7 @@ function tickLabelStyle(pct, strong) {
 }
 
 export default function StockPositionBar({
-  available, minStock, reorder, maxStock, reservedQty, physicalStock, idle,
+  available, minStock, reorder, suggested, maxStock, reservedQty, physicalStock, idle,
   target, axisMax, animateFill = true,
 }) {
   const { theme } = useTheme();
@@ -65,6 +78,7 @@ export default function StockPositionBar({
 
   const avail = Number(available) || 0;
   const rop = Number(reorder) || 0;
+  const sug = Number(suggested) || 0;
   const max = Number(maxStock) || 0;
   const tgt = Number(target) || 0;
   const physical = Math.max(Number(physicalStock) || 0, avail);
@@ -214,12 +228,12 @@ export default function StockPositionBar({
       <div style={{ position: "relative", height: 14, fontSize: 11, marginTop: 1 }}>
         <span style={{ position: "absolute", left: 0, color: "var(--text-muted)" }}>0</span>
         {showReorder && (
-          <HoverHint panelWidth={260} content={reorderCopy(true)}>
+          <HoverHint panelWidth={280} content={reorderCopy(true, sug)}>
             <span style={tickLabelStyle(reorderPct, true)}>Reorder {fmt(rop)} MT</span>
           </HoverHint>
         )}
         {!showReorder && (
-          <HoverHint panelWidth={260} content={reorderCopy(false)}>
+          <HoverHint panelWidth={280} content={reorderCopy(false, sug)}>
             <span style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", color: "var(--text-muted)" }}>
               no reorder point
             </span>

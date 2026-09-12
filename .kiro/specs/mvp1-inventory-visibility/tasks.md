@@ -881,6 +881,51 @@ was not, and the investigation is worth recording.
 neither of them questioned whether it should exist - they audited how it was drawn, not whether it was
 warranted. Provenance ("is this in the spec?") is worth an explicit line item in any future review pass.
 
+## TASK-30 - Full interactive audit: bugs and UI/UX across all three pages (2026-09-13)
+User asked for a full visual audit by actually interacting with every element, then a plan and its
+implementation. Ten findings, all fixed.
+
+**Data / correctness**
+- [x] **The stock bar and the status badge were measuring different things.** The table and the SKU
+      Overview drew the tick at `reorder_point_suggested` while the edit preview used
+      `reorder_point_policy`, and alerts/health key off policy. Thai Jasmine 10KG therefore showed a red
+      bar reading "28 MT below reorder point" next to a green "Healthy" badge, and the tick silently
+      jumped 316 -> 302 when you switched tabs. All bars now use the policy value (the approved
+      operating number the engines actually use); the suggested figure is named separately in the hover,
+      per spec Step 8's "shown side by side, not merged".
+- [x] `ai_recommendation_qty` of 0 was rendered via `!= null`, producing "Purchase 0 MT",
+      "Suggested quantity: 0 MT" and "AI recommendation: 0 MT" on overstock / slow-moving / idle /
+      ageing alerts, whose entire point is to stop ordering. Now gated on `> 0`.
+- [x] Same carrying-cost figure formatted two ways: "SGD $12K" on the alert card, "SGD $11880" on the
+      SKU detail. `fmt$` is now exported from `alerts.js` and reused in `index.js` so there is one
+      definition.
+
+**UI bugs**
+- [x] Projection chart Y-axis clipped its leading digit ("800 MT" rendered as ":00 MT"): axis width 60 -> 78.
+- [x] "1 active alerts" - pluralisation added.
+- [x] Min order qty sat on a different baseline from its neighbours: it is the only sliderless field on
+      the Policy tab, and NumberField stacks label over input while SliderField puts them on one line.
+      Added `alignWithSlider` to NumberField.
+- [x] Missing space after the warning emoji in the AI-modal disclaimer.
+
+**UX**
+- [x] The decision modal opened with the Reason field already red and "a reason is required" showing,
+      scolding the user before they had done anything. Now tracked with `reasonTouched` and surfaced on
+      blur or on a submit attempt.
+- [x] The SKU modal re-centred on every tab switch (frame 749-824px tall, tab row moving ~37px), sliding
+      the tabs out from under the pointer. Anchored to a fixed top offset instead of vertical centring;
+      the tab row now sits at a constant 166px on all three tabs. A modest min-height stops the shortest
+      tab collapsing, without padding the others out with dead space.
+- [x] Overview is read-only but still offered a primary "Save changes". It now shows only "Close".
+- [x] Alert type tiles reading 0 carried the same visual weight as populated ones. They now recede
+      (muted label/icon, 0.55 opacity) while staying clickable, so the row stays a stable set of six.
+- [x] Inventory subtitle filler ("rice inventory management") replaced with a real figure:
+      "10 of 10 SKUs · 6 need attention", counted across the catalogue rather than the filtered view.
+- [x] The three filter dropdowns had no accessible name - their only label lived inside an `<option>`.
+      Added `aria-label`.
+
+Verified by interaction across all three pages in both themes; `npx vite build` clean; no console errors.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

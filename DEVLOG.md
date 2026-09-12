@@ -252,3 +252,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/{tasks,design,requirements}.md, DEVLOG.md, backend/src/engines/{segmentation,index,smoke}.js, frontend/src/pages/Dashboard.jsx
 - **New files:** none
 - **Notes:** Replaced the ABC x XYZ matrix with ABC x movement class (TASK-29), after the user asked whether the chart was in the documentation. It was not: ABC is specified in technical-spec Step 8A, but XYZ appears in no source domain doc, and Step 8A item 7 actually asks to "Combine ABC class with Fast/Normal/Slow/Idle". The code shipped first (c17ae80) and REQ-14/design.md were back-filled to describe it, which is how XYZ came to look specified. It was also the weakest widget on real data: 5 of 9 cells empty including both AZ and BZ, the cells its own caption told you to act on. New matrix populates 6 of 12 along a clean diagonal. Also corrected design.md and REQ-14 rather than leaving the drift, and renamed stats.abcXyzMatrix to stats.abcMovementMatrix.
+
+---
+
+## Session: 2026-09-13 02:00
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, backend/src/engines/{alerts,index}.js, frontend/src/pages/{Inventory,Alerts}.jsx, frontend/src/components/{StockPositionBar,FormField}.jsx
+- **New files:** none
+- **Notes:** Full interactive audit of all three pages (TASK-30), 10 fixes. Biggest: the stock bar drew the SUGGESTED reorder point while the status badge and alerts used the POLICY one, so a SKU could show a red "28 MT below reorder point" bar beside a green "Healthy" badge, and the tick jumped when switching modal tabs. All bars now use policy, suggested named separately in the hover. Also: "Purchase 0 MT" on alerts that mean stop buying, a clipped chart Y-axis, "1 active alerts", premature validation scolding on modal open, the modal re-centring and sliding its tabs on every switch, Save offered on a read-only tab, misaligned Min order qty, full-weight zero tiles, unlabelled filter selects, and one carrying-cost figure formatted two different ways in two places.
