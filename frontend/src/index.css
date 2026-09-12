@@ -226,6 +226,27 @@ input, select, textarea {
   border-bottom: 2px solid var(--blue);
 }
 
+/* ── Progressive-disclosure sections (Dashboard "Portfolio structure") ────
+   Native <details>/<summary> — no JS state needed for an open/closed toggle.
+   Reserved for genuinely occasional-use analysis, not daily-glance metrics. */
+details.disclosure {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+details.disclosure summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  font-size: var(--text-base);
+  color: var(--blue);
+  user-select: none;
+}
+details.disclosure summary::-webkit-details-marker { display: none; }
+details.disclosure summary::before { content: "▸ "; font-size: 11px; }
+details.disclosure[open] summary::before { content: "▾ "; }
+
 /* ── Hover-hint affordance (HoverHint) ──────────────────────────────────── */
 .hint-trigger { cursor: help; }
 .hint-trigger:hover {

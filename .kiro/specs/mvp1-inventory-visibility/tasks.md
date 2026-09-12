@@ -498,6 +498,55 @@ Continued the reiteration into the Restock flow, table sort/filter, and backend 
 
 ---
 
+## TASK-22 — Dashboard redesign: declutter + better chart selection (2026-09-12)
+Direct follow-up to user feedback that the Dashboard "still feels cluttered" and its charts could be
+"redesigned or better selected." Researched current dashboard-design guidance (progressive disclosure,
+"≤8-10 primary data points," "single number the user checks most" — see chat for sources) before
+proposing anything, then built three concept mockups as an artifact for review before touching code:
+**A · Signal First** (merge the three overlapping list widgets into one, donut for health-by-value, ABC×XYZ
+behind a disclosure), **B · Command Deck** (denser but every widget gets a purpose-built chart type —
+bullet bars, heatmap, small multiples), **C · At a Glance** (one number + one ring + 3 lines, everything
+else behind a single toggle — included for contrast, not recommended for a daily ops tool per the B2B
+density research from the earlier visual-overhaul pass). Implemented Concept A, the recommended
+direction, with one addition borrowed from Concept B (kept the per-SKU coverage bar chart rather than
+dropping it, moved into the same disclosure as ABC×XYZ instead of losing it).
+
+- [x] `Dashboard.jsx`: renamed `buildTodayActions` → `buildNeedsAttention` and merged what were three
+      separate sections — Today's Top Actions, Open Exceptions, Ageing Inventory — into one ranked list.
+      Ageing folds onto an existing row's tag/reason for the same SKU (Japonica renders as one row
+      tagged "IDLE STOCK · AGEING", not two rows) or gets its own row when no other exception applies.
+      Caught and fixed a regression during this merge: the original `buildTodayActions` never had a
+      SLOW_MOVING branch (that only ever surfaced via the separate Open Exceptions widget, sourced from
+      the backend's `primaryExceptions`) — without adding it back explicitly, Basmati Premium, Basmati
+      Bulk, and Brown Rice Organic would have silently dropped off the merged Dashboard entirely, still
+      visible only on `/inventory` and `/alerts`. Added a SLOW_MOVING branch mirroring `alerts.js`'s own
+      rule (`movement_class === "Slow Moving" && days_of_cover > 120`) before shipping.
+- [x] Replaced the flat `HealthByValueBar` with a `HealthDonut` (real recharts `PieChart`/`Pie`,
+      `innerRadius`/`outerRadius`, center label showing the portfolio total) — proportion across four
+      categories reads faster as area+angle than as a thin horizontal strip once shares are uneven.
+- [x] Moved the per-SKU coverage-vs-lead-time bar chart and the ABC×XYZ matrix into one native
+      `<details className="disclosure">` ("Portfolio structure — coverage detail & ABC × XYZ
+      segmentation") — genuinely occasional-use analysis, not a daily-glance metric; kept both rather
+      than dropping the coverage chart outright, so no analytical capability was actually lost, just
+      reorganized. Added the `.disclosure` styles (native, no JS state) to `index.css`.
+      "Show more metrics" (Coverage in Target Band, Compliance Position) was left exactly as it was —
+      not part of what was being criticized this round.
+- [x] Removed the now-dead `ExceptionRow` component and the `Badge` import it was the only user of.
+- [x] Published three mockups as a Claude Artifact (built with the `artifact-design` skill) using the
+      dashboard's real seeded numbers throughout, with a working concept switcher, before writing any
+      product code — caught one thing worth recording: the artifact's interactive switcher initially
+      looked broken when tested via raw-pixel-coordinate clicks in the browser-automation tool: a
+      synthetic `.click()` on the same element worked instantly, proving the page's own JS was correct
+      and the failure was the tooling's screenshot-vs-viewport coordinate scaling (documented earlier
+      this session), not a defect — resolved by clicking via element reference instead.
+- [x] Verified via browser across Light/Dark/Glass: Needs Attention list (all 6 exceptions present,
+      correct severity-colored stripes, Japonica's combined tag), Inventory Health donut (correct
+      proportions and center total), disclosure opens/closes and its coverage chart + ABC×XYZ render
+      correctly; confirmed Inventory and Alerts pages unaffected (not touched this pass).
+- [x] `npx vite build` clean
+
+---
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy
