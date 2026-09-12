@@ -547,6 +547,56 @@ dropping it, moved into the same disclosure as ABC×XYZ instead of losing it).
 
 ---
 
+## TASK-23 — Dashboard: switch to Command Deck, add cross-filtering + collapsible sections (2026-09-12)
+User picked **Concept B (Command Deck)** over the just-shipped Concept A after seeing both live, plus
+three specific asks: keep "vs last month" in full on the hero and add a chart to illustrate it, real
+click-to-filter interactivity "like PowerBI" from the charts into a table, ELI18 help tooltips
+throughout, and an element of Concept C — optional collapsible sections, so density doesn't have to
+mean clutter for a user who doesn't want it.
+
+- [x] Rebuilt the main Dashboard grid to Concept B's composition: Inventory Health (labeled 100%-
+      stacked bar, swapped back from TASK-22's donut per the user's explicit preference) and ABC×XYZ
+      heatmap in one row; Cover vs Lead+Safety (hand-rolled bullet-chart rows, replacing the old
+      recharts grouped-bar chart) and Needs Attention (now a dense `<table>`, not a card list) in the
+      row below. The TASK-22 disclosure is gone — in Command Deck these are primary, always-visible
+      widgets, not occasional-use detail.
+- [x] Added a real two-bar month-comparison chart (`MonthTrendChart`, recharts) next to the hero,
+      keeping the existing "▲ $151K **vs last month**" text in full (not shortened, as it had been in
+      the concept mockup). Deliberately stayed a two-bar comparison rather than a fabricated multi-point
+      trend line — this project has no historical snapshots stored yet, only the current figure and one
+      hand-set prior-month figure (see the `PRIOR` constant's existing comment); hover shows the exact
+      SGD value per bar via a real recharts `Tooltip`.
+      **Scoping note on click-to-filter for this specific chart**: unlike the three widgets below, there
+      is no real per-SKU breakdown of the $151K delta to drill into (the total is just two numbers), so
+      making it clickable would mean fabricating a breakdown that isn't real data. Left it hover-only;
+      the genuine PowerBI-style click-to-filter work went into the three widgets that do have real per-
+      SKU data behind them (see below).
+- [x] Implemented real click-to-filter cross-highlighting into the Needs Attention table — a single
+      active filter (`{type: "health"|"segment"|"sku", value}`), toggled off by clicking the same
+      element again, from all three of: a Health-by-Value segment, an ABC×XYZ cell (using the real
+      `skus` array each cell already carries — no new backend query), and a Coverage bullet-chart row.
+      Selected element gets a visible highlight (outline/border), the other elements in that same chart
+      dim slightly, and a "Filtering by X ✕" chip appears above the table with a one-click clear.
+      Verified all three filter sources plus the toggle-off and clear-chip paths via browser.
+- [x] Added `ColHint` (the existing Inventory-table help-icon component, reused rather than building a
+      new one) to every section title and every KPI tile — Total Inventory Value, all 6 KPI tiles,
+      Needs Attention, Inventory Health, ABC×XYZ, Coverage, and Coverage-in-Target-Band. Extended
+      `StatCard.jsx` with an optional `hint` prop to carry this. Copy is ELI18 throughout — plain
+      language, a "What is this?" / "How to read it" split, assumes no prior inventory-ops vocabulary
+      (e.g. GMROI, turnover, ABC×XYZ are all explained from scratch) without being condescending.
+      Verified rendered content via browser.
+- [x] Made all four main widgets independently collapsible (`Section`'s new `collapsible` prop + a
+      `useCollapsed` hook backed by `localStorage`, keyed per-widget) — closed/open state persists
+      across reloads, so it's a one-time "I don't need this" choice per user/browser, not a per-visit
+      toggle. Defaults to open; nothing is hidden unless the user chooses to hide it. Verified a
+      collapse survives a hard refresh.
+- [x] Verified across Light/Dark/Glass; no console errors across the full interaction set (hover
+      tooltips, three filter sources, toggle-off, clear chip, collapse/expand, reload-persistence);
+      confirmed Inventory and Alerts pages unaffected (not touched this pass).
+- [x] `npx vite build` clean
+
+---
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

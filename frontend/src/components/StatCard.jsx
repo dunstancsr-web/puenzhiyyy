@@ -1,4 +1,5 @@
 import React from "react";
+import ColHint from "./ColHint";
 
 // Redesigned 2026-09 — no decorative per-metric icon color, no box/shadow.
 // `status` ("ok" | "warn" | "bad", default "ok") is the ONLY thing that
@@ -6,7 +7,9 @@ import React from "react";
 // color reserved for state and meaning, never decoration. Icon is muted in
 // the neutral case; label/value use standard text tokens. Separates from
 // neighbors via the caller's own hairline divider, not a border+shadow box.
-export default function StatCard({ label, value, icon: Icon, sub, target, trend, status = "ok" }) {
+// `hint` (optional {what, how}) adds a ColHint ⓘ next to the label — plain-
+// language help for jargon terms like "GMROI" or "turnover".
+export default function StatCard({ label, value, icon: Icon, sub, target, trend, status = "ok", hint }) {
   const statusColor = { ok: "var(--text-primary)", warn: "var(--yellow)", bad: "var(--red)" }[status];
 
   return (
@@ -15,8 +18,9 @@ export default function StatCard({ label, value, icon: Icon, sub, target, trend,
         <Icon size={16} color="var(--text-muted)" style={{ flexShrink: 0, marginTop: 2 }} />
       )}
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500 }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}>
           {label}
+          {hint && <ColHint label={label} what={hint.what} how={hint.how} />}
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)", marginTop: 2, flexWrap: "wrap" }}>
           <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: statusColor, lineHeight: 1.2 }}>

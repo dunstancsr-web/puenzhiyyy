@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, PieChart, Pie,
+  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import {
-  AlertTriangle, TrendingUp, Clock, ArrowRight, PackageX, Repeat, Target,
-  ShieldCheck, ChevronDown,
+  AlertTriangle, TrendingUp, Clock, PackageX, Repeat, Target,
+  ShieldCheck, ChevronDown, X,
 } from "lucide-react";
 import StatCard from "../components/StatCard";
+import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { api } from "../api/inventory";
@@ -51,14 +51,65 @@ const moneyTrend = (d) => ({ dir: d.dir, good: d.good, text: fmt$(Math.abs(d.dif
 const ppTrend = (d) => ({ dir: d.dir, good: d.good, text: `${Math.abs(d.diff).toFixed(1)} pp` });
 const numTrend = (d, p = "") => ({ dir: d.dir, good: d.good, text: `${p}${Math.abs(d.diff).toFixed(2)}` });
 
+// ── Plain-language help text (ELI18: assume zero prior inventory-ops
+// knowledge, but not childish) for every ColHint on this page ─────────────────
+const HINTS = {
+  heroValue: {
+    what: "The total dollar value of every bag of rice currently sitting in the warehouse, valued at what it cost to buy — not what it would sell for.",
+    how: "The number next to it compares to last month. Going up isn't automatically good or bad — check Overstock and Excess & Obsolete below to see whether it's deliberate stocking up or stock quietly piling up unsold.",
+  },
+  turnover: {
+    what: "How many times your entire stock would sell out and get fully replaced in a year, at the current sales pace.",
+    how: "Higher is usually better — it means cash isn't sitting on a shelf as unsold rice. A low number alongside a high Excess & Obsolete number means stock is piling up faster than it sells.",
+  },
+  fillRate: {
+    what: "Of everything customers wanted to buy, what percentage did you actually have in stock to sell them?",
+    how: "Should be close to 100%. A drop means real sales were turned away somewhere in the portfolio because of a stockout — check Needs Attention for which SKU.",
+  },
+  gmroi: {
+    what: "Gross Margin Return on Inventory — for every $1 of stock sitting in the warehouse, how many dollars of profit did it generate?",
+    how: "Above $1 means the inventory earns more than it costs to hold. Below $1 means it's tying up more cash than it's returning.",
+  },
+  stockoutRisk: {
+    what: "The profit you'd lose if the SKUs currently projected to run out actually do run out before the next shipment arrives.",
+    how: "Ideally $0. Any number here points to a specific SKU in Needs Attention that needs a purchase order placed now.",
+  },
+  overstock: {
+    what: "The value of stock sitting above the maximum level set for it — more on hand than normal operations need.",
+    how: "Overstock ties up cash and warehouse space. It isn't automatically a mistake (e.g. a bulk discount), but it should be a deliberate choice, not a surprise.",
+  },
+  eo: {
+    what: "Excess & Obsolete — stock that's slow-moving or hasn't sold in a long time, and may need discounting, redirecting, or writing off.",
+    how: "A rising percentage here is money sitting on the shelf that isn't earning its keep. Compare against Turnover: low turnover + high E&O is the clearest warning sign.",
+  },
+  coverageBand: {
+    what: "The share of your portfolio sitting in the sweet spot — not so low you risk running out, not so high you're wasting money holding it.",
+    how: "Target is 80% or higher. Below that, too much of the portfolio is either running low or piled up above what's needed.",
+  },
+  needsAttention: {
+    what: "Every SKU with an open problem right now — running low, sitting idle, overstocked, or ageing past its shelf-life target — combined into one list instead of three separate ones.",
+    how: "Ranked with the most urgent, highest-value problems at the top. Click a bar or cell in the charts on this page to filter this table down to just the SKUs in that category — click it again to clear the filter.",
+  },
+  health: {
+    what: "Every SKU sorted into one of four health buckets by real rules — about to run out, needs action soon, worth watching, or genuinely fine — shown by dollar value, not just a headcount.",
+    how: "A big red or amber share means a lot of your money is sitting in problem stock, even if it's only a couple of SKUs. Click a colour to filter Needs Attention to just that bucket.",
+  },
+  abcXyz: {
+    what: "Splits every SKU two ways at once: how much money it represents (A = most, C = least) and how predictable its demand is (X = steady, Z = erratic).",
+    how: "AZ, BZ and CZ are the hardest combination — real money on unpredictable demand — and usually need the most safety stock. Click a cell to filter Needs Attention to that combination.",
+  },
+  coverage: {
+    what: "For each SKU: how many days the stock on hand will last (the coloured bar) compared to how many days it takes to get more from the supplier (the tick mark).",
+    how: "If the bar doesn't reach the tick mark, you'll run out before the next shipment arrives — a real stockout risk, not just \"low stock\". Click a row to filter Needs Attention to that SKU.",
+  },
+};
+
 // ── Needs Attention — ranked by urgency + financial exposure ─────────────────
-// Replaces three formerly-separate sections (Today's Top Actions, Open
-// Exceptions, Ageing Inventory) that were, on inspection, three overlapping
-// views of the same underlying "which SKUs have a problem" question — a
-// direct response to "still feels cluttered / too many similar list widgets"
-// (visual redesign pass, 2026-09). Ageing folds in as an extra tag + detail
-// on whichever row already exists for that SKU (e.g. Japonica is both IDLE
-// and Ageing — one row, not two), or its own row if nothing else applies.
+// Merges what used to be three separate, overlapping sections (Today's Top
+// Actions, Open Exceptions, Ageing Inventory) into one ranked list. Ageing
+// folds onto an existing row's tag/reason for the same SKU (Japonica reads
+// as one row tagged "IDLE STOCK · AGEING", not two rows), or gets its own
+// row when no other exception applies.
 function buildNeedsAttention(skus) {
   const actions = [];
 
@@ -131,10 +182,7 @@ function buildNeedsAttention(skus) {
       });
     });
 
-  // Matches alerts.js's SLOW_MOVING rule — this branch didn't exist in the
-  // old buildTodayActions; that info only ever surfaced via the now-removed
-  // separate "Open Exceptions" widget, so it would have silently dropped out
-  // of the merged list without being added back here.
+  // Matches alerts.js's SLOW_MOVING rule.
   skus
     .filter((s) => s.movement_class === "Slow Moving" && s.days_of_cover != null && s.days_of_cover > 120)
     .forEach((s) => {
@@ -158,9 +206,8 @@ function buildNeedsAttention(skus) {
     .forEach((a) => { if (!bySku[a.sku_id]) bySku[a.sku_id] = a; });
   const rows = Object.values(bySku);
 
-  // Ageing: append onto an existing row for the same SKU (Japonica ends up
-  // "IDLE · AGEING" in one line, not two), or add its own lowest-priority
-  // row when the SKU has no other open exception.
+  // Ageing: append onto an existing row for the same SKU, or add its own
+  // lowest-priority row when the SKU has no other open exception.
   skus
     .filter((s) => s.ageing_status === "Ageing" || s.ageing_status === "At Risk")
     .forEach((s) => {
@@ -184,12 +231,10 @@ function buildNeedsAttention(skus) {
       }
     });
 
-  return rows
-    .sort((a, b) => a.priority - b.priority || b.value - a.value)
-    .slice(0, 8);
+  return rows.sort((a, b) => a.priority - b.priority || b.value - a.value).slice(0, 8);
 }
 
-// ── Coverage vs (lead time + safety) chart data ─────────────────────────────
+// ── Coverage vs (lead time + safety) — one row per SKU, worst gap first ──────
 function buildCoverageData(skus) {
   return [...skus]
     .filter((s) => s.days_of_cover !== null)
@@ -200,7 +245,8 @@ function buildCoverageData(skus) {
     })
     .slice(0, 7)
     .map((s) => ({
-      name: s.product_name.replace(/ \d+KG$/, "").slice(0, 16),
+      sku_id: s.sku_id,
+      name: s.product_name,
       coverage: s.days_of_cover,
       threshold: s.lead_time_days + s.safety_stock_days,
       onOrder: s.expected_incoming_qty,
@@ -210,39 +256,57 @@ function buildCoverageData(skus) {
     }));
 }
 
-const CoverageTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  const gap = (d?.coverage ?? 0) - (d?.threshold ?? 0);
-  return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", fontSize: "var(--text-sm)" }}>
-      <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
-      <div style={{ color: "var(--text-secondary)", marginBottom: 3 }}>Days of cover: <strong>{d?.coverage}d</strong></div>
-      <div style={{ color: "var(--text-secondary)", marginBottom: 3 }}>Lead + safety: <strong>{d?.threshold}d</strong></div>
-      {d?.onOrder > 0 && (
-        <div style={{ color: "var(--text-secondary)", marginBottom: 3 }}>
-          On order: <strong>{d.onOrder} MT</strong>{d.eta != null ? ` · ETA ${d.eta}d` : ""}
-        </div>
-      )}
-      <div style={{ color: gap < 0 && !d?.coveredByPo ? "var(--red)" : "var(--green)", fontWeight: 700 }}>
-        {gap < 0
-          ? d?.coveredByPo ? `⚠ ${Math.abs(gap)}d short — covered by inbound PO` : `⚠ ${Math.abs(gap)}d SHORTFALL`
-          : `✓ ${gap}d buffer`}
-      </div>
-    </div>
-  );
-};
+// ── Per-section collapse state, persisted so a user's "I don't need this
+// widget" choice survives a reload. Defaults to open — nothing is hidden
+// unless the user chooses to hide it. ──────────────────────────────────────
+function useCollapsed(key, defaultOpen) {
+  const storageKey = `dash-section-open:${key}`;
+  const [open, setOpen] = useState(() => {
+    try {
+      const v = localStorage.getItem(storageKey);
+      return v === null ? defaultOpen : v === "1";
+    } catch { return defaultOpen; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, open ? "1" : "0"); } catch { /* private mode etc. */ }
+  }, [storageKey, open]);
+  return [open, setOpen];
+}
+
+const toggleFilter = (setFilter, type, value) =>
+  setFilter((f) => (f && f.type === type && f.value === value ? null : { type, value }));
+
+function matchesFilter(row, filter, skuIndex) {
+  if (!filter) return true;
+  const sku = skuIndex.get(row.sku_id);
+  if (filter.type === "sku") return row.sku_id === filter.value;
+  if (filter.type === "health") return sku?.health_status === filter.value;
+  if (filter.type === "segment") return sku && `${sku.abc_class}${sku.xyz_class}` === filter.value;
+  return true;
+}
+
+function filterLabel(filter, skuIndex) {
+  if (filter.type === "health") return HEALTH_LABEL[filter.value];
+  if (filter.type === "segment") return filter.value;
+  if (filter.type === "sku") return skuIndex.get(filter.value)?.product_name || filter.value;
+  return "";
+}
 
 export default function Dashboard() {
   const [skus, setSkus] = useState(null);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [showMore, setShowMore] = useState(false);
+  // Single active cross-filter, PowerBI-style: click a bar/cell/row in any
+  // chart on this page to filter Needs Attention to just those SKUs; click
+  // the same one again to clear it. Only one filter active at a time.
+  const [filter, setFilter] = useState(null);
 
   const load = useCallback(() => {
     setError(null);
     setSkus(null);
     setStats(null);
+    setFilter(null);
     Promise.all([api.getSkus(), api.getDashboardStats()])
       .then(([skusData, statsData]) => { setSkus(skusData); setStats(statsData); })
       .catch((err) => setError(err.message || "Failed to load dashboard"));
@@ -266,6 +330,12 @@ export default function Dashboard() {
   };
   const attention = buildNeedsAttention(skus);
   const coverageData = buildCoverageData(skus);
+  const skuIndex = new Map(skus.map((sk) => [sk.sku_id, sk]));
+  const filteredAttention = attention.filter((a) => matchesFilter(a, filter, skuIndex));
+  const monthTrendData = [
+    { name: "Last month", value: PRIOR.totalInventoryValue },
+    { name: "This month", value: s.totalInventoryValue },
+  ];
 
   return (
     <div>
@@ -274,34 +344,38 @@ export default function Dashboard() {
         subtitle={`${new Date().toLocaleDateString("en-SG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} · ${s.totalSkus} active SKUs · data as of ${new Date(s.asOf).toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}`}
       />
 
-      {/* ── Hero: the one number that summarizes the business state ── */}
-      <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)" }}>
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, marginBottom: 2 }}>
-          Total Inventory Value
-        </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap" }}>
-          <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
-            SGD {fmt$(s.totalInventoryValue)}
+      {/* ── Hero + month-over-month bar chart ── */}
+      <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "var(--space-5)" }}>
+        <div>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, marginBottom: 2, display: "flex", alignItems: "center", gap: 5 }}>
+            Total Inventory Value
+            <ColHint label="Total Inventory Value" what={HINTS.heroValue.what} how={HINTS.heroValue.how} />
           </div>
-          <span style={{ fontSize: "var(--text-base)", fontWeight: 700, color: t.inventoryValue.good ? "var(--green)" : "var(--red)" }}>
-            {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs last month
-          </span>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap" }}>
+            <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
+              SGD {fmt$(s.totalInventoryValue)}
+            </div>
+            <span style={{ fontSize: "var(--text-base)", fontWeight: 700, color: t.inventoryValue.good ? "var(--green)" : "var(--red)" }}>
+              {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs last month
+            </span>
+          </div>
         </div>
+        <MonthTrendChart data={monthTrendData} />
       </div>
 
       {/* ── Secondary strip: core numbers, demoted but never hidden ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--space-5)", marginBottom: "var(--space-3)" }}>
-        <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat}
+        <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
           status={s.turnover < 6.0 ? "warn" : "ok"} trend={numTrend(t.turnover)} sub={`${s.dio}d of supply`} />
-        <StatCard label="Fill Rate" value={`${s.fillRate}%`} icon={ShieldCheck}
+        <StatCard label="Fill Rate" value={`${s.fillRate}%`} icon={ShieldCheck} hint={HINTS.fillRate}
           status={s.fillRate < 90 ? "bad" : s.fillRate < 98 ? "warn" : "ok"} trend={ppTrend(t.fillRate)} sub={`${s.lostSales30d} MT unfilled`} />
-        <StatCard label="GMROI" value={`$${s.gmroi.toFixed(2)}`} icon={Target}
+        <StatCard label="GMROI" value={`$${s.gmroi.toFixed(2)}`} icon={Target} hint={HINTS.gmroi}
           status={s.gmroi < 1.5 ? "warn" : "ok"} trend={numTrend(t.gmroi, "$")} sub="per $1 of stock" />
-        <StatCard label="Stockout Risk" value={`SGD ${fmt$(s.stockoutRiskMargin)}`} icon={AlertTriangle}
+        <StatCard label="Stockout Risk" value={`SGD ${fmt$(s.stockoutRiskMargin)}`} icon={AlertTriangle} hint={HINTS.stockoutRisk}
           status={s.stockoutSkuCount > 0 ? "bad" : "ok"} trend={moneyTrend(t.stockoutRiskMargin)} sub={`${s.stockoutSkuCount} SKU`} />
-        <StatCard label="Overstock" value={`SGD ${fmt$(s.overstockValue)}`} icon={TrendingUp}
+        <StatCard label="Overstock" value={`SGD ${fmt$(s.overstockValue)}`} icon={TrendingUp} hint={HINTS.overstock}
           status={s.overstockPct > 5 ? "warn" : "ok"} trend={ppTrend(t.overstockPct)} sub={`${s.overstockPct}% of inventory`} />
-        <StatCard label="Excess & Obsolete" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX}
+        <StatCard label="Excess & Obsolete" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX} hint={HINTS.eo}
           status={s.eoPct > 15 ? "warn" : "ok"} trend={ppTrend(t.eoPct)} sub={`${s.eoPct}% of inventory`} />
       </div>
 
@@ -319,7 +393,7 @@ export default function Dashboard() {
       </button>
       {showMore && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-5)", marginBottom: "var(--space-5)" }}>
-          <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock}
+          <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
             status={s.coverageInBandPct < 80 ? "warn" : "ok"} trend={ppTrend(t.coverageInBandPct)}
             sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
           <StatCard label="Compliance Position" value={`${s.compliancePosition >= 0 ? "+" : ""}${fmt$(s.compliancePosition)}`}
@@ -328,130 +402,154 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Needs Attention + Inventory Health ──────────────────────────────
-          Replaces the old Today's Top Actions + Open Exceptions + Ageing
-          Inventory sections — three overlapping views of the same "which
-          SKUs have a problem" question, merged into one ranked list. Health
-          by value moves from a flat bar to a donut: proportion across four
-          categories reads faster as area+angle than as a thin strip. ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: "var(--space-6)", marginBottom: "var(--space-5)" }}>
-        <div>
-          <Section title="Needs Attention" subtitle="Every open exception, ranked by urgency then financial exposure">
-            {attention.length === 0 ? (
-              <div style={{ padding: "var(--space-4) 0", textAlign: "center", color: "var(--green)", fontWeight: 600, fontSize: "var(--text-base)" }}>
-                ✓ No open exceptions — portfolio is healthy.
-              </div>
-            ) : (
-              <div>
-                {attention.map((a, i) => (
-                  <div key={a.sku_id} style={{
-                    display: "grid", gridTemplateColumns: "3px 1fr auto auto", gap: "var(--space-4)", alignItems: "center",
-                    padding: "var(--space-3) 0",
-                    borderBottom: i < attention.length - 1 ? "1px solid var(--border)" : "none",
-                  }}>
-                    <div style={{ alignSelf: "stretch", borderRadius: 2, background: a.tagColor }} />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: 3, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700, fontSize: "var(--text-base)" }}>{a.name}</span>
-                        <span style={{
-                          fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.02em",
-                          color: a.tagColor, background: a.tagColor.replace(")", "-light)"),
-                          padding: "2px 8px", borderRadius: 99,
-                        }}>{a.tag}</span>
-                      </div>
-                      <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
-                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{a.action}</span>
-                        {" — "}{a.reason}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)" }}>SGD {fmt$(a.value)}</div>
-                      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{a.valueLabel}</div>
-                    </div>
-                    <ArrowRight size={14} color="var(--text-muted)" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </Section>
-        </div>
+      {/* ── Command Deck: four purpose-built widgets, each independently
+          collapsible (persisted), each a live filter source for Needs
+          Attention — click a bar/cell/row, click again to clear. ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-6)", marginBottom: "var(--space-2)" }}>
+        <Section title="Inventory Health" subtitle="Share of working capital by status — click a colour to filter" hint={HINTS.health}
+          collapsible storageKey="health" defaultOpen>
+          <HealthStack data={s.healthByValue} selected={filter?.type === "health" ? filter.value : null}
+            onSelect={(status) => toggleFilter(setFilter, "health", status)} />
+        </Section>
 
-        <div>
-          <Section title="Inventory Health" subtitle="Share of working capital by status">
-            <HealthDonut data={s.healthByValue} />
-          </Section>
-        </div>
+        <Section title="ABC × XYZ Segmentation" subtitle="Value tier × demand predictability — click a cell to filter" hint={HINTS.abcXyz}
+          collapsible storageKey="abcxyz" defaultOpen>
+          <AbcXyzMatrix matrix={s.abcXyzMatrix} selected={filter?.type === "segment" ? filter.value : null}
+            onSelect={(key) => toggleFilter(setFilter, "segment", key)} />
+        </Section>
       </div>
 
-      {/* ── Portfolio structure — occasional-use analysis, not a daily
-          glance: coverage-per-SKU and ABC×XYZ both live here now instead
-          of competing for space with the exception list above. ── */}
-      <details className="disclosure">
-        <summary>Portfolio structure — coverage detail &amp; ABC × XYZ segmentation</summary>
-        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "var(--space-5)", marginTop: "var(--space-4)" }}>
-          <Section title="Cover vs Lead Time + Safety Stock" subtitle="Coloured bar = days of cover · grey outline = lead time + statistical safety stock">
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={coverageData} margin={{ top: 8, right: 16, bottom: 0, left: -10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} unit="d" />
-                <Tooltip content={<CoverageTooltip />} cursor={{ fill: "var(--surface-2)" }} />
-                <Bar dataKey="coverage" radius={[4, 4, 0, 0]} name="Days of cover">
-                  {coverageData.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                </Bar>
-                <Bar dataKey="threshold" fill="transparent" stroke="var(--text-muted)" strokeWidth={1.5}
-                  radius={[3, 3, 0, 0]} name="Lead + safety" />
-              </BarChart>
-            </ResponsiveContainer>
-            <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--text-muted)", flexWrap: "wrap" }}>
-              {Object.entries(HEALTH_COLORS).map(([k, c]) => (
-                <span key={k} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: c, display: "inline-block" }} />{HEALTH_LABEL[k]}
-                </span>
-              ))}
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, border: "1.5px solid var(--text-muted)", display: "inline-block" }} />Lead + safety stock
-              </span>
-            </div>
-          </Section>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "var(--space-6)", marginBottom: "var(--space-5)" }}>
+        <Section title="Cover vs Lead + Safety" subtitle="Worst gap first — click a row to filter" hint={HINTS.coverage}
+          collapsible storageKey="coverage" defaultOpen>
+          <CoverageBullets data={coverageData} selected={filter?.type === "sku" ? filter.value : null}
+            onSelect={(skuId) => toggleFilter(setFilter, "sku", skuId)} />
+        </Section>
 
-          <Section title="ABC × XYZ Segmentation" subtitle="Rows: value (Pareto). Columns: demand predictability. Cell = SKUs · stock value">
-            <AbcXyzMatrix matrix={s.abcXyzMatrix} />
-          </Section>
-        </div>
-      </details>
+        <Section title="Needs Attention" subtitle="Every open exception, ranked by urgency then financial exposure" hint={HINTS.needsAttention}
+          collapsible storageKey="needs-attention" defaultOpen>
+          {filter && (
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600,
+              background: "var(--blue-light)", color: "var(--blue)", padding: "4px 10px 4px 12px",
+              borderRadius: 99, marginBottom: "var(--space-3)",
+            }}>
+              Filtering by {filterLabel(filter, skuIndex)}
+              <button type="button" onClick={() => setFilter(null)} aria-label="Clear filter"
+                style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", display: "flex", padding: 2 }}>
+                <X size={13} />
+              </button>
+            </div>
+          )}
+          {filteredAttention.length === 0 ? (
+            <div style={{ padding: "var(--space-4) 0", textAlign: "center", color: attention.length === 0 ? "var(--green)" : "var(--text-muted)", fontWeight: 600, fontSize: "var(--text-base)" }}>
+              {attention.length === 0 ? "✓ No open exceptions — portfolio is healthy." : "No open exceptions match this filter."}
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
+                <thead>
+                  <tr>
+                    {["SKU", "Type", "Action", "Value"].map((h, i) => (
+                      <th key={h} style={{
+                        textAlign: i === 3 ? "right" : "left", fontSize: "var(--text-xs)", fontWeight: 700,
+                        textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--text-muted)",
+                        padding: "0 8px 8px", whiteSpace: "nowrap",
+                      }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAttention.map((a) => (
+                    <tr key={a.sku_id} style={{ borderTop: "1px solid var(--border)" }}>
+                      <td style={{ padding: "10px 8px 10px 10px", borderLeft: `3px solid ${a.tagColor}`, fontWeight: 700 }}>{a.name}</td>
+                      <td style={{ padding: "10px 8px" }}>
+                        <span style={{
+                          fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.02em", whiteSpace: "nowrap",
+                          color: a.tagColor, background: a.tagColor.replace(")", "-light)"), padding: "2px 8px", borderRadius: 99,
+                        }}>{a.tag}</span>
+                      </td>
+                      <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>
+                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{a.action}</span> — {a.reason}
+                      </td>
+                      <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                        <div style={{ fontWeight: 700 }}>SGD {fmt$(a.value)}</div>
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{a.valueLabel}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+      </div>
     </div>
   );
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-// Donut, not a flat bar — proportion across four categories reads faster as
-// area+angle than as a thin strip once the shares are meaningfully uneven.
-function HealthDonut({ data }) {
-  const chartData = data.filter((d) => d.pct > 0).map((d) => ({ name: HEALTH_LABEL[d.status], value: d.value, fill: HEALTH_COLORS[d.status] }));
-  const total = data.reduce((sum, d) => sum + d.value, 0);
+// Small hero-side chart: only two real data points exist (no historical
+// snapshots are stored yet), so this stays an honest two-bar comparison
+// rather than a fabricated multi-point trend line. Tooltip on hover shows
+// the exact SGD figure for whichever bar the pointer is over.
+function MonthTrendChart({ data }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-5)", flexWrap: "wrap" }}>
-      <div style={{ width: 130, height: 130, position: "relative", flexShrink: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={41} outerRadius={63} paddingAngle={2} stroke="none" isAnimationActive={false}>
-              {chartData.map((d, i) => <Cell key={i} fill={d.fill} />)}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-          <div style={{ fontSize: "var(--text-md)", fontWeight: 800 }}>{fmt$(total)}</div>
-          <div style={{ fontSize: 9, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>total</div>
-        </div>
+    <div style={{ width: 140, height: 60, flexShrink: 0 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 2, right: 2, bottom: 0, left: 2 }}>
+          <Tooltip
+            cursor={{ fill: "var(--surface-2)" }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const d = payload[0].payload;
+              return (
+                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: 11, boxShadow: "var(--shadow)" }}>
+                  <strong>{d.name}</strong>: SGD {fmt$(d.value)}
+                </div>
+              );
+            }}
+          />
+          <XAxis dataKey="name" hide />
+          <Bar dataKey="value" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+            {data.map((d, i) => <Cell key={i} fill={i === data.length - 1 ? "var(--blue)" : "var(--border)"} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// Labeled 100%-stacked bar. Each segment is a real <button> — clickable
+// (filters Needs Attention to that health status) and keyboard-reachable.
+function HealthStack({ data, selected, onSelect }) {
+  return (
+    <div>
+      <div style={{ display: "flex", height: 34, borderRadius: 6, overflow: "hidden", gap: 2 }}>
+        {data.filter((d) => d.pct > 0).map((d) => (
+          <button key={d.status} type="button" onClick={() => onSelect(d.status)}
+            title={`${HEALTH_LABEL[d.status]}: ${fmt$(d.value)} · ${d.pct}% · ${d.count} SKU${d.count === 1 ? "" : "s"} — click to filter`}
+            style={{
+              width: `${d.pct}%`, background: HEALTH_COLORS[d.status], border: "none", cursor: "pointer", padding: 0,
+              outline: selected === d.status ? "2px solid var(--text-primary)" : "none", outlineOffset: -2,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              opacity: selected && selected !== d.status ? 0.55 : 1,
+            }}>
+            {d.pct > 12 && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>{d.pct}%</span>}
+          </button>
+        ))}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-2)", marginTop: "var(--space-4)" }}>
         {data.map((d) => (
-          <div key={d.status} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: "var(--text-sm)" }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: HEALTH_COLORS[d.status], flexShrink: 0 }} />
-            <span style={{ fontWeight: 600, width: 56, flexShrink: 0 }}>{HEALTH_LABEL[d.status]}</span>
-            <span style={{ color: "var(--text-secondary)" }}>{fmt$(d.value)} · {d.pct}% · {d.count} SKU{d.count === 1 ? "" : "s"}</span>
+          <div key={d.status} style={{ fontSize: "var(--text-sm)", opacity: selected && selected !== d.status ? 0.55 : 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: HEALTH_COLORS[d.status] }} />
+              <span style={{ fontWeight: 600 }}>{HEALTH_LABEL[d.status]}</span>
+            </div>
+            <div style={{ color: "var(--text-secondary)" }}>
+              {fmt$(d.value)} · {d.pct}% · {d.count} SKU{d.count === 1 ? "" : "s"}
+            </div>
           </div>
         ))}
       </div>
@@ -459,7 +557,7 @@ function HealthDonut({ data }) {
   );
 }
 
-function AbcXyzMatrix({ matrix }) {
+function AbcXyzMatrix({ matrix, selected, onSelect }) {
   const { rows, cols, cells } = matrix;
   const maxVal = Math.max(...Object.values(cells).map((c) => c.value), 1);
   const rowHint = { A: "high value", B: "medium", C: "low value" };
@@ -480,18 +578,26 @@ function AbcXyzMatrix({ matrix }) {
               {r}<span style={{ fontWeight: 400, fontSize: 10, color: "var(--text-muted)" }}>{rowHint[r]}</span>
             </div>
             {cols.map((c) => {
-              const cell = cells[`${r}${c}`];
+              const key = `${r}${c}`;
+              const cell = cells[key];
               const intensity = cell.value / maxVal;
+              const clickable = cell.count > 0;
+              const isSel = selected === key;
               return (
-                <div key={c} style={{
-                  background: cell.value > 0 ? `rgba(59,130,246,${0.08 + intensity * 0.32})` : "var(--surface-2)",
-                  borderRadius: 6, padding: "var(--space-3) 4px", textAlign: "center",
-                }}>
+                <button key={c} type="button" disabled={!clickable} onClick={() => onSelect(key)}
+                  title={clickable ? `${key}: ${cell.count} SKU${cell.count === 1 ? "" : "s"} · ${fmt$(cell.value)} — click to filter` : `${key}: no SKUs`}
+                  style={{
+                    background: cell.value > 0 ? `rgba(59,130,246,${0.08 + intensity * 0.32})` : "var(--surface-2)",
+                    borderRadius: 6, padding: "var(--space-3) 4px", textAlign: "center", font: "inherit",
+                    border: isSel ? "2px solid var(--blue)" : "2px solid transparent",
+                    cursor: clickable ? "pointer" : "default",
+                    opacity: selected && !isSel ? 0.55 : 1,
+                  }}>
                   <div style={{ fontSize: 15, fontWeight: 800, color: cell.count ? "var(--text-primary)" : "var(--text-muted)" }}>
                     {cell.count}
                   </div>
                   <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{cell.value > 0 ? fmt$(cell.value) : "—"}</div>
-                </div>
+                </button>
               );
             })}
           </React.Fragment>
@@ -500,6 +606,47 @@ function AbcXyzMatrix({ matrix }) {
       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-3)", lineHeight: 1.5 }}>
         AZ / BZ / CZ carry the hardest-to-plan stock — set higher safety stock and shorter review cycles there.
       </div>
+    </div>
+  );
+}
+
+// Bullet-style rows (Stephen Few pattern): a thin fill bar for actual days of
+// cover, a tick mark for the required lead+safety threshold. Each row is a
+// real button — clickable (filters Needs Attention to that SKU) with a
+// native title tooltip carrying the exact numbers on hover.
+function CoverageBullets({ data, selected, onSelect }) {
+  const max = Math.max(...data.map((d) => Math.max(d.coverage, d.threshold))) * 1.08;
+  return (
+    <div>
+      {data.map((d) => {
+        const isSel = selected === d.sku_id;
+        const fillPct = Math.min(100, (d.coverage / max) * 100);
+        const tickPct = Math.min(100, (d.threshold / max) * 100);
+        const gap = d.coverage - d.threshold;
+        const gapText = gap < 0
+          ? d.coveredByPo ? `${Math.abs(gap)}d short — covered by inbound PO` : `${Math.abs(gap)}d SHORTFALL`
+          : `${gap}d buffer`;
+        return (
+          <button key={d.sku_id} type="button" onClick={() => onSelect(d.sku_id)}
+            title={`${d.name}: ${d.coverage}d cover vs ${d.threshold}d lead+safety — ${gapText}${d.onOrder > 0 ? ` · ${d.onOrder} MT on order (ETA ${d.eta}d)` : ""}`}
+            style={{
+              display: "grid", gridTemplateColumns: "128px 1fr 68px", gap: "var(--space-3)", alignItems: "center",
+              width: "100%", padding: "6px 8px", marginBottom: 2, borderRadius: "var(--radius)", font: "inherit", textAlign: "left",
+              background: isSel ? "var(--blue-light)" : "transparent",
+              border: `1px solid ${isSel ? "var(--blue)" : "transparent"}`,
+              cursor: "pointer", opacity: selected && !isSel ? 0.6 : 1,
+            }}>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {d.name}
+            </span>
+            <span style={{ position: "relative", height: 12, background: "var(--surface-2)", borderRadius: 3 }}>
+              <span style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${fillPct}%`, background: d.fill, borderRadius: 3 }} />
+              <span style={{ position: "absolute", top: -3, bottom: -3, left: `${tickPct}%`, width: 2, background: "var(--text-primary)", opacity: 0.55 }} />
+            </span>
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", textAlign: "right" }}>{d.coverage}d / {d.threshold}d</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -513,16 +660,31 @@ function PageHeader({ title, subtitle }) {
   );
 }
 
-// Renamed from `Card` — no border/shadow/accent-stripe; a labelled section that
-// separates from its neighbors via spacing, matching the rest of the page.
-function Section({ title, subtitle, children }) {
+// `collapsible` sections persist their open/closed state per-browser
+// (localStorage) — the "optional decluttering" a user can set once and
+// forget, rather than a per-visit toggle. Defaults to open.
+function Section({ title, subtitle, children, hint, collapsible = false, storageKey, defaultOpen = true }) {
+  const [storedOpen, setStoredOpen] = useCollapsed(storageKey || title, defaultOpen);
+  const open = collapsible ? storedOpen : true;
   return (
     <div>
-      <div style={{ marginBottom: "var(--space-4)" }}>
-        <div style={{ fontWeight: 600, fontSize: "var(--text-md)" }}>{title}</div>
-        {subtitle && <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginTop: 2 }}>{subtitle}</div>}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: open ? "var(--space-4)" : 0 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: "var(--text-md)", display: "flex", alignItems: "center", gap: 5 }}>
+            {title}
+            {hint && <ColHint label={title} what={hint.what} how={hint.how} />}
+          </div>
+          {subtitle && open && <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginTop: 2 }}>{subtitle}</div>}
+        </div>
+        {collapsible && (
+          <button type="button" onClick={() => setStoredOpen((v) => !v)} aria-expanded={open}
+            aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: 2, flexShrink: 0 }}>
+            <ChevronDown size={15} style={{ transform: open ? "none" : "rotate(-90deg)", transition: "transform 0.15s" }} />
+          </button>
+        )}
       </div>
-      {children}
+      {open && children}
     </div>
   );
 }
