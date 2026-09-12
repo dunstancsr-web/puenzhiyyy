@@ -39,7 +39,7 @@ export default function Badge({ type, label: overrideLabel }) {
         borderRadius: 99,
         background: s.bg,
         color: s.color,
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 600,
         whiteSpace: "nowrap",
       }}

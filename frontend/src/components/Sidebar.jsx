@@ -45,14 +45,14 @@ export default function Sidebar() {
           <TrendingUp size={18} color="#fff" />
         </div>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text-primary)" }}>StockSense</div>
-          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Rice Inventory AI</div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-primary)" }}>StockSense</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Rice Inventory AI</div>
         </div>
       </div>
 
       {/* Nav */}
       <nav style={{ flex: 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", padding: "0 8px", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", padding: "0 8px", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
           Menu
         </div>
         {navItems.map(({ to, label, icon: Icon, badge }) => (
@@ -64,7 +64,7 @@ export default function Sidebar() {
               padding: "10px 16px", borderRadius: "var(--radius)",
               color: isActive ? "#fff" : "var(--text-secondary)",
               background: isActive ? "var(--blue)" : "transparent",
-              fontWeight: 500, fontSize: 14,
+              fontWeight: 500, fontSize: 15,
               marginBottom: 4, transition: "all 0.15s",
               textDecoration: "none",
             })}
@@ -72,7 +72,7 @@ export default function Sidebar() {
             <Icon size={17} />
             <span style={{ flex: 1 }}>{label}</span>
             {badge > 0 && (
-              <span style={{ background: "var(--red)", color: "#fff", borderRadius: 99, fontSize: 11, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>
+              <span style={{ background: "var(--red)", color: "#fff", borderRadius: 99, fontSize: 12, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>
                 {badge}
               </span>
             )}
@@ -82,7 +82,7 @@ export default function Sidebar() {
 
       {/* Theme switcher */}
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", padding: "0 8px", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", padding: "0 8px", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
           Theme
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -96,12 +96,12 @@ export default function Sidebar() {
                 border: `1px solid ${theme === t.id ? "var(--blue)" : "var(--border)"}`,
                 background: theme === t.id ? "var(--blue-light)" : "transparent",
                 color: theme === t.id ? "var(--blue)" : "var(--text-secondary)",
-                fontSize: 13, fontWeight: theme === t.id ? 600 : 400,
+                fontSize: 14, fontWeight: theme === t.id ? 600 : 400,
                 cursor: "pointer", textAlign: "left",
                 transition: "all 0.15s",
               }}
             >
-              <span style={{ fontSize: 14 }}>{t.icon}</span>
+              <span style={{ fontSize: 15 }}>{t.icon}</span>
               {t.label}
               {theme === t.id && (
                 <span style={{ marginLeft: "auto", width: 6, height: 6, borderRadius: "50%", background: "var(--blue)" }} />
@@ -111,7 +111,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div style={{ padding: "12px 8px", borderTop: "1px solid var(--sidebar-border)", fontSize: 12, color: "var(--text-muted)" }}>
+      <div style={{ padding: "12px 8px", borderTop: "1px solid var(--sidebar-border)", fontSize: 13, color: "var(--text-muted)" }}>
         AWS NUS-ISS SMYA 2026
       </div>
     </aside>

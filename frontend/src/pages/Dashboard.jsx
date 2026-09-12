@@ -8,14 +8,19 @@ import {
 } from "lucide-react";
 import StatCard from "../components/StatCard";
 import ColHint from "../components/ColHint";
+import HoverHint from "../components/HoverHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
 
-// Prior period (last month) — hand-set illustrative comparison, not derived from
+// Reference baseline — hand-set illustrative comparison, not derived from
 // stored history (this project has no historical snapshots yet). Carried over
 // unchanged from the mock era; feeds the trend arrows via delta() below.
+// Deliberately labeled "vs baseline" everywhere in the UI, not "vs last
+// month" — the latter asserts a real, live month-over-month feed that
+// doesn't exist yet, and would silently go stale the moment a real month
+// passes without this constant being hand-updated.
 const PRIOR = {
   totalInventoryValue: 3_560_000,
   turnover: 3.3,
@@ -57,7 +62,7 @@ const numTrend = (d, p = "") => ({ dir: d.dir, good: d.good, text: `${p}${Math.a
 const HINTS = {
   heroValue: {
     what: "The total dollar value of every bag of rice currently sitting in the warehouse, valued at what it cost to buy — not what it would sell for.",
-    how: "The number next to it compares to last month. Going up isn't automatically good or bad — check Overstock and Excess & Obsolete below to see whether it's deliberate stocking up or stock quietly piling up unsold.",
+    how: "The number next to it compares to a fixed reference baseline, not a live month-over-month feed — this project doesn't store historical snapshots yet, so treat it as illustrative until that's built. Going up isn't automatically good or bad either way — check Overstock and Excess & Obsolete below to see whether it's deliberate stocking up or stock quietly piling up unsold.",
   },
   turnover: {
     what: "How many times your entire stock would sell out and get fully replaced in a year, at the current sales pace.",
@@ -200,11 +205,22 @@ function buildNeedsAttention(skus) {
       });
     });
 
-  // One row per SKU — keep its highest-priority (lowest number) action
+  // One row per SKU — keep its highest-priority (lowest number) action as
+  // the row's action/reason/value, but a SKU can genuinely trip more than
+  // one condition at once (e.g. Overstock AND Slow Moving). Don't silently
+  // drop the second condition the way a plain first-match-wins dedup would —
+  // fold its tag onto the existing row, same idea as the Ageing merge below.
   const bySku = {};
   actions
     .sort((a, b) => a.priority - b.priority || b.value - a.value)
-    .forEach((a) => { if (!bySku[a.sku_id]) bySku[a.sku_id] = a; });
+    .forEach((a) => {
+      const existing = bySku[a.sku_id];
+      if (!existing) {
+        bySku[a.sku_id] = { ...a };
+      } else if (!existing.tag.includes(a.tag)) {
+        existing.tag += ` · ${a.tag}`;
+      }
+    });
   const rows = Object.values(bySku);
 
   // Ageing: append onto an existing row for the same SKU, or add its own
@@ -232,8 +248,18 @@ function buildNeedsAttention(skus) {
       }
     });
 
-  return rows.sort((a, b) => a.priority - b.priority || b.value - a.value).slice(0, 8);
+  // Full sorted list — deliberately NOT capped here. Capping before the
+  // caller's filter is applied would silently hide a real exception whose
+  // category just didn't make this function's cut (see NEEDS_ATTENTION_CAP
+  // at the call site, applied after filtering).
+  return rows.sort((a, b) => a.priority - b.priority || b.value - a.value);
 }
+
+// Display cap for the Needs Attention table — applied AFTER filtering, so a
+// filter always searches the full exception list, not just what fit on
+// screen. Any rows beyond this are surfaced via a "+N more" note rather than
+// disappearing without a trace.
+const NEEDS_ATTENTION_CAP = 8;
 
 // ── Coverage vs (lead time + safety) — one row per SKU, worst gap first ──────
 function buildCoverageData(skus) {
@@ -315,7 +341,11 @@ export default function Dashboard() {
   const attention = buildNeedsAttention(skus);
   const coverageData = buildCoverageData(skus);
   const skuIndex = new Map(skus.map((sk) => [sk.sku_id, sk]));
+  // Filter first, cap for display second — a filter must search every real
+  // exception, not just the top slice that happened to fit on screen.
   const filteredAttention = attention.filter((a) => matchesFilter(a, filter, skuIndex));
+  const shownAttention = filteredAttention.slice(0, NEEDS_ATTENTION_CAP);
+  const hiddenAttentionCount = filteredAttention.length - shownAttention.length;
   const monthTrendData = [
     { name: "Last month", value: PRIOR.totalInventoryValue },
     { name: "This month", value: s.totalInventoryValue },
@@ -339,31 +369,42 @@ export default function Dashboard() {
             <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
               SGD {fmt$(s.totalInventoryValue)}
             </div>
-            <span style={{ fontSize: "var(--text-base)", fontWeight: 700, color: t.inventoryValue.good ? "var(--green)" : "var(--red)" }}>
-              {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs last month
+            <span title="vs a fixed reference baseline — not a live month-over-month feed yet" style={{ fontSize: "var(--text-base)", fontWeight: 700, color: t.inventoryValue.good ? "var(--green)" : "var(--red)" }}>
+              {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs baseline
             </span>
           </div>
         </div>
         <MonthTrendChart data={monthTrendData} />
       </div>
 
-      {/* ── Secondary strip: core numbers, demoted but never hidden ── */}
+      {/* ── Secondary strip: core numbers, demoted but never hidden. Every
+          threshold below has real headroom on both ends (a "bad" tier, not
+          just warn/ok) so the status color can actually move instead of
+          sitting permanently on one shade — GMROI's line is set at $1 to
+          match its own hint text below. ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--space-5)", marginBottom: "var(--space-3)" }}>
         <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
-          status={s.turnover < 6.0 ? "warn" : "ok"} trend={numTrend(t.turnover)} sub={`${s.dio}d of supply`} />
+          status={s.turnover < 2.5 ? "bad" : s.turnover < 4.0 ? "warn" : "ok"} trend={numTrend(t.turnover)} sub={`${s.dio}d of supply`} />
         <StatCard label="Fill Rate" value={`${s.fillRate}%`} icon={ShieldCheck} hint={HINTS.fillRate}
           status={s.fillRate < 90 ? "bad" : s.fillRate < 98 ? "warn" : "ok"} trend={ppTrend(t.fillRate)} sub={`${s.lostSales30d} MT unfilled`} />
         <StatCard label="GMROI" value={`$${s.gmroi.toFixed(2)}`} icon={Target} hint={HINTS.gmroi}
-          status={s.gmroi < 1.5 ? "warn" : "ok"} trend={numTrend(t.gmroi, "$")} sub="per $1 of stock" />
+          status={s.gmroi < 1.0 ? "bad" : s.gmroi < 1.5 ? "warn" : "ok"} trend={numTrend(t.gmroi, "$")} sub="per $1 of stock" />
         <StatCard label="Stockout Risk" value={`SGD ${fmt$(s.stockoutRiskMargin)}`} icon={AlertTriangle} hint={HINTS.stockoutRisk}
           status={s.stockoutSkuCount > 0 ? "bad" : "ok"} trend={moneyTrend(t.stockoutRiskMargin)} sub={`${s.stockoutSkuCount} SKU`} />
         <StatCard label="Overstock" value={`SGD ${fmt$(s.overstockValue)}`} icon={TrendingUp} hint={HINTS.overstock}
-          status={s.overstockPct > 5 ? "warn" : "ok"} trend={ppTrend(t.overstockPct)} sub={`${s.overstockPct}% of inventory`} />
+          status={s.overstockPct > 10 ? "bad" : s.overstockPct > 5 ? "warn" : "ok"} trend={ppTrend(t.overstockPct)} sub={`${s.overstockPct}% of inventory`} />
         <StatCard label="Excess & Obsolete" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX} hint={HINTS.eo}
-          status={s.eoPct > 15 ? "warn" : "ok"} trend={ppTrend(t.eoPct)} sub={`${s.eoPct}% of inventory`} />
+          status={s.eoPct > 30 ? "bad" : s.eoPct > 15 ? "warn" : "ok"} trend={ppTrend(t.eoPct)} sub={`${s.eoPct}% of inventory`} />
+        <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
+          status={s.coverageInBandPct < 50 ? "bad" : s.coverageInBandPct < 80 ? "warn" : "ok"} trend={ppTrend(t.coverageInBandPct)}
+          sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
       </div>
 
-      {/* ── One real disclosure: situational numbers, not daily-glance ── */}
+      {/* ── One real disclosure: Compliance Position is the only genuinely
+          situational number here (illustrative, pending governance approval)
+          — Coverage in Target Band moved above since it's a real daily-glance
+          figure, not a duplicate of Health-by-Value (different taxonomy:
+          below/in/above/idle days-of-cover vs RED/ORANGE/YELLOW/GREEN rules). ── */}
       <button
         onClick={() => setShowMore((v) => !v)}
         style={{
@@ -373,13 +414,10 @@ export default function Dashboard() {
         }}
       >
         <ChevronDown size={13} style={{ transform: showMore ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
-        {showMore ? "Hide" : "Show"} more metrics
+        {showMore ? "Hide" : "Show"} compliance position
       </button>
       {showMore && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-5)", marginBottom: "var(--space-5)" }}>
-          <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
-            status={s.coverageInBandPct < 80 ? "warn" : "ok"} trend={ppTrend(t.coverageInBandPct)}
-            sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
           <StatCard label="Compliance Position" value={`${s.compliancePosition >= 0 ? "+" : ""}${fmt$(s.compliancePosition)}`}
             icon={ShieldCheck} status={s.compliancePosition < 0 ? "bad" : "ok"}
             sub="Illustrative rice-stockpile buffer · pending governance approval" />
@@ -444,7 +482,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAttention.map((a) => (
+                  {shownAttention.map((a) => (
                     <tr key={a.sku_id} style={{ borderTop: "1px solid var(--border)" }}>
                       <td style={{ padding: "10px 8px 10px 10px", borderLeft: `3px solid ${a.tagColor}`, fontWeight: 700 }}>{a.name}</td>
                       <td style={{ padding: "10px 8px" }}>
@@ -464,6 +502,11 @@ export default function Dashboard() {
                   ))}
                 </tbody>
               </table>
+              {hiddenAttentionCount > 0 && (
+                <div style={{ padding: "var(--space-3) 8px 0", fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
+                  +{hiddenAttentionCount} more — showing the {NEEDS_ATTENTION_CAP} highest-priority exceptions{filter ? " matching this filter" : ""}.
+                </div>
+              )}
             </div>
           )}
         </Section>
@@ -489,7 +532,7 @@ function MonthTrendChart({ data }) {
               if (!active || !payload?.length) return null;
               const d = payload[0].payload;
               return (
-                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: 11, boxShadow: "var(--shadow)" }}>
+                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: 12, boxShadow: "var(--shadow)" }}>
                   <strong>{d.name}</strong>: SGD {fmt$(d.value)}
                 </div>
               );
@@ -507,21 +550,26 @@ function MonthTrendChart({ data }) {
 
 // Labeled 100%-stacked bar. Each segment is a real <button> — clickable
 // (filters Needs Attention to that health status) and keyboard-reachable.
+// Detail lives in a HoverHint (focus + hover + Escape-to-close, visible on
+// touch via focus), not a native `title` — title tooltips don't fire on
+// tap, so touch users would otherwise get zero detail on this widget.
 function HealthStack({ data, selected, onSelect }) {
   return (
     <div>
       <div style={{ display: "flex", height: 34, borderRadius: 6, overflow: "hidden", gap: 2 }}>
         {data.filter((d) => d.pct > 0).map((d) => (
-          <button key={d.status} type="button" onClick={() => onSelect(d.status)}
-            title={`${HEALTH_LABEL[d.status]}: ${fmt$(d.value)} · ${d.pct}% · ${d.count} SKU${d.count === 1 ? "" : "s"} — click to filter`}
-            style={{
-              width: `${d.pct}%`, background: HEALTH_COLORS[d.status], border: "none", cursor: "pointer", padding: 0,
-              outline: selected === d.status ? "2px solid var(--text-primary)" : "none", outlineOffset: -2,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              opacity: selected && selected !== d.status ? 0.55 : 1,
-            }}>
-            {d.pct > 12 && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>{d.pct}%</span>}
-          </button>
+          <HoverHint key={d.status} content={`${HEALTH_LABEL[d.status]}: ${fmt$(d.value)} · ${d.pct}% · ${d.count} SKU${d.count === 1 ? "" : "s"} — click to filter`}>
+            <button type="button" onClick={() => onSelect(d.status)}
+              aria-label={`${HEALTH_LABEL[d.status]}: ${d.pct}% of inventory value`}
+              style={{
+                width: `${d.pct}%`, background: HEALTH_COLORS[d.status], border: "none", cursor: "pointer", padding: 0,
+                outline: selected === d.status ? "2px solid var(--text-primary)" : "none", outlineOffset: -2,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: selected && selected !== d.status ? 0.55 : 1,
+              }}>
+              {d.pct > 12 && <span style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>{d.pct}%</span>}
+            </button>
+          </HoverHint>
         ))}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-2)", marginTop: "var(--space-4)" }}>
@@ -553,13 +601,13 @@ function AbcXyzMatrix({ matrix, selected, onSelect }) {
         <div />
         {cols.map((c) => (
           <div key={c} style={{ textAlign: "center", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)" }}>
-            {c}<div style={{ fontWeight: 400, fontSize: 10, color: "var(--text-muted)" }}>{colHint[c]}</div>
+            {c}<div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)" }}>{colHint[c]}</div>
           </div>
         ))}
         {rows.map((r) => (
           <React.Fragment key={r}>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", paddingRight: 6 }}>
-              {r}<span style={{ fontWeight: 400, fontSize: 10, color: "var(--text-muted)" }}>{rowHint[r]}</span>
+              {r}<span style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)" }}>{rowHint[r]}</span>
             </div>
             {cols.map((c) => {
               const key = `${r}${c}`;
@@ -568,20 +616,22 @@ function AbcXyzMatrix({ matrix, selected, onSelect }) {
               const clickable = cell.count > 0;
               const isSel = selected === key;
               return (
-                <button key={c} type="button" disabled={!clickable} onClick={() => onSelect(key)}
-                  title={clickable ? `${key}: ${cell.count} SKU${cell.count === 1 ? "" : "s"} · ${fmt$(cell.value)} — click to filter` : `${key}: no SKUs`}
-                  style={{
-                    background: cell.value > 0 ? `rgba(59,130,246,${0.08 + intensity * 0.32})` : "var(--surface-2)",
-                    borderRadius: 6, padding: "var(--space-3) 4px", textAlign: "center", font: "inherit",
-                    border: isSel ? "2px solid var(--blue)" : "2px solid transparent",
-                    cursor: clickable ? "pointer" : "default",
-                    opacity: selected && !isSel ? 0.55 : 1,
-                  }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: cell.count ? "var(--text-primary)" : "var(--text-muted)" }}>
-                    {cell.count}
-                  </div>
-                  <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{cell.value > 0 ? fmt$(cell.value) : "—"}</div>
-                </button>
+                <HoverHint key={c} content={clickable ? `${key}: ${cell.count} SKU${cell.count === 1 ? "" : "s"} · ${fmt$(cell.value)} — click to filter` : `${key}: no SKUs`}>
+                  <button type="button" disabled={!clickable} onClick={() => onSelect(key)}
+                    aria-label={clickable ? `${key}: ${cell.count} SKUs, ${fmt$(cell.value)}` : `${key}: no SKUs`}
+                    style={{
+                      background: cell.value > 0 ? `rgba(59,130,246,${0.08 + intensity * 0.32})` : "var(--surface-2)",
+                      borderRadius: 6, padding: "var(--space-3) 4px", textAlign: "center", font: "inherit",
+                      border: isSel ? "2px solid var(--blue)" : "2px solid transparent",
+                      cursor: clickable ? "pointer" : "default",
+                      opacity: selected && !isSel ? 0.55 : 1,
+                    }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: cell.count ? "var(--text-primary)" : "var(--text-muted)" }}>
+                      {cell.count}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{cell.value > 0 ? fmt$(cell.value) : "—"}</div>
+                  </button>
+                </HoverHint>
               );
             })}
           </React.Fragment>
@@ -596,8 +646,9 @@ function AbcXyzMatrix({ matrix, selected, onSelect }) {
 
 // Bullet-style rows (Stephen Few pattern): a thin fill bar for actual days of
 // cover, a tick mark for the required lead+safety threshold. Each row is a
-// real button — clickable (filters Needs Attention to that SKU) with a
-// native title tooltip carrying the exact numbers on hover.
+// real button — clickable (filters Needs Attention to that SKU) — with the
+// exact numbers in a HoverHint (focus/touch-reachable), not a native title
+// tooltip, which never fires on tap.
 function CoverageBullets({ data, selected, onSelect }) {
   const max = Math.max(...data.map((d) => Math.max(d.coverage, d.threshold))) * 1.08;
   return (
@@ -611,24 +662,26 @@ function CoverageBullets({ data, selected, onSelect }) {
           ? d.coveredByPo ? `${Math.abs(gap)}d short — covered by inbound PO` : `${Math.abs(gap)}d SHORTFALL`
           : `${gap}d buffer`;
         return (
-          <button key={d.sku_id} type="button" onClick={() => onSelect(d.sku_id)}
-            title={`${d.name}: ${d.coverage}d cover vs ${d.threshold}d lead+safety — ${gapText}${d.onOrder > 0 ? ` · ${d.onOrder} MT on order (ETA ${d.eta}d)` : ""}`}
-            style={{
-              display: "grid", gridTemplateColumns: "128px 1fr 68px", gap: "var(--space-3)", alignItems: "center",
-              width: "100%", padding: "6px 8px", marginBottom: 2, borderRadius: "var(--radius)", font: "inherit", textAlign: "left",
-              background: isSel ? "var(--blue-light)" : "transparent",
-              border: `1px solid ${isSel ? "var(--blue)" : "transparent"}`,
-              cursor: "pointer", opacity: selected && !isSel ? 0.6 : 1,
-            }}>
-            <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {d.name}
-            </span>
-            <span style={{ position: "relative", height: 12, background: "var(--surface-2)", borderRadius: 3 }}>
-              <span style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${fillPct}%`, background: d.fill, borderRadius: 3 }} />
-              <span style={{ position: "absolute", top: -3, bottom: -3, left: `${tickPct}%`, width: 2, background: "var(--text-primary)", opacity: 0.55 }} />
-            </span>
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", textAlign: "right" }}>{d.coverage}d / {d.threshold}d</span>
-          </button>
+          <HoverHint key={d.sku_id} content={`${d.name}: ${d.coverage}d cover vs ${d.threshold}d lead+safety — ${gapText}${d.onOrder > 0 ? ` · ${d.onOrder} MT on order (ETA ${d.eta}d)` : ""}`}>
+            <button type="button" onClick={() => onSelect(d.sku_id)}
+              aria-label={`${d.name}: ${d.coverage} days of cover vs ${d.threshold} days needed`}
+              style={{
+                display: "grid", gridTemplateColumns: "128px 1fr 68px", gap: "var(--space-3)", alignItems: "center",
+                width: "100%", padding: "6px 8px", marginBottom: 2, borderRadius: "var(--radius)", font: "inherit", textAlign: "left",
+                background: isSel ? "var(--blue-light)" : "transparent",
+                border: `1px solid ${isSel ? "var(--blue)" : "transparent"}`,
+                cursor: "pointer", opacity: selected && !isSel ? 0.6 : 1,
+              }}>
+              <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {d.name}
+              </span>
+              <span style={{ position: "relative", height: 12, background: "var(--surface-2)", borderRadius: 3 }}>
+                <span style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${fillPct}%`, background: d.fill, borderRadius: 3 }} />
+                <span style={{ position: "absolute", top: -3, bottom: -3, left: `${tickPct}%`, width: 2, background: "var(--text-primary)", opacity: 0.55 }} />
+              </span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", textAlign: "right" }}>{d.coverage}d / {d.threshold}d</span>
+            </button>
+          </HoverHint>
         );
       })}
     </div>

@@ -180,3 +180,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md,frontend/src/pages/Alerts.jsx,frontend/src/pages/Dashboard.jsx
 - **New files:** frontend/src/hooks/useCollapsed.js
 - **Notes:** Alerts page polish (TASK-24): removed a redundant filter-tiles/filter-tabs duplication, added ELI18 help tooltips, made the Decision Log collapsible (shared hook extracted from Dashboard), restyled alert cards to drop the boxed/shadowed look, and corrected the AI modal's disclaimer copy to stop overstating what the current rule-based placeholder does.
+
+---
+
+## Session: 2026-09-12 23:45
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/index.css, frontend/src/pages/Dashboard.jsx, frontend/src/components/StatCard.jsx, frontend/src/components/hintStyles.js, frontend/src/components/Sidebar.jsx, frontend/src/components/Badge.jsx, frontend/src/components/FormField.jsx, frontend/src/components/ErrorState.jsx, frontend/src/components/StockPositionBar.jsx, frontend/src/pages/Inventory.jsx, frontend/src/pages/Alerts.jsx
+- **New files:** none
+- **Notes:** Dashboard critic pass (TASK-25): ran a strict UI/UX + data-analyst review of the Dashboard, reported findings by severity, then fixed the Critical + High items the user picked — honest "vs baseline" relabel (was silently asserting a real month-over-month feed that doesn't exist), a site-wide `:focus-visible` outline (buttons had none at all), touch/keyboard-accessible chart tooltips (swapped native `title` for the existing `HoverHint` pattern on 3 widgets), recalibrated KPI status thresholds so "bad" is reachable (not just perpetual "warn"), un-hid Coverage-in-Target-Band (28.9% — a real alarm, not a duplicate metric), and fixed `buildNeedsAttention` silently dropping overlapping SKU conditions plus a latent filter-after-truncation bug. Also did a site-wide font-size increase (type scale + body floor to 16px, per WCAG/Apple HIG/Material guidance) for older users, sweeping hardcoded sub-12px literals across 9 components.

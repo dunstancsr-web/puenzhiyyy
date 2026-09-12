@@ -211,7 +211,7 @@ export default function StockPositionBar({
       </HoverHint>
 
       {/* axis labels — sit under their ticks */}
-      <div style={{ position: "relative", height: 13, fontSize: 10, marginTop: 1 }}>
+      <div style={{ position: "relative", height: 14, fontSize: 11, marginTop: 1 }}>
         <span style={{ position: "absolute", left: 0, color: "var(--text-muted)" }}>0</span>
         {showReorder && (
           <HoverHint panelWidth={260} content={reorderCopy(true)}>
@@ -235,7 +235,7 @@ export default function StockPositionBar({
       {/* status line */}
       {gapText && (
         <HoverHint panelWidth={260} content={gapCopy(idle)}>
-          <div style={{ fontSize: 12, fontWeight: gapWeight, color: gapColor }}>{gapText}</div>
+          <div style={{ fontSize: 13, fontWeight: gapWeight, color: gapColor }}>{gapText}</div>
         </HoverHint>
       )}
     </div>

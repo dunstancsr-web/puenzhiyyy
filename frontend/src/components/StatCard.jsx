@@ -28,7 +28,7 @@ export default function StatCard({ label, value, icon: Icon, sub, target, trend,
           </div>
           {trend && (
             <span
-              title="vs last month"
+              title="vs a fixed reference baseline — not a live month-over-month feed yet"
               style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: trend.good ? "var(--green)" : "var(--red)", whiteSpace: "nowrap" }}
             >
               {trend.dir === "up" ? "▲" : trend.dir === "down" ? "▼" : "▬"} {trend.text}

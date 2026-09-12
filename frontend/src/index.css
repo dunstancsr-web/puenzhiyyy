@@ -120,13 +120,18 @@
   --space-7: 48px;
   --space-8: 64px;
 
-  --text-xs:   11px;
-  --text-sm:   12px;
-  --text-base: 13px;
-  --text-md:   14px;
-  --text-lg:   16px;
-  --text-xl:   22px;
-  --text-2xl:  32px;
+  /* Bumped 2026-09 for readability (WCAG/Apple HIG/Material all converge on a
+     16px web body-text floor, and steer clear of sub-12px text entirely —
+     older users are the group this costs the most and gains the least by
+     skimping on). --text-xs is now the absolute floor; nothing on the site
+     should go smaller. */
+  --text-xs:   12px;
+  --text-sm:   13px;
+  --text-base: 15px;
+  --text-md:   16px;
+  --text-lg:   18px;
+  --text-xl:   24px;
+  --text-2xl:  34px;
 }
 
 /* Default in-page surface: no border, no shadow — content separates via
@@ -140,7 +145,7 @@ body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 16px; /* web body-text floor (WCAG/Apple HIG/Material) */
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   transition: background 0.3s ease, color 0.3s ease;
@@ -153,6 +158,21 @@ button {
   font-family: inherit;
   border: none;
   outline: none;
+}
+
+/* Removing the default outline above is fine ONLY because every focusable
+   control gets a real one back here, keyboard-only (mouse/touch clicks don't
+   trigger :focus-visible) — every button on Dashboard/Alerts (filter chips,
+   collapse toggles, chart bars/cells/rows) relies on this to be usable
+   without a mouse. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 
 input, select, textarea {
@@ -244,7 +264,7 @@ details.disclosure summary {
   user-select: none;
 }
 details.disclosure summary::-webkit-details-marker { display: none; }
-details.disclosure summary::before { content: "▸ "; font-size: 11px; }
+details.disclosure summary::before { content: "▸ "; font-size: 12px; }
 details.disclosure[open] summary::before { content: "▾ "; }
 
 /* ── Hover-hint affordance (HoverHint) ──────────────────────────────────── */

@@ -167,14 +167,14 @@ export default function Alerts() {
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>Alerts</h1>
-          <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700 }}>Alerts</h1>
+          <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>
             {filter === "ALL" ? `${active.length} active alerts` : `${filtered.length} of ${active.length} alerts`} · sorted by severity
           </p>
         </div>
         <button
           onClick={loadAlerts}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--card-bg)", fontSize: 13, color: "var(--text-secondary)", cursor: "pointer" }}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--card-bg)", fontSize: 14, color: "var(--text-secondary)", cursor: "pointer" }}
         >
           <RefreshCw size={13} /> Refresh
         </button>
@@ -202,7 +202,7 @@ export default function Alerts() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
                 <Icon size={14} color={meta.color} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: meta.color }}>{meta.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: meta.color }}>{meta.label}</span>
                 <ColHint label={meta.label} what={TYPE_HINTS[type].what} how={TYPE_HINTS[type].how} />
               </div>
               <div style={{ fontSize: 26, fontWeight: 700, color: count > 0 ? meta.color : "var(--text-muted)" }}>
@@ -215,7 +215,7 @@ export default function Alerts() {
 
       {filter !== "ALL" && (
         <div style={{
-          display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600,
+          display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600,
           background: "var(--blue-light)", color: "var(--blue)", padding: "4px 10px 4px 12px",
           borderRadius: 99, marginBottom: 18,
         }}>
@@ -230,7 +230,7 @@ export default function Alerts() {
       {/* ── Alert cards ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 32 }}>
         {filtered.length === 0 ? (
-          <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+          <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 15 }}>
             {active.length === 0 ? "✓ No active alerts — all inventory levels are healthy." : "No alerts match this filter."}
           </div>
         ) : (
@@ -257,7 +257,7 @@ export default function Alerts() {
               aria-label={logOpen ? "Collapse Decision Log" : "Expand Decision Log"}
               style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", padding: 0, color: "inherit" }}>
               <ChevronDown size={15} color="var(--text-muted)" style={{ transform: logOpen ? "none" : "rotate(-90deg)", transition: "transform 0.15s" }} />
-              <h2 style={{ fontSize: 16, fontWeight: 700 }}>Decision Log</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 700 }}>Decision Log</h2>
             </button>
             <ColHint label="Decision Log" what={DECISION_LOG_HINT.what} how={DECISION_LOG_HINT.how} />
           </div>
@@ -267,21 +267,21 @@ export default function Alerts() {
               <thead>
                 <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
                   {["Time", "SKU", "Alert Type", "AI Recommended", "Manager Decision", "Qty Approved", "Reason"].map((h) => (
-                    <th key={h} style={{ padding: "9px 14px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{h}</th>
+                    <th key={h} style={{ padding: "9px 14px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {decisions.map((d, i) => (
                   <tr key={d.id} style={{ borderBottom: i < decisions.length - 1 ? "1px solid var(--border)" : "none" }}>
-                    <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                    <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
                       {new Date(d.decided_at).toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}
                     </td>
-                    <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 600 }}>{d.sku_name}</td>
+                    <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600 }}>{d.sku_name}</td>
                     <td style={{ padding: "10px 14px" }}>
                       {d.trigger_type && <Badge type={d.trigger_type} label={d.trigger_type.replace(/_/g, " ")} />}
                     </td>
-                    <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--text-secondary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--text-secondary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                       title={d.ai_quantity == null ? d.ai_recommendation : undefined}>
                       {/* Quantity-based alerts (stockout, reorder) recommend an
                           MT figure; qualitative ones (idle, ageing, slow-moving)
@@ -292,16 +292,16 @@ export default function Alerts() {
                     </td>
                     <td style={{ padding: "10px 14px" }}>
                       <span style={{
-                        fontWeight: 700, fontSize: 12,
+                        fontWeight: 700, fontSize: 13,
                         color: d.manager_action === "approved" ? "var(--green)" : d.manager_action === "rejected" ? "var(--red)" : "var(--yellow)",
                       }}>
                         {d.manager_action.toUpperCase()}
                       </span>
                     </td>
-                    <td style={{ padding: "10px 14px", fontSize: 13 }}>
+                    <td style={{ padding: "10px 14px", fontSize: 14 }}>
                       {d.manager_quantity != null ? `${d.manager_quantity} MT` : "—"}
                     </td>
-                    <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--text-secondary)" }}>
+                    <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--text-secondary)" }}>
                       {d.manager_reason || "—"}
                     </td>
                   </tr>
@@ -357,15 +357,15 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
         {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>{alert.sku_name}</span>
-            <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-muted)", background: "var(--surface-2)", padding: "1px 7px", borderRadius: 4 }}>{alert.sku_id}</span>
+            <span style={{ fontWeight: 700, fontSize: 15 }}>{alert.sku_name}</span>
+            <span style={{ fontSize: 12, fontFamily: "monospace", color: "var(--text-muted)", background: "var(--surface-2)", padding: "1px 7px", borderRadius: 4 }}>{alert.sku_id}</span>
             <Badge type={alert.alert_type} label={meta.label} />
             <Badge type={alert.severity} />
           </div>
-          <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 8 }}>
+          <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 8 }}>
             {alert.message}
           </p>
-          <div style={{ padding: "8px 12px", background: "var(--surface-2)", borderRadius: "var(--radius)", fontSize: 12, color: "var(--text-primary)", borderLeft: "3px solid var(--blue)" }}>
+          <div style={{ padding: "8px 12px", background: "var(--surface-2)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--text-primary)", borderLeft: "3px solid var(--blue)" }}>
             <span style={{ fontWeight: 600, color: "var(--blue)" }}>Recommended: </span>
             {alert.recommended_action}
           </div>
@@ -373,15 +373,15 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
 
         {/* Right: value + acknowledge */}
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: meta.color }}>{alert.triggered_value}</div>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10 }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: meta.color }}>{alert.triggered_value}</div>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
             {/* Matches each alert type's actual triggered_value unit — see backend/src/engines/alerts.js */}
             {alert.alert_type === "STOCKOUT_RISK" || alert.alert_type === "SLOW_MOVING" ? "days" :
              alert.alert_type === "REORDER" || alert.alert_type === "OVERSTOCK" ? "MT" :
              alert.alert_type === "IDLE" ? "days idle" : "days held"}
           </div>
           <button onClick={() => onAcknowledge(alert.id)}
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--card-bg)", fontSize: 12, cursor: "pointer", color: "var(--text-secondary)" }}>
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--card-bg)", fontSize: 13, cursor: "pointer", color: "var(--text-secondary)" }}>
             <CheckCircle size={12} /> Dismiss
           </button>
         </div>
@@ -394,7 +394,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
           padding: "10px 20px", background: "var(--surface-2)",
           borderTop: "1px solid var(--border)",
         }}>
-          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
             <span style={{ fontWeight: 600 }}>AI Recommendation: </span>
             {alert.ai_recommendation_qty != null
               ? `Purchase ${alert.ai_recommendation_qty} MT`
@@ -408,7 +408,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
                 padding: "6px 14px", borderRadius: "var(--radius)",
                 border: "1px solid var(--border)",
                 background: "var(--purple-light)", color: "var(--purple)",
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                fontSize: 13, fontWeight: 600, cursor: "pointer",
               }}
             >
               <Cpu size={12} /> Ask AI
@@ -417,15 +417,15 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
                 `setApprovalModal` directly and threw ReferenceError on click;
                 now correctly call the `onApprove` prop passed down from Alerts(). */}
             <button onClick={() => onApprove(alert)}
-              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--green-light)", color: "var(--green)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--green-light)", color: "var(--green)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               ✓ Approve
             </button>
             <button onClick={() => onApprove({ alert, preAction: "modified" })}
-              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--yellow-light)", color: "var(--yellow)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--yellow-light)", color: "var(--yellow)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               ✏ Modify
             </button>
             <button onClick={() => onApprove({ alert, preAction: "rejected" })}
-              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--red-light)", color: "var(--red)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--red-light)", color: "var(--red)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               ✕ Reject
             </button>
           </div>
@@ -450,8 +450,8 @@ function AiModal({ aiModal, onClose }) {
               <Cpu size={15} color="var(--purple)" />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>Explanation</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{alert.sku_name} · {alert.alert_type.replace(/_/g, " ")}</div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>Explanation</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{alert.sku_name} · {alert.alert_type.replace(/_/g, " ")}</div>
             </div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
@@ -462,18 +462,18 @@ function AiModal({ aiModal, onClose }) {
             fields, not a live model call (TASK-11 needs an API key that
             isn't available yet). Corrected to say so plainly rather than
             claim a capability that doesn't exist yet. */}
-        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 12, color: "var(--yellow)", marginBottom: 16 }}>
+        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--yellow)", marginBottom: 16 }}>
           ⚠️ Rule-based summary of the numbers already computed for this SKU — not yet a live AI call. All recommendations require manager review and approval before action is taken.
         </div>
 
         {/* Explanation */}
-        <div style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.8, whiteSpace: "pre-line" }}>
+        <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.8, whiteSpace: "pre-line" }}>
           {explanation}
         </div>
 
         <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}>
           <button onClick={onClose}
-            style={{ padding: "8px 20px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer" }}>
+            style={{ padding: "8px 20px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff", fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}>
             Understood
           </button>
         </div>
@@ -522,12 +522,12 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
       <div style={{ background: "var(--modal-bg)", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: 480, boxShadow: "var(--shadow-md)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>Manager Decision</div>
+          <div style={{ fontWeight: 700, fontSize: 18 }}>Manager Decision</div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
         </div>
 
         {/* Context */}
-        <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", marginBottom: 20, fontSize: 13 }}>
+        <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", marginBottom: 20, fontSize: 14 }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>{alert.sku_name}</div>
           <div style={{ color: "var(--text-secondary)" }}>{alert.recommended_action}</div>
           {alert.ai_recommendation_qty != null && (
@@ -540,7 +540,7 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
         <form onSubmit={handleSubmit}>
           {/* Action selector */}
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>Decision</label>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>Decision</label>
             <div style={{ display: "flex", gap: 8 }}>
               {[
                 { value: "approved", label: "✓ Approve", activeColor: "var(--green)", activeBg: "var(--green-light)" },
@@ -549,7 +549,7 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
               ].map((opt) => (
                 <button key={opt.value} type="button" onClick={() => setAction(opt.value)}
                   style={{
-                    flex: 1, padding: "8px", borderRadius: "var(--radius)", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    flex: 1, padding: "8px", borderRadius: "var(--radius)", fontSize: 14, fontWeight: 600, cursor: "pointer",
                     border: `1px solid ${action === opt.value ? opt.activeColor : "var(--border)"}`,
                     background: action === opt.value ? opt.activeBg : "var(--surface)",
                     color: action === opt.value ? opt.activeColor : "var(--text-secondary)",
@@ -563,17 +563,17 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
           {/* Quantity (shown for approve/modify) */}
           {action !== "rejected" && alert.ai_recommendation_qty != null && (
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
                 Quantity to {action === "approved" ? "approve" : "adjust"} (MT)
               </label>
               <input type="number" min={0} step={1} value={qty} onChange={(e) => setQty(e.target.value)}
-                style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13 }} />
+                style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 14 }} />
             </div>
           )}
 
           {/* Reason */}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
               Reason / Notes {action !== "approved" && <span style={{ color: "var(--red)" }}>*</span>}
             </label>
             <textarea
@@ -581,31 +581,31 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
               placeholder="e.g. Customer contract confirmed, adjusted quantity accordingly…"
               rows={3}
               style={{
-                width: "100%", padding: "9px 12px", borderRadius: "var(--radius)", fontSize: 13,
+                width: "100%", padding: "9px 12px", borderRadius: "var(--radius)", fontSize: 14,
                 resize: "vertical", fontFamily: "inherit",
                 border: `1px solid ${reasonRequired && !reason.trim() ? "var(--red)" : "var(--border)"}`,
               }}
             />
             {reasonRequired && !reason.trim() && (
-              <div style={{ fontSize: 11, color: "var(--red)", marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: "var(--red)", marginTop: 4 }}>
                 A reason is required to {action === "rejected" ? "reject" : "modify"} this recommendation.
               </div>
             )}
           </div>
 
           {submitError && (
-            <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 12 }}>⚠ {submitError}</div>
+            <div style={{ fontSize: 13, color: "var(--red)", marginBottom: 12 }}>⚠ {submitError}</div>
           )}
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button type="button" onClick={onClose} disabled={saving}
-              style={{ padding: "8px 18px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, cursor: saving ? "not-allowed" : "pointer" }}>
+              style={{ padding: "8px 18px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--surface)", fontSize: 14, cursor: saving ? "not-allowed" : "pointer" }}>
               Cancel
             </button>
             <button type="submit" disabled={!valid || saving}
               style={{
                 padding: "8px 22px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff",
-                fontWeight: 600, fontSize: 13, border: "none", cursor: !valid || saving ? "not-allowed" : "pointer",
+                fontWeight: 600, fontSize: 14, border: "none", cursor: !valid || saving ? "not-allowed" : "pointer",
                 opacity: !valid || saving ? 0.6 : 1,
               }}>
               {saving ? "Recording…" : "Record Decision"}

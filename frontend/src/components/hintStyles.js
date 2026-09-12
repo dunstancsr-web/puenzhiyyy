@@ -24,7 +24,7 @@ export const HINT_PANEL_STYLE = {
 };
 
 export const HINT_HDR_STYLE = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   color: "#475569",
   textTransform: "uppercase",
@@ -32,4 +32,4 @@ export const HINT_HDR_STYLE = {
   marginBottom: 6,
 };
 
-export const HINT_BODY_STYLE = { fontSize: 12, lineHeight: 1.65, color: "#1e293b" };
+export const HINT_BODY_STYLE = { fontSize: 14, lineHeight: 1.65, color: "#1e293b" };

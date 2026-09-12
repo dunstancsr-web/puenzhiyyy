@@ -628,6 +628,77 @@ visual-consistency and interaction-pattern work (TASK-22/23) — it only ever go
 
 ---
 
+## TASK-25 — Dashboard critic pass: critical/high fixes + site-wide font-size increase (2026-09-12)
+User asked for a strict UI/UX-critic + data-analyst review of the Dashboard. Findings were ranked by
+severity (Critical/High/Medium/Low) and reported for review; user picked the Critical + High sections to
+act on now, plus a general font-size increase for older users, "to follow website/mobile site design
+guidelines."
+
+- [x] **Honest "vs baseline" relabel.** The hero and every `StatCard` trend arrow said "vs last month,"
+      which asserts a real, live month-over-month feed — this project has no stored historical snapshots
+      yet; the comparison is a hand-set constant (`PRIOR`) that will silently go stale the moment a real
+      month passes without someone updating it by hand. Relabeled to "vs baseline" everywhere in the UI
+      (hero text, `StatCard`'s trend title), with the `title`/hover-hint copy spelling out plainly that
+      it's a fixed reference point, not live tracking, until historical snapshots are built.
+- [x] **Keyboard focus indicator, site-wide.** `index.css` unconditionally set `button { outline: none; }`
+      with no replacement anywhere — every interactive control on Dashboard/Alerts (filter chips, chart
+      bars/cells/rows, collapse toggles) was keyboard-invisible: a Tab-only user had no way to see where
+      focus was. Added a `:focus-visible` outline (`var(--blue)`, 2px) to buttons/links/inputs/selects/
+      textareas/`[tabindex]` globally.
+- [x] **Touch/keyboard-accessible chart tooltips.** `HealthStack`, `AbcXyzMatrix`, and `CoverageBullets`
+      carried their detail in a native `title` attribute only — invisible on touch (no hover to trigger
+      it) and inconsistent with the `ColHint`/`HoverHint` pattern already used everywhere else on the
+      same page. Replaced all three with `HoverHint` (focus + hover + Escape-to-close, already used by
+      `StockPositionBar`), added `aria-label`s so each control has a real accessible name independent of
+      the tooltip.
+- [x] **Status-threshold recalibration.** Turnover/GMROI/Overstock/E&O only ever resolved to "warn," never
+      "ok" or "bad," against the portfolio's real current/prior values (Turnover 3.4×/3.3× vs a <6.0
+      "warn" line; GMROI $0.68 vs a <1.5 line that never escalated even here) — amber with no headroom in
+      either direction reads as decorative, not a real signal. Added a real "bad" tier to all four:
+      Turnover (<2.5 bad / <4.0 warn), GMROI (<1.0 bad / <1.5 warn — now matches its own ColHint copy,
+      which already stated $1 as the real breakeven line), Overstock (>10% bad / >5% warn), E&O (>30% bad
+      / >15% warn). Coverage-in-Target-Band got the same treatment (<50% bad / <80% warn) as part of the
+      next fix.
+- [x] **Un-hid Coverage-in-Target-Band.** Only 28.9% of portfolio value sits in the healthy coverage band
+      — a genuinely alarming, daily-glance figure — but it was filed under "Show more metrics" on the
+      stated grounds that it duplicated Health-by-Value. It doesn't: Health-by-Value buckets by
+      RED/ORANGE/YELLOW/GREEN business rules, Coverage-in-Band buckets by below/in/above/idle
+      days-of-cover — different lenses. Moved it into the always-visible secondary strip (now 7 KPI
+      tiles); the disclosure toggle now holds only Compliance Position (genuinely situational — labeled
+      "illustrative, pending governance approval") and was relabeled "Show/Hide compliance position" to
+      match.
+- [x] **`buildNeedsAttention` no longer silently drops overlapping conditions.** The per-SKU dedup kept
+      only the first (lowest-priority-number) match and threw the rest away — a SKU that was both
+      Overstock and Slow Moving, say, would show only "OVERSTOCK" with no trace the second condition
+      existed (Ageing was the only condition that got folded onto an existing row). Now every matched
+      condition folds its tag onto the row (`existing.tag += " · TAG"`) the same way Ageing already did;
+      verified live against real data — "Japonica Short Grain 5KG" now correctly reads
+      "IDLE STOCK · OVERSTOCK · AGEING" instead of just one of the three.
+- [x] **Fixed silent truncation + a latent filter-order bug in Needs Attention.** `buildNeedsAttention`
+      used to hard-cap at 8 rows internally with no indication more existed once a real catalog grows
+      past that — and because the filter was applied *after* that internal cap, a filter could show "no
+      matches" for a real exception whose category simply didn't make the pre-filter top-8 cut. Removed
+      the cap from `buildNeedsAttention` (now returns the full sorted list); the cap is applied at the
+      call site *after* filtering (`NEEDS_ATTENTION_CAP = 8`), with a "+N more — showing the 8
+      highest-priority exceptions" note when the true count exceeds it.
+- [x] **Site-wide font-size increase for older users.** `index.css`'s type scale sat at 11–32px with a
+      14px body default — below the ~16px web body-text floor that WCAG/Apple HIG/Material Design
+      converge on, and several components had sub-12px hardcoded literals bypassing the scale entirely.
+      Bumped the whole `--text-*` scale up one step (new floor `--text-xs: 12px`, body/`--text-md: 16px`,
+      up to `--text-2xl: 34px`) and the `body` base font-size 14→16px — this cascades through every
+      component already using the tokens. Also swept every hardcoded `fontSize:` literal below the new
+      floor across `Dashboard.jsx`, `StatCard.jsx`, `Sidebar.jsx`, `Badge.jsx`, `FormField.jsx`,
+      `ErrorState.jsx`, `StockPositionBar.jsx`, `hintStyles.js` (the shared ColHint/HoverHint panel text),
+      `Inventory.jsx`, and `Alerts.jsx`, bumping each by roughly one step so nothing on the site still
+      renders below ~12px.
+- [x] Verified via browser across Light/Dark on Dashboard/Alerts/Inventory: relabeled trend text, all 7
+      KPI tiles' new status colors against live data (GMROI/E&O/Coverage-in-Band correctly red, Turnover/
+      Overstock amber), the folded multi-tag Needs Attention row, HoverHint tooltips firing on hover for
+      all three chart widgets (replacing native `title`), a visible focus ring on a real click-triggered
+      focus, larger legible type throughout, no layout overflow/clipping from the size increase, and no
+      console errors.
+- [x] `npx vite build` clean
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy
