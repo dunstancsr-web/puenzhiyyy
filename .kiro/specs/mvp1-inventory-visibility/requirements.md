@@ -266,6 +266,13 @@ Formula:
 
 XYZ (demand-predictability) axis, by coefficient of variation of demand: X < 0.25, Y 0.25–0.5, Z > 0.5.
 
+⚠️ **XYZ has no source-document backing** (noted 2026-09-13). It appears in no part of the technical
+spec, the glossary or the terminology map; it was implemented in `segmentation.js` first and written
+into this requirement afterwards. It is retained only because `xyz_class` is already stored and shown
+on the Inventory table. **The management matrix on the dashboard pairs ABC with movement class**, which
+is what spec Step 8A item 7 actually prescribes ("Combine ABC class with Fast/Normal/Slow/Idle for
+management action"). Do not reintroduce ABC × XYZ without a source-doc basis for the XYZ axis.
+
 ---
 
 ### REQ-15 — Suggested Order Quantity ✅ 2026-09-12: upgraded to the real formula (TASK-07)

@@ -44,6 +44,12 @@ function delta(cur, prev, { higherIsBetter = true, unit = "", pp = false } = {})
 const HEALTH_COLORS = { GREEN: "#22c55e", YELLOW: "#f59e0b", ORANGE: "#f97316", RED: "#ef4444" };
 const HEALTH_LABEL = { RED: "Critical", ORANGE: "Action", YELLOW: "Watch", GREEN: "Healthy" };
 
+// Movement axis of the ABC x movement matrix. Must mirror MOVEMENT_COLS in
+// backend/src/engines/segmentation.js - the cell keys are built from these.
+const MOVE_CODE = { "Fast Moving": "Fast", "Normal": "Normal", "Slow Moving": "Slow", "Idle": "Idle" };
+const MOVE_NOTE = { Fast: "high velocity", Normal: "steady", Slow: "low velocity", Idle: "no sales 90d+" };
+const ABC_NOTE = { A: "top 80% of value", B: "next 15%", C: "the rest" };
+
 // ── Money formatting - consistent M / K, never mixed ─────────────────────────
 const fmt$ = (v) => {
   const n = Math.abs(v);
@@ -106,9 +112,9 @@ const HINTS = {
     what: "Every SKU sorted into one of four health buckets by real rules - about to run out, needs action soon, worth watching, or genuinely fine - shown by dollar value, not just a headcount.",
     how: "A big red or amber share means a lot of your money is sitting in problem stock, even if it's only a couple of SKUs. Click a colour to filter Needs Attention to just that bucket.",
   },
-  abcXyz: {
-    what: "Splits every SKU two ways at once: how much money it represents (A = most, C = least) and how predictable its demand is (X = steady, Z = erratic).",
-    how: "AZ, BZ and CZ are the hardest combination - real money on unpredictable demand - and usually need the most safety stock. Click a cell to filter Needs Attention to that combination.",
+  abcMovement: {
+    what: "Splits every SKU two ways at once: how much of your money it represents (A is the top 80% of annual value, C the last few percent) and how fast it actually sells, from Fast Moving down to Idle, meaning no sales in 90+ days.",
+    how: "The corner that costs you is A + Idle: your most valuable stock, not moving. Stop buying it and start a disposition review. A + Fast is the opposite problem, worth tight availability control so it never runs dry. C + Idle is low-priority clearance. Click a cell to filter Needs Attention to those SKUs.",
   },
   coverage: {
     what: "For each SKU: how many days the stock on hand will last (the coloured bar) compared to how many days it takes to get more from the supplier (the tick mark).",
@@ -170,7 +176,7 @@ function buildNeedsAttention(skus) {
         sku_id: s.sku_id,
         name: s.product_name,
         action: "Suspend purchasing",
-        reason: `${s.overstock_qty} MT above max · ${s.abc_class}${s.xyz_class} class`,
+        reason: `${s.overstock_qty} MT above max · ${s.abc_class} class, ${s.movement_class}`,
         value: s.overstock_carrying_cost,
         valueLabel: "carrying cost / yr",
         tag: "OVERSTOCK",
@@ -297,13 +303,13 @@ function matchesFilter(row, filter, skuIndex) {
   const sku = skuIndex.get(row.sku_id);
   if (filter.type === "sku") return row.sku_id === filter.value;
   if (filter.type === "health") return sku?.health_status === filter.value;
-  if (filter.type === "segment") return sku && `${sku.abc_class}${sku.xyz_class}` === filter.value;
+  if (filter.type === "segment") return sku && `${sku.abc_class}:${MOVE_CODE[sku.movement_class]}` === filter.value;
   return true;
 }
 
 function filterLabel(filter, skuIndex) {
   if (filter.type === "health") return HEALTH_LABEL[filter.value];
-  if (filter.type === "segment") return filter.value;
+  if (filter.type === "segment") return filter.value.replace(":", " · ");
   if (filter.type === "sku") return skuIndex.get(filter.value)?.product_name || filter.value;
   return "";
 }
@@ -566,9 +572,9 @@ export default function Dashboard() {
             onSelect={(status) => toggleFilter(setFilter, "health", status)} />
         </Section>
 
-        <Section title="ABC × XYZ Segmentation" subtitle="Value tier × demand predictability - click a cell to filter" hint={HINTS.abcXyz}
+        <Section title="Value × Movement" subtitle="Economic value tier × how fast it sells - click a cell to filter" hint={HINTS.abcMovement}
           collapsible storageKey="abcxyz" defaultOpen>
-          <AbcXyzMatrix matrix={s.abcXyzMatrix} selected={filter?.type === "segment" ? filter.value : null}
+          <AbcMovementMatrix matrix={s.abcMovementMatrix} selected={filter?.type === "segment" ? filter.value : null}
             onSelect={(key) => toggleFilter(setFilter, "segment", key)} />
         </Section>
       </div>
@@ -659,36 +665,40 @@ function HealthStack({ data, selected, onSelect }) {
   );
 }
 
-function AbcXyzMatrix({ matrix, selected, onSelect }) {
+// ABC (economic value) × movement class (velocity). This is the pairing the
+// domain spec prescribes - Step 8A item 7, "Combine ABC class with
+// Fast/Normal/Slow/Idle for management action" - replacing an earlier
+// ABC × XYZ matrix whose second axis appears in no source domain doc and
+// which left 5 of 9 cells empty on a 10-SKU portfolio.
+function AbcMovementMatrix({ matrix, selected, onSelect }) {
   const { rows, cols, cells } = matrix;
   const maxVal = Math.max(...Object.values(cells).map((c) => c.value), 1);
-  const rowHint = { A: "high value", B: "medium", C: "low value" };
-  const colHint = { X: "steady", Y: "variable", Z: "erratic" };
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "auto repeat(3, 1fr)", gap: 4 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "auto repeat(4, 1fr)", gap: 4 }}>
         <div />
         {cols.map((c) => (
           <div key={c} style={{ textAlign: "center", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)" }}>
-            {c}<div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)" }}>{colHint[c]}</div>
+            {c}<div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)" }}>{MOVE_NOTE[c]}</div>
           </div>
         ))}
         {rows.map((r) => (
           <React.Fragment key={r}>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", paddingRight: 6 }}>
-              {r}<span style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)" }}>{rowHint[r]}</span>
+              {r}<span style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)" }}>{ABC_NOTE[r]}</span>
             </div>
             {cols.map((c) => {
-              const key = `${r}${c}`;
+              const key = `${r}:${c}`;
               const cell = cells[key];
               const intensity = cell.value / maxVal;
               const clickable = cell.count > 0;
               const isSel = selected === key;
+              const name = `${r} · ${c}`;   // "A:Fast" reads badly to a human or a screen reader
               return (
-                <HoverHint key={c} content={clickable ? `${key}: ${cell.count} SKU${cell.count === 1 ? "" : "s"} · ${fmt$(cell.value)} - click to filter` : `${key}: no SKUs`}>
+                <HoverHint key={c} content={clickable ? `${name}: ${cell.count} SKU${cell.count === 1 ? "" : "s"} · ${fmt$(cell.value)} - click to filter` : `${name}: no SKUs`}>
                   <button type="button" disabled={!clickable} onClick={() => onSelect(key)}
-                    aria-label={clickable ? `${key}: ${cell.count} SKUs, ${fmt$(cell.value)}` : `${key}: no SKUs`}
+                    aria-label={clickable ? `${name}: ${cell.count} SKUs, ${fmt$(cell.value)}` : `${name}: no SKUs`}
                     style={{
                       background: cell.value > 0 ? `rgba(59,130,246,${0.08 + intensity * 0.32})` : "var(--surface-2)",
                       borderRadius: 6, padding: "var(--space-3) 4px", textAlign: "center", font: "inherit",
@@ -718,8 +728,14 @@ function AbcXyzMatrix({ matrix, selected, onSelect }) {
         </span>
         <span>less → more</span>
       </div>
+      {/* Wording follows the spec's own interpretation table (Step 8A), and
+          reads off the live data rather than prescribing action in a cell
+          that may be empty - which is exactly what the previous caption did
+          when it pointed at AZ / BZ. */}
       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-2)", lineHeight: 1.5 }}>
-        AZ / BZ / CZ carry the hardest-to-plan stock - set higher safety stock and shorter review cycles there.
+        {cells["A:Idle"] && cells["A:Idle"].count > 0
+          ? `A · Idle is the expensive corner and you have ${cells["A:Idle"].count} there: high value trapped in weak demand. Stop purchasing and open a disposition review.`
+          : "A · Idle is the expensive corner, high value trapped in weak demand, and it is clear right now. A · Fast earns tight availability control; C · Idle is low-priority clearance."}
       </div>
     </div>
   );

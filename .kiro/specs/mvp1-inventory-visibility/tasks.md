@@ -832,6 +832,55 @@ Second strict UI/UX-critic + data-analyst review of the Dashboard. User's one ex
 - `Inventory.jsx:610`'s hardcoded inline `1fr 1fr` grid inside the SKU edit modal still will not collapse
   on a phone (same inline-style-beats-media-query shape as the TASK-27 bug).
 
+## TASK-29 — Replace ABC × XYZ with ABC × movement class (2026-09-13)
+User asked what the rationale for the ABC × XYZ chart was and whether it was in the documentation. It
+was not, and the investigation is worth recording.
+
+**Findings**
+- ABC *is* genuinely specified: `reference/rice-inventory-technical-spec.md` Step 8A, with formula,
+  cumulative-% thresholds, configurable bands and acceptance criteria. Correctly implemented.
+- **XYZ is in no source domain document.** Grepping the technical spec, the glossary and the
+  terminology map for `XYZ`, `coefficient of variation` and `predictab` returns zero matches.
+- **The spec asks for a different second axis.** Step 8A item 7: "Combine ABC class with
+  Fast/Normal/Slow/Idle for management action", with an interpretation table (A+fast, A+idle, C+fast,
+  C+idle). ABC × movement is the prescribed matrix; ABC × XYZ is not.
+- **The code came first and the docs were back-filled to match it.** `segmentation.js` shipped in
+  commit `c17ae80` already headed "ABC × XYZ SEGMENTATION ENGINE"; REQ-14 then says verbatim "Already
+  implemented in code (`segmentation.js`, `abc_class`/`xyz_class` columns) but missing from this
+  document until now", and design.md said "new to this document, already implemented in code". The
+  alignment commit was `08ba8c1`. XYZ acquired the appearance of being specified by being written into
+  a requirement titled after ABC.
+- The widget was also the weakest on the page against real data: 5 of 9 cells empty, the Y and Z
+  columns empty apart from one C-row SKU each, and its own caption told the reader to act on AZ / BZ,
+  both of which were zero.
+
+**Changes**
+- [x] `segmentation.js → buildMatrix` now builds ABC × movement class (cols Fast/Normal/Slow/Idle, cell
+      keys `A:Fast`), with the provenance recorded in the function's comment. `segmentPortfolio` still
+      computes `xyz_class`, which REQ-14 documents and the Inventory table still displays; it simply no
+      longer drives this matrix.
+- [x] Renamed `stats.abcXyzMatrix` to `stats.abcMovementMatrix` through `engines/index.js` and
+      `smoke.js` rather than leaving a name that misdescribes its contents.
+- [x] Dashboard: `AbcXyzMatrix` -> `AbcMovementMatrix`, 4 columns, section retitled "Value × Movement",
+      filter key format updated in `matchesFilter`/`filterLabel`, cell names rendered "A · Fast" for
+      humans and screen readers rather than the raw `A:Fast` key. ELI18 hint copy rewritten against the
+      spec's interpretation table.
+- [x] Caption now reads off the live data instead of prescribing action in a possibly-empty cell, which
+      is the exact flaw called out in the old one: it names the A · Idle count when there is one and
+      says the corner is clear when there is not.
+- [x] Needs Attention's overstock reason no longer prints the XYZ letter (`BX class` became
+      `B class, Normal`), which is both spec-aligned and more informative.
+- [x] Corrected the documentation rather than leaving the drift: design.md's section is now "ABC Value
+      Classification" and records the provenance correction; REQ-14 carries an explicit warning that XYZ
+      has no source-document backing and must not be reintroduced into the matrix without one.
+- [x] Verified: matrix populates 6 of 12 cells along a sensible diagonal (A in Fast/Normal, B in
+      Normal/Slow, C in Slow/Idle), click-to-filter works on the new keys ("Filtering by A · Fast"), no
+      console errors, `npx vite build` clean.
+
+**Process note.** This widget predates the two "strict critic" passes in TASK-25 and TASK-28, and
+neither of them questioned whether it should exist - they audited how it was drawn, not whether it was
+warranted. Provenance ("is this in the spec?") is worth an explicit line item in any future review pass.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

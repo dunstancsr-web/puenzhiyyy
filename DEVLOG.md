@@ -244,3 +244,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** DEVLOG.md, frontend/src/index.css
 - **New files:** none
 - **Notes:** Applied the user's own glass values from the Glass Tooltip Tuner artifact (published this session at claude.ai/code/artifact/62c1d4c6). Light theme taken as given: fill 0.72/0.33, ring 0.09, drop 0.74, blur 3px saturate 220%, radius 15px, gradient 135deg. Measured worst case 17.85:1 on card, 10.1:1 over green, 7.1:1 over red, all still AAA. Did NOT take the dark fills from the same paste (0.44/0.34): those ride along with the tuner's "Max glass" preset and measure 3.74:1 over a bright health segment, under AA, where the shipped 0.66/0.52 holds 5.58:1. User said they mainly tuned light and care about light, so dark was left safe and the reason recorded in a comment.
+
+---
+
+## Session: 2026-09-13 01:25
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/{tasks,design,requirements}.md, DEVLOG.md, backend/src/engines/{segmentation,index,smoke}.js, frontend/src/pages/Dashboard.jsx
+- **New files:** none
+- **Notes:** Replaced the ABC x XYZ matrix with ABC x movement class (TASK-29), after the user asked whether the chart was in the documentation. It was not: ABC is specified in technical-spec Step 8A, but XYZ appears in no source domain doc, and Step 8A item 7 actually asks to "Combine ABC class with Fast/Normal/Slow/Idle". The code shipped first (c17ae80) and REQ-14/design.md were back-filled to describe it, which is how XYZ came to look specified. It was also the weakest widget on real data: 5 of 9 cells empty including both AZ and BZ, the cells its own caption told you to act on. New matrix populates 6 of 12 along a clean diagonal. Also corrected design.md and REQ-14 rather than leaving the drift, and renamed stats.abcXyzMatrix to stats.abcMovementMatrix.

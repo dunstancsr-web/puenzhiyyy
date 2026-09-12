@@ -260,13 +260,27 @@ Fast Moving if avg_daily_30d >= p75 of all active SKUs
 Normal      otherwise
 ```
 
-### ABC / XYZ Value Classification (glossary Step 8A — new to this document, already implemented in code)
+### ABC Value Classification (spec Step 8A)
 ```
 annual_consumption_value = blended_daily_usage * 365 * unit_cost_sgd
 ABC: sort descending by annual_consumption_value, assign by cumulative % of portfolio total
      A <= 80%   B <= 95%   C remainder
-XYZ: by demand coefficient of variation — X < 0.25, Y 0.25-0.5, Z > 0.5
 ```
+
+**Management matrix: ABC × movement class.** Per spec Step 8A item 7 — "Combine ABC class with
+Fast/Normal/Slow/Idle for management action" — and its interpretation table (A+fast: frequent review and
+strong availability control; A+idle: immediate purchasing stop and disposition review; C+fast: simple
+efficient replenishment; C+idle: low-priority discontinuation/clearance). Built by
+`segmentation.js → buildMatrix`, surfaced as `stats.abcMovementMatrix`.
+
+> **Provenance correction, 2026-09-13.** Until this date the dashboard showed an **ABC × XYZ** matrix,
+> and this section described it as if specified. It was not. XYZ (demand predictability by coefficient
+> of variation) appears nowhere in the technical spec, the glossary or the terminology map — it was
+> written in `segmentation.js` first and back-filled into REQ-14 afterwards, under a heading about ABC.
+> On the 10-SKU portfolio it also left 5 of 9 cells empty, including both AZ and BZ, the cells the
+> widget's own caption told the reader to act on. The matrix now uses the axis the spec actually asks
+> for. `xyz_class` is still computed and still shown on the Inventory table (REQ-14 documents it); it
+> simply no longer drives this matrix.
 
 ### Compliance Position (glossary #38 / spec Step 11A — new, simplified & illustrative)
 

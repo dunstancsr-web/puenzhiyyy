@@ -40,7 +40,7 @@ console.log({
 });
 console.log("coverage:", JSON.stringify(stats.coverage));
 console.log("healthByValue:", JSON.stringify(stats.healthByValue));
-console.log("abcXyz cells:", JSON.stringify(stats.abcXyzMatrix.cells));
+console.log("ABC x movement cells:", JSON.stringify(stats.abcMovementMatrix.cells));
 
 console.log("\n── ALERTS ────────────────────────────────────────────────────");
 console.table(alerts.map((a) => ({ sku: a.sku_id, type: a.alert_type, sev: a.severity, trig: a.triggered_value, thr: a.threshold_value })));

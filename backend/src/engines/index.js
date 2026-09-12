@@ -4,7 +4,7 @@
 // order and returns the fully enriched SKU list + portfolio KPIs + alerts —
 // the same shape the frontend mock (riceData.js / statsData.js) exposes.
 //
-//   const { skus, stats, alerts, primaryExceptions, abcXyzMatrix } =
+//   const { skus, stats, alerts, primaryExceptions, abcMovementMatrix } =
 //       buildAnalytics(db);
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -131,17 +131,17 @@ function buildAnalytics(db, asOf = Date.now()) {
   );
 
   const stats = portfolioStats(skus, demand);
-  const abcXyzMatrix = buildMatrix(skus);
+  const abcMovementMatrix = buildMatrix(skus);
   const { alerts, primaryExceptions } = generateAlerts(skus);
 
-  stats.abcXyzMatrix = abcXyzMatrix;
+  stats.abcMovementMatrix = abcMovementMatrix;
   stats.openExceptions = {
     count: primaryExceptions.length,
     critical: primaryExceptions.filter((a) => a.severity === "critical").length,
     rawAlertCount: alerts.length,
   };
 
-  return { skus, stats, alerts, primaryExceptions, abcXyzMatrix, asOf: new Date(now).toISOString() };
+  return { skus, stats, alerts, primaryExceptions, abcMovementMatrix, asOf: new Date(now).toISOString() };
 }
 
 // Short rule-based recommended action for the SKU detail view.
