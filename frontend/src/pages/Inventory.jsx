@@ -12,7 +12,7 @@ import ErrorState from "../components/ErrorState";
 import { TextField, NumberField, SliderField, niceCeil } from "../components/FormField";
 import { api } from "../api/inventory";
 // Used only for the SkuEditForm's instant live-preview strip while dragging sliders
-// (no round-trip per keystroke) — the actual Save always persists via the real API
+// (no round-trip per keystroke) - the actual Save always persists via the real API
 // below. Formulas are identical post the domain-alignment rename, so the preview
 // matches what the server will return.
 import { computeSkuAnalytics } from "../mock/analytics";
@@ -29,7 +29,7 @@ const COLS = [
     key: "health_status", label: "Status", width: "11%",
     tip: {
       what: "The overall health of this SKU's inventory position.",
-      how: "🔴 RED — Critical. Either you'll run out before the next shipment arrives, or stock has been sitting idle too long.\n🟠 ORANGE — Action needed soon. You're approaching your reorder point or you're holding too much stock.\n🟡 YELLOW — Watch this one. It's slow-moving or drifting toward a problem.\n🟢 GREEN — You're in good shape. No action needed right now.",
+      how: "🔴 RED - Critical. Either you'll run out before the next shipment arrives, or stock has been sitting idle too long.\n🟠 ORANGE - Action needed soon. You're approaching your reorder point or you're holding too much stock.\n🟡 YELLOW - Watch this one. It's slow-moving or drifting toward a problem.\n🟢 GREEN - You're in good shape. No action needed right now.",
     },
   },
   {
@@ -43,28 +43,28 @@ const COLS = [
     key: "available_qty", label: "Stock Position", width: "30%",
     tip: {
       what: "Where this SKU's available stock sits against its reorder point and maximum.",
-      how: "The coloured bar is available stock; its colour is the health status — red below the reorder point, amber just above it, green healthy, purple overstock.\n\nThe two tick marks are the reorder point and the maximum, labelled with their values beneath. Grey shading marks the ranges to avoid: below the reorder point (order now) or above the maximum (overstock). Aim to keep the bar between the two ticks.\n\nAvailable = on-hand stock − reserved for orders − quality hold.",
+      how: "The coloured bar is available stock; its colour is the health status - red below the reorder point, amber just above it, green healthy, purple overstock.\n\nThe two tick marks are the reorder point and the maximum, labelled with their values beneath. Grey shading marks the ranges to avoid: below the reorder point (order now) or above the maximum (overstock). Aim to keep the bar between the two ticks.\n\nAvailable = on-hand stock − reserved for orders − quality hold.",
     },
   },
   {
     key: "days_of_cover", label: "Coverage vs Lead Time", width: "14%",
     tip: {
       what: "How many days your current stock will last, compared to how long it takes to get more.",
-      how: "Formula: Days of cover = Available stock ÷ Average daily sales (last 30 days).\n\nThe grey marker on the mini bar shows your supplier's lead time. If the coloured bar doesn't reach the marker — you will run out before new stock arrives.\n\nExample: 26 days of cover, 45-day lead time = 19-day gap. Red bar, order now.\n\nIf no demand is shown, this SKU hasn't sold anything recently and is classified as Idle.",
+      how: "Formula: Days of cover = Available stock ÷ Average daily sales (last 30 days).\n\nThe grey marker on the mini bar shows your supplier's lead time. If the coloured bar doesn't reach the marker - you will run out before new stock arrives.\n\nExample: 26 days of cover, 45-day lead time = 19-day gap. Red bar, order now.\n\nIf no demand is shown, this SKU hasn't sold anything recently and is classified as Idle.",
     },
   },
   {
     key: "movement_class", label: "Movement", width: "12%",
     tip: {
       what: "How quickly this SKU is selling, based on recent sales data.",
-      how: "🔵 Fast Moving — High daily sales. Priority: prevent stockouts.\n⚫ Normal — Steady demand. Maintain target stock.\n🟡 Slow Moving — Low sales relative to stock on hand. Consider reducing the next order.\n🔴 Idle — No meaningful sales in 90+ days. Stop ordering and review whether to discount, redirect, or dispose.\n\nThe number below is average daily consumption in MT.",
+      how: "🔵 Fast Moving - High daily sales. Priority: prevent stockouts.\n⚫ Normal - Steady demand. Maintain target stock.\n🟡 Slow Moving - Low sales relative to stock on hand. Consider reducing the next order.\n🔴 Idle - No meaningful sales in 90+ days. Stop ordering and review whether to discount, redirect, or dispose.\n\nThe number below is average daily consumption in MT.",
     },
   },
   {
     key: null, label: "Actions", width: "10%",
     tip: {
       what: "Quick actions you can take on this SKU.",
-      how: "Restock — record a new incoming quantity (e.g. a shipment just arrived).\nEdit — open the full SKU record to change policy thresholds, supplier, costs, lead time, and stock adjustments.",
+      how: "Restock - record a new incoming quantity (e.g. a shipment just arrived).\nEdit - open the full SKU record to change policy thresholds, supplier, costs, lead time, and stock adjustments.",
     },
   },
 ];
@@ -117,7 +117,7 @@ const NUMERIC_EDIT_KEYS = EDIT_GROUPS.flatMap((g) =>
 );
 
 // Which SkuEditForm tab each EDIT_GROUPS section renders under (visual overhaul,
-// 2026-09) — "Overview" (the default tab) has no EDIT_GROUPS section at all;
+// 2026-09) - "Overview" (the default tab) has no EDIT_GROUPS section at all;
 // it's built from read-only SKU data instead. See SkuEditForm below.
 const TAB_FOR_GROUP = {
   "Inventory Policy": "policy",
@@ -224,7 +224,7 @@ export default function Inventory() {
     else { setSortKey(key); setSortDir("asc"); }
   };
 
-  // ── Mutations — all routed through the real backend (TASK-10); the server's
+  // ── Mutations - all routed through the real backend (TASK-10); the server's
   // recomputed SKU (not a client-side recompute) is the source of truth ──────
   const replaceSku = (updated) =>
     setSkus((prev) => prev.map((s) => (s.sku_id === updated.sku_id ? updated : s)));
@@ -234,7 +234,7 @@ export default function Inventory() {
 
   const handleRestock = async () => {
     const qty = parseFloat(restockQty);
-    // Used to just `return` here on a zero/negative/unparseable quantity —
+    // Used to just `return` here on a zero/negative/unparseable quantity -
     // the button looked like it did nothing, with no indication why. The
     // native <input type="number" min={0.1}> attributes look like validation
     // but never actually run: this button isn't a form submit, so HTML5
@@ -319,7 +319,6 @@ export default function Inventory() {
 
       {/* ── Table ── */}
       <div
-        className="glass-blur"
         style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow)", overflow: "hidden" }}
       >
         <div style={{ overflowX: "auto" }}>
@@ -370,7 +369,7 @@ export default function Inventory() {
                       </div>
                     </td>
 
-                    {/* Product — click to open the record */}
+                    {/* Product - click to open the record */}
                     <td
                       onClick={() => setSelectedSku(sku)}
                       style={{ padding: "13px 16px", cursor: "pointer" }}
@@ -616,7 +615,7 @@ function FormSection({ title, children }) {
 }
 
 // ── Projected inventory curve (TASK-07) ─────────────────────────────────────
-// Real 90-day projection from the backend (backend/src/engines/projection.js) —
+// Real 90-day projection from the backend (backend/src/engines/projection.js) -
 // available stock depleting at the blended daily rate, stepped up by open POs
 // on their ETA day. Fetched fresh per SKU; not blocking the rest of the modal.
 function ProjectionChart({ skuId }) {
@@ -632,7 +631,7 @@ function ProjectionChart({ skuId }) {
   }, [skuId]);
 
   if (error) {
-    return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Projection unavailable — {error}</div>;
+    return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Projection unavailable - {error}</div>;
   }
   if (!projection) {
     return <div style={{ fontSize: 13, color: "var(--text-muted)", padding: "16px 0" }}>Loading projection…</div>;
@@ -645,7 +644,7 @@ function ProjectionChart({ skuId }) {
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, marginBottom: 10 }}>
         {first_stockout_date ? (
           <span style={{ color: "var(--red)", fontWeight: 700 }}>
-            {/* "Projected" reads oddly for a date of today — that's not a forecast,
+            {/* "Projected" reads oddly for a date of today - that's not a forecast,
                 the SKU is already at/below zero right now. */}
             {first_stockout_date === curve[0]?.date
               ? "⚠ Already out of stock"
@@ -747,7 +746,7 @@ function SkuEditForm({ sku, onSave, onCancel }) {
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  // Opens on Overview (read-only) — no editable fields visible until the user
+  // Opens on Overview (read-only) - no editable fields visible until the user
   // deliberately switches to Policy or Details. This is the fix for "a wall
   // of text-box fields on open."
   const [activeTab, setActiveTab] = useState("overview");
@@ -786,7 +785,7 @@ function SkuEditForm({ sku, onSave, onCancel }) {
         ))}
       </div>
 
-      {/* ── Overview: read-only, zero editable fields — what opens by default ── */}
+      {/* ── Overview: read-only, zero editable fields - what opens by default ── */}
       {activeTab === "overview" && (
         <div>
           <div style={{ marginBottom: "var(--space-5)" }}>
@@ -869,7 +868,7 @@ function SkuEditForm({ sku, onSave, onCancel }) {
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px var(--space-4)", alignItems: "center" }}>
               <span>Available <strong>{preview.available_qty} MT</strong></span>
-              <span>Days of cover <strong>{preview.days_of_cover ?? "—"}</strong></span>
+              <span>Days of cover <strong>{preview.days_of_cover ?? "-"}</strong></span>
               <span>Reorder point (suggested) <strong>{preview.reorder_point_suggested} MT</strong></span>
               <span>Gross margin <strong>{preview.gross_margin_pct}%</strong></span>
               <Badge type={preview.health_status} />
@@ -884,7 +883,7 @@ function SkuEditForm({ sku, onSave, onCancel }) {
         </div>
       )}
 
-      {/* ── Details: identity, costs, stock adjustments — least frequently touched ── */}
+      {/* ── Details: identity, costs, stock adjustments - least frequently touched ── */}
       {activeTab === "details" && (
         <div>
           {EDIT_GROUPS.filter((g) => TAB_FOR_GROUP[g.title] === "details").map((g) => (

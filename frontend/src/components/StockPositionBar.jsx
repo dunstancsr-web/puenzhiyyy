@@ -17,9 +17,9 @@ const fmt = (n) => Math.round(n).toLocaleString("en-SG");
 
 // ── Explanatory copy ───────────────────────────────────────────────────────
 const AVAIL_COPY =
-  "Available stock — physical stock minus what's reserved for confirmed orders and held for quality checks. This is what you can actually sell or ship today. Its colour is the health status.";
+  "Available stock - physical stock minus what's reserved for confirmed orders and held for quality checks. This is what you can actually sell or ship today. Its colour is the health status.";
 const MAX_LABEL_COPY =
-  "Maximum stock level. Holding more than this ties up cash and warehouse space — it shows as a purple bar running into the grey zone on the right.";
+  "Maximum stock level. Holding more than this ties up cash and warehouse space - it shows as a purple bar running into the grey zone on the right.";
 
 const committedPhrase = (reserved, hold) => {
   const parts = [];
@@ -29,7 +29,7 @@ const committedPhrase = (reserved, hold) => {
 };
 const trackCopy = (committed, reserved, hold) => {
   let s =
-    "The solid bar is available stock, coloured by health status. The tick marks are your reorder point and your maximum. Grey shading marks the ranges to avoid — below the reorder point (order now) or above the maximum (overstock).";
+    "The solid bar is available stock, coloured by health status. The tick marks are your reorder point and your maximum. Grey shading marks the ranges to avoid - below the reorder point (order now) or above the maximum (overstock).";
   if (committed > 0) {
     s += `\n\nThe faded tail past the solid bar is stock that's physically here but not available to promise: ${committedPhrase(reserved, hold)}.`;
   }
@@ -37,8 +37,8 @@ const trackCopy = (committed, reserved, hold) => {
 };
 const reorderCopy = (showReorder) =>
   showReorder
-    ? "Reorder point — when available stock drops to this tick, place a replenishment order. It's set to cover demand over the supplier's lead time plus a safety buffer."
-    : "No reorder point yet — it needs a lead time and some sales history before one can be calculated.";
+    ? "Reorder point - when available stock drops to this tick, place a replenishment order. It's set to cover demand over the supplier's lead time plus a safety buffer."
+    : "No reorder point yet - it needs a lead time and some sales history before one can be calculated.";
 const gapCopy = (idle) =>
   idle
     ? "This SKU has had no recent demand, so there's no meaningful gap to the reorder point."
@@ -94,7 +94,7 @@ export default function StockPositionBar({
   const targetPct = tgt > 0 ? pct(tgt) : null;
   const belowEnd = showReorder ? Math.min(reorderPct, showMax ? maxPct : 100) : 0;
 
-  // Health status of the measure bar — kept consistent with the gap wording.
+  // Health status of the measure bar - kept consistent with the gap wording.
   const zoneKey = idle
     ? "idle"
     : showMax && avail >= max ? "purple"
@@ -108,7 +108,7 @@ export default function StockPositionBar({
   // Status line under the bar
   let gapText, gapColor, gapWeight = 600;
   if (idle) {
-    gapText = "Idle — no recent demand";
+    gapText = "Idle - no recent demand";
     gapColor = "var(--text-secondary)";
   } else if (showMax && avail > max) {
     gapText = `${fmt(avail - max)} MT over maximum`;
@@ -124,7 +124,7 @@ export default function StockPositionBar({
       gapColor = "var(--red)";
       gapWeight = 700;
     } else if (gap < rop * 0.15) {
-      gapText = `+${fmt(gap)} MT — near reorder point`;
+      gapText = `+${fmt(gap)} MT - near reorder point`;
       gapColor = "var(--yellow)";
     } else {
       gapText = `+${fmt(gap)} MT above reorder point`;
@@ -164,7 +164,7 @@ export default function StockPositionBar({
           {shade(0, belowEnd)}
           {showMax && shade(maxPct, 100)}
 
-          {/* committed tail — physically here but reserved / on hold */}
+          {/* committed tail - physically here but reserved / on hold */}
           {committed > 0 && (
             <div style={{
               position: "absolute", top: 0, height: "100%",
@@ -183,7 +183,7 @@ export default function StockPositionBar({
             transition: animateFill ? "width 0.4s ease" : "none",
           }} />
 
-          {/* target tick (hollow — preview only) */}
+          {/* target tick (hollow - preview only) */}
           {targetPct != null && (
             <div style={{
               position: "absolute", top: -1, left: `calc(${targetPct}% - 1px)`,
@@ -210,7 +210,7 @@ export default function StockPositionBar({
         </div>
       </HoverHint>
 
-      {/* axis labels — sit under their ticks */}
+      {/* axis labels - sit under their ticks */}
       <div style={{ position: "relative", height: 14, fontSize: 11, marginTop: 1 }}>
         <span style={{ position: "absolute", left: 0, color: "var(--text-muted)" }}>0</span>
         {showReorder && (

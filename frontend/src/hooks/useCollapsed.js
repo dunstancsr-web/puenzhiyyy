@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 // Per-section collapse state, persisted so a user's "I don't need this
-// widget" choice survives a reload — a one-time preference, not a per-visit
+// widget" choice survives a reload - a one-time preference, not a per-visit
 // toggle. Defaults to whatever `defaultOpen` the caller passes. Shared
 // between Dashboard and Alerts so both pages' collapsible sections agree on
 // storage-key shape and behavior.

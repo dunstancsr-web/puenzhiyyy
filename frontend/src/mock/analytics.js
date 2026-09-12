@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ANALYTICS — pure, reusable derivation of every computed SKU field.
+// ANALYTICS - pure, reusable derivation of every computed SKU field.
 //
 // Extracted from riceData.js so the same logic can run at module load (over the
 // seed data) AND on every local edit / restock / add in the Inventory page.
-// Nothing here imports riceData.js — keep it dependency-free to avoid a cycle
+// Nothing here imports riceData.js - keep it dependency-free to avoid a cycle
 // (analytics ← riceData ← statsData).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ export function zScore(sl) {
 
 const num = (v, fallback = 0) => (Number.isFinite(+v) ? +v : fallback);
 
-// Rule-based health status. Canonical rule set — must match backend/src/engines/health.js
+// Rule-based health status. Canonical rule set - must match backend/src/engines/health.js
 // exactly (see .kiro/specs/mvp1-inventory-visibility/reference/terminology-map.md item 1;
 // this used to silently diverge from the backend and was missing the max_holding_days trigger).
 export function deriveHealthStatus(s) {
@@ -56,7 +56,7 @@ export function deriveHealthStatus(s) {
 }
 
 /**
- * Derive every computed field for one SKU. Pure — returns a new object,
+ * Derive every computed field for one SKU. Pure - returns a new object,
  * never mutates the input.
  *
  * @param {object} sku   base fields + the 7 policy inputs (per-key fallback to DEFAULT_EXTRAS)
@@ -78,13 +78,13 @@ export function computeSkuAnalytics(sku, { recomputeHealth = true } = {}) {
 
   // ── Mechanical stock position ──────────────────────────────────────────────
   const available_qty = +(onHand - reserved - hold).toFixed(2);
-  const days_of_cover = avg30 > 0 ? Math.round(available_qty / avg30) : null; // "Not Applicable" is a display-layer concern, not a data one — see StockPositionBar / dashboard
+  const days_of_cover = avg30 > 0 ? Math.round(available_qty / avg30) : null; // "Not Applicable" is a display-layer concern, not a data one - see StockPositionBar / dashboard
   const months_of_cover = days_of_cover != null ? +(days_of_cover / 30).toFixed(1) : null;
 
   // ── Velocity / financials ─────────────────────────────────────────────────
   const blended_daily_usage = +(0.5 * avg30 + 0.5 * avg90).toFixed(2);
   const expected_incoming_qty = num(s.expected_incoming_qty);
-  const inventory_position = +(available_qty + expected_incoming_qty).toFixed(2); // glossary #18 (simplified — see design.md)
+  const inventory_position = +(available_qty + expected_incoming_qty).toFixed(2); // glossary #18 (simplified - see design.md)
   const gross_margin_pct = unitPrice > 0 ? +((marginPerMt / unitPrice) * 100).toFixed(1) : 0;
   const annual_cogs = Math.round(blended_daily_usage * 365 * unitCost);
   const annual_gross_margin = Math.round(blended_daily_usage * 365 * marginPerMt);
@@ -169,7 +169,7 @@ export function computeSkuAnalytics(sku, { recomputeHealth = true } = {}) {
 }
 
 /**
- * Portfolio pass — ABC class is Pareto-relative so it needs every SKU.
+ * Portfolio pass - ABC class is Pareto-relative so it needs every SKU.
  * Pure: returns a new array; each element gets `abc_class`.
  */
 export function computePortfolioAnalytics(skus) {

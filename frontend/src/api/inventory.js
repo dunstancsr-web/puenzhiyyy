@@ -1,4 +1,4 @@
-// Fetch client for backend/src/routes/inventory.js — the real SQLite + analytics
+// Fetch client for backend/src/routes/inventory.js - the real SQLite + analytics
 // backend (TASK-09/10). Response shape is always { success, data, message? };
 // `request()` unwraps it to just the `data` payload and throws on failure so
 // callers can `await` directly and catch one error type.
@@ -33,7 +33,7 @@ export const api = {
   getAlerts: () => request("/alerts"),
   acknowledgeAlert: (id) => request(`/alerts/${id}/acknowledge`, { method: "POST" }),
 
-  // Decisions (TASK-12) — Approve/Modify/Reject audit trail
+  // Decisions (TASK-12) - Approve/Modify/Reject audit trail
   getDecisions: () => request("/decisions"),
   createDecision: (body) => request("/decisions", { method: "POST", body }),
 };

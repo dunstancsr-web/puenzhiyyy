@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { HINT_PANEL_STYLE, HINT_HDR_STYLE, HINT_BODY_STYLE } from "./hintStyles";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HoverHint — a frosted hover/focus tooltip that attaches to its trigger via
+// HoverHint - a frosted hover/focus tooltip that attaches to its trigger via
 // React.cloneElement (no wrapper DOM node, so flex/grid layouts are untouched).
 // Portals to <body>, clamps to the viewport, flips above if it would overflow.
 //

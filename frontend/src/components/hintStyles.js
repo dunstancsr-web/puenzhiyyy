@@ -1,12 +1,12 @@
-// Frosted hover-panel style shared by ColHint + HoverHint — the same light
+// Frosted hover-panel style shared by ColHint + HoverHint - the same light
 // frosted card in every app theme.
 //
 // Tuned sheer: you can read the panel while still seeing what's underneath.
 // Safe self-tune range (keeps the dark body text legible over any backdrop,
-// including the busy glass theme):
-//   background alpha : 0.30 – 0.75     (lower = sheerer; heavy blur carries it)
-//   backdrop blur     : 18px – 40px    (raise blur whenever you lower alpha)
-//   saturate          : 150% – 190%
+// light or dark):
+//   background alpha : 0.30 - 0.75     (lower = sheerer; heavy blur carries it)
+//   backdrop blur     : 18px - 40px    (raise blur whenever you lower alpha)
+//   saturate          : 150% - 190%
 // Below alpha 0.30 / blur 18px the text starts to lose contrast on busy
 // backgrounds; above ~0.75 it stops reading as glass.
 

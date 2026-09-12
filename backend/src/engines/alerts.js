@@ -29,7 +29,7 @@ function alertsForSku(s) {
       triggered_value: s.days_of_cover,
       threshold_value: s.lead_time_days,
       message: `${s.product_name} has ${s.days_of_cover} days of cover against a ${s.lead_time_days}-day supplier lead time. A stockout is projected ${s.stockout_gap_days} days before replenishment can arrive.`,
-      recommended_action: `Place a replenishment order now (min ${fmtMt(s.min_order_qty)}). Suggested quantity ${fmtMt(Math.max(s.min_order_qty, s.target_stock - s.available_qty))}. ${s.expected_incoming_qty > 0 ? `${fmtMt(s.expected_incoming_qty)} already inbound (ETA ${s.incoming_eta_days}d) — expedite if possible.` : "Consider expedited freight."}`,
+      recommended_action: `Place a replenishment order now (min ${fmtMt(s.min_order_qty)}). Suggested quantity ${fmtMt(Math.max(s.min_order_qty, s.target_stock - s.available_qty))}. ${s.expected_incoming_qty > 0 ? `${fmtMt(s.expected_incoming_qty)} already inbound (ETA ${s.incoming_eta_days}d) - expedite if possible.` : "Consider expedited freight."}`,
       ai_recommendation_qty: Math.round(Math.max(s.min_order_qty, s.target_stock - s.available_qty)),
     });
   }
@@ -68,7 +68,7 @@ function alertsForSku(s) {
       triggered_value: s.days_since_last_sale ?? 90,
       threshold_value: 90,
       message: `${s.product_name} has had no sales for ${s.days_since_last_sale ?? "90+"} days. ${fmtMt(s.available_qty)} on hand, ${fmt$(s.eo_value)} tied up.`,
-      recommended_action: `Stop replenishment. Initiate disposition review — discount, alternative channel, or CSR donation. Write-down risk ≈ ${fmt$(s.eo_value_risk_adjusted)}.`,
+      recommended_action: `Stop replenishment. Initiate disposition review - discount, alternative channel, or CSR donation. Write-down risk ≈ ${fmt$(s.eo_value_risk_adjusted)}.`,
       ai_recommendation_qty: null,
     });
   }
@@ -94,7 +94,7 @@ function alertsForSku(s) {
       triggered_value: s.inventory_age_days,
       threshold_value: s.max_holding_days,
       message: `${s.product_name} has been held ${s.inventory_age_days} days against a ${s.max_holding_days}-day limit (status: ${s.ageing_status}).`,
-      recommended_action: `Escalate to QA and commercial. Move stock before it reaches the holding limit — ${s.max_holding_days - s.inventory_age_days} days remain.`,
+      recommended_action: `Escalate to QA and commercial. Move stock before it reaches the holding limit - ${s.max_holding_days - s.inventory_age_days} days remain.`,
       ai_recommendation_qty: null,
     });
   }

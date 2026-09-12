@@ -85,7 +85,7 @@ router.get("/alerts", (req, res) => {
         name: p.name,
         type: "slow_moving",
         severity: "info",
-        message: `${p.name} is slow-moving — only ${p.salesLast30Days} sales in last 30 days.`,
+        message: `${p.name} is slow-moving - only ${p.salesLast30Days} sales in last 30 days.`,
         currentStock: p.currentStock,
         salesLast30Days: p.salesLast30Days,
       });

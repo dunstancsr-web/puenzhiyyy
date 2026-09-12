@@ -1,7 +1,7 @@
 import React from "react";
 
-// Colours resolve from theme CSS vars so badges stay legible in Dark / Liquid
-// Glass. ORANGE keeps a fixed dark amber text (there is no --orange var).
+// Colours resolve from theme CSS vars so badges stay legible in Dark mode too.
+// ORANGE keeps a fixed dark amber text (there is no --orange var).
 const styles = {
   // Health statuses
   GREEN:        { bg: "var(--green-light)",  color: "var(--green)",          label: "Healthy" },

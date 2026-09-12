@@ -147,13 +147,13 @@ function buildAnalytics(db, asOf = Date.now()) {
 // Short rule-based recommended action for the SKU detail view.
 function recommend(s) {
   if (s.health_status === "RED" && s.movement_class === "Idle")
-    return "Stop replenishment. Initiate disposition review — discount, alternative channel, or CSR evaluation.";
+    return "Stop replenishment. Initiate disposition review - discount, alternative channel, or CSR evaluation.";
   if (s.health_status === "RED")
     return `Place replenishment order immediately. Projected ${s.stockout_gap_days}-day stockout before resupply.`;
   if (s.overstock_qty > 0)
-    return `Suspend purchasing. ${Math.round(s.overstock_qty)} MT above max — carrying cost ≈ SGD $${Math.round(s.overstock_carrying_cost)}/yr.`;
+    return `Suspend purchasing. ${Math.round(s.overstock_qty)} MT above max - carrying cost ≈ SGD $${Math.round(s.overstock_carrying_cost)}/yr.`;
   if (s.movement_class === "Slow Moving")
-    return "Reduce next order quantity. Stock coverage well above target — review demand.";
+    return "Reduce next order quantity. Stock coverage well above target - review demand.";
   if (s.coverage_band === "below")
     return "Approaching reorder point. Initiate procurement review within the lead-time window.";
   return "No action required. Stock position within the healthy band.";

@@ -699,6 +699,32 @@ guidelines."
       console errors.
 - [x] `npx vite build` clean
 
+## TASK-26 — Remove Liquid Glass theme; strip em/en dashes app-wide (2026-09-12)
+User feedback: the Liquid Glass theme was "useless," and heavy em/en dash usage throughout the UI copy
+and code comments read as an obvious AI-generated tell. Both were fixed, and the dash rule was written
+down as a standing instruction for future agent sessions.
+
+- [x] Removed the "Liquid Glass" theme entirely: dropped its entry from `ThemeContext.jsx`'s `THEMES`
+      array, deleted its whole `[data-theme="glass"]` color block plus the glass-only backdrop-blur rule
+      and the gradient body background from `index.css`, and removed the now-dead `className="glass-blur"`
+      references in `Sidebar.jsx` and `Inventory.jsx`. `ThemeProvider` now falls back to "light" if a
+      browser has an old "glass" value saved in localStorage, so no one gets stuck on an undefined theme.
+- [x] Replaced every literal em dash and en dash in frontend UI copy and code comments (`Dashboard.jsx`,
+      `Alerts.jsx`, `Inventory.jsx`, `StatCard.jsx`, `Sidebar.jsx`, `hintStyles.js`, `StockPositionBar.jsx`,
+      `FormField.jsx`, `LoadingState.jsx`, `HoverHint.jsx`, `useCollapsed.js`, `api/inventory.js`, and the
+      mock data files) with a plain hyphen. Also fixed the backend's actual user-facing strings (the
+      `recommended_action` and `message` templates in `engines/alerts.js`, `engines/index.js`, and
+      `routes/products.js`) that render on the Alerts page and the SKU detail view. Left backend code
+      comments alone (not user-facing, and out of scope for this pass) — see the new style rule below for
+      going forward.
+- [x] Wrote the "no em/en dash" rule down as a standing instruction for future agent sessions: added a
+      new `CLAUDE.md` at the repo root (this project had none) pointing to the existing `.kiro/` docs plus
+      the dash rule and the Kiro-hooks tooling note, and added the same rule to
+      `.kiro/steering/project-context.md` (its `inclusion: always` frontmatter means Kiro sessions load it
+      automatically too).
+- [x] Verified via browser: theme switcher now shows only Light/Dark, no console errors, dash-free copy
+      renders correctly on Dashboard. `npx vite build` clean.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

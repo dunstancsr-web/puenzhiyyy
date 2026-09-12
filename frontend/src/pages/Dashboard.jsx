@@ -14,11 +14,11 @@ import ErrorState from "../components/ErrorState";
 import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
 
-// Reference baseline — hand-set illustrative comparison, not derived from
+// Reference baseline - hand-set illustrative comparison, not derived from
 // stored history (this project has no historical snapshots yet). Carried over
 // unchanged from the mock era; feeds the trend arrows via delta() below.
 // Deliberately labeled "vs baseline" everywhere in the UI, not "vs last
-// month" — the latter asserts a real, live month-over-month feed that
+// month" - the latter asserts a real, live month-over-month feed that
 // doesn't exist yet, and would silently go stale the moment a real month
 // passes without this constant being hand-updated.
 const PRIOR = {
@@ -44,7 +44,7 @@ function delta(cur, prev, { higherIsBetter = true, unit = "", pp = false } = {})
 const HEALTH_COLORS = { GREEN: "#22c55e", YELLOW: "#f59e0b", ORANGE: "#f97316", RED: "#ef4444" };
 const HEALTH_LABEL = { RED: "Critical", ORANGE: "Action", YELLOW: "Watch", GREEN: "Healthy" };
 
-// ── Money formatting — consistent M / K, never mixed ─────────────────────────
+// ── Money formatting - consistent M / K, never mixed ─────────────────────────
 const fmt$ = (v) => {
   const n = Math.abs(v);
   if (n >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
@@ -61,19 +61,19 @@ const numTrend = (d, p = "") => ({ dir: d.dir, good: d.good, text: `${p}${Math.a
 // knowledge, but not childish) for every ColHint on this page ─────────────────
 const HINTS = {
   heroValue: {
-    what: "The total dollar value of every bag of rice currently sitting in the warehouse, valued at what it cost to buy — not what it would sell for.",
-    how: "The number next to it compares to a fixed reference baseline, not a live month-over-month feed — this project doesn't store historical snapshots yet, so treat it as illustrative until that's built. Going up isn't automatically good or bad either way — check Overstock and Excess & Obsolete below to see whether it's deliberate stocking up or stock quietly piling up unsold.",
+    what: "The total dollar value of every bag of rice currently sitting in the warehouse, valued at what it cost to buy - not what it would sell for.",
+    how: "The number next to it compares to a fixed reference baseline, not a live month-over-month feed - this project doesn't store historical snapshots yet, so treat it as illustrative until that's built. Going up isn't automatically good or bad either way - check Overstock and Excess & Obsolete below to see whether it's deliberate stocking up or stock quietly piling up unsold.",
   },
   turnover: {
     what: "How many times your entire stock would sell out and get fully replaced in a year, at the current sales pace.",
-    how: "Higher is usually better — it means cash isn't sitting on a shelf as unsold rice. A low number alongside a high Excess & Obsolete number means stock is piling up faster than it sells.",
+    how: "Higher is usually better - it means cash isn't sitting on a shelf as unsold rice. A low number alongside a high Excess & Obsolete number means stock is piling up faster than it sells.",
   },
   fillRate: {
     what: "Of everything customers wanted to buy, what percentage did you actually have in stock to sell them?",
-    how: "Should be close to 100%. A drop means real sales were turned away somewhere in the portfolio because of a stockout — check Needs Attention for which SKU.",
+    how: "Should be close to 100%. A drop means real sales were turned away somewhere in the portfolio because of a stockout - check Needs Attention for which SKU.",
   },
   gmroi: {
-    what: "Gross Margin Return on Inventory — for every $1 of stock sitting in the warehouse, how many dollars of profit did it generate?",
+    what: "Gross Margin Return on Inventory - for every $1 of stock sitting in the warehouse, how many dollars of profit did it generate?",
     how: "Above $1 means the inventory earns more than it costs to hold. Below $1 means it's tying up more cash than it's returning.",
   },
   stockoutRisk: {
@@ -81,36 +81,36 @@ const HINTS = {
     how: "Ideally $0. Any number here points to a specific SKU in Needs Attention that needs a purchase order placed now.",
   },
   overstock: {
-    what: "The value of stock sitting above the maximum level set for it — more on hand than normal operations need.",
+    what: "The value of stock sitting above the maximum level set for it - more on hand than normal operations need.",
     how: "Overstock ties up cash and warehouse space. It isn't automatically a mistake (e.g. a bulk discount), but it should be a deliberate choice, not a surprise.",
   },
   eo: {
-    what: "Excess & Obsolete — stock that's slow-moving or hasn't sold in a long time, and may need discounting, redirecting, or writing off.",
+    what: "Excess & Obsolete - stock that's slow-moving or hasn't sold in a long time, and may need discounting, redirecting, or writing off.",
     how: "A rising percentage here is money sitting on the shelf that isn't earning its keep. Compare against Turnover: low turnover + high E&O is the clearest warning sign.",
   },
   coverageBand: {
-    what: "The share of your portfolio sitting in the sweet spot — not so low you risk running out, not so high you're wasting money holding it.",
+    what: "The share of your portfolio sitting in the sweet spot - not so low you risk running out, not so high you're wasting money holding it.",
     how: "Target is 80% or higher. Below that, too much of the portfolio is either running low or piled up above what's needed.",
   },
   needsAttention: {
-    what: "Every SKU with an open problem right now — running low, sitting idle, overstocked, or ageing past its shelf-life target — combined into one list instead of three separate ones.",
-    how: "Ranked with the most urgent, highest-value problems at the top. Click a bar or cell in the charts on this page to filter this table down to just the SKUs in that category — click it again to clear the filter.",
+    what: "Every SKU with an open problem right now - running low, sitting idle, overstocked, or ageing past its shelf-life target - combined into one list instead of three separate ones.",
+    how: "Ranked with the most urgent, highest-value problems at the top. Click a bar or cell in the charts on this page to filter this table down to just the SKUs in that category - click it again to clear the filter.",
   },
   health: {
-    what: "Every SKU sorted into one of four health buckets by real rules — about to run out, needs action soon, worth watching, or genuinely fine — shown by dollar value, not just a headcount.",
+    what: "Every SKU sorted into one of four health buckets by real rules - about to run out, needs action soon, worth watching, or genuinely fine - shown by dollar value, not just a headcount.",
     how: "A big red or amber share means a lot of your money is sitting in problem stock, even if it's only a couple of SKUs. Click a colour to filter Needs Attention to just that bucket.",
   },
   abcXyz: {
     what: "Splits every SKU two ways at once: how much money it represents (A = most, C = least) and how predictable its demand is (X = steady, Z = erratic).",
-    how: "AZ, BZ and CZ are the hardest combination — real money on unpredictable demand — and usually need the most safety stock. Click a cell to filter Needs Attention to that combination.",
+    how: "AZ, BZ and CZ are the hardest combination - real money on unpredictable demand - and usually need the most safety stock. Click a cell to filter Needs Attention to that combination.",
   },
   coverage: {
     what: "For each SKU: how many days the stock on hand will last (the coloured bar) compared to how many days it takes to get more from the supplier (the tick mark).",
-    how: "If the bar doesn't reach the tick mark, you'll run out before the next shipment arrives — a real stockout risk, not just \"low stock\". Click a row to filter Needs Attention to that SKU.",
+    how: "If the bar doesn't reach the tick mark, you'll run out before the next shipment arrives - a real stockout risk, not just \"low stock\". Click a row to filter Needs Attention to that SKU.",
   },
 };
 
-// ── Needs Attention — ranked by urgency + financial exposure ─────────────────
+// ── Needs Attention - ranked by urgency + financial exposure ─────────────────
 // Merges what used to be three separate, overlapping sections (Today's Top
 // Actions, Open Exceptions, Ageing Inventory) into one ranked list. Ageing
 // folds onto an existing row's tag/reason for the same SKU (Japonica reads
@@ -127,7 +127,7 @@ function buildNeedsAttention(skus) {
         priority: 1,
         sku_id: s.sku_id,
         name: s.product_name,
-        action: `Place PO — ${qty} MT`,
+        action: `Place PO - ${qty} MT`,
         reason: `${s.days_of_cover}d cover vs ${s.lead_time_days + s.safety_stock_days}d (lead + safety) · ${s.stockout_gap_days}d gap · ${s.expected_incoming_qty > 0 ? `${s.expected_incoming_qty} MT inbound` : "no PO inbound"}`,
         value: s.lost_margin_risk || s.lost_sales_value_risk,
         valueLabel: "lost margin",
@@ -139,7 +139,7 @@ function buildNeedsAttention(skus) {
   skus
     // available_qty > 0 matches health.js's RED rule and alerts.js's IDLE
     // alert: a SKU truly at zero stock isn't "idle inventory tying up
-    // capital" — it's just empty, and flagging it here contradicted the
+    // capital" - it's just empty, and flagging it here contradicted the
     // SKU's own "Healthy, no action required" recommendation.
     .filter((s) => s.movement_class === "Idle" && s.available_qty > 0)
     .forEach((s) => {
@@ -205,10 +205,10 @@ function buildNeedsAttention(skus) {
       });
     });
 
-  // One row per SKU — keep its highest-priority (lowest number) action as
+  // One row per SKU - keep its highest-priority (lowest number) action as
   // the row's action/reason/value, but a SKU can genuinely trip more than
   // one condition at once (e.g. Overstock AND Slow Moving). Don't silently
-  // drop the second condition the way a plain first-match-wins dedup would —
+  // drop the second condition the way a plain first-match-wins dedup would -
   // fold its tag onto the existing row, same idea as the Ageing merge below.
   const bySku = {};
   actions
@@ -248,20 +248,20 @@ function buildNeedsAttention(skus) {
       }
     });
 
-  // Full sorted list — deliberately NOT capped here. Capping before the
+  // Full sorted list - deliberately NOT capped here. Capping before the
   // caller's filter is applied would silently hide a real exception whose
   // category just didn't make this function's cut (see NEEDS_ATTENTION_CAP
   // at the call site, applied after filtering).
   return rows.sort((a, b) => a.priority - b.priority || b.value - a.value);
 }
 
-// Display cap for the Needs Attention table — applied AFTER filtering, so a
+// Display cap for the Needs Attention table - applied AFTER filtering, so a
 // filter always searches the full exception list, not just what fit on
 // screen. Any rows beyond this are surfaced via a "+N more" note rather than
 // disappearing without a trace.
 const NEEDS_ATTENTION_CAP = 8;
 
-// ── Coverage vs (lead time + safety) — one row per SKU, worst gap first ──────
+// ── Coverage vs (lead time + safety) - one row per SKU, worst gap first ──────
 function buildCoverageData(skus) {
   return [...skus]
     .filter((s) => s.days_of_cover !== null)
@@ -341,7 +341,7 @@ export default function Dashboard() {
   const attention = buildNeedsAttention(skus);
   const coverageData = buildCoverageData(skus);
   const skuIndex = new Map(skus.map((sk) => [sk.sku_id, sk]));
-  // Filter first, cap for display second — a filter must search every real
+  // Filter first, cap for display second - a filter must search every real
   // exception, not just the top slice that happened to fit on screen.
   const filteredAttention = attention.filter((a) => matchesFilter(a, filter, skuIndex));
   const shownAttention = filteredAttention.slice(0, NEEDS_ATTENTION_CAP);
@@ -369,7 +369,7 @@ export default function Dashboard() {
             <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
               SGD {fmt$(s.totalInventoryValue)}
             </div>
-            <span title="vs a fixed reference baseline — not a live month-over-month feed yet" style={{ fontSize: "var(--text-base)", fontWeight: 700, color: t.inventoryValue.good ? "var(--green)" : "var(--red)" }}>
+            <span title="vs a fixed reference baseline - not a live month-over-month feed yet" style={{ fontSize: "var(--text-base)", fontWeight: 700, color: t.inventoryValue.good ? "var(--green)" : "var(--red)" }}>
               {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs baseline
             </span>
           </div>
@@ -380,7 +380,7 @@ export default function Dashboard() {
       {/* ── Secondary strip: core numbers, demoted but never hidden. Every
           threshold below has real headroom on both ends (a "bad" tier, not
           just warn/ok) so the status color can actually move instead of
-          sitting permanently on one shade — GMROI's line is set at $1 to
+          sitting permanently on one shade - GMROI's line is set at $1 to
           match its own hint text below. ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--space-5)", marginBottom: "var(--space-3)" }}>
         <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
@@ -402,7 +402,7 @@ export default function Dashboard() {
 
       {/* ── One real disclosure: Compliance Position is the only genuinely
           situational number here (illustrative, pending governance approval)
-          — Coverage in Target Band moved above since it's a real daily-glance
+          - Coverage in Target Band moved above since it's a real daily-glance
           figure, not a duplicate of Health-by-Value (different taxonomy:
           below/in/above/idle days-of-cover vs RED/ORANGE/YELLOW/GREEN rules). ── */}
       <button
@@ -426,15 +426,15 @@ export default function Dashboard() {
 
       {/* ── Command Deck: four purpose-built widgets, each independently
           collapsible (persisted), each a live filter source for Needs
-          Attention — click a bar/cell/row, click again to clear. ── */}
+          Attention - click a bar/cell/row, click again to clear. ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-6)", marginBottom: "var(--space-2)" }}>
-        <Section title="Inventory Health" subtitle="Share of working capital by status — click a colour to filter" hint={HINTS.health}
+        <Section title="Inventory Health" subtitle="Share of working capital by status - click a colour to filter" hint={HINTS.health}
           collapsible storageKey="health" defaultOpen>
           <HealthStack data={s.healthByValue} selected={filter?.type === "health" ? filter.value : null}
             onSelect={(status) => toggleFilter(setFilter, "health", status)} />
         </Section>
 
-        <Section title="ABC × XYZ Segmentation" subtitle="Value tier × demand predictability — click a cell to filter" hint={HINTS.abcXyz}
+        <Section title="ABC × XYZ Segmentation" subtitle="Value tier × demand predictability - click a cell to filter" hint={HINTS.abcXyz}
           collapsible storageKey="abcxyz" defaultOpen>
           <AbcXyzMatrix matrix={s.abcXyzMatrix} selected={filter?.type === "segment" ? filter.value : null}
             onSelect={(key) => toggleFilter(setFilter, "segment", key)} />
@@ -442,7 +442,7 @@ export default function Dashboard() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "var(--space-6)", marginBottom: "var(--space-5)" }}>
-        <Section title="Cover vs Lead + Safety" subtitle="Worst gap first — click a row to filter" hint={HINTS.coverage}
+        <Section title="Cover vs Lead + Safety" subtitle="Worst gap first - click a row to filter" hint={HINTS.coverage}
           collapsible storageKey="coverage" defaultOpen>
           <CoverageBullets data={coverageData} selected={filter?.type === "sku" ? filter.value : null}
             onSelect={(skuId) => toggleFilter(setFilter, "sku", skuId)} />
@@ -465,7 +465,7 @@ export default function Dashboard() {
           )}
           {filteredAttention.length === 0 ? (
             <div style={{ padding: "var(--space-4) 0", textAlign: "center", color: attention.length === 0 ? "var(--green)" : "var(--text-muted)", fontWeight: 600, fontSize: "var(--text-base)" }}>
-              {attention.length === 0 ? "✓ No open exceptions — portfolio is healthy." : "No open exceptions match this filter."}
+              {attention.length === 0 ? "✓ No open exceptions - portfolio is healthy." : "No open exceptions match this filter."}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -492,7 +492,7 @@ export default function Dashboard() {
                         }}>{a.tag}</span>
                       </td>
                       <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>
-                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{a.action}</span> — {a.reason}
+                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{a.action}</span> - {a.reason}
                       </td>
                       <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
                         <div style={{ fontWeight: 700 }}>SGD {fmt$(a.value)}</div>
@@ -504,7 +504,7 @@ export default function Dashboard() {
               </table>
               {hiddenAttentionCount > 0 && (
                 <div style={{ padding: "var(--space-3) 8px 0", fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-                  +{hiddenAttentionCount} more — showing the {NEEDS_ATTENTION_CAP} highest-priority exceptions{filter ? " matching this filter" : ""}.
+                  +{hiddenAttentionCount} more - showing the {NEEDS_ATTENTION_CAP} highest-priority exceptions{filter ? " matching this filter" : ""}.
                 </div>
               )}
             </div>
@@ -548,17 +548,17 @@ function MonthTrendChart({ data }) {
   );
 }
 
-// Labeled 100%-stacked bar. Each segment is a real <button> — clickable
+// Labeled 100%-stacked bar. Each segment is a real <button> - clickable
 // (filters Needs Attention to that health status) and keyboard-reachable.
 // Detail lives in a HoverHint (focus + hover + Escape-to-close, visible on
-// touch via focus), not a native `title` — title tooltips don't fire on
+// touch via focus), not a native `title` - title tooltips don't fire on
 // tap, so touch users would otherwise get zero detail on this widget.
 function HealthStack({ data, selected, onSelect }) {
   return (
     <div>
       <div style={{ display: "flex", height: 34, borderRadius: 6, overflow: "hidden", gap: 2 }}>
         {data.filter((d) => d.pct > 0).map((d) => (
-          <HoverHint key={d.status} content={`${HEALTH_LABEL[d.status]}: ${fmt$(d.value)} · ${d.pct}% · ${d.count} SKU${d.count === 1 ? "" : "s"} — click to filter`}>
+          <HoverHint key={d.status} content={`${HEALTH_LABEL[d.status]}: ${fmt$(d.value)} · ${d.pct}% · ${d.count} SKU${d.count === 1 ? "" : "s"} - click to filter`}>
             <button type="button" onClick={() => onSelect(d.status)}
               aria-label={`${HEALTH_LABEL[d.status]}: ${d.pct}% of inventory value`}
               style={{
@@ -616,7 +616,7 @@ function AbcXyzMatrix({ matrix, selected, onSelect }) {
               const clickable = cell.count > 0;
               const isSel = selected === key;
               return (
-                <HoverHint key={c} content={clickable ? `${key}: ${cell.count} SKU${cell.count === 1 ? "" : "s"} · ${fmt$(cell.value)} — click to filter` : `${key}: no SKUs`}>
+                <HoverHint key={c} content={clickable ? `${key}: ${cell.count} SKU${cell.count === 1 ? "" : "s"} · ${fmt$(cell.value)} - click to filter` : `${key}: no SKUs`}>
                   <button type="button" disabled={!clickable} onClick={() => onSelect(key)}
                     aria-label={clickable ? `${key}: ${cell.count} SKUs, ${fmt$(cell.value)}` : `${key}: no SKUs`}
                     style={{
@@ -629,7 +629,7 @@ function AbcXyzMatrix({ matrix, selected, onSelect }) {
                     <div style={{ fontSize: 16, fontWeight: 800, color: cell.count ? "var(--text-primary)" : "var(--text-muted)" }}>
                       {cell.count}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{cell.value > 0 ? fmt$(cell.value) : "—"}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{cell.value > 0 ? fmt$(cell.value) : "-"}</div>
                   </button>
                 </HoverHint>
               );
@@ -638,7 +638,7 @@ function AbcXyzMatrix({ matrix, selected, onSelect }) {
         ))}
       </div>
       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-3)", lineHeight: 1.5 }}>
-        AZ / BZ / CZ carry the hardest-to-plan stock — set higher safety stock and shorter review cycles there.
+        AZ / BZ / CZ carry the hardest-to-plan stock - set higher safety stock and shorter review cycles there.
       </div>
     </div>
   );
@@ -646,7 +646,7 @@ function AbcXyzMatrix({ matrix, selected, onSelect }) {
 
 // Bullet-style rows (Stephen Few pattern): a thin fill bar for actual days of
 // cover, a tick mark for the required lead+safety threshold. Each row is a
-// real button — clickable (filters Needs Attention to that SKU) — with the
+// real button - clickable (filters Needs Attention to that SKU) - with the
 // exact numbers in a HoverHint (focus/touch-reachable), not a native title
 // tooltip, which never fires on tap.
 function CoverageBullets({ data, selected, onSelect }) {
@@ -659,10 +659,10 @@ function CoverageBullets({ data, selected, onSelect }) {
         const tickPct = Math.min(100, (d.threshold / max) * 100);
         const gap = d.coverage - d.threshold;
         const gapText = gap < 0
-          ? d.coveredByPo ? `${Math.abs(gap)}d short — covered by inbound PO` : `${Math.abs(gap)}d SHORTFALL`
+          ? d.coveredByPo ? `${Math.abs(gap)}d short - covered by inbound PO` : `${Math.abs(gap)}d SHORTFALL`
           : `${gap}d buffer`;
         return (
-          <HoverHint key={d.sku_id} content={`${d.name}: ${d.coverage}d cover vs ${d.threshold}d lead+safety — ${gapText}${d.onOrder > 0 ? ` · ${d.onOrder} MT on order (ETA ${d.eta}d)` : ""}`}>
+          <HoverHint key={d.sku_id} content={`${d.name}: ${d.coverage}d cover vs ${d.threshold}d lead+safety - ${gapText}${d.onOrder > 0 ? ` · ${d.onOrder} MT on order (ETA ${d.eta}d)` : ""}`}>
             <button type="button" onClick={() => onSelect(d.sku_id)}
               aria-label={`${d.name}: ${d.coverage} days of cover vs ${d.threshold} days needed`}
               style={{
@@ -698,7 +698,7 @@ function PageHeader({ title, subtitle }) {
 }
 
 // `collapsible` sections persist their open/closed state per-browser
-// (localStorage) — the "optional decluttering" a user can set once and
+// (localStorage) - the "optional decluttering" a user can set once and
 // forget, rather than a per-visit toggle. Defaults to open.
 function Section({ title, subtitle, children, hint, collapsible = false, storageKey, defaultOpen = true }) {
   const [storedOpen, setStoredOpen] = useCollapsed(storageKey || title, defaultOpen);

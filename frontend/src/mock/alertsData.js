@@ -1,4 +1,4 @@
-// Mock alerts — one of each type so every UI state is visible during validation.
+// Mock alerts - one of each type so every UI state is visible during validation.
 // severity: critical | warning | info
 // alert_type maps to filter tabs on the Alerts page.
 
@@ -60,7 +60,7 @@ export const mockAlerts = [
     triggered_value: 292,       // days of cover
     threshold_value: 120,       // slow moving threshold (days)
     message:
-      "Basmati Premium 5KG has 292 days of stock on hand. Sales velocity has been decelerating — 30-day usage (18 MT) is below the 90-day average (19.3 MT/month).",
+      "Basmati Premium 5KG has 292 days of stock on hand. Sales velocity has been decelerating - 30-day usage (18 MT) is below the 90-day average (19.3 MT/month).",
     recommended_action:
       "Reduce next order quantity. Consider targeted promotions for price-sensitive customers or food-service channels.",
     ai_recommendation_qty: null,

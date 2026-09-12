@@ -5,7 +5,7 @@ import React from "react";
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
-// Round a positive number UP to the next 1 / 2 / 5 × 10ⁿ boundary — used to
+// Round a positive number UP to the next 1 / 2 / 5 × 10ⁿ boundary - used to
 // keep a slider's max from drifting as the user drags.
 export function niceCeil(n) {
   if (!Number.isFinite(n) || n <= 0) return 10;
@@ -91,7 +91,7 @@ export function NumberField({
 
 // Range slider + editable number. Keeps NumberField's onChange(rawString)
 // contract, so form coercion/validation is unchanged. Only the thumb position
-// clamps to [min,max] — the stored string keeps whatever the user last entered
+// clamps to [min,max] - the stored string keeps whatever the user last entered
 // (so mid-edit "" / "1." / out-of-range values aren't clobbered).
 // Keyboard (Arrow ±step, Home/End, PageUp/Down) and touch-drag come free from
 // the native <input type="range">.
@@ -115,7 +115,7 @@ export function SliderField({
             // whatever value the SKU already has (e.g. a seeded 302 against a step-5
             // slider). Sharing `step` here means the browser's native HTML5 constraint
             // validation silently blocks form submission for any pre-existing value
-            // that isn't an exact multiple — no JS error, no network call, nothing
+            // that isn't an exact multiple - no JS error, no network call, nothing
             // visible. Found via a real Save-button click producing zero effect.
             step="any"
             min={min}

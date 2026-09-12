@@ -2,7 +2,7 @@ import { mockSkus, getAbcXyzMatrix, getCoverageBandSummary, getHealthByValue } f
 import { mockAlerts } from "./alertsData";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dashboard KPIs — computed from mock data so they stay in sync.
+// Dashboard KPIs - computed from mock data so they stay in sync.
 // Rebuilt to industry-standard inventory metrics: turnover / DIO, fill rate,
 // GMROI, and value-weighted risk figures (not raw SKU counts / stock value).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ const annualGrossMargin = activeSkus.reduce((sum, s) => sum + s.annual_gross_mar
 
 // Inventory turnover = annualised COGS ÷ inventory value at cost
 const turnover = +(annualCogs / totalInventoryValue).toFixed(1);
-// Days Inventory Outstanding — value-weighted, unlike a plain days-of-stock mean
+// Days Inventory Outstanding - value-weighted, unlike a plain days-of-stock mean
 const dio = Math.round(365 / (annualCogs / totalInventoryValue));
 // GMROI = annual gross margin $ per $1 of inventory investment
 const gmroi = +(annualGrossMargin / totalInventoryValue).toFixed(2);
@@ -59,23 +59,23 @@ const movementCounts = activeSkus.reduce(
 const healthByValue = getHealthByValue();
 const abcXyzMatrix = getAbcXyzMatrix();
 
-// Unweighted average days of cover — kept for reference / comparison alongside the
+// Unweighted average days of cover - kept for reference / comparison alongside the
 // value-weighted DIO above (glossary #22, Days of Cover).
 const skusWithDays = activeSkus.filter((s) => s.days_of_cover !== null);
 const avgDaysOfCover = Math.round(
   skusWithDays.reduce((sum, s) => sum + s.days_of_cover, 0) / skusWithDays.length
 );
 
-// ── Compliance Position (REQ-16, glossary #38) — illustrative, portfolio-level ──
+// ── Compliance Position (REQ-16, glossary #38) - illustrative, portfolio-level ──
 // The real rice-stockpile scheme is company-wide, not per-SKU. Uses demand as an
 // honest stand-in for real import-receipt history, which this project doesn't have.
 const complianceEligibleQty = Math.round(activeSkus.reduce((sum, s) => sum + s.on_hand_qty, 0));
 const complianceRequiredQty = Math.round(2 * activeSkus.reduce((sum, s) => sum + s.blended_daily_usage, 0) * 30);
 const compliancePosition = complianceEligibleQty - complianceRequiredQty;
 
-// ── Data Status (REQ-17, glossary #39) — informational as-of timestamp only; no
+// ── Data Status (REQ-17, glossary #39) - informational as-of timestamp only; no
 // live staleness detection in MVP1 (that needs spec Step 18A's freshness state
-// machine, deferred — see requirements.md "Explicitly Deferred").
+// machine, deferred - see requirements.md "Explicitly Deferred").
 const asOf = new Date().toISOString();
 
 // ── Top stockout risks ─────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ const ageingItems = activeSkus.filter(
   (s) => s.ageing_status === "Ageing" || s.ageing_status === "At Risk"
 );
 
-// ── Exception queue — one row per SKU, highest-priority trigger only ────────
+// ── Exception queue - one row per SKU, highest-priority trigger only ────────
 const SEVERITY_RANK = { critical: 0, warning: 1, info: 2 };
 const primaryExceptions = Object.values(
   mockAlerts
@@ -121,8 +121,8 @@ const openExceptions = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Prior period (last month) — hand-set so the dashboard can show direction.
-// Story: service level recovering, but working capital deteriorating — a classic
+// Prior period (last month) - hand-set so the dashboard can show direction.
+// Story: service level recovering, but working capital deteriorating - a classic
 // over-correction toward fulfilment at the expense of turnover.
 // ─────────────────────────────────────────────────────────────────────────────
 const prior = {
@@ -192,12 +192,12 @@ export const mockStats = {
   healthByValue,
   abcXyzMatrix,
 
-  // Compliance Position — illustrative, portfolio-level (REQ-16)
+  // Compliance Position - illustrative, portfolio-level (REQ-16)
   complianceEligibleQty,
   complianceRequiredQty,
   compliancePosition,
 
-  // Data Status — informational as-of timestamp (REQ-17)
+  // Data Status - informational as-of timestamp (REQ-17)
   asOf,
 
   // Exceptions

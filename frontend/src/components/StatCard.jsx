@@ -1,13 +1,13 @@
 import React from "react";
 import ColHint from "./ColHint";
 
-// Redesigned 2026-09 — no decorative per-metric icon color, no box/shadow.
+// Redesigned 2026-09 - no decorative per-metric icon color, no box/shadow.
 // `status` ("ok" | "warn" | "bad", default "ok") is the ONLY thing that
-// introduces color, and only when the metric itself is actually a problem —
+// introduces color, and only when the metric itself is actually a problem -
 // color reserved for state and meaning, never decoration. Icon is muted in
 // the neutral case; label/value use standard text tokens. Separates from
 // neighbors via the caller's own hairline divider, not a border+shadow box.
-// `hint` (optional {what, how}) adds a ColHint ⓘ next to the label — plain-
+// `hint` (optional {what, how}) adds a ColHint ⓘ next to the label - plain-
 // language help for jargon terms like "GMROI" or "turnover".
 export default function StatCard({ label, value, icon: Icon, sub, target, trend, status = "ok", hint }) {
   const statusColor = { ok: "var(--text-primary)", warn: "var(--yellow)", bad: "var(--red)" }[status];
@@ -28,7 +28,7 @@ export default function StatCard({ label, value, icon: Icon, sub, target, trend,
           </div>
           {trend && (
             <span
-              title="vs a fixed reference baseline — not a live month-over-month feed yet"
+              title="vs a fixed reference baseline - not a live month-over-month feed yet"
               style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: trend.good ? "var(--green)" : "var(--red)", whiteSpace: "nowrap" }}
             >
               {trend.dir === "up" ? "▲" : trend.dir === "down" ? "▼" : "▬"} {trend.text}

@@ -1,7 +1,7 @@
 import React from "react";
 
 // Shared loading placeholder for pages fetching from the real backend
-// (TASK-10). Matches the plain-CSS-variable styling used everywhere else —
+// (TASK-10). Matches the plain-CSS-variable styling used everywhere else -
 // no spinner library, just a subtle pulsing dot.
 
 export default function LoadingState({ label = "Loading…" }) {

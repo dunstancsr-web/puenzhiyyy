@@ -121,6 +121,12 @@ puenzhiyyy/
 - LLM delayed until explicit user trigger to minimise token costs
 - Stan develops independently from Tawmo until results are proven
 
+## Writing Style (added 2026-09-12, user feedback)
+Do not use an em dash or an en dash anywhere in this project: not in UI copy, not in code comments, not
+in commit messages, not in this file. The user flagged heavy dash use as an obvious "AI vibes" tell.
+Use a plain hyphen, a comma, a colon, parentheses, or split into two sentences instead. This applies to
+new writing going forward; it is not a mandate to rewrite every existing comment in one pass.
+
 ## Current State
 - Boilerplate built: React frontend + Express backend + 10 seeded products
 - Pages: Dashboard, Inventory table, Alerts

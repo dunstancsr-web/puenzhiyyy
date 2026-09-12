@@ -11,7 +11,7 @@ export default function Sidebar() {
 
   // Sidebar persists across page navigation (mounted once above <Routes> in
   // App.jsx) rather than remounting per page, so refetch on every route change
-  // to stay live — e.g. dismissing an alert on /alerts should update the badge
+  // to stay live - e.g. dismissing an alert on /alerts should update the badge
   // the moment you navigate away, not just on a hard refresh.
   useEffect(() => {
     api.getAlerts().then((data) => setAlertCount(data.length)).catch(() => {});
@@ -25,7 +25,6 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="glass-blur"
       style={{
         width: 230,
         background: "var(--sidebar-bg)",

@@ -11,7 +11,7 @@ import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
 
 // Escape-to-close + body-scroll-lock while a modal is open. Inventory.jsx's
-// Modal component already does this; AiModal/ApprovalModal below didn't —
+// Modal component already does this; AiModal/ApprovalModal below didn't -
 // pressing Escape closed the SKU edit/Add SKU/Restock modals but silently
 // did nothing here, and the alert list behind these two could still scroll.
 function useModalEscape(onClose) {
@@ -28,7 +28,7 @@ function useModalEscape(onClose) {
 }
 
 // ── Config ─────────────────────────────────────────────────────────────────────
-// Colors now token-based (was hardcoded light-mode-only hex) — the direct
+// Colors now token-based (was hardcoded light-mode-only hex) - the direct
 // cause of this page never respecting Dark/Glass (visual overhaul, 2026-09).
 const TYPE_META = {
   STOCKOUT_RISK: { icon: XCircle,       color: "var(--red)",    bg: "var(--red-light)",    label: "Stockout Risk" },
@@ -41,27 +41,27 @@ const TYPE_META = {
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
 
-// ELI18: plain language, no assumed prior inventory-ops vocabulary — matches
+// ELI18: plain language, no assumed prior inventory-ops vocabulary - matches
 // the Dashboard's ColHint copy style (visual-consistency pass, 2026-09).
 const TYPE_HINTS = {
   STOCKOUT_RISK: {
     what: "Stock on hand won't last until the next shipment arrives, based on how fast it's currently selling.",
-    how: "The number shown is days until it runs out. If that's less than the supplier's lead time, the shelf goes empty before the next delivery lands — place an order now.",
+    how: "The number shown is days until it runs out. If that's less than the supplier's lead time, the shelf goes empty before the next delivery lands - place an order now.",
   },
   REORDER: {
     what: "Stock has dropped to the point a normal reorder should be triggered, based on typical sales between shipments.",
     how: "Not yet as urgent as Stockout Risk, but ignoring it usually turns into one. The number shown is MT currently on hand plus anything already inbound.",
   },
   OVERSTOCK: {
-    what: "More stock is on hand than the maximum level set for this SKU — more than normal operations need.",
+    what: "More stock is on hand than the maximum level set for this SKU - more than normal operations need.",
     how: "The number shown is how many MT over that maximum. Ties up cash and warehouse space; not automatically a mistake, but should be a deliberate choice.",
   },
   SLOW_MOVING: {
     what: "This SKU is selling much slower than usual, so the stock on hand will last far longer than it should.",
-    how: "The number shown is days of cover — how long it'd last at the current sales pace. A high number means cash sitting on a shelf instead of turning into sales.",
+    how: "The number shown is days of cover - how long it'd last at the current sales pace. A high number means cash sitting on a shelf instead of turning into sales.",
   },
   IDLE: {
-    what: "No sales at all for this SKU in 90+ days — it isn't moving, period.",
+    what: "No sales at all for this SKU in 90+ days - it isn't moving, period.",
     how: "The number shown is days since the last sale. The longer it sits, the more likely it needs a markdown, a different sales channel, or a write-off.",
   },
   AGEING: {
@@ -71,12 +71,12 @@ const TYPE_HINTS = {
 };
 const DECISION_LOG_HINT = {
   what: "A permanent record of every Approve, Modify, or Reject decision a manager has made on an AI/rule-based recommendation.",
-  how: "Nothing here can be edited or deleted — it's the audit trail for \"who decided what, and why,\" not a working list. Compare Manager Decision against AI Recommended to see how often recommendations get overridden.",
+  how: "Nothing here can be edited or deleted - it's the audit trail for \"who decided what, and why,\" not a working list. Compare Manager Decision against AI Recommended to see how often recommendations get overridden.",
 };
 
 // Ask AI is a placeholder until TASK-11 wires a real LLM call (blocked on an
 // Anthropic API key). This used to look up a MOCK_AI_EXPLANATIONS dict keyed
-// by numeric alert.id, hand-written against the old mock alert set — but
+// by numeric alert.id, hand-written against the old mock alert set - but
 // alert.id now comes from the live alerts_log table, and only ever lined up
 // with that hand-written content by coincidence for one alert. Every other
 // click showed a different SKU's canned explanation as if it were this
@@ -114,7 +114,7 @@ export default function Alerts() {
 
   // ── Filtering + sorting ──────────────────────────────────────────────────────
   // The API already excludes acknowledged alerts (routes/inventory.js materializes
-  // against alerts_log) — no client-side "active" filter needed any more.
+  // against alerts_log) - no client-side "active" filter needed any more.
   const active = alerts;
   const filtered = active
     .filter((a) => filter === "ALL" || a.alert_type === filter)
@@ -127,8 +127,8 @@ export default function Alerts() {
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   // acknowledge/dismiss and decisions are both wired to the real backend
-  // (alerts_log.status / the decisions table — TASK-10 / TASK-12). handleAskAI
-  // stays local-only for now — Ask AI needs an LLM API key that isn't set up
+  // (alerts_log.status / the decisions table - TASK-10 / TASK-12). handleAskAI
+  // stays local-only for now - Ask AI needs an LLM API key that isn't set up
   // yet (TASK-11); buildFallbackExplanation is the known placeholder until then.
   const acknowledge = async (id) => {
     try {
@@ -147,7 +147,7 @@ export default function Alerts() {
   // rejection to show its own error + keep the modal open (and the user's
   // typed reason) rather than the decision silently vanishing. It used to
   // be swallowed here with a `finally { setApprovalModal(null) }` that
-  // closed the modal unconditionally — a failed save looked identical to a
+  // closed the modal unconditionally - a failed save looked identical to a
   // successful one.
   const handleDecision = async (alert, action, qty, reason) => {
     const created = await api.createDecision({
@@ -180,7 +180,7 @@ export default function Alerts() {
         </button>
       </div>
 
-      {/* ── Summary tiles — these ARE the filter control (click to filter,
+      {/* ── Summary tiles - these ARE the filter control (click to filter,
           click again to clear); a separate row of filter pills used to sit
           right below repeating the exact same counts and the exact same
           click target, which was the same "two widgets, one job" pattern
@@ -231,7 +231,7 @@ export default function Alerts() {
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 32 }}>
         {filtered.length === 0 ? (
           <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 15 }}>
-            {active.length === 0 ? "✓ No active alerts — all inventory levels are healthy." : "No alerts match this filter."}
+            {active.length === 0 ? "✓ No active alerts - all inventory levels are healthy." : "No alerts match this filter."}
           </div>
         ) : (
           filtered.map((alert, i) => (
@@ -247,7 +247,7 @@ export default function Alerts() {
         )}
       </div>
 
-      {/* ── Decision log — collapsible: it only grows, and isn't something
+      {/* ── Decision log - collapsible: it only grows, and isn't something
           you need open on every visit (matches the Dashboard's per-widget
           collapse pattern, persisted the same way). ── */}
       {decisions.length > 0 && (
@@ -285,10 +285,10 @@ export default function Alerts() {
                       title={d.ai_quantity == null ? d.ai_recommendation : undefined}>
                       {/* Quantity-based alerts (stockout, reorder) recommend an
                           MT figure; qualitative ones (idle, ageing, slow-moving)
-                          don't — this used to fall back to a bare, meaningless
+                          don't - this used to fall back to a bare, meaningless
                           "Review" literal instead of the actual recommendation
                           text that's already stored right alongside it. */}
-                      {d.ai_quantity != null ? `${d.ai_quantity} MT` : (d.ai_recommendation || "—")}
+                      {d.ai_quantity != null ? `${d.ai_quantity} MT` : (d.ai_recommendation || "-")}
                     </td>
                     <td style={{ padding: "10px 14px" }}>
                       <span style={{
@@ -299,10 +299,10 @@ export default function Alerts() {
                       </span>
                     </td>
                     <td style={{ padding: "10px 14px", fontSize: 14 }}>
-                      {d.manager_quantity != null ? `${d.manager_quantity} MT` : "—"}
+                      {d.manager_quantity != null ? `${d.manager_quantity} MT` : "-"}
                     </td>
                     <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--text-secondary)" }}>
-                      {d.manager_reason || "—"}
+                      {d.manager_reason || "-"}
                     </td>
                   </tr>
                 ))}
@@ -337,10 +337,10 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
   const Icon = meta.icon;
   const needsApproval = alert.severity === "critical" || (alert.ai_recommendation_qty != null);
 
-  // Hairline divider, not a bordered-and-shadowed box — matches the rest of
+  // Hairline divider, not a bordered-and-shadowed box - matches the rest of
   // the app's post-overhaul style; the colored left stripe still carries
   // severity at a glance without needing a full card outline (visual-
-  // consistency pass, 2026-09 — this was the last page still boxing rows).
+  // consistency pass, 2026-09 - this was the last page still boxing rows).
   return (
     <div style={{
       borderLeft: `3px solid ${meta.color}`,
@@ -375,7 +375,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontSize: 24, fontWeight: 700, color: meta.color }}>{alert.triggered_value}</div>
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
-            {/* Matches each alert type's actual triggered_value unit — see backend/src/engines/alerts.js */}
+            {/* Matches each alert type's actual triggered_value unit - see backend/src/engines/alerts.js */}
             {alert.alert_type === "STOCKOUT_RISK" || alert.alert_type === "SLOW_MOVING" ? "days" :
              alert.alert_type === "REORDER" || alert.alert_type === "OVERSTOCK" ? "MT" :
              alert.alert_type === "IDLE" ? "days idle" : "days held"}
@@ -387,7 +387,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
         </div>
       </div>
 
-      {/* Action bar — only for alerts needing manager decision */}
+      {/* Action bar - only for alerts needing manager decision */}
       {needsApproval && (
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -413,7 +413,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
             >
               <Cpu size={12} /> Ask AI
             </button>
-            {/* Approval buttons — fixed: these referenced the out-of-scope
+            {/* Approval buttons - fixed: these referenced the out-of-scope
                 `setApprovalModal` directly and threw ReferenceError on click;
                 now correctly call the `onApprove` prop passed down from Alerts(). */}
             <button onClick={() => onApprove(alert)}
@@ -457,13 +457,13 @@ function AiModal({ aiModal, onClose }) {
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
         </div>
 
-        {/* Disclaimer — was "AI-generated analysis", which overstated what
+        {/* Disclaimer - was "AI-generated analysis", which overstated what
             this actually is: a rule-based summary of already-computed
             fields, not a live model call (TASK-11 needs an API key that
             isn't available yet). Corrected to say so plainly rather than
             claim a capability that doesn't exist yet. */}
         <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--yellow)", marginBottom: 16 }}>
-          ⚠️ Rule-based summary of the numbers already computed for this SKU — not yet a live AI call. All recommendations require manager review and approval before action is taken.
+          ⚠️ Rule-based summary of the numbers already computed for this SKU - not yet a live AI call. All recommendations require manager review and approval before action is taken.
         </div>
 
         {/* Explanation */}
@@ -494,7 +494,7 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
   useModalEscape(() => { if (!saving) onClose(); });
 
   // The label shows a required "*" on Reason for modify/reject, but nothing
-  // actually enforced it — a Reject could be recorded with an empty reason,
+  // actually enforced it - a Reject could be recorded with an empty reason,
   // leaving no audit trail for why. Enforced here to match the label.
   const reasonRequired = action !== "approved";
   const valid = !reasonRequired || reason.trim().length > 0;
@@ -508,7 +508,7 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
       await onDecide(alert, action, qty !== "" ? Number(qty) : null, reason);
       onClose();
     } catch (err) {
-      // Keep the modal open with what the user typed — it used to close
+      // Keep the modal open with what the user typed - it used to close
       // unconditionally here, so a failed save looked identical to a
       // successful one with no error shown at all.
       setSubmitError(err.message || "Failed to record decision");

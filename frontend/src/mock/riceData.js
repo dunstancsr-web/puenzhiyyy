@@ -135,7 +135,7 @@ export const mockSkus = [
     months_of_cover: 9.7,
     movement_class: "Slow Moving",
     health_status: "YELLOW",
-    recommended_action: "Review sales strategy. Stock coverage exceeds 9 months — consider reducing next order quantity.",
+    recommended_action: "Review sales strategy. Stock coverage exceeds 9 months - consider reducing next order quantity.",
     expected_incoming_qty: 0,
   },
   {
@@ -174,7 +174,7 @@ export const mockSkus = [
     months_of_cover: null,
     movement_class: "Idle",
     health_status: "RED",
-    recommended_action: "Stop replenishment immediately. No sales in 104 days. Initiate inventory disposition review — consider discount, alternative channel, or CSR evaluation.",
+    recommended_action: "Stop replenishment immediately. No sales in 104 days. Initiate inventory disposition review - consider discount, alternative channel, or CSR evaluation.",
     expected_incoming_qty: 0,
   },
   {
@@ -213,7 +213,7 @@ export const mockSkus = [
     months_of_cover: 1.8,
     movement_class: "Fast Moving",
     health_status: "GREEN",
-    recommended_action: "No immediate action required. Monitor — stock coverage is within healthy range.",
+    recommended_action: "No immediate action required. Monitor - stock coverage is within healthy range.",
     expected_incoming_qty: 300,
   },
   {
@@ -291,7 +291,7 @@ export const mockSkus = [
     months_of_cover: 10.0,
     movement_class: "Slow Moving",
     health_status: "YELLOW",
-    recommended_action: "Reduce next order quantity. Stock coverage at 10 months. Demand is decelerating — review customer base.",
+    recommended_action: "Reduce next order quantity. Stock coverage at 10 months. Demand is decelerating - review customer base.",
     expected_incoming_qty: 0,
   },
   {
@@ -408,7 +408,7 @@ export const mockSkus = [
     months_of_cover: 6.4,
     movement_class: "Slow Moving",
     health_status: "YELLOW",
-    recommended_action: "Slow moving. Reduce next order size. Monitor demand — organic segment may need targeted promotion.",
+    recommended_action: "Slow moving. Reduce next order size. Monitor demand - organic segment may need targeted promotion.",
     expected_incoming_qty: 0,
   },
 ];
@@ -465,7 +465,7 @@ export const getHealthCounts = () =>
     { GREEN: 0, YELLOW: 0, ORANGE: 0, RED: 0 }
   );
 
-// Health distribution weighted by inventory value — 2 RED SKUs may be 3% or 40%
+// Health distribution weighted by inventory value - 2 RED SKUs may be 3% or 40%
 // of working capital. Count alone hides that.
 export const getHealthByValue = () => {
   const base = { RED: 0, ORANGE: 0, YELLOW: 0, GREEN: 0 };
@@ -494,7 +494,7 @@ export const getMovementCounts = () =>
     { "Fast Moving": 0, Normal: 0, "Slow Moving": 0, Idle: 0 }
   );
 
-// ABC × XYZ matrix — the foundational inventory segmentation.
+// ABC × XYZ matrix - the foundational inventory segmentation.
 // Rows A/B/C (value), columns X/Y/Z (predictability). Each cell: SKU count + value.
 export const getAbcXyzMatrix = () => {
   const rows = ["A", "B", "C"];
