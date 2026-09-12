@@ -22,14 +22,20 @@ const TYPE_META = {
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
 
-const MOCK_AI_EXPLANATIONS = {
-  1: `Thai Jasmine 25KG requires immediate procurement action.\n\nCurrent available stock stands at 160 MT against a reorder point of 302 MT. At the current 30-day consumption rate of 6.2 MT/day, stock will be fully depleted in approximately 26 days.\n\nThe supplier's average lead time is 45 days. This means that even if a purchase order is placed today, new inventory will not be available before the current stock runs out — creating a projected 19-day supply gap.\n\nDemand is currently accelerating (30-day rate exceeds 90-day average by 5.6%), which increases the risk further.\n\nRecommended action: Place a replenishment order of at minimum 300 MT immediately. Consider requesting expedited handling from Supplier ABC Thailand given the urgency.`,
-  2: `Thai White Rice 25KG is approaching its reorder point.\n\nAvailable stock is 260 MT, which is 10 MT above the reorder point of 250 MT. At current consumption of 4.6 MT/day, the reorder point will be breached within approximately 7 days.\n\nSupplier lead time is 45 days, so action is required now to avoid a potential shortage situation developing.\n\nDemand trend is stable, which gives reasonable confidence in the forecast.\n\nRecommended action: Initiate a standard replenishment order of 250 MT within the next 7 days.`,
-  3: `Vietnam Fragrant 10KG is significantly overstocked.\n\nCurrent physical stock of 620 MT exceeds the maximum recommended level of 400 MT by 220 MT. A further confirmed inbound shipment of 200 MT will push total inventory to approximately 820 MT — more than double the recommended maximum.\n\nAt the current consumption rate of 3.17 MT/day, this represents over 6 months of stock. Excess holding is locking up working capital and increasing storage and ageing risk.\n\nRecommended action: Cancel or defer the inbound shipment if contractually possible. Suspend all new purchasing for this SKU. Consider a targeted sales promotion to accelerate consumption.`,
-  4: `Basmati Premium 5KG is slow-moving with excessive stock coverage.\n\nWith 175 MT available and average daily consumption of only 0.6 MT, current stock represents approximately 292 days of supply — nearly 10 months.\n\nDemand has been decelerating: the 30-day consumption rate is below the 90-day average, suggesting the slowdown may continue.\n\nRecommended action: Reduce or pause future ordering. Review the customer base for this SKU and consider a targeted promotion or price adjustment to stimulate demand.`,
-  5: `Japonica Short Grain 5KG has been completely idle for 104 days.\n\nWith 78 MT on hand valued at approximately SGD $249,600 and no sales recorded in the past 104 days, this inventory represents a significant working capital risk.\n\nThe inventory is also ageing — held for 189 days against a maximum holding guideline of 270 days. At zero current demand, the stock will reach the ageing threshold before being consumed.\n\nRecommended action: Stop all replenishment immediately. Convene a commercial and QA review. Evaluate in order: (1) targeted discount to existing customers, (2) alternative commercial channels such as wholesalers or food-service operators, (3) CSR donation if stock remains safe and unsellable. Do not allow stock to age past the quality threshold.`,
-  6: `Japonica Short Grain 5KG inventory is ageing and at risk of exceeding holding limits.\n\nThe batch has been held for 189 days. At zero current demand, the entire 78 MT will reach the 270-day maximum holding guideline in approximately 81 days — without any consumption.\n\nQuality risk increases with age. If the stock is not moved commercially, it may need to be downgraded or disposed of.\n\nRecommended action: Escalate to QA for a quality inspection. Simultaneously activate a commercial disposal strategy — discount, alternative channel, or CSR donation — before the stock reaches critical age.`,
-};
+// Ask AI is a placeholder until TASK-11 wires a real LLM call (blocked on an
+// Anthropic API key). This used to look up a MOCK_AI_EXPLANATIONS dict keyed
+// by numeric alert.id, hand-written against the old mock alert set — but
+// alert.id now comes from the live alerts_log table, and only ever lined up
+// with that hand-written content by coincidence for one alert. Every other
+// click showed a different SKU's canned explanation as if it were this
+// alert's. Synthesizing from the alert's own (already-correct) fields
+// guarantees the text always matches what was actually clicked.
+function buildFallbackExplanation(alert) {
+  const qtyLine = alert.ai_recommendation_qty != null
+    ? `\n\nSuggested quantity: ${alert.ai_recommendation_qty} MT.`
+    : "";
+  return `${alert.message}\n\nRecommended action: ${alert.recommended_action}${qtyLine}`;
+}
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Alerts() {
@@ -75,7 +81,7 @@ export default function Alerts() {
   // acknowledge/dismiss and decisions are both wired to the real backend
   // (alerts_log.status / the decisions table — TASK-10 / TASK-12). handleAskAI
   // stays local-only for now — Ask AI needs an LLM API key that isn't set up
-  // yet (TASK-11); MOCK_AI_EXPLANATIONS is the known placeholder until then.
+  // yet (TASK-11); buildFallbackExplanation is the known placeholder until then.
   const acknowledge = async (id) => {
     try {
       await api.acknowledgeAlert(id);
@@ -86,28 +92,27 @@ export default function Alerts() {
   };
 
   const handleAskAI = (alert) => {
-    const explanation = MOCK_AI_EXPLANATIONS[alert.id] || "AI explanation not available for this alert.";
-    setAiModal({ alert, explanation });
+    setAiModal({ alert, explanation: buildFallbackExplanation(alert) });
   };
 
+  // Deliberately doesn't catch: ApprovalModal awaits this and needs the
+  // rejection to show its own error + keep the modal open (and the user's
+  // typed reason) rather than the decision silently vanishing. It used to
+  // be swallowed here with a `finally { setApprovalModal(null) }` that
+  // closed the modal unconditionally — a failed save looked identical to a
+  // successful one.
   const handleDecision = async (alert, action, qty, reason) => {
-    try {
-      const created = await api.createDecision({
-        sku_id: alert.sku_id,
-        alert_type: alert.alert_type,
-        ai_recommendation: alert.recommended_action,
-        ai_quantity: alert.ai_recommendation_qty,
-        manager_action: action,
-        manager_quantity: qty,
-        manager_reason: reason,
-      });
-      setDecisions((prev) => [created, ...prev]);
-      await acknowledge(alert.id);
-    } catch (err) {
-      console.error("Failed to record decision:", err);
-    } finally {
-      setApprovalModal(null);
-    }
+    const created = await api.createDecision({
+      sku_id: alert.sku_id,
+      alert_type: alert.alert_type,
+      ai_recommendation: alert.recommended_action,
+      ai_quantity: alert.ai_recommendation_qty,
+      manager_action: action,
+      manager_quantity: qty,
+      manager_reason: reason,
+    });
+    setDecisions((prev) => [created, ...prev]);
+    await acknowledge(alert.id);
   };
   return (
     <div>
@@ -220,8 +225,14 @@ export default function Alerts() {
                     <td style={{ padding: "10px 14px" }}>
                       {d.trigger_type && <Badge type={d.trigger_type} label={d.trigger_type.replace(/_/g, " ")} />}
                     </td>
-                    <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--text-secondary)" }}>
-                      {d.ai_quantity != null ? `${d.ai_quantity} MT` : "Review"}
+                    <td style={{ padding: "10px 14px", fontSize: 12, color: "var(--text-secondary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      title={d.ai_quantity == null ? d.ai_recommendation : undefined}>
+                      {/* Quantity-based alerts (stockout, reorder) recommend an
+                          MT figure; qualitative ones (idle, ageing, slow-moving)
+                          don't — this used to fall back to a bare, meaningless
+                          "Review" literal instead of the actual recommendation
+                          text that's already stored right alongside it. */}
+                      {d.ai_quantity != null ? `${d.ai_quantity} MT` : (d.ai_recommendation || "—")}
                     </td>
                     <td style={{ padding: "10px 14px" }}>
                       <span style={{
@@ -412,10 +423,31 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
   const [action, setAction] = useState(preAction);
   const [qty, setQty] = useState(alert.ai_recommendation_qty ?? "");
   const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
-  const handleSubmit = (e) => {
+  // The label shows a required "*" on Reason for modify/reject, but nothing
+  // actually enforced it — a Reject could be recorded with an empty reason,
+  // leaving no audit trail for why. Enforced here to match the label.
+  const reasonRequired = action !== "approved";
+  const valid = !reasonRequired || reason.trim().length > 0;
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onDecide(alert, action, qty !== "" ? Number(qty) : null, reason);
+    if (!valid || saving) return;
+    setSaving(true);
+    setSubmitError(null);
+    try {
+      await onDecide(alert, action, qty !== "" ? Number(qty) : null, reason);
+      onClose();
+    } catch (err) {
+      // Keep the modal open with what the user typed — it used to close
+      // unconditionally here, so a failed save looked identical to a
+      // successful one with no error shown at all.
+      setSubmitError(err.message || "Failed to record decision");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -481,18 +513,35 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
               value={reason} onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. Customer contract confirmed, adjusted quantity accordingly…"
               rows={3}
-              style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, resize: "vertical", fontFamily: "inherit" }}
+              style={{
+                width: "100%", padding: "9px 12px", borderRadius: "var(--radius)", fontSize: 13,
+                resize: "vertical", fontFamily: "inherit",
+                border: `1px solid ${reasonRequired && !reason.trim() ? "var(--red)" : "var(--border)"}`,
+              }}
             />
+            {reasonRequired && !reason.trim() && (
+              <div style={{ fontSize: 11, color: "var(--red)", marginTop: 4 }}>
+                A reason is required to {action === "rejected" ? "reject" : "modify"} this recommendation.
+              </div>
+            )}
           </div>
 
+          {submitError && (
+            <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 12 }}>⚠ {submitError}</div>
+          )}
+
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <button type="button" onClick={onClose}
-              style={{ padding: "8px 18px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, cursor: "pointer" }}>
+            <button type="button" onClick={onClose} disabled={saving}
+              style={{ padding: "8px 18px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--surface)", fontSize: 13, cursor: saving ? "not-allowed" : "pointer" }}>
               Cancel
             </button>
-            <button type="submit"
-              style={{ padding: "8px 22px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer" }}>
-              Record Decision
+            <button type="submit" disabled={!valid || saving}
+              style={{
+                padding: "8px 22px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff",
+                fontWeight: 600, fontSize: 13, border: "none", cursor: !valid || saving ? "not-allowed" : "pointer",
+                opacity: !valid || saving ? 0.6 : 1,
+              }}>
+              {saving ? "Recording…" : "Record Decision"}
             </button>
           </div>
         </form>

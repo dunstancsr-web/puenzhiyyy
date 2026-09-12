@@ -381,6 +381,49 @@ code audit, looking for both functional and visual defects across the now-commit
 
 ---
 
+## TASK-18 — Second bug-finding pass: Alerts decision flow (2026-09-12)
+Continued the reiteration into `Alerts.jsx`'s Approve/Modify/Reject and Ask AI paths.
+
+- [x] Fixed a real content-mismatch bug: "Ask AI" looked up `MOCK_AI_EXPLANATIONS` by numeric
+      `alert.id`, hand-written years ago against the old mock alert set. Now that `alert.id` comes from
+      the live `alerts_log` table, that lookup only lined up with the hand-written text by coincidence
+      for one alert — every other click showed a different SKU's canned explanation attributed to
+      whatever was actually clicked. Replaced with `buildFallbackExplanation(alert)`, synthesized from
+      the alert's own already-correct `message`/`recommended_action`/`ai_recommendation_qty` fields, so
+      it's always accurate regardless of which alert is clicked. (Still a rule-based placeholder, not a
+      real LLM call — TASK-11 remains blocked on an API key.)
+- [x] Fixed a real validation gap in `ApprovalModal`: the "Reason / Notes" label shows a required red
+      `*` for Modify/Reject, but nothing actually enforced it — a Reject could be recorded with an
+      empty reason, leaving no audit trail for why. Added real enforcement (red border + inline error +
+      disabled submit) matching the label.
+- [x] Fixed a real silent-failure bug: `handleDecision` caught its own errors (console.error only) and
+      unconditionally closed the modal in a `finally` block — a failed `POST /api/decisions` looked
+      identical to a successful one, with the user's typed reason silently discarded and no error
+      shown. Reworked the contract so the parent no longer swallows the error: `ApprovalModal` now
+      awaits `onDecide`, shows `submitError` inline, and keeps the modal (and what the user typed) open
+      on failure; it also gained a `saving` state disabling both buttons mid-request to prevent a
+      double-click from recording the same decision twice.
+- [x] Fixed the Decision Log's "AI Recommended" column: it only ever read `ai_quantity`, falling back
+      to a bare, meaningless `"Review"` literal for every qualitative alert (idle, ageing, slow-moving)
+      that doesn't have a quantity — even though the real recommendation text (`ai_recommendation`) was
+      already stored and returned by the API right alongside it. Now shows that text (truncated with a
+      full-text tooltip) instead of the placeholder.
+- [x] Verified via browser: Ask AI now shows content matching the clicked alert's own SKU/type; Reject
+      and Modify both correctly block submission on an empty reason and re-enable live as text is
+      typed; a completed Reject appears in the Decision Log with the real recommendation text visible.
+- [x] Verified Inventory table sort (ascending/descending, multiple columns) and the three native
+      `<select>` filters (Health Status/Movement/Origin) both work correctly — an initial "nothing
+      happens on click" observation for the filters was a false alarm: native `<select>` popups don't
+      render in an automated screenshot even when functioning correctly; confirmed via direct DOM
+      value-change instead.
+- [x] Checked the Modify/Approve quantity input for the same class of HTML5 `step`-mismatch bug fixed
+      earlier in `FormField.jsx` — not present here: every `ai_recommendation_qty` alerts.js produces
+      is either `Math.round()`ed to an integer, exactly `0`, or `null` (which hides the field entirely),
+      so it can never land on a non-integer value the `step={1}` input would silently reject.
+- [x] `npx vite build` clean after all fixes
+
+---
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy
