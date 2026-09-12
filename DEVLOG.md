@@ -174,3 +174,9 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 ---
 
 **Tooling note (2026-09-12):** the entries above were backfilled by hand — `auto-devlog.json`'s `"trigger": "Stop"` fires on a *Kiro* session ending, not a Claude Code one, so it never ran during this session despite 9 real commits landing. If you want logging to stay automatic while working in Claude Code, this hook needs a Claude Code–side equivalent (or an entry needs to be appended manually, e.g. via a `git commit` alias/hook) — it isn't happening on its own today.
+
+## Session: 2026-09-12 23:11
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md,frontend/src/pages/Alerts.jsx,frontend/src/pages/Dashboard.jsx
+- **New files:** frontend/src/hooks/useCollapsed.js
+- **Notes:** Alerts page polish (TASK-24): removed a redundant filter-tiles/filter-tabs duplication, added ELI18 help tooltips, made the Decision Log collapsible (shared hook extracted from Dashboard), restyled alert cards to drop the boxed/shadowed look, and corrected the AI modal's disclaimer copy to stop overstating what the current rule-based placeholder does.
