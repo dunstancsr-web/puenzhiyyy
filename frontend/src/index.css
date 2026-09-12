@@ -34,6 +34,11 @@
   --radius-lg:      16px;
   --shadow:         0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
   --shadow-md:      0 4px 12px rgba(0,0,0,0.08);
+
+  /* Small-screen floating top bar only (see .app-topbar-glass below) - a
+     one-off frosted-glass treatment for that one component, not a site-wide
+     theme. Works the same way under Light and Dark. */
+  --glass-bar-bg: rgba(255,255,255,0.6);
 }
 
 /* ── DARK theme ──────────────────────────────────────────────────────────── */
@@ -56,6 +61,8 @@
   --sidebar-border: #334155;
   --card-bg:        #1e293b;
   --table-head-bg:  #263148;
+
+  --glass-bar-bg: rgba(30,41,59,0.6);
 }
 
 /* ── Design system foundation (visual overhaul, 2026-09) ─────────────────────
@@ -92,6 +99,44 @@
    should genuinely float above content (modals, popovers). */
 .surface-flat { background: var(--card-bg); }
 .divider { border-bottom: 1px solid var(--border); }
+
+/* ── Responsive nav: full side panel on large screens, floating glass top
+   bar below 769px. Both markups always render (see Sidebar.jsx); this media
+   query is the only thing that decides which one is visible, so there is no
+   layout flash while JS figures out the viewport. ───────────────────────── */
+.app-topbar-glass { display: none; }
+.app-main { padding: 28px 32px; }
+
+@media (max-width: 768px) {
+  .app-sidebar-panel { display: none; }
+
+  .app-topbar-glass {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 0;
+  }
+  .app-topbar-glass__inner {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 48px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--glass-bar-bg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  .app-main {
+    padding: 76px 16px 24px;
+  }
+}
 
 /* ── Base styles ─────────────────────────────────────────────────────────── */
 body {

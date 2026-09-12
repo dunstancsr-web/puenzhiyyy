@@ -725,6 +725,30 @@ down as a standing instruction for future agent sessions.
 - [x] Verified via browser: theme switcher now shows only Light/Dark, no console errors, dash-free copy
       renders correctly on Dashboard. `npx vite build` clean.
 
+## TASK-27 — Responsive nav: floating glass top bar on small screens (2026-09-12)
+User brainstorm request, given three ASCII-mockup options via AskUserQuestion (floating bottom bar,
+floating top bar, expanding FAB). User picked the floating glass top bar.
+
+- [x] `Sidebar.jsx` now renders two markups: the existing full side panel (`.app-sidebar-panel`,
+      unchanged) and a new compact `.app-topbar-glass` bar (brand mark, icon-only Dashboard/Inventory/
+      Alerts links with the same alert badge, and a single tap to flip Light/Dark). Both always render;
+      a CSS media query at 768px is the only thing deciding which one shows, so there is no layout flash
+      while JS reads the viewport width.
+- [x] The floating bar is a one-off frosted-glass treatment for this one component (`--glass-bar-bg`
+      token, `backdrop-filter: blur(20px) saturate(180%)`), not a revival of the removed "Liquid Glass"
+      site theme — it works correctly under both Light and Dark.
+- [x] `Layout.jsx`'s `<main>` padding moved from inline style to a new `.app-main` class so the same media
+      query can retarget it (76px top padding on small screens to clear the fixed bar) without an
+      `!important` hack.
+- [x] Verified: real window resizing did not change the page's actual viewport in this browser-automation
+      environment (a tooling limitation, not a code issue — `window.innerWidth` stayed fixed regardless
+      of the requested window size), so the small-screen markup was verified by temporarily forcing the
+      breakpoint's CSS via an injected stylesheet instead. Confirmed the bar renders correctly, the active
+      route highlights the right icon, the alert badge shows, the theme toggle flips Light/Dark live and
+      persists across a route change, and the desktop panel is unaffected at the normal viewport. No
+      console errors. `npx vite build` clean. Recommended the user do a final check on an actual phone or
+      by manually resizing outside the automation tool, since real-device confirmation wasn't possible.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

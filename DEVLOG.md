@@ -196,3 +196,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** CLAUDE.md (new), .kiro/steering/project-context.md, .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/context/ThemeContext.jsx, frontend/src/index.css, frontend/src/components/Sidebar.jsx, frontend/src/components/Badge.jsx, frontend/src/components/hintStyles.js, frontend/src/pages/Inventory.jsx, frontend/src/pages/Dashboard.jsx, frontend/src/pages/Alerts.jsx, frontend/src/components/StatCard.jsx, frontend/src/components/StockPositionBar.jsx, frontend/src/components/FormField.jsx, frontend/src/components/LoadingState.jsx, frontend/src/components/HoverHint.jsx, frontend/src/hooks/useCollapsed.js, frontend/src/api/inventory.js, frontend/src/mock/*.js, backend/src/engines/alerts.js, backend/src/engines/index.js, backend/src/routes/products.js
 - **New files:** CLAUDE.md
 - **Notes:** Removed the Liquid Glass theme entirely (user called it useless) and stripped every em dash and en dash from UI copy and frontend code comments plus the backend's user-facing recommendation strings, following user feedback that heavy dash usage reads as an AI-generated tell. Wrote the "no em/en dash" rule into a new root CLAUDE.md and into the Kiro steering doc so it persists for future agent sessions on this project, not just this one.
+
+---
+
+## Session: 2026-09-13 00:20
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/components/Sidebar.jsx, frontend/src/components/Layout.jsx, frontend/src/index.css
+- **New files:** none
+- **Notes:** Responsive nav (TASK-27): brainstormed three small-screen nav concepts (floating bottom bar, floating top bar, expanding FAB) via ASCII mockups, user picked the floating glass top bar. Sidebar.jsx now renders both the full side panel and a new compact frosted-glass bar; a 768px media query picks which one shows. Verified with a temporary CSS override since real window resizing does not change the actual viewport in this browser-automation environment.

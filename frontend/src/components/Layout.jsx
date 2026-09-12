@@ -6,9 +6,9 @@ export default function Layout({ children }) {
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
       <main
+        className="app-main"
         style={{
           flex: 1,
-          padding: "28px 32px",
           overflowY: "auto",
           background: "var(--bg)",
           minHeight: "100vh",
