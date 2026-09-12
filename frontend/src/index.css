@@ -135,6 +135,20 @@
   padding: var(--space-5);
 }
 
+/* KPI grid. Both groups share one 4-column template so cards line up
+   vertically between the two rows; the Service group simply leaves its last
+   cell empty rather than stretching three cards to a different width than the
+   four below them. Declared as a class, not inline, so the breakpoints can
+   reach it. */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px)  { .kpi-grid { grid-template-columns: 1fr; } }
+
 /* Dashboard widget rows: two side-by-side widgets on a wide screen, stacked
    below the breakpoint (they are unreadable squeezed into half a phone).
    align-items:start stops a short card being stretched to match a tall
@@ -302,6 +316,81 @@ details.disclosure summary {
 details.disclosure summary::-webkit-details-marker { display: none; }
 details.disclosure summary::before { content: "▸ "; font-size: 12px; }
 details.disclosure[open] summary::before { content: "▾ "; }
+
+/* ── Hint panel: liquid-glass tooltip (HoverHint / ColHint) ───────────────
+   Previously ONE light frosted card with dark text in both themes. That is
+   why it could not be pushed glassier: over a dark backdrop it already
+   measured ~4.0:1, under AA, and lowering the fill alpha drops it toward
+   2.7:1. Making the glass theme-aware (light tint + dark text in Light, dark
+   tint + light text in Dark) moves the tint and the text together, which buys
+   enough headroom to run a much lower alpha and still stay well past AA.
+
+   Tuning: --hint-fill-* alphas are the "how glassy" dial, and blur is its
+   partner - raise blur whenever you lower alpha, because a heavier blur turns
+   the backdrop into a smooth wash instead of high-contrast detail bleeding
+   through the text. Ranges that stay legible: alpha 0.35-0.70, blur 28-56px,
+   saturate 170-200%. */
+:root {
+  --hint-fill-top:    rgba(255,255,255,0.62);
+  --hint-fill-bottom: rgba(255,255,255,0.40);
+  --hint-specular:    rgba(255,255,255,0.90);
+  --hint-inner-base:  rgba(255,255,255,0.30);
+  --hint-border:      rgba(255,255,255,0.55);
+  --hint-ring:        rgba(15,23,42,0.07);
+  --hint-drop:        0 24px 60px rgba(15,23,42,0.26);
+  --hint-text:        #0f172a;
+  --hint-hdr:         #475569;
+  --hint-blur:        blur(40px) saturate(190%);
+}
+[data-theme="dark"] {
+  --hint-fill-top:    rgba(38,50,70,0.66);
+  --hint-fill-bottom: rgba(15,23,42,0.52);
+  --hint-specular:    rgba(255,255,255,0.24);
+  --hint-inner-base:  rgba(0,0,0,0.25);
+  --hint-border:      rgba(255,255,255,0.14);
+  --hint-ring:        rgba(0,0,0,0.45);
+  --hint-drop:        0 24px 60px rgba(0,0,0,0.55);
+  --hint-text:        #e8edf5;
+  --hint-hdr:         #a9b6c8;
+}
+
+.hint-panel {
+  padding: 14px 16px;
+  border-radius: 18px;
+  z-index: 9999;
+  color: var(--hint-text);
+  /* A gradient rather than a flat fill: real glass catches more light at the
+     top edge than the bottom, and the shift is what stops it reading as a
+     plain translucent rectangle. */
+  background: linear-gradient(158deg, var(--hint-fill-top), var(--hint-fill-bottom));
+  border: 1px solid var(--hint-border);
+  backdrop-filter: var(--hint-blur);
+  -webkit-backdrop-filter: var(--hint-blur);
+  box-shadow:
+    inset 0 1px 0 var(--hint-specular),   /* specular highlight along the top edge */
+    inset 0 -1px 0 var(--hint-inner-base),/* base shade, reads as glass thickness */
+    var(--hint-drop),                     /* float above the page */
+    0 0 0 1px var(--hint-ring);           /* hairline contact ring */
+}
+.hint-panel__hdr {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--hint-hdr);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.hint-panel__body { font-size: var(--text-md); line-height: 1.65; color: var(--hint-text); }
+
+/* Some people turn transparency off at the OS level precisely because frosted
+   panels are hard to read. Honour it: drop the blur and go effectively solid. */
+@media (prefers-reduced-transparency: reduce) {
+  .hint-panel {
+    background: var(--card-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
 
 /* ── Hover-hint affordance (HoverHint) ──────────────────────────────────── */
 .hint-trigger { cursor: help; }

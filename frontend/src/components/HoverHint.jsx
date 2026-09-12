@@ -3,7 +3,6 @@ import React, {
   useLayoutEffect, useRef, useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { HINT_PANEL_STYLE, HINT_HDR_STYLE, HINT_BODY_STYLE } from "./hintStyles";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HoverHint - a frosted hover/focus tooltip that attaches to its trigger via
@@ -137,6 +136,7 @@ export default function HoverHint({
       ref={panelRef}
       id={id}
       role="tooltip"
+      className="hint-panel"
       onMouseEnter={() => clearTimeout(closeT.current)}
       onMouseLeave={scheduleHide}
       style={{
@@ -144,12 +144,11 @@ export default function HoverHint({
         top: coords.top,
         left: coords.left,
         width: coords.width,
-        ...HINT_PANEL_STYLE,
       }}
     >
-      {title && <div style={HINT_HDR_STYLE}>{title}</div>}
+      {title && <div className="hint-panel__hdr">{title}</div>}
       {typeof content === "string"
-        ? <div style={{ ...HINT_BODY_STYLE, whiteSpace: "pre-line" }}>{content}</div>
+        ? <div className="hint-panel__body" style={{ whiteSpace: "pre-line" }}>{content}</div>
         : content}
     </div>
   );

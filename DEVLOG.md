@@ -228,3 +228,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** DEVLOG.md, frontend/src/api/inventory.js
 - **New files:** none
 - **Notes:** Made a dead backend diagnose itself. Previously any failure collapsed to "Request failed (500)", which points you at the frontend when the real problem is that the API process is gone. Probed the actual failure mode first: with :4000 down, the Vite proxy answers with a bare text/plain 500 and an empty body, while every genuine Express error returns JSON with a message. That makes an unparseable body a reliable signal the request never reached Express, so the client now shows "Cannot reach the API on localhost:4000..." for that case and leaves real API messages untouched. Verified all three paths: backend down (browser), genuine 404 (keeps "SKU not found"), and Retry recovering once the backend is back.
+
+---
+
+## Session: 2026-09-13 00:50
+- **Branch:** main
+- **Files changed:** DEVLOG.md, frontend/src/index.css, frontend/src/pages/Dashboard.jsx, frontend/src/components/HoverHint.jsx, frontend/src/components/ColHint.jsx
+- **Deleted:** frontend/src/components/hintStyles.js
+- **Notes:** Three UI changes. (1) Removed justifyContent:space-between from the hero row so the Baseline/Now chart sits tight against the number it explains instead of being pinned ~700px away at the card edge. (2) Grouped the seven KPIs into two labelled rows along the project's own two competing objectives (service/availability vs working capital), sharing one 4-column grid so cards align between rows. (3) Rebuilt the hint tooltip as theme-aware liquid glass: it was one light panel with dark text in both themes, measuring 4.04:1 over a dark backdrop (under AA), which is why it could not be pushed glassier. Light tint/dark text in Light and dark tint/light text in Dark now measures 7.8-17.9:1 and 5.9-13.9:1 while running a lower fill alpha, plus gradient fill, specular top edge, inner base shade and a prefers-reduced-transparency fallback.

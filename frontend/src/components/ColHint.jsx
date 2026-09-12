@@ -1,7 +1,6 @@
 import React from "react";
 import { HelpCircle } from "lucide-react";
 import HoverHint from "./HoverHint";
-import { HINT_HDR_STYLE, HINT_BODY_STYLE } from "./hintStyles";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column-header help popover. Thin composition over HoverHint: an ⓘ trigger
@@ -15,12 +14,12 @@ export default function ColHint({ label, what, how }) {
       panelWidth={320}
       content={
         <>
-          <div style={HINT_HDR_STYLE}>What is this?</div>
-          <div style={{ ...HINT_BODY_STYLE, marginBottom: 12, whiteSpace: "normal", overflowWrap: "anywhere" }}>
+          <div className="hint-panel__hdr">What is this?</div>
+          <div className="hint-panel__body" style={{ marginBottom: 12, whiteSpace: "normal", overflowWrap: "anywhere" }}>
             {what}
           </div>
-          <div style={HINT_HDR_STYLE}>How to read it</div>
-          <div style={{ ...HINT_BODY_STYLE, whiteSpace: "pre-line" }}>{how}</div>
+          <div className="hint-panel__hdr">How to read it</div>
+          <div className="hint-panel__body" style={{ whiteSpace: "pre-line" }}>{how}</div>
         </>
       }
     >

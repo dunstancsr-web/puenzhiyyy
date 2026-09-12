@@ -371,7 +371,13 @@ export default function Dashboard() {
           right now"), separated internally by a hairline rather than being
           five floating islands on the page background. ── */}
       <div className="card" style={{ marginBottom: "var(--space-5)" }}>
-        <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "var(--space-5)" }}>
+        {/* No justifyContent: space-between here. It pinned the chart to the
+            far edge of a ~1300px card, leaving ~700px of gap between a number
+            and the chart that exists to explain that number - which reads as
+            two unrelated elements (Gestalt proximity). The standard KPI +
+            sparkline treatment keeps the chart tight against the value it
+            describes and simply lets the leftover width be leftover. */}
+        <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)", display: "flex", alignItems: "flex-end", flexWrap: "wrap", gap: "var(--space-6)" }}>
           <div>
             <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, marginBottom: 2, display: "flex", alignItems: "center", gap: 5 }}>
               Total Inventory Value
@@ -399,15 +405,38 @@ export default function Dashboard() {
           just warn/ok) so the status color can actually move instead of
           sitting permanently on one shade - GMROI's line is set at $1 to
           match its own hint text below. ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "var(--space-5)", alignItems: "start" }}>
-        <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
-          status={s.turnover < 2.5 ? "bad" : s.turnover < 4.0 ? "warn" : "ok"} trend={numTrend(t.turnover)} sub={`${s.dio}d of supply`} />
+      {/* Seven loose metrics in one undifferentiated row gave no reason why any
+          number sat next to any other. They are grouped here into the two
+          competing objectives this project is actually built around (see
+          .kiro/steering/project-context.md: "Customer fulfilment (avoid
+          stockouts)" vs "Working capital efficiency"). Nearly every decision
+          on this dashboard is a trade-off between those two, so the grouping
+          is the real framing, not decoration.
+
+          Both rows share one 4-column grid so the cards line up vertically
+          between groups; row 1 simply leaves its last cell empty. */}
+      <KpiGroup label="Service & availability" note="Can we supply what customers order?" />
+      <div className="kpi-grid">
         <StatCard label="Fill Rate" value={`${s.fillRate}%`} icon={ShieldCheck} hint={HINTS.fillRate}
           status={s.fillRate < 90 ? "bad" : s.fillRate < 98 ? "warn" : "ok"} trend={ppTrend(t.fillRate)} sub={`${s.lostSales30d} MT unfilled`} />
-        <StatCard label="GMROI" value={`$${s.gmroi.toFixed(2)}`} icon={Target} hint={HINTS.gmroi}
-          status={s.gmroi < 1.0 ? "bad" : s.gmroi < 1.5 ? "warn" : "ok"} trend={numTrend(t.gmroi, "$")} sub="per $1 of stock" />
         <StatCard label="Stockout Risk" value={`SGD ${fmt$(s.stockoutRiskMargin)}`} icon={AlertTriangle} hint={HINTS.stockoutRisk}
           status={s.stockoutSkuCount > 0 ? "bad" : "ok"} trend={moneyTrend(t.stockoutRiskMargin)} sub={`${s.stockoutSkuCount} SKU`} />
+        {/* Sits with service because the half that matters most here is the
+            "below band" share, which is a stockout signal. Its sub-line names
+            both sides, since the metric genuinely straddles the two groups. */}
+        <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
+          status={s.coverageInBandPct < 50 ? "bad" : s.coverageInBandPct < 80 ? "warn" : "ok"} trend={ppTrend(t.coverageInBandPct)}
+          sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
+      </div>
+
+      <div className="divider" style={{ margin: "var(--space-5) 0" }} />
+
+      <KpiGroup label="Working capital" note="Is cash tied up in the right stock?" />
+      <div className="kpi-grid">
+        <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
+          status={s.turnover < 2.5 ? "bad" : s.turnover < 4.0 ? "warn" : "ok"} trend={numTrend(t.turnover)} sub={`${s.dio}d of supply`} />
+        <StatCard label="GMROI" value={`$${s.gmroi.toFixed(2)}`} icon={Target} hint={HINTS.gmroi}
+          status={s.gmroi < 1.0 ? "bad" : s.gmroi < 1.5 ? "warn" : "ok"} trend={numTrend(t.gmroi, "$")} sub="per $1 of stock" />
         <StatCard label="Overstock" value={`SGD ${fmt$(s.overstockValue)}`} icon={TrendingUp} hint={HINTS.overstock}
           status={s.overstockPct > 10 ? "bad" : s.overstockPct > 5 ? "warn" : "ok"} trend={ppTrend(t.overstockPct)} sub={`${s.overstockPct}% of inventory`} />
         {/* Gross E&O is the headline, but the risk-adjusted figure is what the
@@ -417,9 +446,6 @@ export default function Dashboard() {
         <StatCard label="Excess & Obsolete" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX} hint={HINTS.eo}
           status={s.eoPct > 30 ? "bad" : s.eoPct > 15 ? "warn" : "ok"} trend={ppTrend(t.eoPct)}
           sub={`${s.eoPct}% of inventory · ${fmt$(s.eoValueRiskAdjusted)} risk-adjusted`} />
-        <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
-          status={s.coverageInBandPct < 50 ? "bad" : s.coverageInBandPct < 80 ? "warn" : "ok"} trend={ppTrend(t.coverageInBandPct)}
-          sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
       </div>
 
       {/* ── One real disclosure: Compliance Position is the only genuinely
@@ -739,6 +765,19 @@ function CoverageBullets({ data, selected, onSelect }) {
           </HoverHint>
         );
       })}
+    </div>
+  );
+}
+
+// Small caps heading over a KPI group, with a one-line plain-language note
+// saying what question that group answers.
+function KpiGroup({ label, note }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-3)" }}>
+      <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-secondary)" }}>
+        {label}
+      </span>
+      {note && <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>{note}</span>}
     </div>
   );
 }
