@@ -236,3 +236,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** DEVLOG.md, frontend/src/index.css, frontend/src/pages/Dashboard.jsx, frontend/src/components/HoverHint.jsx, frontend/src/components/ColHint.jsx
 - **Deleted:** frontend/src/components/hintStyles.js
 - **Notes:** Three UI changes. (1) Removed justifyContent:space-between from the hero row so the Baseline/Now chart sits tight against the number it explains instead of being pinned ~700px away at the card edge. (2) Grouped the seven KPIs into two labelled rows along the project's own two competing objectives (service/availability vs working capital), sharing one 4-column grid so cards align between rows. (3) Rebuilt the hint tooltip as theme-aware liquid glass: it was one light panel with dark text in both themes, measuring 4.04:1 over a dark backdrop (under AA), which is why it could not be pushed glassier. Light tint/dark text in Light and dark tint/light text in Dark now measures 7.8-17.9:1 and 5.9-13.9:1 while running a lower fill alpha, plus gradient fill, specular top edge, inner base shade and a prefers-reduced-transparency fallback.
+
+---
+
+## Session: 2026-09-13 01:05
+- **Branch:** main
+- **Files changed:** DEVLOG.md, frontend/src/index.css
+- **New files:** none
+- **Notes:** Applied the user's own glass values from the Glass Tooltip Tuner artifact (published this session at claude.ai/code/artifact/62c1d4c6). Light theme taken as given: fill 0.72/0.33, ring 0.09, drop 0.74, blur 3px saturate 220%, radius 15px, gradient 135deg. Measured worst case 17.85:1 on card, 10.1:1 over green, 7.1:1 over red, all still AAA. Did NOT take the dark fills from the same paste (0.44/0.34): those ride along with the tuner's "Max glass" preset and measure 3.74:1 over a bright health segment, under AA, where the shipped 0.66/0.52 holds 5.58:1. User said they mainly tuned light and care about light, so dark was left safe and the reason recorded in a comment.

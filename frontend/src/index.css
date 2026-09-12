@@ -331,18 +331,34 @@ details.disclosure[open] summary::before { content: "▾ "; }
    through the text. Ranges that stay legible: alpha 0.35-0.70, blur 28-56px,
    saturate 170-200%. */
 :root {
-  --hint-fill-top:    rgba(255,255,255,0.62);
-  --hint-fill-bottom: rgba(255,255,255,0.40);
+  /* Light values tuned by the user in the Glass Tooltip Tuner, 2026-09-13.
+     Measured worst case with these numbers: 17.85:1 on a white card, 10.1:1
+     over a green health segment, 7.1:1 over a red one. All still AAA.
+     Note blur is deliberately low here (see --hint-blur below). */
+  --hint-fill-top:    rgba(255,255,255,0.72);
+  --hint-fill-bottom: rgba(255,255,255,0.33);
   --hint-specular:    rgba(255,255,255,0.90);
   --hint-inner-base:  rgba(255,255,255,0.30);
   --hint-border:      rgba(255,255,255,0.55);
-  --hint-ring:        rgba(15,23,42,0.07);
-  --hint-drop:        0 24px 60px rgba(15,23,42,0.26);
+  --hint-ring:        rgba(15,23,42,0.09);
+  --hint-drop:        0 24px 60px rgba(15,23,42,0.74);
   --hint-text:        #0f172a;
   --hint-hdr:         #475569;
-  --hint-blur:        blur(40px) saturate(190%);
+  /* 3px is a near-clear sheet rather than a frosted one: the backdrop stays
+     recognisable through the panel instead of being averaged into a wash.
+     Contrast still passes comfortably because the fill is white-dominant, but
+     shapes and letterforms behind the panel do compete with its text. Chosen
+     deliberately for the look; raise toward 16-40px to trade that see-through
+     character for a calmer reading surface. */
+  --hint-blur:        blur(3px) saturate(220%);
 }
 [data-theme="dark"] {
+  /* Left at the shipped alphas on purpose. The tuner session also carried the
+     dark fills down to 0.44/0.34 (they ride along with the "Max glass"
+     preset), but measured against a bright health segment that lands at
+     3.74:1, under AA, where 0.66/0.52 holds 5.58:1. On its own card either is
+     fine - it is only over the saturated status bars that the thinner fill
+     gives out. Raise these only alongside a real check over a colour bar. */
   --hint-fill-top:    rgba(38,50,70,0.66);
   --hint-fill-bottom: rgba(15,23,42,0.52);
   --hint-specular:    rgba(255,255,255,0.24);
@@ -356,13 +372,13 @@ details.disclosure[open] summary::before { content: "▾ "; }
 
 .hint-panel {
   padding: 14px 16px;
-  border-radius: 18px;
+  border-radius: 15px;
   z-index: 9999;
   color: var(--hint-text);
   /* A gradient rather than a flat fill: real glass catches more light at the
      top edge than the bottom, and the shift is what stops it reading as a
      plain translucent rectangle. */
-  background: linear-gradient(158deg, var(--hint-fill-top), var(--hint-fill-bottom));
+  background: linear-gradient(135deg, var(--hint-fill-top), var(--hint-fill-bottom));
   border: 1px solid var(--hint-border);
   backdrop-filter: var(--hint-blur);
   -webkit-backdrop-filter: var(--hint-blur);
