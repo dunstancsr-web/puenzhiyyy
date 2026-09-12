@@ -185,11 +185,15 @@ function seed() {
   const db = getDb();
 
   const wipe = db.transaction(() => {
-    for (const t of ["sales_transactions", "purchase_orders", "inventory_positions", "alerts_log", "skus"]) {
+    // "decisions" (TASK-12) has a FK on sku_id and must be cleared before
+    // "skus" — this table was added after this wipe list was first written,
+    // and reseeding after recording even one decision failed with
+    // SQLITE_CONSTRAINT_FOREIGNKEY until it was added here.
+    for (const t of ["sales_transactions", "purchase_orders", "inventory_positions", "alerts_log", "decisions", "skus"]) {
       db.exec(`DELETE FROM ${t}`);
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN
-      ('sales_transactions','purchase_orders','inventory_positions','alerts_log','skus')`);
+      ('sales_transactions','purchase_orders','inventory_positions','alerts_log','decisions','skus')`);
   });
   wipe();
 

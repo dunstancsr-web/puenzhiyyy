@@ -636,7 +636,13 @@ function ProjectionChart({ skuId }) {
     <div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, marginBottom: 10 }}>
         {first_stockout_date ? (
-          <span style={{ color: "var(--red)", fontWeight: 700 }}>⚠ Stockout projected {first_stockout_date}</span>
+          <span style={{ color: "var(--red)", fontWeight: 700 }}>
+            {/* "Projected" reads oddly for a date of today — that's not a forecast,
+                the SKU is already at/below zero right now. */}
+            {first_stockout_date === curve[0]?.date
+              ? "⚠ Already out of stock"
+              : `⚠ Stockout projected ${first_stockout_date}`}
+          </span>
         ) : (
           <span style={{ color: "var(--green)", fontWeight: 700 }}>✓ No stockout projected within 90 days</span>
         )}

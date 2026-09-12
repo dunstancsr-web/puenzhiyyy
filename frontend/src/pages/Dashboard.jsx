@@ -53,10 +53,10 @@ const ppTrend = (d) => ({ dir: d.dir, good: d.good, text: `${Math.abs(d.diff).to
 const numTrend = (d, p = "") => ({ dir: d.dir, good: d.good, text: `${p}${Math.abs(d.diff).toFixed(2)}` });
 
 // ── Today's actions — ranked by urgency + financial exposure ─────────────────
-function buildTodayActions(mockSkus) {
+function buildTodayActions(skus) {
   const actions = [];
 
-  mockSkus
+  skus
     .filter((s) => s.stockout_gap_days > 0)
     .forEach((s) => {
       const qty = Math.max(s.min_order_qty, Math.round(s.target_stock - s.available_qty));
@@ -73,8 +73,12 @@ function buildTodayActions(mockSkus) {
       });
     });
 
-  mockSkus
-    .filter((s) => s.movement_class === "Idle")
+  skus
+    // available_qty > 0 matches health.js's RED rule and alerts.js's IDLE
+    // alert: a SKU truly at zero stock isn't "idle inventory tying up
+    // capital" — it's just empty, and flagging it here contradicted the
+    // SKU's own "Healthy, no action required" recommendation.
+    .filter((s) => s.movement_class === "Idle" && s.available_qty > 0)
     .forEach((s) => {
       actions.push({
         priority: 2,
@@ -89,7 +93,7 @@ function buildTodayActions(mockSkus) {
       });
     });
 
-  mockSkus
+  skus
     .filter((s) => s.overstock_qty > 0)
     .forEach((s) => {
       actions.push({
@@ -105,7 +109,7 @@ function buildTodayActions(mockSkus) {
       });
     });
 
-  mockSkus
+  skus
     .filter((s) => s.coverage_band === "below" && s.stockout_gap_days === 0 && s.available_qty <= s.reorder_point_policy && s.movement_class !== "Idle")
     .forEach((s) => {
       actions.push({
@@ -133,8 +137,8 @@ function buildTodayActions(mockSkus) {
 }
 
 // ── Coverage vs (lead time + safety) chart data ─────────────────────────────
-function buildCoverageData(mockSkus) {
-  return [...mockSkus]
+function buildCoverageData(skus) {
+  return [...skus]
     .filter((s) => s.days_of_cover !== null)
     .sort((a, b) => {
       const aGap = a.days_of_cover - (a.lead_time_days + a.safety_stock_days);

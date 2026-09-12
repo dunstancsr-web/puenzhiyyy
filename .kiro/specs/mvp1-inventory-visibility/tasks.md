@@ -325,6 +325,62 @@ pass only (no structural change), which also fixed a real bug (see below).
 
 ---
 
+## TASK-17 — Bug-finding & improvement pass (2026-09-12)
+Post-commit reiteration: exploratory testing (zero-value SKU, Add SKU, Approve/Reject flow) plus a
+code audit, looking for both functional and visual defects across the now-committed overhaul.
+
+- [x] Fixed `backend/src/engines/projection.js`: `lowest_date` rendered blank whenever day 0 was the
+      curve's actual lowest point (e.g. a flat zero-demand curve) — the tracking variable was seeded
+      with `date: null` instead of day 0's own date, and the loop only overwrites it on a *strictly
+      lower* value, so that seed was never replaced. Seeded with the real day-0 date instead.
+- [x] Fixed `ProjectionChart` (Inventory.jsx): a SKU already at/below zero stock showed "⚠ Stockout
+      projected {today's date}" — technically true but reads as a forecast for something that isn't
+      a future event. Now shows "⚠ Already out of stock" when the stockout date is day 0, and the
+      normal "Stockout projected {date}" copy only for an actual future date.
+- [x] Fixed a real cross-engine inconsistency found via a deliberately empty test SKU (0 on-hand,
+      0 demand, Idle): `Dashboard.jsx`'s `buildTodayActions` re-implements "is this SKU idle" locally
+      instead of consuming the backend's `alerts`, and its filter (`movement_class === "Idle"`) was
+      missing the `available_qty > 0` guard that both `health.js`'s RED rule and `alerts.js`'s IDLE
+      alert already have — so a SKU the edit modal correctly called "Healthy, no action required"
+      simultaneously showed up in the Dashboard's "Today's Top Actions" as a critical "Initiate
+      disposition review". Added the matching guard. Longer-term, `buildTodayActions` re-deriving its
+      own alert rules instead of reading `primaryExceptions` from the API is worth revisiting — three
+      independent implementations of the same rule (health.js, alerts.js, Dashboard.jsx) is exactly
+      how this drift happened.
+- [x] Renamed `buildTodayActions`/`buildCoverageData`'s stale `mockSkus` parameter to `skus` — a
+      leftover name from before TASK-10 rewired the Dashboard to live API data; purely cosmetic.
+- [x] Verified via browser: zero-value SKU creation and edit (no crash, sane "No stock policy set" /
+      "No demand" copy), Alerts Approve flow end-to-end (Manager Decision modal → `POST /api/decisions`
+      → Decision Log row with the entered reason → alert count and per-type badges update correctly),
+      Dashboard "Show more metrics" toggle.
+- [x] Investigated washed-out text in the SKU edit modal under Glass theme; root-caused to a browser
+      extension (`spoken-word` read-aloud highlighter) injecting global text-dimming styles into this
+      testing profile, confirmed via `getComputedStyle` showing settled (non-transitioning) colors no
+      app stylesheet declares, and `html > *` listing extension-injected elements. Not an app bug —
+      no code change.
+- [x] Noted, not fixed: a SKU created with every policy field left at 0 (min/target/max/reorder all
+      0) computes `health_status = GREEN` — none of health.js's rules fire because they all require
+      either `days_of_cover != null` or `available_qty > 0`. Defensible for a genuinely empty,
+      never-sold item (nothing to fail), but showing a confident green "Healthy" badge next to
+      "No stock policy set" reads oddly. Worth deciding deliberately (e.g. a distinct "Unconfigured"
+      state) rather than fixing reactively — flagging for a product decision, not a code fix.
+- [x] Noted, not fixed: `AddSkuForm` (Inventory.jsx) still shows all ~14 identity + policy fields at
+      once — the same pattern SkuEditForm was restructured away from in TASK-16. Left as-is since a
+      create flow legitimately needs every field before the record can exist (unlike editing, there's
+      no "current state" to default to an Overview-only view of); revisit if it starts feeling heavy
+      in practice.
+- [x] Fixed a significant latent bug in `backend/src/db/seed.js`: `npm run seed` failed with
+      `SQLITE_CONSTRAINT_FOREIGNKEY` as soon as any row existed in `decisions` (TASK-12's Approve/
+      Modify/Reject audit table, which has a `sku_id` FK) — the wipe list predates that table and was
+      never updated to clear it before `skus`. Never surfaced before because no session had recorded
+      a real decision and then reseeded; hit it directly while cleaning up test data after the Approve
+      flow verification above. Added `decisions` to both the DELETE loop and the `sqlite_sequence`
+      reset, ordered before `skus`. This would otherwise have permanently blocked reseeding the demo
+      database the first time anyone used the approval workflow for real.
+- [x] `npx vite build` clean after all fixes
+
+---
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

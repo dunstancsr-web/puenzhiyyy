@@ -50,7 +50,11 @@ function projectInventory({
   let projected = availableQty;
   let firstStockoutDate = null;
   let firstSafetyBreachDate = null;
-  let lowest = { day: 0, date: null, projected_available: projected };
+  // Seed with day 0's own date, not null — day 0 is a valid lowest point
+  // (e.g. a flat zero-demand curve never dips below it), and the loop below
+  // only overwrites `lowest` on a strictly-lower value, so a null seed here
+  // left `lowest_date` blank for exactly that case.
+  let lowest = { day: 0, date: new Date(startTime).toISOString().slice(0, 10), projected_available: projected };
 
   for (let day = 0; day <= days; day++) {
     if (day > 0) {
