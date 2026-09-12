@@ -424,6 +424,44 @@ Continued the reiteration into `Alerts.jsx`'s Approve/Modify/Reject and Ask AI p
 
 ---
 
+## TASK-19 — Third bug-finding pass: Restock validation + server-side input hardening (2026-09-12)
+Continued the reiteration into the Restock flow, table sort/filter, and backend input validation.
+
+- [x] Fixed a real feedback gap in the Restock modal: entering 0, a negative number, or a
+      non-numeric quantity and clicking "Confirm Restock" silently did nothing — `handleRestock`'s
+      guard clause just `return`ed with no message. The `<input type="number" min={0.1}>` attributes
+      look like validation but never actually run, since this button isn't a form submit and HTML5
+      constraint validation only fires on submit. Added an inline "Enter a quantity greater than 0."
+      error (cleared live as the user retypes), matching the pattern already used elsewhere.
+- [x] Fixed a real, if low-severity, robustness gap: `POST /api/skus` and `PUT /api/skus/:id` accepted
+      any numeric value for policy/cost fields with zero server-side validation — confirmed via curl
+      that `PUT {min_stock: -500}` was accepted and stored as-is. The only guard was client-side
+      (`SkuEditForm`/`AddSkuForm`'s "Must be ≥ 0"), trivially bypassed by any direct API call. Added
+      `validateNumericFields()` in `routes/inventory.js`, applied to both routes: rejects negative
+      values for every policy/cost/adjustment field, and additionally caps `target_service_level` at 1
+      (it's a probability). Verified via curl: negative values and `target_service_level > 1` are now
+      rejected with a 400, valid updates still succeed.
+- [x] Verified via browser: a large legitimate restock correctly clears the SKU's STOCKOUT_RISK alert
+      and raises a brand-new OVERSTOCK alert automatically on next load — confirms the alert engine
+      reacts live to state changes with no explicit dismiss needed, and validates `materializeAlerts`
+      handles a dedupe_key's first-ever appearance correctly (not just the already-tested "stays
+      suppressed after dismiss" path).
+- [x] Verified via browser: duplicate SKU ID creation shows a clear inline error in `AddSkuForm`
+      ("SKU TJ-25KG already exists") rather than failing silently or crashing.
+- [x] Investigated the Inventory table's `ABC × XYZ Segmentation` matrix: cell intensity tint is a
+      hardcoded `rgba(59,130,246,...)` (Light theme's `--blue`), not a CSS variable — in Glass theme
+      (`--blue: #58a6ff`) this cell color doesn't quite match the rest of the UI's blue accent. Minor,
+      cosmetic-only, theme-specific mismatch; not fixed this pass since a proper fix needs an RGB-triplet
+      CSS variable (e.g. `--blue-rgb`) added to the design-system foundation, not a one-line patch —
+      worth doing together with any future pass over the remaining hardcoded rgba() usages, rather than
+      as a one-off.
+- [x] Confirmed (no bug): `alerts_log`'s "dismiss is a one-way step, even if the condition recurs"
+      behavior is already explicitly documented in `routes/inventory.js` as intentional MVP scope, not
+      an oversight — left alone.
+- [x] `npx vite build` clean after all fixes; backend smoke test (`npm run analytics`) matches baseline
+
+---
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

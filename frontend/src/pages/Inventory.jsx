@@ -234,7 +234,15 @@ export default function Inventory() {
 
   const handleRestock = async () => {
     const qty = parseFloat(restockQty);
-    if (!qty || qty <= 0) return;
+    // Used to just `return` here on a zero/negative/unparseable quantity —
+    // the button looked like it did nothing, with no indication why. The
+    // native <input type="number" min={0.1}> attributes look like validation
+    // but never actually run: this button isn't a form submit, so HTML5
+    // constraint validation never triggers on click.
+    if (!qty || qty <= 0) {
+      setRestockError("Enter a quantity greater than 0.");
+      return;
+    }
     setRestockSaving(true);
     setRestockError(null);
     try {
@@ -471,7 +479,7 @@ export default function Inventory() {
           </label>
           <input
             type="number" min={0.1} step={0.1} value={restockQty}
-            onChange={(e) => setRestockQty(e.target.value)}
+            onChange={(e) => { setRestockQty(e.target.value); setRestockError(null); }}
             placeholder="e.g. 200"
             style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, marginBottom: restockError ? 8 : 18, background: "var(--surface)", color: "var(--text-primary)" }}
             autoFocus

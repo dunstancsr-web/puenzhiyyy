@@ -20,6 +20,29 @@ function getAnalytics() {
   return buildAnalytics(getDb());
 }
 
+// Numeric fields on skus/inventory_positions that must be >= 0 (target_service_level
+// additionally must be <= 1, being a probability). SkuEditForm/AddSkuForm already
+// enforce this client-side ("Must be ≥ 0"), but that's the only guard that existed —
+// POST /skus and PUT /skus/:id accepted any number, including negative ones, from
+// any direct API call. Found via curl: PUT {min_stock: -500} was accepted and stored
+// as-is with no error.
+const NONNEGATIVE_NUMERIC_FIELDS = [
+  "min_order_qty", "reorder_point_policy", "min_stock", "target_stock", "max_stock",
+  "safety_stock_pct", "lead_time_days", "target_service_level", "unit_cost_sgd",
+  "unit_price_sgd", "reserved_qty", "quality_hold_qty",
+];
+
+// Returns an error message string, or null if every provided numeric field is valid.
+function validateNumericFields(body) {
+  for (const k of NONNEGATIVE_NUMERIC_FIELDS) {
+    if (body[k] === undefined) continue;
+    const n = Number(body[k]);
+    if (!Number.isFinite(n) || n < 0) return `${k} must be a number >= 0`;
+    if (k === "target_service_level" && n > 1) return `${k} must be <= 1`;
+  }
+  return null;
+}
+
 // ── SKUs ─────────────────────────────────────────────────────────────────────
 
 // GET /api/skus — every active SKU with all computed fields
@@ -90,6 +113,8 @@ router.post("/skus", (req, res) => {
   for (const field of required) {
     if (!b[field]) return res.status(400).json({ success: false, message: `Missing required field: ${field}` });
   }
+  const numericError = validateNumericFields(b);
+  if (numericError) return res.status(400).json({ success: false, message: numericError });
 
   try {
     const db = getDb();
@@ -146,6 +171,8 @@ const POSITION_TABLE_FIELDS = ["reserved_qty", "quality_hold_qty"];
 
 router.put("/skus/:id", (req, res) => {
   const b = req.body || {};
+  const numericError = validateNumericFields(b);
+  if (numericError) return res.status(400).json({ success: false, message: numericError });
   try {
     const db = getDb();
     const existing = db.prepare(`SELECT 1 FROM skus WHERE sku_id = ?`).get(req.params.id);
