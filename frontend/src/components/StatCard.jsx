@@ -10,7 +10,13 @@ import ColHint from "./ColHint";
 // `hint` (optional {what, how}) adds a ColHint ⓘ next to the label - plain-
 // language help for jargon terms like "GMROI" or "turnover".
 export default function StatCard({ label, value, icon: Icon, sub, target, trend, status = "ok", hint }) {
-  const statusColor = { ok: "var(--text-primary)", warn: "var(--yellow)", bad: "var(--red)" }[status];
+  // Only a genuine "bad" recolours the number itself. "warn" gets a small
+  // amber dot next to the label instead: with this portfolio, six of seven
+  // KPIs resolve to warn or bad, and painting every one of them a loud colour
+  // left the strip with no focal point at all - the reader cannot tell which
+  // two numbers are the emergency. The dot keeps the signal without the shout.
+  const statusColor = status === "bad" ? "var(--red)" : "var(--text-primary)";
+  const dotColor = { ok: null, warn: "var(--yellow)", bad: "var(--red)" }[status];
 
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)" }}>
@@ -19,6 +25,13 @@ export default function StatCard({ label, value, icon: Icon, sub, target, trend,
       )}
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}>
+          {dotColor && (
+            <span
+              aria-label={status === "bad" ? "Critical" : "Needs watching"}
+              title={status === "bad" ? "Critical" : "Needs watching"}
+              style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }}
+            />
+          )}
           {label}
           {hint && <ColHint label={label} what={hint.what} how={hint.how} />}
         </div>

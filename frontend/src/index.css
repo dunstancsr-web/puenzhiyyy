@@ -11,8 +11,13 @@
   --surface-2:      #f8f9fb;
   --border:         #e2e6ea;
   --text-primary:   #1a202c;
-  --text-secondary: #64748b;
-  --text-muted:     #94a3b8;
+  /* Darkened 2026-09-13: --text-muted was #94a3b8, which measures ~3.6:1 on
+     white and fails WCAG AA's 4.5:1 for normal-size text. It carries a lot of
+     real content here (KPI sub-lines, chart axis labels, table captions), so
+     it has to be legible. Both steps moved down one shade to keep the
+     primary/secondary/muted hierarchy intact while clearing AA. */
+  --text-secondary: #475569;
+  --text-muted:     #64748b;
 
   --blue:           #3b82f6;
   --blue-light:     #eff6ff;
@@ -48,8 +53,10 @@
   --surface-2:      #263148;
   --border:         #334155;
   --text-primary:   #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted:     #64748b;
+  /* Same AA fix on the dark side: #64748b muted on the #1e293b card ground
+     measures ~3.3:1. Both steps moved up one shade. */
+  --text-secondary: #cbd5e1;
+  --text-muted:     #94a3b8;
 
   --blue-light:     #1e3a5f;
   --green-light:    #052e16;
@@ -115,9 +122,24 @@
 .app-topbar-glass { display: none; }
 .app-main { padding: 28px 32px; }
 
+/* Card: the default container for a dashboard widget. Restored 2026-09-13 at
+   the user's request - the flat/hairline treatment left every widget floating
+   on one undifferentiated grey field with nothing telling the eye where one
+   widget ended and the next began. Uses --card-bg (white in Light, slate in
+   Dark), so this is "white cards" in the theme-correct sense. */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: var(--space-5);
+}
+
 /* Dashboard widget rows: two side-by-side widgets on a wide screen, stacked
-   below the breakpoint (they are unreadable squeezed into half a phone). */
-.dash-row { display: grid; gap: var(--space-6); }
+   below the breakpoint (they are unreadable squeezed into half a phone).
+   align-items:start stops a short card being stretched to match a tall
+   neighbour, which was leaving ~150px of dead white space inside it. */
+.dash-row { display: grid; gap: var(--space-5); align-items: start; }
 .dash-row--even       { grid-template-columns: 1fr 1fr; }
 .dash-row--wide-right { grid-template-columns: 1fr 1.3fr; }
 

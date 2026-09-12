@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
 } from "recharts";
 import {
   AlertTriangle, TrendingUp, Clock, PackageX, Repeat, Target,
@@ -51,6 +51,12 @@ const fmt$ = (v) => {
   if (n >= 1e3) return `$${Math.round(v / 1e3)}K`;
   return `$${Math.round(v)}`;
 };
+
+// Tonnage, NOT money. Kept separate from fmt$ on purpose: the two were
+// conflated once already (Compliance Position is metric tonnes and was being
+// rendered as dollars), so quantities get their own formatter with real
+// thousands separators and no K/M abbreviation.
+const fmtMt = (v) => Math.round(v).toLocaleString("en-SG");
 
 // Trend chip builders (magnitude formatted for the metric type)
 const moneyTrend = (d) => ({ dir: d.dir, good: d.good, text: fmt$(Math.abs(d.diff)) });
@@ -346,9 +352,11 @@ export default function Dashboard() {
   const filteredAttention = attention.filter((a) => matchesFilter(a, filter, skuIndex));
   const shownAttention = filteredAttention.slice(0, NEEDS_ATTENTION_CAP);
   const hiddenAttentionCount = filteredAttention.length - shownAttention.length;
+  // "Baseline"/"Now" rather than "Last month"/"This month": the comparison
+  // point is a fixed hand-set constant, not a real previous month.
   const monthTrendData = [
-    { name: "Last month", value: PRIOR.totalInventoryValue },
-    { name: "This month", value: s.totalInventoryValue },
+    { name: "Baseline", value: PRIOR.totalInventoryValue },
+    { name: "Now", value: s.totalInventoryValue },
   ];
 
   return (
@@ -358,31 +366,40 @@ export default function Dashboard() {
         subtitle={`${new Date().toLocaleDateString("en-SG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} · ${s.totalSkus} active SKUs · data as of ${new Date(s.asOf).toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}`}
       />
 
-      {/* ── Hero + month-over-month bar chart ── */}
-      <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "var(--space-5)" }}>
-        <div>
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, marginBottom: 2, display: "flex", alignItems: "center", gap: 5 }}>
-            Total Inventory Value
-            <ColHint label="Total Inventory Value" what={HINTS.heroValue.what} how={HINTS.heroValue.how} />
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap" }}>
-            <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
-              SGD {fmt$(s.totalInventoryValue)}
+      {/* ── Summary card: hero value, month comparison, and the core KPI strip.
+          One card, because these are one thought ("state of the portfolio
+          right now"), separated internally by a hairline rather than being
+          five floating islands on the page background. ── */}
+      <div className="card" style={{ marginBottom: "var(--space-5)" }}>
+        <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "var(--space-5)" }}>
+          <div>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, marginBottom: 2, display: "flex", alignItems: "center", gap: 5 }}>
+              Total Inventory Value
+              <ColHint label="Total Inventory Value" what={HINTS.heroValue.what} how={HINTS.heroValue.how} />
             </div>
-            <span title="vs a fixed reference baseline - not a live month-over-month feed yet" style={{ fontSize: "var(--text-base)", fontWeight: 700, color: t.inventoryValue.good ? "var(--green)" : "var(--red)" }}>
-              {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs baseline
-            </span>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap" }}>
+              <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
+                SGD {fmt$(s.totalInventoryValue)}
+              </div>
+              {/* Deliberately NOT coloured good/bad. A rising inventory value
+                  is genuinely ambiguous (deliberate stock-up vs stock piling
+                  up unsold) and this metric's own hint says exactly that, so
+                  painting it red asserted a judgement the copy disclaims. */}
+              <span title="vs a fixed reference baseline - not a live month-over-month feed yet"
+                style={{ fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-secondary)" }}>
+                {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs baseline
+              </span>
+            </div>
           </div>
+          <MonthTrendChart data={monthTrendData} />
         </div>
-        <MonthTrendChart data={monthTrendData} />
-      </div>
 
       {/* ── Secondary strip: core numbers, demoted but never hidden. Every
           threshold below has real headroom on both ends (a "bad" tier, not
           just warn/ok) so the status color can actually move instead of
           sitting permanently on one shade - GMROI's line is set at $1 to
           match its own hint text below. ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--space-5)", marginBottom: "var(--space-3)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "var(--space-5)", alignItems: "start" }}>
         <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
           status={s.turnover < 2.5 ? "bad" : s.turnover < 4.0 ? "warn" : "ok"} trend={numTrend(t.turnover)} sub={`${s.dio}d of supply`} />
         <StatCard label="Fill Rate" value={`${s.fillRate}%`} icon={ShieldCheck} hint={HINTS.fillRate}
@@ -393,8 +410,13 @@ export default function Dashboard() {
           status={s.stockoutSkuCount > 0 ? "bad" : "ok"} trend={moneyTrend(t.stockoutRiskMargin)} sub={`${s.stockoutSkuCount} SKU`} />
         <StatCard label="Overstock" value={`SGD ${fmt$(s.overstockValue)}`} icon={TrendingUp} hint={HINTS.overstock}
           status={s.overstockPct > 10 ? "bad" : s.overstockPct > 5 ? "warn" : "ok"} trend={ppTrend(t.overstockPct)} sub={`${s.overstockPct}% of inventory`} />
+        {/* Gross E&O is the headline, but the risk-adjusted figure is what the
+            Needs Attention rows below actually use. Showing only the gross
+            number up here meant the same concept appeared as $1.36M in one
+            place and $273K in another with nothing explaining the gap. */}
         <StatCard label="Excess & Obsolete" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX} hint={HINTS.eo}
-          status={s.eoPct > 30 ? "bad" : s.eoPct > 15 ? "warn" : "ok"} trend={ppTrend(t.eoPct)} sub={`${s.eoPct}% of inventory`} />
+          status={s.eoPct > 30 ? "bad" : s.eoPct > 15 ? "warn" : "ok"} trend={ppTrend(t.eoPct)}
+          sub={`${s.eoPct}% of inventory · ${fmt$(s.eoValueRiskAdjusted)} risk-adjusted`} />
         <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
           status={s.coverageInBandPct < 50 ? "bad" : s.coverageInBandPct < 80 ? "warn" : "ok"} trend={ppTrend(t.coverageInBandPct)}
           sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
@@ -417,30 +439,29 @@ export default function Dashboard() {
         {showMore ? "Hide" : "Show"} compliance position
       </button>
       {showMore && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-5)", marginBottom: "var(--space-5)" }}>
-          <StatCard label="Compliance Position" value={`${s.compliancePosition >= 0 ? "+" : ""}${fmt$(s.compliancePosition)}`}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-5)" }}>
+          {/* compliancePosition is a QUANTITY in metric tonnes (eligible on-hand
+              minus required buffer, see financials.js), not money. It used to
+              render through fmt$ and displayed "+$1K" for what is actually
+              +1,058 MT of rice - wrong unit and, via the K-rounding, wrong
+              magnitude too. */}
+          <StatCard label="Compliance Position"
+            value={`${s.compliancePosition >= 0 ? "+" : ""}${fmtMt(s.compliancePosition)} MT`}
             icon={ShieldCheck} status={s.compliancePosition < 0 ? "bad" : "ok"}
-            sub="Illustrative rice-stockpile buffer · pending governance approval" />
+            sub={`${fmtMt(s.complianceEligibleQty)} MT eligible vs ${fmtMt(s.complianceRequiredQty)} MT required · illustrative, pending governance approval`} />
         </div>
       )}
+      </div>
 
       {/* ── Command Deck: four purpose-built widgets, each independently
           collapsible (persisted), each a live filter source for Needs
-          Attention - click a bar/cell/row, click again to clear. ── */}
-      <div className="dash-row dash-row--even" style={{ marginBottom: "var(--space-2)" }}>
-        <Section title="Inventory Health" subtitle="Share of working capital by status - click a colour to filter" hint={HINTS.health}
-          collapsible storageKey="health" defaultOpen>
-          <HealthStack data={s.healthByValue} selected={filter?.type === "health" ? filter.value : null}
-            onSelect={(status) => toggleFilter(setFilter, "health", status)} />
-        </Section>
+          Attention - click a bar/cell/row, click again to clear.
 
-        <Section title="ABC × XYZ Segmentation" subtitle="Value tier × demand predictability - click a cell to filter" hint={HINTS.abcXyz}
-          collapsible storageKey="abcxyz" defaultOpen>
-          <AbcXyzMatrix matrix={s.abcXyzMatrix} selected={filter?.type === "segment" ? filter.value : null}
-            onSelect={(key) => toggleFilter(setFilter, "segment", key)} />
-        </Section>
-      </div>
-
+          Row order is deliberate: "what needs doing today" (coverage gaps +
+          the exception list) sits above the fold, and the portfolio-structure
+          analysis (health mix, ABC x XYZ) sits below it. It used to be the
+          other way round, which pushed the single most actionable widget on
+          the page off-screen behind a segmentation matrix. ── */}
       <div className="dash-row dash-row--wide-right" style={{ marginBottom: "var(--space-5)" }}>
         <Section title="Cover vs Lead + Safety" subtitle="Worst gap first - click a row to filter" hint={HINTS.coverage}
           collapsible storageKey="coverage" defaultOpen>
@@ -511,6 +532,20 @@ export default function Dashboard() {
           )}
         </Section>
       </div>
+
+      <div className="dash-row dash-row--even" style={{ marginBottom: "var(--space-5)" }}>
+        <Section title="Inventory Health" subtitle="Share of working capital by status - click a colour to filter" hint={HINTS.health}
+          collapsible storageKey="health" defaultOpen>
+          <HealthStack data={s.healthByValue} selected={filter?.type === "health" ? filter.value : null}
+            onSelect={(status) => toggleFilter(setFilter, "health", status)} />
+        </Section>
+
+        <Section title="ABC × XYZ Segmentation" subtitle="Value tier × demand predictability - click a cell to filter" hint={HINTS.abcXyz}
+          collapsible storageKey="abcxyz" defaultOpen>
+          <AbcXyzMatrix matrix={s.abcXyzMatrix} selected={filter?.type === "segment" ? filter.value : null}
+            onSelect={(key) => toggleFilter(setFilter, "segment", key)} />
+        </Section>
+      </div>
     </div>
   );
 }
@@ -519,13 +554,19 @@ export default function Dashboard() {
 
 // Small hero-side chart: only two real data points exist (no historical
 // snapshots are stored yet), so this stays an honest two-bar comparison
-// rather than a fabricated multi-point trend line. Tooltip on hover shows
-// the exact SGD figure for whichever bar the pointer is over.
+// rather than a fabricated multi-point trend line.
+//
+// It carries value labels and axis labels rather than being two bare
+// rectangles: the two figures are only ~4% apart, so on a zero baseline the
+// bars are near-identical in height and the picture alone says nothing. The
+// zero baseline stays (truncating it to exaggerate a 4% move is the classic
+// misleading-bar-chart trick); the labels are what make it readable, and the
+// near-equal heights are themselves the honest message.
 function MonthTrendChart({ data }) {
   return (
-    <div style={{ width: 140, height: 60, flexShrink: 0 }}>
+    <div style={{ width: 200, height: 92, flexShrink: 0 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 2, right: 2, bottom: 0, left: 2 }}>
+        <BarChart data={data} margin={{ top: 18, right: 6, bottom: 0, left: 6 }}>
           <Tooltip
             cursor={{ fill: "var(--surface-2)" }}
             content={({ active, payload }) => {
@@ -538,8 +579,11 @@ function MonthTrendChart({ data }) {
               );
             }}
           />
-          <XAxis dataKey="name" hide />
+          <XAxis dataKey="name" axisLine={false} tickLine={false}
+            tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
           <Bar dataKey="value" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+            <LabelList dataKey="value" position="top" formatter={(v) => fmt$(v)}
+              style={{ fontSize: 11, fontWeight: 700, fill: "var(--text-secondary)" }} />
             {data.map((d, i) => <Cell key={i} fill={i === data.length - 1 ? "var(--blue)" : "var(--border)"} />)}
           </Bar>
         </BarChart>
@@ -637,7 +681,18 @@ function AbcXyzMatrix({ matrix, selected, onSelect }) {
           </React.Fragment>
         ))}
       </div>
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-3)", lineHeight: 1.5 }}>
+      {/* The cell tint encodes inventory value, which was nowhere stated -
+          readers had no way to know the blue meant anything at all. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: "var(--space-3)", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+        <span>Shade = inventory value</span>
+        <span style={{ display: "flex", flex: 1, maxWidth: 120, height: 7, borderRadius: 99, overflow: "hidden" }}>
+          {[0.08, 0.16, 0.24, 0.32, 0.4].map((a) => (
+            <span key={a} style={{ flex: 1, background: `rgba(59,130,246,${a})` }} />
+          ))}
+        </span>
+        <span>less → more</span>
+      </div>
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-2)", lineHeight: 1.5 }}>
         AZ / BZ / CZ carry the hardest-to-plan stock - set higher safety stock and shorter review cycles there.
       </div>
     </div>
@@ -704,7 +759,7 @@ function Section({ title, subtitle, children, hint, collapsible = false, storage
   const [storedOpen, setStoredOpen] = useCollapsed(storageKey || title, defaultOpen);
   const open = collapsible ? storedOpen : true;
   return (
-    <div>
+    <div className="card">
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: open ? "var(--space-4)" : 0 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: "var(--text-md)", display: "flex", alignItems: "center", gap: 5 }}>

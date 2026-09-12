@@ -212,3 +212,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/components/Sidebar.jsx, frontend/src/pages/Dashboard.jsx, frontend/src/index.css
 - **New files:** none
 - **Notes:** Fixed a real bug the user caught with a phone screenshot: the floating glass bar and the full side panel both rendered at once. Cause was an inline `display: flex` on the sidebar beating the breakpoint's `display: none`. The original verification had injected `!important`, which masked it, so it passed on broken code. Re-verified with no `!important` this time. Also moved the Dashboard's two widget rows off inline grid columns so they collapse to one column on small screens.
+
+---
+
+## Session: 2026-09-13 00:30
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/index.css, frontend/src/pages/Dashboard.jsx, frontend/src/components/StatCard.jsx
+- **New files:** none
+- **Notes:** Second critic pass on the Dashboard (TASK-28). Restored white cards at the user's request (new .card class on --card-bg, applied to all four widgets plus a summary card around the hero and KPI strip). Caught a real data bug: Compliance Position is metric tonnes but was rendering through fmt$ as "+$1K" for what is actually +1,058 MT; added a separate fmtMt formatter. Swapped the widget rows so Needs Attention sits above the fold instead of the ABC x XYZ matrix. Made the hero delta neutral (its own hint says the direction is ambiguous, but it was painted red), reconciled gross vs risk-adjusted E&O, cut KPI colour overload to a status dot for "warn", labelled the month comparison chart, removed stretched dead space, added a heatmap legend, and fixed --text-muted failing WCAG AA (3.6:1 -> 4.76:1).

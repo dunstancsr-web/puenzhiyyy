@@ -774,6 +774,64 @@ rendering on top of each other. Real bug, shipped in the commit above.
       has the same hardcoded-inline shape and will be tight on a phone. Left alone pending a proper pass
       over that modal on small screens.
 
+## TASK-28 — Second critic pass: cards restored, unit bug, hierarchy (2026-09-13)
+Second strict UI/UX-critic + data-analyst review of the Dashboard. User's one explicit instruction was
+"I want the white cards back again to aid with visibility", with discretion over the rest.
+
+- [x] **Cards restored** (the explicit ask). New `.card` class in `index.css` (background `--card-bg`,
+      1px border, `--radius-lg`, `--shadow`). Applied to `Section` (all four widgets) and to a new
+      summary card wrapping the hero value, month comparison, KPI strip and the compliance disclosure as
+      one unit. The flat/hairline treatment from the Linear overhaul had left every widget floating on
+      one undifferentiated grey field with nothing marking where one ended and the next began. Uses the
+      theme token, so it is white in Light and slate in Dark rather than literally white in both.
+- [x] **Data bug: Compliance Position was rendering metric tonnes as dollars.** `financials.js` computes
+      `compliancePosition = complianceEligibleQty - complianceRequiredQty`, both sums of `on_hand_qty` in
+      MT. The Dashboard passed it through `fmt$`, so +1,058 MT of rice displayed as **"+$1K"** - wrong
+      unit, and the K-rounding destroyed the magnitude on top of it. Added a separate `fmtMt` formatter
+      (thousands separators, no K/M abbreviation) kept deliberately distinct from `fmt$`, and the card
+      now reads "+1,058 MT" with "2,853 MT eligible vs 1,795 MT required" as context.
+- [x] **Information hierarchy: swapped the two widget rows.** Needs Attention, the only "what do I do
+      today" widget on the page, was below the fold while the ABC × XYZ segmentation matrix (analysis,
+      not action) held prime position above it. Now row 1 is Cover vs Lead + Safety and Needs Attention
+      ("what needs doing"), row 2 is Inventory Health and ABC × XYZ ("how the portfolio is structured").
+      Verified the cross-filter still works across the new arrangement: clicking Critical filters the
+      table to exactly the 2 RED SKUs.
+- [x] **Metric-vs-copy contradiction fixed.** The hero's "▲ $151K vs baseline" was painted red, i.e.
+      asserting "bad", while that metric's own hint text says a rising inventory value "isn't
+      automatically good or bad". Made it neutral; direction is still shown by the arrow.
+- [x] **E&O gross vs risk-adjusted reconciled.** The KPI showed gross E&O ($1.36M) while the Needs
+      Attention rows below use risk-adjusted ($273K) - the same concept appearing as two numbers 5x apart
+      with nothing explaining the gap. The KPI sub-line now carries both.
+- [x] **Colour overload reduced.** Six of seven KPIs resolve to warn or bad against this portfolio, and
+      every one of them was rendering as a large coloured number, so the strip had no focal point at all.
+      `StatCard` now recolours the value only for a genuine "bad"; "warn" gets a small amber status dot
+      beside the label instead. Signal kept, shouting removed.
+- [x] **Month comparison chart made readable.** It was two unlabelled rectangles at 140x60 with a hidden
+      axis; worse, the two values are only ~4% apart, so on a zero baseline the bars are near-identical
+      and the picture alone said nothing. Added value labels and axis labels and sized it up. Kept the
+      zero baseline deliberately (truncating it to dramatise a 4% move is the classic misleading-bar
+      trick) - the near-equal heights are the honest message, the labels are what make it informative.
+- [x] **Dead space removed.** `align-items: start` on `.dash-row`, so a short card is no longer stretched
+      to match a tall neighbour (Inventory Health had ~150px of empty card below its content).
+- [x] **ABC × XYZ legend added.** The cell tint encodes inventory value and this was stated nowhere, so
+      readers had no way to know the blue meant anything.
+- [x] **WCAG AA text contrast fixed.** `--text-muted` (#94a3b8) measured ~3.6:1 on white, under AA's
+      4.5:1 for normal text, while carrying real content (KPI sub-lines, axis labels, table captions).
+      Moved both muted and secondary down one shade in Light (now 4.76:1 and 7.58:1, measured in-browser)
+      and up one shade in Dark, preserving the three-step hierarchy.
+- [x] Verified in Light and Dark, cross-filter re-tested after the reorder, no console errors,
+      `npx vite build` clean.
+
+### Known, deliberately not fixed in this pass
+- `fmt$` rounds every value >= $1,000 to the nearest K, including row-level Needs Attention figures, so
+  $26,217 reads "$26K". Fine for the hero, lossy where a user is comparing two similar rows.
+- Needs Attention priority order still ranks Overstock (P3, "suspend purchasing", no ticking clock) above
+  Reorder (P4, a SKU approaching its reorder point, genuinely time-sensitive).
+- The KPI strip wraps raggedly: "Coverage in Target Band" takes two lines for its label and three for its
+  sub-line while its neighbours take one, so baselines do not align across the row.
+- `Inventory.jsx:610`'s hardcoded inline `1fr 1fr` grid inside the SKU edit modal still will not collapse
+  on a phone (same inline-style-beats-media-query shape as the TASK-27 bug).
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy
