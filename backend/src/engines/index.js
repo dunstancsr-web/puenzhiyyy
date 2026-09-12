@@ -16,6 +16,7 @@ const { segmentPortfolio, buildMatrix } = require("./segmentation");
 const { computeHealth } = require("./health");
 const { skuFinancials, portfolioStats } = require("./financials");
 const { generateAlerts } = require("./alerts");
+const { projectInventory } = require("./projection");
 
 function ageingStatus(ageDays, maxHoldingDays) {
   if (ageDays == null) return "Fresh";
@@ -51,17 +52,29 @@ function buildAnalytics(db, asOf = Date.now()) {
     });
 
     const blended = v.blended_daily_usage;
-    const days_of_stock = blended > 0 ? Math.round(p.available_stock / blended) : null;
-    const months_of_stock = days_of_stock != null ? round1(days_of_stock / 30) : null;
-    const target_days = blended > 0 ? Math.round(m.target_stock / blended) : null;
+    const days_of_cover = blended > 0 ? Math.round(p.available_qty / blended) : null;
+    const months_of_cover = days_of_cover != null ? round1(days_of_cover / 30) : null;
+    const target_days_of_cover = blended > 0 ? Math.round(m.target_stock / blended) : null;
 
     const covered_by_po =
-      p.on_order > 0 &&
+      p.expected_incoming_qty > 0 &&
       p.incoming_eta_days != null &&
-      days_of_stock != null &&
-      p.incoming_eta_days <= days_of_stock;
+      days_of_cover != null &&
+      p.incoming_eta_days <= days_of_cover;
 
     const lost_30d = lostStmt.get(m.sku_id, daysAgo(30, now)).lost;
+
+    // Suggested Order Quantity (glossary #30) = target stock - projected position at receipt,
+    // using the real projection curve (TASK-07) run out to the lead time.
+    const projectionAtReceipt = projectInventory({
+      availableQty: p.available_qty,
+      dailyDemand: blended,
+      openPos: p.open_pos,
+      days: Math.max(0, Math.round(m.lead_time_days)),
+      asOf: now,
+    });
+    const projectedPositionAtReceipt = projectionAtReceipt.curve[projectionAtReceipt.curve.length - 1].projected_available;
+    const suggested_order_qty = Math.max(0, round1(m.target_stock - projectedPositionAtReceipt));
 
     return {
       ...m,
@@ -70,13 +83,14 @@ function buildAnalytics(db, asOf = Date.now()) {
       demand_cv: demandCv,
       safety_stock_days: ss.safety_stock_days,
       safety_stock_mt: ss.safety_stock_mt,
-      reorder_point_calc: ss.reorder_point_mt,
+      reorder_point_suggested: ss.reorder_point_suggested,
       lead_time_demand_mt: ss.lead_time_demand_mt,
       service_z: ss.z,
-      days_of_stock,
-      months_of_stock,
-      target_days,
+      days_of_cover,
+      months_of_cover,
+      target_days_of_cover,
       covered_by_po,
+      suggested_order_qty,
       lost_30d,
       ageing_status: ageingStatus(p.inventory_age_days, m.max_holding_days),
       annual_cogs: Math.round(blended * 365 * m.unit_cost_sgd),
@@ -93,9 +107,9 @@ function buildAnalytics(db, asOf = Date.now()) {
   // ── Pass 2: coverage band, financials, health ─────────────────────────────
   skus = skus.map((s) => {
     let coverage_band;
-    if (s.days_of_stock == null) coverage_band = "idle";
-    else if (s.days_of_stock < s.lead_time_days + s.safety_stock_days) coverage_band = "below";
-    else if (s.target_days != null && s.days_of_stock > s.target_days) coverage_band = "above";
+    if (s.days_of_cover == null) coverage_band = "idle";
+    else if (s.days_of_cover < s.lead_time_days + s.safety_stock_days) coverage_band = "below";
+    else if (s.target_days_of_cover != null && s.days_of_cover > s.target_days_of_cover) coverage_band = "above";
     else coverage_band = "in";
 
     const withBand = { ...s, coverage_band };
@@ -136,8 +150,8 @@ function recommend(s) {
     return "Stop replenishment. Initiate disposition review — discount, alternative channel, or CSR evaluation.";
   if (s.health_status === "RED")
     return `Place replenishment order immediately. Projected ${s.stockout_gap_days}-day stockout before resupply.`;
-  if (s.excess_mt > 0)
-    return `Suspend purchasing. ${Math.round(s.excess_mt)} MT above max — carrying cost ≈ SGD $${Math.round(s.excess_carrying_cost)}/yr.`;
+  if (s.overstock_qty > 0)
+    return `Suspend purchasing. ${Math.round(s.overstock_qty)} MT above max — carrying cost ≈ SGD $${Math.round(s.overstock_carrying_cost)}/yr.`;
   if (s.movement_class === "Slow Moving")
     return "Reduce next order quantity. Stock coverage well above target — review demand.";
   if (s.coverage_band === "below")

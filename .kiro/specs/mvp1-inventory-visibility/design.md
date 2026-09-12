@@ -1,5 +1,10 @@
 # MVP 1 — Inventory Visibility: Design
 
+> **2026-09-12 domain-alignment pass**: schema columns and formulas below are updated to the canonical
+> names/definitions from `reference/rice-inventory-terms-glossary.md`, per
+> `reference/terminology-map.md`. Old names are struck through inline where it helps orient anyone
+> reading the git history; the authoritative current names are what's in the SQL/code blocks.
+
 ## Architecture Overview
 
 ```
@@ -37,17 +42,18 @@ CREATE TABLE skus (
   packaging_size   TEXT,
   uom              TEXT DEFAULT 'MT',
   supplier         TEXT,
-  min_order_qty    REAL DEFAULT 0,
-  reorder_point    REAL DEFAULT 0,
-  min_stock        REAL DEFAULT 0,
-  target_stock     REAL DEFAULT 0,
-  max_stock        REAL DEFAULT 0,
-  safety_stock_pct REAL DEFAULT 20,
-  lead_time_days   INTEGER DEFAULT 45,
-  unit_cost_sgd    REAL DEFAULT 0,
+  min_order_qty        REAL DEFAULT 0,
+  reorder_point_policy REAL DEFAULT 0,  -- was `reorder_point`; the approved/editable operating value (glossary #28)
+  min_stock            REAL DEFAULT 0,
+  target_stock         REAL DEFAULT 0,
+  max_stock            REAL DEFAULT 0,
+  safety_stock_pct     REAL DEFAULT 20,
+  lead_time_days       INTEGER DEFAULT 45,
+  unit_cost_sgd        REAL DEFAULT 0,
   max_holding_days     INTEGER DEFAULT 270,
   active               INTEGER DEFAULT 1,
   strategic_adjustment REAL DEFAULT 0,  -- Phase 2 placeholder: price intelligence adjustment (MT)
+  compliance_required_qty REAL,  -- cached on refresh: 2x trailing-3mo avg monthly receipts (REQ-16, illustrative rule)
   created_at           TEXT DEFAULT (datetime('now'))
 );
 ```
@@ -57,9 +63,9 @@ CREATE TABLE skus (
 CREATE TABLE inventory_positions (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   sku_id           TEXT NOT NULL,
-  physical_stock   REAL DEFAULT 0,
+  on_hand_qty      REAL DEFAULT 0,  -- was `physical_stock` (glossary #4, On Hand)
   reserved_qty     REAL DEFAULT 0,
-  quality_hold_qty REAL DEFAULT 0,
+  quality_hold_qty REAL DEFAULT 0,  -- one modelled component of glossary's broader "Unavailable" (#6); blocked/damaged/rejected are Phase 2
   last_received_date TEXT,
   last_updated     TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
@@ -167,10 +173,24 @@ backend/src/
 
 ## Key Computation Logic
 
-### Available Stock
+> Field names and formulas below match `reference/rice-inventory-terms-glossary.md`; see
+> `reference/terminology-map.md` for the full rename diff and the reasoning behind each one.
+
+### Available Stock (glossary #7)
 ```
-available = physical_stock - reserved_qty - quality_hold_qty
+available_qty = on_hand_qty - reserved_qty - quality_hold_qty
 ```
+
+### Inventory Position (glossary #18) and Expected Incoming (glossary #15)
+```
+expected_incoming_qty = SUM(ordered_qty) WHERE purchase_orders.status = 'open'   -- was two separate
+                                                                                   aliases: `on_order`
+                                                                                   and `incoming_stock`
+inventory_position = available_qty + expected_incoming_qty
+```
+Simplification, documented: the glossary's full formula subtracts "unreserved outstanding demand" too
+— MVP1 has no separate confirmed-order tracking distinct from `reserved_qty`, so that term is always
+zero here. Not a bug; a scoped-out capability (see requirements.md "Explicitly Deferred").
 
 ### Sales Velocity
 ```
@@ -183,30 +203,89 @@ velocity_trend:
   else → "stable"
 ```
 
-### Days of Stock
+### Days / Months of Cover (glossary #22 — renamed from "Days/Months of Stock")
 ```
-days_of_stock = available_stock / avg_daily_30d
-(null if avg_daily_30d = 0)
+days_of_cover = available_qty / avg_daily_30d
+(displayed as "Not Applicable" in the UI if avg_daily_30d = 0, per glossary #22 — not left blank/null)
+months_of_cover = days_of_cover / 30
 ```
 
-### Health Status (evaluated in order)
+### Reorder Point (glossary #28) and Suggested Order Quantity (glossary #30)
 ```
-RED    if days_of_stock < lead_time_days
-       OR inventory_age > max_holding_days
-ORANGE if days_of_stock < (lead_time_days * 1.5)
-       OR physical_stock > max_stock
+reorder_point_suggested = lead_time_demand_mt + safety_stock_mt     -- system-calculated (was `reorder_point_calc`)
+reorder_point_policy    = the approved, editable value on the SKU record (was the `reorder_point` column)
+suggested_order_qty     = max(0, target_stock - projected_available_at_lead_time)  -- glossary's full formula
+                                                                       (see Projected Inventory below; upgraded
+                                                                       2026-09-12 from a snapshot-based proxy)
+```
+`reorder_point_suggested` is shown alongside `reorder_point_policy` for comparison — alerts and health
+status key off the **policy** value (the approved operating level), matching the source spec's
+raw-vs-approved pattern (Step 11).
+
+### Projected Inventory (glossary #29 / spec Step 12 — REQ-18, TASK-07)
+```
+projected_available(day) = available_qty - (blended_daily_usage * day)
+                            + Σ open-PO qty landing on or before that day
+```
+Run flat-rate 90 days out (`backend/src/engines/projection.js`), exposed at
+`GET /api/skus/:id/projection`; also run out to just `lead_time_days` to produce
+`suggested_order_qty` above — same function, two callers (`engines/index.js` and the route). Surfaced
+as a line chart with reference lines (safety stock, reorder point, max stock) in the SKU edit modal —
+this app has no separate SKU detail page, so the existing edit modal (which already carries read-only
+current-position context) doubles as the detail view.
+
+### Health Status (glossary Appendix A / spec Step 13 triggers; evaluated top to bottom, first match wins)
+
+> **2026-09-12 correction**: the backend engine and the frontend mock had silently diverged. This is
+> now the single reconciled rule set both layers implement — see `reference/terminology-map.md` item 1.
+
+```
+RED    if days_of_cover < lead_time_days, UNLESS covered_by_po
+       OR inventory_age_days > max_holding_days
+       OR movement_class = "Idle" AND available_qty > 0
+ORANGE if days_of_cover < (lead_time_days + safety_stock_days), UNLESS covered_by_po
+       OR on_hand_qty > max_stock
 YELLOW if movement_class = "Slow Moving"
-       OR days_of_stock < target_days
+       OR days_of_cover > target_days_of_cover
 GREEN  otherwise
 ```
+`covered_by_po` = an open PO's ETA arrives no later than the projected stockout date — softens the RED/
+ORANGE triggers when supply is already inbound, so a real-but-non-emergency gap doesn't over-alarm.
 
-### Movement Classification
+### Movement Classification (velocity — kept separate from the ABC value classification below)
 ```
 Idle        if no sales in 90 days
-Slow Moving if avg_daily_30d > 0 AND days_of_stock > 120
+Slow Moving if avg_daily_30d > 0 AND days_of_cover > 120
 Fast Moving if avg_daily_30d >= p75 of all active SKUs
 Normal      otherwise
 ```
+
+### ABC / XYZ Value Classification (glossary Step 8A — new to this document, already implemented in code)
+```
+annual_consumption_value = blended_daily_usage * 365 * unit_cost_sgd
+ABC: sort descending by annual_consumption_value, assign by cumulative % of portfolio total
+     A <= 80%   B <= 95%   C remainder
+XYZ: by demand coefficient of variation — X < 0.25, Y 0.25-0.5, Z > 0.5
+```
+
+### Compliance Position (glossary #38 / spec Step 11A — new, simplified & illustrative)
+
+A **portfolio-level** figure (the real Singapore rice-stockpile scheme is a company-wide requirement
+across all SKUs, not a per-SKU one — spec Step 11A: "compliance applicability by SKU/grade/importer
+licence/warehouse/ownership" describes the *scope* a real rule can narrow to, but the pitch-deck-level
+"two months of import volume" description is inherently an aggregate figure).
+
+```
+compliance_eligible_qty = Σ on_hand_qty across all active SKUs
+                           (MVP1 has no blocked/damaged/rejected statuses to exclude yet)
+compliance_required_qty = 2 * Σ(blended_daily_usage across active SKUs) * 30
+                           -- placeholder rule; substitutes portfolio demand throughput for real import-
+                           -- receipt history, which this project doesn't have. Honestly labelled below.
+compliance_position     = compliance_eligible_qty - compliance_required_qty
+```
+Must always render with an **"illustrative — pending governance approval of the actual rule, using
+demand as a stand-in for import history"** label (spec Step 11A requires a formally approved rule
+before any real compliance figure is presented as authoritative).
 
 ---
 
@@ -250,3 +329,38 @@ Seed data should include:
 - Filter tabs
 - Alert cards with left colour border by severity
 - Acknowledge button per alert
+
+---
+
+## Appendix D — Canonical Dashboard Labels
+
+From `reference/rice-inventory-terms-glossary.md` Appendix A — the label a user reads on screen, mapped
+to the field it must never be confused with.
+
+| Dashboard label | Field | Never combine with |
+|---|---|---|
+| On Hand | `on_hand_qty` | Expected Incoming (current physical vs. future supply) |
+| Available | `available_qty` | Projected Stock (current usable vs. future-date estimate) |
+| Reserved | `reserved_qty` | Actual Stock Out (reservation ≠ dispatch) |
+| Expected Incoming | `expected_incoming_qty` | On Hand |
+| Days of Cover | `days_of_cover` | — |
+| Suggested Order | `suggested_order_qty` | An already-approved action — this is a recommendation |
+| Compliance Position | `compliance_position` | Safety Stock (regulatory buffer ≠ operating buffer) |
+| Data Status | `as_of` timestamp | A live freshness/health indicator (MVP1 shows the timestamp only — see requirements.md REQ-17) |
+
+## Appendix E — Roadmap Beyond This Pass
+
+Mirrors the source spec's own delivery roadmap (`reference/rice-inventory-technical-spec.md` Appendix
+C), scoped to what's realistic after the hackathon rather than the full enterprise sequence:
+
+| Phase | Scope | Depends on | Status |
+|---|---|---|---|
+| Done | Canonical terminology, formula reconciliation, Suggested Order Qty (proxy), illustrative Compliance Position, Data Status timestamp | — | ✅ |
+| Done | Wire frontend to the real backend (TASK-09/10) | Terminology pass | ✅ |
+| Done | Approval workflow persistence (TASK-12) — decisions durably recorded, independent of the AI layer | Backend wiring | ✅ |
+| Done | Real projected-inventory curve (TASK-07) — `suggested_order_qty` now exact, not a proxy | Backend wiring | ✅ |
+| Next | Agent layer (TASK-11 "Ask AI") built to the spec's Step 14/15 permission model | An LLM API key (blocked — see `tasks.md` TASK-11) | ⏸ |
+| Then | Append-only movement ledger (spec Step 2) — replaces the mutable `inventory_positions` snapshot | Real usage/demand for audit trail | — |
+| Then | Lot/batch tracking, full stock-status taxonomy (blocked/damaged/rejected) | Movement ledger | — |
+| Then | Governance-approved Compliance Position rule (replaces REQ-16's placeholder) | A compliance owner, not a technical blocker | — |
+| Then | Statistically backtested demand forecasting — replaces the flat blended-rate demand input the projection curve (REQ-18) currently uses | A model-building effort of its own | — |

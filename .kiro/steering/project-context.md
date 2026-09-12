@@ -52,16 +52,43 @@ Company → Warehouse → Product Category → SKU → Supplier/Origin → Batch
 For MVP 1: track at SKU level. Batch-level tracking added in MVP 2+.
 
 ## Key Domain Concepts (always keep in mind)
-- Available stock ≠ physical stock. Available = Physical − Reserved − Quality Hold
-- Days of inventory = Available stock / Forecast daily demand
-- Reorder Point = Lead-Time Demand + Safety Stock
-- Inventory Position = Available + Incoming − Committed demand
-- Health statuses: GREEN (healthy), YELLOW (watch), ORANGE (action required), RED (critical)
-- SKU movement classes: Fast Moving, Normal, Slow Moving, Idle/Non-Moving
-- Triggers: Stockout Risk, Reorder, Excess Stock, Slow Moving, Idle, Ageing, Quality Risk, Supplier Delay, Demand Surge, Demand Collapse
+> Corrected 2026-09-12 against real-world domain docs — see
+> `.kiro/specs/mvp1-inventory-visibility/reference/rice-inventory-terms-glossary.md` (canonical
+> definitions) and `.../reference/terminology-map.md` (exact field renames). **Use these field names in
+> new code**, not the old ones (`physical_stock`, `available_stock`, `days_of_stock`, `reorder_point`,
+> `on_order`/`incoming_stock` are all superseded).
+
+- On Hand (`on_hand_qty`) ≠ Available (`available_qty`). Available = On Hand − Reserved − Quality Hold.
+- Purchase orders and forecasts are never added to current on-hand stock — they're Expected Incoming
+  (`expected_incoming_qty`), a separate figure, until an accepted receipt posts.
+- Days of Cover (`days_of_cover`) = Available / Average Daily Demand. Show **"Not Applicable"** when
+  demand is zero — never infinity, never a blank.
+- Reorder Point Suggested (`reorder_point_suggested`) = Lead-Time Demand + Safety Stock — a
+  system calculation. Reorder Point Policy (`reorder_point_policy`) is the approved, editable
+  operating value alerts/health actually key off. They're shown side by side, not merged.
+- Inventory Position (`inventory_position`) = Available + Expected Incoming − Unreserved Outstanding
+  Demand. MVP1 has no separate outstanding-demand tracking beyond reservation, so that term is always
+  zero — a documented simplification, not a bug.
+- Suggested Order Quantity (`suggested_order_qty`) = max(0, Target Stock − Inventory Position). A
+  recommendation requiring manager approval — never auto-executed.
+- Health statuses: GREEN (healthy), YELLOW (watch), ORANGE (action required), RED (critical) — one
+  reconciled rule set shared by the backend engine and the frontend mock (they used to silently
+  diverge; see terminology-map.md item 1).
+- SKU movement classes (velocity): Fast Moving, Normal, Slow Moving, Idle/Non-Moving — kept as a
+  **separate axis** from ABC value classification (A/B/C by annual consumption value); never conflate
+  "moves fast" with "matters economically."
+- Compliance Position (`compliance_position`) — a rice-specific regulatory stockpile buffer, distinct
+  from operational Safety Stock. MVP1's version is illustrative/placeholder, not a governance-approved
+  rule; always label it as such.
+- Triggers: Stockout Risk, Reorder, Overstock, Slow Moving, Idle, Ageing, Quality Risk, Supplier Delay,
+  Demand Surge, Demand Collapse.
+- What StockSense deliberately does **not** model yet: an immutable movement ledger (balances are a
+  mutable snapshot, not rebuildable from history), lot/batch genealogy, blocked/damaged/rejected stock
+  statuses, agent execution governance. See the spec's "Explicitly Deferred" section for the full list
+  and why — these are scoped-out, not missed.
 
 ## Rice SKU Data Model (MVP 1)
-Each SKU has: SKU ID, product name, rice variety, grade, country of origin, brand, packaging size, UOM, supplier, min order qty, reorder point, min stock, max stock, safety stock %, active status.
+Each SKU has: SKU ID, product name, rice variety, grade, country of origin, brand, packaging size, UOM, supplier, min order qty, reorder point policy, min stock, max stock, safety stock %, active status.
 
 ## File Structure
 ```

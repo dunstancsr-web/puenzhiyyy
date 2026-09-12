@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // INVENTORY POSITION ENGINE
-//   available          = physical - reserved - quality_hold
-//   on_order           = Σ open purchase-order qty
-//   inventory_position = available + on_order            (no backorders in MVP1)
+//   available_qty      = on_hand - reserved - quality_hold
+//   expected_incoming_qty = Σ open purchase-order qty     (glossary #15)
+//   inventory_position  = available + expected_incoming    (glossary #18; no
+//                         backorders/unreserved-outstanding-demand in MVP1)
 // Also surfaces the nearest inbound ETA so risk logic can tell whether an open
 // PO already covers a projected stockout.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -14,10 +15,10 @@ function computePosition(db, skuId, asOf = Date.now()) {
 
   const pos = db
     .prepare(
-      `SELECT physical_stock, reserved_qty, quality_hold_qty, last_received_date
+      `SELECT on_hand_qty, reserved_qty, quality_hold_qty, last_received_date
          FROM inventory_positions WHERE sku_id = ?`
     )
-    .get(skuId) || { physical_stock: 0, reserved_qty: 0, quality_hold_qty: 0, last_received_date: null };
+    .get(skuId) || { on_hand_qty: 0, reserved_qty: 0, quality_hold_qty: 0, last_received_date: null };
 
   const openPos = db
     .prepare(
@@ -26,11 +27,11 @@ function computePosition(db, skuId, asOf = Date.now()) {
     )
     .all(skuId);
 
-  const physical = round(pos.physical_stock);
+  const onHand = round(pos.on_hand_qty);
   const reserved = round(pos.reserved_qty);
   const qualityHold = round(pos.quality_hold_qty);
-  const available = round(physical - reserved - qualityHold);
-  const onOrder = round(openPos.reduce((s, p) => s + p.ordered_qty, 0));
+  const available = round(onHand - reserved - qualityHold);
+  const expectedIncoming = round(openPos.reduce((s, p) => s + p.ordered_qty, 0));
 
   const etas = openPos
     .filter((p) => p.eta)
@@ -44,17 +45,17 @@ function computePosition(db, skuId, asOf = Date.now()) {
     : null;
 
   return {
-    physical_stock: physical,
+    on_hand_qty: onHand,
     reserved_qty: reserved,
     quality_hold_qty: qualityHold,
-    available_stock: available,
-    on_order: onOrder,
-    incoming_stock: onOrder,
-    inventory_position: round(available + onOrder),
+    available_qty: available,
+    expected_incoming_qty: expectedIncoming,
+    inventory_position: round(available + expectedIncoming),
     incoming_eta_days,
     last_received_date: pos.last_received_date,
     inventory_age_days,
     open_po_count: openPos.length,
+    open_pos: openPos, // raw {ordered_qty, eta} rows — reused by the projection engine (TASK-07)
   };
 }
 

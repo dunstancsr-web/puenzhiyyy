@@ -45,7 +45,7 @@ function initDb() {
       supplier                 TEXT,
       warehouse                TEXT DEFAULT 'MAIN',
       min_order_qty            REAL DEFAULT 0,
-      reorder_point            REAL DEFAULT 0,   -- manual / legacy; engine computes reorder_point_calc
+      reorder_point_policy     REAL DEFAULT 0,   -- approved/editable operating value (glossary #28); engine also computes reorder_point_suggested
       min_stock                REAL DEFAULT 0,
       target_stock             REAL DEFAULT 0,
       max_stock                REAL DEFAULT 0,
@@ -68,12 +68,12 @@ function initDb() {
 
     -- ================================================================
     -- INVENTORY POSITIONS
-    -- available = physical - reserved - quality_hold  (always derived)
+    -- available_qty = on_hand_qty - reserved - quality_hold  (always derived)
     -- ================================================================
     CREATE TABLE IF NOT EXISTS inventory_positions (
       id                 INTEGER PRIMARY KEY AUTOINCREMENT,
       sku_id             TEXT NOT NULL UNIQUE,
-      physical_stock     REAL DEFAULT 0,
+      on_hand_qty        REAL DEFAULT 0,   -- glossary #4 "On Hand"; was 'physical_stock'
       reserved_qty       REAL DEFAULT 0,
       quality_hold_qty   REAL DEFAULT 0,
       last_received_date TEXT,
@@ -179,6 +179,7 @@ function initDb() {
   ensureColumn(db, "skus", "obsolescence_risk_pct", "obsolescence_risk_pct REAL DEFAULT 10");
   ensureColumn(db, "skus", "abc_class", "abc_class TEXT");
   ensureColumn(db, "skus", "xyz_class", "xyz_class TEXT");
+  // Compliance Position (REQ-16) is a portfolio-level KPI, computed in financials.js — no SKU column needed.
   ensureColumn(db, "alerts_log", "dedupe_key", "dedupe_key TEXT");
   ensureColumn(db, "alerts_log", "status", "status TEXT DEFAULT 'open'");
   ensureColumn(db, "alerts_log", "owner", "owner TEXT");

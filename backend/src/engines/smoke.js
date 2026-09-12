@@ -14,9 +14,9 @@ console.table(
     health: s.health_status,
     move: s.movement_class,
     abcxyz: `${s.abc_class}${s.xyz_class}`,
-    avail: s.available_stock,
-    on_order: s.on_order,
-    dos: s.days_of_stock,
+    avail: s.available_qty,
+    incoming: s.expected_incoming_qty,
+    cover: s.days_of_cover,
     "LT+SS": s.lead_time_days + s.safety_stock_days,
     band: s.coverage_band,
     inv_value: s.inventory_value,
@@ -31,11 +31,12 @@ console.log({
   gmroi: stats.gmroi,
   fillRate: stats.fillRate,
   stockoutRiskMargin: stats.stockoutRiskMargin,
-  excessValue: stats.excessValue,
-  excessPct: stats.excessPct,
+  overstockValue: stats.overstockValue,
+  overstockPct: stats.overstockPct,
   eoValue: stats.eoValue,
   eoPct: stats.eoPct,
   coverageInBandPct: stats.coverageInBandPct,
+  compliancePosition: stats.compliancePosition,
 });
 console.log("coverage:", JSON.stringify(stats.coverage));
 console.log("healthByValue:", JSON.stringify(stats.healthByValue));

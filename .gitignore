@@ -2,7 +2,7 @@
 node_modules/
 
 # Database file (auto-created on startup)
-backend/data/stocksense.db
+backend/data/
 
 # Build output
 frontend/dist/

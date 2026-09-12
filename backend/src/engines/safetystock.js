@@ -29,7 +29,7 @@ function zScore(serviceLevel) {
  * @param {number} p.leadTimeDays
  * @param {number} p.leadTimeStdDays
  * @param {number} p.serviceLevel     e.g. 0.95
- * @returns {{ z, safety_stock_mt, safety_stock_days, reorder_point_mt, lead_time_demand_mt }}
+ * @returns {{ z, safety_stock_mt, safety_stock_days, reorder_point_suggested, lead_time_demand_mt }}
  */
 function computeSafetyStock({
   avgDailyDemand = 0,
@@ -51,7 +51,7 @@ function computeSafetyStock({
     safety_stock_mt: round(ssMt),
     safety_stock_days: avgDailyDemand > 0 ? Math.round(ssMt / avgDailyDemand) : 0,
     lead_time_demand_mt: round(leadTimeDemand),
-    reorder_point_mt: round(leadTimeDemand + ssMt),
+    reorder_point_suggested: round(leadTimeDemand + ssMt),  // glossary #28; system-calculated, compared against reorder_point_policy
   };
 }
 
