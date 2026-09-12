@@ -749,6 +749,31 @@ floating top bar, expanding FAB). User picked the floating glass top bar.
       console errors. `npx vite build` clean. Recommended the user do a final check on an actual phone or
       by manually resizing outside the automation tool, since real-device confirmation wasn't possible.
 
+### TASK-27 fix — both navs rendered at once on a phone (2026-09-13)
+User sent a screenshot from a real narrow viewport showing the floating glass bar AND the full side panel
+rendering on top of each other. Real bug, shipped in the commit above.
+
+- [x] Root cause: `Sidebar.jsx` set `display: "flex"` as an **inline style** on the `<aside>`. An inline
+      `display` beats any stylesheet rule that lacks `!important`, so the breakpoint's
+      `.app-sidebar-panel { display: none }` could never win, and the panel stayed visible under the bar
+      while still consuming its 230px of width. Moved `display` and `flex-direction` into the
+      `.app-sidebar-panel` class where the media query can actually reach them.
+- [x] Why the original "verification" missed it: the forced-breakpoint preview injected
+      `display: none !important`, which DID beat the inline style. That tested a mocked-up version of the
+      fix, not the real cascade, and reported a pass on broken code. Re-verified this time by injecting
+      the breakpoint's rules with **no `!important` anywhere** (gated on `@media (min-width: 0px)` so they
+      apply immediately) and reading `getComputedStyle`: sidebar `flex` -> `none`, topbar `none` ->
+      `block`, both dashboard rows `2 columns` -> `1fr`, main padding-top `76px`. Added a comment in
+      `index.css` recording the rule so this is not reintroduced.
+- [x] Second issue found in the same screenshot: the Dashboard's two widget rows were inline
+      `gridTemplateColumns: "1fr 1fr"` / `"1fr 1.3fr"`, so Inventory Health and ABC × XYZ stayed
+      side-by-side and got crushed at phone width (same inline-style-beats-media-query problem). Moved
+      them to `.dash-row--even` / `.dash-row--wide-right` classes that collapse to a single column below
+      the breakpoint.
+- [x] Still outstanding, not fixed here: `Inventory.jsx:610`'s `1fr 1fr` grid inside the SKU edit modal
+      has the same hardcoded-inline shape and will be tight on a phone. Left alone pending a proper pass
+      over that modal on small screens.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

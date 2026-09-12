@@ -103,12 +103,29 @@
 /* ── Responsive nav: full side panel on large screens, floating glass top
    bar below 769px. Both markups always render (see Sidebar.jsx); this media
    query is the only thing that decides which one is visible, so there is no
-   layout flash while JS figures out the viewport. ───────────────────────── */
+   layout flash while JS figures out the viewport.
+
+   Anything the breakpoint below needs to change must be declared HERE as a
+   class, never as an inline style prop in JSX: an inline `display` or
+   `grid-template-columns` beats a stylesheet rule that lacks !important, so a
+   media query can never reach it. That exact mistake shipped once already
+   (the side panel kept its inline `display: flex` and refused to hide, so
+   both navs rendered stacked on top of each other on a phone). */
+.app-sidebar-panel { display: flex; flex-direction: column; }
 .app-topbar-glass { display: none; }
 .app-main { padding: 28px 32px; }
 
+/* Dashboard widget rows: two side-by-side widgets on a wide screen, stacked
+   below the breakpoint (they are unreadable squeezed into half a phone). */
+.dash-row { display: grid; gap: var(--space-6); }
+.dash-row--even       { grid-template-columns: 1fr 1fr; }
+.dash-row--wide-right { grid-template-columns: 1fr 1.3fr; }
+
 @media (max-width: 768px) {
   .app-sidebar-panel { display: none; }
+
+  .dash-row--even,
+  .dash-row--wide-right { grid-template-columns: 1fr; gap: var(--space-5); }
 
   .app-topbar-glass {
     display: block;

@@ -427,7 +427,7 @@ export default function Dashboard() {
       {/* ── Command Deck: four purpose-built widgets, each independently
           collapsible (persisted), each a live filter source for Needs
           Attention - click a bar/cell/row, click again to clear. ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-6)", marginBottom: "var(--space-2)" }}>
+      <div className="dash-row dash-row--even" style={{ marginBottom: "var(--space-2)" }}>
         <Section title="Inventory Health" subtitle="Share of working capital by status - click a colour to filter" hint={HINTS.health}
           collapsible storageKey="health" defaultOpen>
           <HealthStack data={s.healthByValue} selected={filter?.type === "health" ? filter.value : null}
@@ -441,7 +441,7 @@ export default function Dashboard() {
         </Section>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: "var(--space-6)", marginBottom: "var(--space-5)" }}>
+      <div className="dash-row dash-row--wide-right" style={{ marginBottom: "var(--space-5)" }}>
         <Section title="Cover vs Lead + Safety" subtitle="Worst gap first - click a row to filter" hint={HINTS.coverage}
           collapsible storageKey="coverage" defaultOpen>
           <CoverageBullets data={coverageData} selected={filter?.type === "sku" ? filter.value : null}

@@ -204,3 +204,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/components/Sidebar.jsx, frontend/src/components/Layout.jsx, frontend/src/index.css
 - **New files:** none
 - **Notes:** Responsive nav (TASK-27): brainstormed three small-screen nav concepts (floating bottom bar, floating top bar, expanding FAB) via ASCII mockups, user picked the floating glass top bar. Sidebar.jsx now renders both the full side panel and a new compact frosted-glass bar; a 768px media query picks which one shows. Verified with a temporary CSS override since real window resizing does not change the actual viewport in this browser-automation environment.
+
+---
+
+## Session: 2026-09-13 00:15
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/components/Sidebar.jsx, frontend/src/pages/Dashboard.jsx, frontend/src/index.css
+- **New files:** none
+- **Notes:** Fixed a real bug the user caught with a phone screenshot: the floating glass bar and the full side panel both rendered at once. Cause was an inline `display: flex` on the sidebar beating the breakpoint's `display: none`. The original verification had injected `!important`, which masked it, so it passed on broken code. Re-verified with no `!important` this time. Also moved the Dashboard's two widget rows off inline grid columns so they collapse to one column on small screens.

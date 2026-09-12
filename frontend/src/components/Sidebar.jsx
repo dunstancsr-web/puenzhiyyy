@@ -26,7 +26,11 @@ export default function Sidebar() {
   return (
     <>
     {/* Full side panel - shown at 769px and up; hidden below that via CSS
-        (see .app-sidebar-panel in index.css). */}
+        (see .app-sidebar-panel in index.css). Note `display` and
+        `flex-direction` live in that CSS class, NOT in the inline style
+        below: an inline `display` beats any stylesheet rule that lacks
+        !important, so the breakpoint's `display: none` could never hide this
+        panel and both navs rendered on top of each other. */}
     <aside
       className="app-sidebar-panel"
       style={{
@@ -34,8 +38,6 @@ export default function Sidebar() {
         background: "var(--sidebar-bg)",
         borderRight: "1px solid var(--sidebar-border)",
         padding: "24px 16px",
-        display: "flex",
-        flexDirection: "column",
         flexShrink: 0,
         position: "sticky",
         top: 0,
