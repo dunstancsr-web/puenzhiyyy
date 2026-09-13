@@ -841,7 +841,10 @@ function Section({ title, subtitle, children, hint, collapsible = false, storage
     <div className="card">
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: open ? "var(--space-4)" : 0 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: "var(--text-md)", display: "flex", alignItems: "center", gap: 5 }}>
+          {/* Card titles are the role --text-lg names, and until now nothing
+              used it. Weight drops to 600 from the old 700 because at 22px the
+              size already carries the emphasis. */}
+          <div style={{ fontWeight: 600, fontSize: "var(--text-lg)", display: "flex", alignItems: "center", gap: 5 }}>
             {title}
             {hint && <ColHint label={title} what={hint.what} how={hint.how} />}
           </div>

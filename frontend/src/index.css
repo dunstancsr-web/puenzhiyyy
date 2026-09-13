@@ -87,18 +87,32 @@
   --space-7: 48px;
   --space-8: 64px;
 
-  /* Bumped 2026-09 for readability (WCAG/Apple HIG/Material all converge on a
-     16px web body-text floor, and steer clear of sub-12px text entirely —
-     older users are the group this costs the most and gains the least by
-     skimping on). --text-xs is now the absolute floor; nothing on the site
-     should go smaller. */
-  --text-xs:   12px;
-  --text-sm:   13px;
-  --text-base: 15px;
-  --text-md:   16px;
-  --text-lg:   18px;
-  --text-xl:   24px;
-  --text-2xl:  34px;
+  /* Type scale, tuned 2026-09-13 with the Type Scale Tuner. Stan picked the
+     large print end of the range, which is the right call for an app demoed on
+     a projector and used by warehouse staff who skew older.
+
+     SIX steps, not seven. The old scale had --text-md at 16px sitting 1px from
+     --text-base and describing the same job ("emphasis"), which is what
+     font-weight is for. A size step that duplicates a weight step is one nobody
+     can apply correctly, and the usage counts showed it: --text-md was used
+     twice in the whole codebase and --text-lg not once.
+
+     The ratios between steps climb (1.15, 1.13, 1.29, 1.36, 1.33) rather than
+     staying constant, and that is deliberate. A geometric scale would force the
+     body size up to satisfy a number. Real interface scales are tight at the
+     bottom, where 2px is a visible difference and absolute size governs
+     legibility, and wide at the top, where the jump is expressive. Tailwind and
+     Material are both shaped this way.
+
+     --text-xs is the absolute floor. Nothing should go smaller, and 30 inline
+     styles currently do, down to a 9px badge. Migrating those is a separate
+     pass. */
+  --text-xs:   13px;  /* captions, uppercase labels, badges */
+  --text-sm:   15px;  /* table rows, dense secondary text */
+  --text-base: 17px;  /* body text, nav links, buttons */
+  --text-lg:   22px;  /* card and section titles */
+  --text-xl:   30px;  /* page titles, big figures */
+  --text-2xl:  40px;  /* the one hero number */
 }
 
 /* Default in-page surface: no border, no shadow — content separates via
@@ -237,7 +251,7 @@ body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--text-primary);
-  font-size: 16px; /* web body-text floor (WCAG/Apple HIG/Material) */
+  font-size: var(--text-base); /* the scale is the single source, not a literal */
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   transition: background 0.3s ease, color 0.3s ease;
@@ -479,7 +493,10 @@ details.disclosure[open] summary::before { content: "▾ "; }
   letter-spacing: 0.05em;
   margin-bottom: 6px;
 }
-.hint-panel__body { font-size: var(--text-md); line-height: 1.65; color: var(--hint-text); }
+/* Was --text-md, which no longer exists. This is running text, so it belongs on
+   the body step; the hint reads as distinct because it is a floating panel, not
+   because it is one pixel larger than the page. */
+.hint-panel__body { font-size: var(--text-base); line-height: 1.65; color: var(--hint-text); }
 
 /* Some people turn transparency off at the OS level precisely because frosted
    panels are hard to read. Honour it: drop the blur and go effectively solid. */
