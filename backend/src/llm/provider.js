@@ -99,6 +99,11 @@ async function callOllamaCompatible({ baseUrl, model, apiKey, retries, system, u
   const body = JSON.stringify({
     model,
     stream: false,
+    // Reasoning models (qwen3 and friends) spend their output budget on an
+    // internal monologue before answering. With num_predict capped for cost,
+    // qwen3:8b burned all 280 tokens thinking and returned an EMPTY message.
+    // Ignored by models that do not think, so it is safe to send always.
+    think: false,
     // Nested under `options`, which is the Ollama wire format that LangChain's
     // ChatOllama sends and therefore what the gateway is built to accept.
     options: { temperature: 0.2, num_predict: MAX_TOKENS },
@@ -288,7 +293,7 @@ function listModes() {
     {
       id: "local",
       label: "Local model",
-      detail: `${process.env.OLLAMA_MODEL || "llama3"} running on this machine. Free and unlimited, slower, less precise.`,
+      detail: `${process.env.OLLAMA_MODEL || "llama3"} running on this machine. Free and unlimited, slower to answer.`,
       cost: "free",
       available: true,
     },

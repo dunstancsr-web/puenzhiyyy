@@ -1274,6 +1274,53 @@ the text is computed from live figures by documented rules, and "hard-coded" imp
 which undersells it to a judge. Settled on **Rule-based** / **Local model** / **AWS Bedrock**, the last
 naming the billing source so the cost is unmissable.
 
+## TASK-43 - Reducing model drift, and measuring it (2026-09-13)
+
+Stan asked whether stricter prompting could cut llama3's precision drift. Prompting turned out to be
+the weaker half of the answer.
+
+- [x] System prompt rewritten as eight numbered hard rules with a worked example contrasting a correct
+      answer against the exact drift observed (converted a duration, rounded a figure, renamed margin as
+      sales).
+- [x] `verifyExplanation` checks what the model wrote against the figures it was given: invented or
+      rounded numbers, hedge words, word-durations in units nobody supplied, and money amounts renamed
+      as sales, revenue, profit or turnover. Scores 8/8 on a set that includes both real llama3 drifts.
+- [x] Numeric tolerance set to 0.3%. An earlier 1% passed 26000 in place of 26217, a rounded claim
+      disguised as a match. 26.2K is 0.06% away and 26000 is 0.83% away, so the threshold has to sit
+      between them rather than be chosen by feel.
+- [x] `explainAlert` retries once, telling the model exactly what it broke. A model that invented a
+      figure will usually invent it again from an identical prompt.
+- [x] `scripts/bench-models.js`: every live alert, every model, scored by the production verifier.
+
+**Two bugs found by the benchmark, one of them in the benchmark.**
+
+`think: false` is now sent on every ollama request. qwen3 is a reasoning model and spent its entire
+capped 280 token budget on an internal monologue, returning an EMPTY message. This reached a live click
+as "Model endpoint returned an empty message" the moment qwen3 was made the default. Disabling thinking
+also made it 36% faster, so the quality-costs-latency trade-off was itself partly an artifact.
+
+The benchmark scored those empty responses as **7/7 clean**, because a verifier that looks for bad
+things finds none in an empty string. It was measuring absence of detectable error and being read as
+correctness. Responses under 80 characters now fail, and `done_reason` is recorded so truncation is
+visible. A liveness check has to come before a quality check.
+
+**Results, 28 runs per model (`--repeat 4`), after both fixes:**
+
+| model | clean | latency | dangerous drift |
+|---|---|---|---|
+| llama3 | 23/28 (82%) | 2760ms | none in 28 runs |
+| qwen3:8b | 21/28 (75%) | 5943ms | renamed money as "sales" 3x |
+| llama3.1:8b | 20/28 (71%) | 3461ms | invented a figure once, renamed once |
+
+llama3, already installed, wins on accuracy and speed, and is the only one of the three that never
+produced a dangerous error. Its failures are all hedge words. A single pass over 7 alerts had put
+llama3.1 last and qwen3 joint first, which is one alert of difference and not a result: repeats are
+what separated a number from a finding.
+
+Drift clusters by alert rather than scattering. qwen3 renamed money as "sales" on JP-5KG IDLE in 3 of
+4 runs; llama3.1 converted 97 days into months on the same alert in 4 of 4. Both are prompt or facts
+problems on one alert, not general model quality.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

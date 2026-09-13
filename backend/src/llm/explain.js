@@ -22,16 +22,32 @@ const SYSTEM = `You are an inventory analyst at a rice importer and distributor 
 You are explaining ONE alert to a warehouse manager who knows the business but not
 the maths. Your job is to make the reasoning legible, not to do the reasoning.
 
-Rules, in priority order:
-1. Use ONLY the figures given to you. Never invent, estimate, extrapolate or
-   recompute a number. If a figure is not supplied, do not mention it.
-2. Do not rename what a figure measures. Margin is not revenue. Days of cover is
-   not days until a stockout. Copy the label you were given.
-3. Four short paragraphs at most, and no paragraph longer than two sentences.
-4. Plain English. No bullet points, no headings, no markdown.
-5. Never use an em dash or an en dash. Use a comma, a colon, or a second
-   sentence instead.
-6. End with the single action you would take, stated plainly.`;
+HARD RULES. Breaking any of these makes the answer useless, because a manager is
+about to commit money based on it.
+
+1. COPY, NEVER COMPUTE. Every number you write must appear, digit for digit, in
+   the figures you were given. Do not add, subtract, average, round, or restate
+   a figure in different units.
+   Given "Days since last sale: 97 days" you may write "97 days".
+   You may NOT write "about 3 months", "over 3 months", or "roughly 100 days".
+2. NEVER CONVERT UNITS. Days stay days, MT stays MT, SGD stays SGD.
+3. NEVER RENAME WHAT A FIGURE MEASURES. Copy the label you were given.
+   "Gross margin at risk" is margin. It is NOT revenue, NOT sales, NOT profit,
+   NOT turnover. "Days of cover" is cover, NOT days until a stockout.
+4. If a figure was not supplied, do not mention it. Never estimate.
+5. Four short paragraphs at most, no paragraph longer than two sentences.
+6. Plain English prose. No bullets, no headings, no markdown.
+7. Never use an em dash or an en dash. Use a comma, a colon, or a new sentence.
+8. End with the single action you would take, stated plainly.
+
+Worked example of the difference:
+  Figures:  Days since last sale: 97 days. Gross margin at risk: 26217 SGD.
+  CORRECT:  "There have been no sales for 97 days, putting 26217 SGD of gross
+             margin at risk."
+  WRONG:    "There have been no sales for almost three months, risking about
+             26000 SGD in potential sales."
+             (converted 97 days into months, rounded the figure, and renamed
+             margin as sales)`;
 
 // The facts block. Deliberately labelled rather than raw JSON: naming the unit
 // beside every number is what stops a model calling margin "sales".
@@ -71,6 +87,110 @@ function buildFacts(sku, alert) {
   add("Supplier", sku.supplier);
 
   return L.join("\n");
+}
+
+// ── Drift verification ───────────────────────────────────────────────────────
+//
+// Prompting alone does not make a small model reliable, it only makes it more
+// often right. This is the deterministic half: check what the model wrote
+// against the figures it was given, and treat any mismatch as drift.
+//
+// Four checks, each aimed at a failure actually observed from llama3 on this
+// data rather than at a hypothetical one.
+
+function normaliseNumber(raw) {
+  const m = String(raw).replace(/,/g, "").match(/^(\d+(?:\.\d+)?)([km])?$/i);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n)) return null;
+  return n * (m[2] ? (m[2].toLowerCase() === "k" ? 1e3 : 1e6) : 1);
+}
+
+function numbersIn(text) {
+  const out = [];
+  for (const m of String(text).matchAll(/\b(\d[\d,]*(?:\.\d+)?)\s*([km])?\b/gi)) {
+    const n = normaliseNumber(m[1] + (m[2] || ""));
+    if (n !== null) out.push(n);
+  }
+  return out;
+}
+
+// Tolerance covers PRESENTATION only. 26217 rendered as 26.2K is the same fact
+// (0.06% apart); rendered as 26000 it is a rounded claim (0.83% apart), which
+// rule 1 forbids. An earlier 1% tolerance let exactly that through, so the
+// threshold sits below the gap between those two cases.
+function isSupported(n, allowed) {
+  return allowed.some((a) => {
+    if (a === n) return true;
+    const scale = Math.max(Math.abs(a), Math.abs(n));
+    return scale > 0 && Math.abs(a - n) / scale <= 0.003;
+  });
+}
+
+// Hedging is rounding done in words. "About 26000" and "almost three months"
+// are the same failure as writing a wrong number.
+const HEDGES = /\b(about|roughly|almost|nearly|approximately|around|circa|ballpark)\b/i;
+
+// How "97 days" became "three months": a duration written as a word plus a unit
+// nobody supplied.
+const WORD_DURATION = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a|an)\s+(month|week|year|quarter)s?\b/i;
+
+// A money amount described as sales, revenue, profit or turnover. The only
+// currency figures supplied are margin at risk, write down risk and carrying
+// cost. Matched as a window around the amount rather than as a bare word,
+// because "no sales for 97 days" is legitimate and must not trip this.
+const RENAMED_MONEY = /(?:SGD|\$)\s*[\d.,]+\s*[KM]?\b(?:\W+\w+){0,3}\W+(sales|revenue|profit|turnover)\b/i;
+
+/**
+ * @returns {{ ok: boolean, issues: string[] }}
+ */
+function verifyExplanation(text, facts) {
+  const issues = [];
+
+  const allowed = numbersIn(facts);
+  // Small integers are how prose counts things ("the two options"), not claims
+  // about inventory, so they are not treated as figures.
+  const invented = [...new Set(numbersIn(text).filter((n) => n > 12 && !isSupported(n, allowed)))];
+  if (invented.length) issues.push(`figures not in the source data: ${invented.join(", ")}`);
+
+  const hedge = text.match(HEDGES);
+  if (hedge) issues.push(`approximated a figure with "${hedge[1]}"`);
+
+  const dur = text.match(WORD_DURATION);
+  if (dur && !new RegExp(dur[2], "i").test(facts)) {
+    issues.push(`converted a duration into ${dur[2]}s, a unit that was not supplied`);
+  }
+
+  const renamed = text.match(RENAMED_MONEY);
+  if (renamed) issues.push(`described a money figure as "${renamed[1]}"`);
+
+  return { ok: issues.length === 0, issues };
+}
+
+const MAX_ATTEMPTS = 2;
+
+// TODO(human): implement onDriftDetected({ attempt, issues, text })
+//
+// verifyExplanation has just caught the model breaking a hard rule: it invented
+// a figure, rounded one, hedged it, converted a unit, or renamed what a figure
+// measures. Decide what should happen next by returning one of three strings.
+//
+//   "retry"   ask the model again, telling it what it got wrong. Costs another
+//             call. On the final attempt an unresolved drift is rejected.
+//   "accept"  show the answer anyway, drift and all.
+//   "reject"  discard it. The caller falls back to the deterministic trace, so
+//             the user still gets a correct explanation, just not a written one.
+//
+// Things worth weighing. On the paid tier every retry spends shared AWS credit,
+// and `attempt` tells you which try you are on. Some issues are cosmetic and
+// some are dangerous: hedging with "about" is untidy, whereas inventing a
+// figure or renaming margin as revenue puts a wrong number in front of someone
+// who is about to commit money. `issues` is an array of short strings, so you
+// can treat different kinds differently rather than applying one rule to all.
+// Remember the fallback is good: rejecting is not failing, it just means the
+// reader sees the audited four step trace on its own.
+function onDriftDetected({ attempt, issues, text }) {
+  return "retry";
 }
 
 // ── Response cache ───────────────────────────────────────────────────────────
@@ -160,7 +280,40 @@ async function explainAlert(sku, alert) {
   const user = `Here are the figures for this alert.\n\n${facts}\n\nExplain why this was flagged and what the manager should do.`;
 
   const started = Date.now();
-  const result = await chat({ system: SYSTEM, user });
+
+  // Up to two attempts. The second one, if it happens, is told exactly what was
+  // wrong with the first, which is far more effective than simply asking again:
+  // a model that invented a figure will usually invent it again from an
+  // identical prompt.
+  let result = null;
+  let check = { ok: true, issues: [] };
+  let attempts = 0;
+
+  for (attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
+    const prompt = attempts === 1
+      ? user
+      : `${user}\n\nYour previous answer broke the hard rules: ${check.issues.join("; ")}.\nWrite it again, copying every figure exactly as supplied.`;
+
+    result = await chat({ system: SYSTEM, user: prompt });
+    check = verifyExplanation(result.text, facts);
+    if (check.ok) break;
+
+    const action = onDriftDetected({ attempt: attempts, issues: check.issues, text: result.text });
+    if (action === "accept") break;
+    if (action === "reject") {
+      throw new LlmUnavailable(
+        `The model's answer did not match the source figures (${check.issues.join("; ")}).`
+      );
+    }
+    // "retry" falls through to the next loop pass. On the last pass there is no
+    // next attempt, so an unresolved drift is rejected rather than shown.
+    if (attempts === MAX_ATTEMPTS) {
+      throw new LlmUnavailable(
+        `The model's answer did not match the source figures after ${MAX_ATTEMPTS} attempts (${check.issues.join("; ")}).`
+      );
+    }
+  }
+
   const ms = Date.now() - started;
 
   // The LLM_CALL event that db/audit.js reserved from the start. Records what
@@ -178,6 +331,9 @@ async function explainAlert(sku, alert) {
     output: {
       explanation: result.text,
       latency_ms: ms,
+      attempts,
+      verified: check.ok,
+      drift_issues: check.issues.length ? check.issues : null,
       input_tokens: result.usage?.input_tokens ?? null,
       output_tokens: result.usage?.output_tokens ?? null,
     },
@@ -188,4 +344,4 @@ async function explainAlert(sku, alert) {
   return { ...value, cached: false };
 }
 
-module.exports = { explainAlert, providerInfo, LlmUnavailable, buildFacts, cacheKey };
+module.exports = { explainAlert, providerInfo, LlmUnavailable, buildFacts, cacheKey, verifyExplanation, SYSTEM };
