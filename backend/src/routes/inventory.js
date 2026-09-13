@@ -515,6 +515,7 @@ router.post("/alerts/explain", async (req, res) => {
           explanation: out.text,
           provider: out.provider,
           model: out.model,
+          mode: out.mode,
           cached: out.cached,
         },
       });

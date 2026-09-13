@@ -1356,6 +1356,51 @@ number. If that fallback rate is too high, moving "converted a duration" out of 
 Tuning stops here. Five benchmark runs in, the remaining failures are rare, mostly cosmetic, and
 handled correctly by the retry and fallback path.
 
+## TASK-45 - Slot filling: the model stops writing numbers (2026-09-13)
+
+Stan's question: if the maths is already hard coded, why is the model handling any of it? Half the
+answer was "it is not, the engines compute everything". The other half was the real insight: the model
+still RETYPED the figures into prose, and every numeric failure measured all day happened in that
+retyping, not in any calculation.
+
+- [x] `llm/slots.js`. 25 named placeholders built from engine-computed values. The model writes
+      `{days_of_cover}`, never `28 days`, and the values are substituted after validation.
+- [x] The raw output is rejected if it contains ANY digit, references an unknown placeholder, uses none
+      at all, or repeats a unit after one. Stating a figure the engine did not compute is therefore not
+      merely detectable, it is unrepresentable. That is the difference between a test and a type.
+- [x] Three layers, strongest first: slots, then the original free text path with its verifier, then the
+      deterministic trace. The feature degrades, it never disappears.
+- [x] The verifier still runs on the RENDERED text, because slots cannot stop the model calling a margin
+      figure "sales" or hedging with "nearly". Those are the words around the number.
+
+**Constraining the arithmetic moved the risk up a level.** With figures made unrepresentable, the
+model's remaining freedom was the ARGUMENT, and on the IDLE alert it used it to write "the stock level
+has fallen below the reorder point, immediately place an order", the exact opposite of the right call.
+Correct numbers inside a wrong argument read as more authoritative, not less. Fixed with a digit free
+semantic brief per alert type, stating plainly what the alert means and what would be the wrong answer.
+
+Three smaller findings. A prompt that forbids digits while PASTING the alert message and recommended
+action (both full of digits) is a contradiction the model resolves by copying, so both became slots
+themselves. Placeholder values carry their own units, so "{days_of_cover} days" rendered as "28 days
+days" and is now rejected. And the preamble stripper required whitespace in `here\s+'s`, so it never
+matched "Here's", the commonest form: a regex that misses the common case is worse than none, because
+it looks handled.
+
+**Measured end to end, 21 real explanations through the full path:**
+
+    mode:      slots 14   freetext 7   rejected 0
+    verified:  clean 16   cosmetic 5   DANGEROUS 0
+    every explanation shown carried a correct figure
+
+Not comparable with the earlier "86% usable", which measured raw single shot model calls rather than
+the system with its retries and fallbacks.
+
+**Honest caveat.** On llama3 (8B) slot mode buys numeric safety at a real cost in prose quality: it pads
+awkwardly around injected values ("too much 620 MT, which includes both 580 MT and 40 MT"). That is an
+8B model writing in an unnatural form, not a bug to regex away, and it is why free text still wins a
+third of the time. The architecture should suit the Bedrock tier far better, where the model follows
+constrained formats more reliably.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

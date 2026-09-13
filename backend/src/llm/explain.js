@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { chat, providerInfo, LlmUnavailable } = require("./provider");
+const { buildSlots, describeSlots, validateSlotted, renderSlots } = require("./slots");
 const { EVENTS, logEvent } = require("../db/audit");
 
 const SYSTEM = `You are an inventory analyst at a rice importer and distributor in Singapore.
@@ -48,6 +49,47 @@ Worked example of the difference:
              26000 SGD in potential sales."
              (converted 97 days into months, rounded the figure, and renamed
              margin as sales)`;
+
+// What each alert actually means, in words, with no digits. Without this the
+// model reasoned from the alert NAME and got it backwards: on an IDLE alert it
+// wrote "the stock level has fallen below the reorder point, immediately place
+// an order", which is the exact opposite of the right call. Slots guarantee the
+// figures; only this guarantees the meaning.
+const ALERT_BRIEF = {
+  STOCKOUT_RISK: "This SKU will run out before a replacement order could arrive. The problem is too little stock. Ordering more, quickly, is the answer.",
+  REORDER: "This SKU has reached the level where a normal replenishment order should be placed. There is still time to order at normal freight rates.",
+  OVERSTOCK: "This SKU holds more than its maximum policy level. The problem is too much stock. Do NOT suggest ordering more. The answer is to stop or defer buying.",
+  IDLE: "This SKU has had no sales at all for a long period. The problem is that capital is trapped in stock nobody is buying. Do NOT suggest ordering more and do NOT mention reorder points. Replenishing is the wrong answer entirely: the decision is how to dispose of what is already held.",
+  SLOW_MOVING: "This SKU is selling, but far too slowly for the quantity held. The problem is too much stock relative to demand. Do NOT suggest ordering more. The answer is to buy less next time.",
+  AGEING: "This SKU has been in the warehouse a long time and is approaching its holding limit. The problem is time, not quantity. The answer is to move it before quality becomes the binding constraint.",
+};
+
+const SLOT_SYSTEM = `You are an inventory analyst at a rice importer and distributor in Singapore.
+
+You are explaining ONE alert to a warehouse manager who knows the business but not
+the maths. Your job is to make the reasoning legible, not to do the reasoning.
+
+THE ONE RULE THAT MATTERS: you may not write any digit, anywhere. Every quantity,
+duration, price and percentage must be inserted with a placeholder from the list
+you are given, written exactly as {placeholder_name}. The real values are
+substituted after you finish, and they already include their units, so never
+write a unit next to a placeholder.
+
+  CORRECT:  "Stock will last {days_of_cover}, but {supplier} needs {lead_time}."
+  WRONG:    "Stock will last 28 days."              (wrote a figure)
+  WRONG:    "Stock will last {days_of_cover} days." (added a unit)
+  WRONG:    "Stock will last {cover_remaining}."    (invented a placeholder)
+
+The other rules:
+1. Use only placeholders from the list. Nothing else is available to you.
+2. Never rename what a placeholder measures. The list says what each one is.
+   Margin is not revenue. Capital tied up is not sales.
+3. Do not hedge. No "about", "roughly", "almost", "nearly", "approximately".
+   The substituted values are exact, so an approximation word makes them wrong.
+4. Four short paragraphs at most, no paragraph longer than two sentences.
+5. Plain English prose. No bullets, no headings, no markdown.
+6. Never use an em dash or an en dash. Use a comma, a colon, or a new sentence.
+7. End with the single action you would take, stated plainly.`;
 
 // The facts block. Deliberately labelled rather than raw JSON: naming the unit
 // beside every number is what stops a model calling margin "sales".
@@ -325,41 +367,84 @@ async function explainAlert(sku, alert) {
   if (cached) return { ...cached, cached: true };
 
   const facts = buildFacts(sku, alert);
-  const user = `Here are the figures for this alert.\n\n${facts}\n\nExplain why this was flagged and what the manager should do.`;
-
+  const slots = buildSlots(sku, alert);
   const started = Date.now();
 
-  // Up to two attempts. The second one, if it happens, is told exactly what was
-  // wrong with the first, which is far more effective than simply asking again:
-  // a model that invented a figure will usually invent it again from an
-  // identical prompt.
+  // Two modes, tried in order of how strong a guarantee they give.
+  //
+  //   slots      the model writes prose with named placeholders and no digits
+  //              at all, and the engine's values are substituted afterwards.
+  //              Stating a figure the engine did not compute is not merely
+  //              detectable here, it is unrepresentable.
+  //   freetext   the original path, where the model writes figures itself and
+  //              verifyExplanation checks them afterwards. Kept as a fallback
+  //              so a model that cannot follow the placeholder format still
+  //              produces something, rather than the feature disappearing.
+  //
+  // Below both sits the deterministic trace in frontend/src/lib/explain.js,
+  // which is a complete and correct explanation on its own.
   let result = null;
+  let rendered = null;
   let check = { ok: true, issues: [] };
   let attempts = 0;
+  let mode = "slots";
 
-  for (attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
-    const prompt = attempts === 1
-      ? user
-      : `${user}\n\nYour previous answer broke the hard rules: ${check.issues.join("; ")}.\nWrite it again, copying every figure exactly as supplied.`;
+  // Deliberately contains no digits. The alert message and the recommended
+  // action are offered as placeholders instead of being pasted in, because a
+  // prompt that forbids digits while displaying them is a contradiction the
+  // model resolves by copying.
+  const slotUser = `Here is the alert.\n\nProduct: ${sku.product_name}\nAlert type: ${alert.alert_type}\nSeverity: ${alert.severity}\n\nPlaceholders available to you:\n${describeSlots(slots)}\n\nWhat this alert means: ${ALERT_BRIEF[alert.alert_type] || "Review this SKU."}\n\nExplain why this was flagged and what the manager should do. End with one sentence that states {recommended_action} on its own.`;
+  const freeUser = `Here are the figures for this alert.\n\n${facts}\n\nExplain why this was flagged and what the manager should do.`;
 
-    result = await chat({ system: SYSTEM, user: prompt });
-    check = verifyExplanation(result.text, facts);
+  for (attempts = 1; attempts <= MAX_ATTEMPTS + 1; attempts++) {
+    // After MAX_ATTEMPTS of placeholder mode, drop to the free text path for a
+    // final try rather than giving up on a written explanation entirely.
+    if (attempts > MAX_ATTEMPTS) mode = "freetext";
+
+    const correction = check.issues.length
+      ? `\n\nYour previous answer broke the rules: ${check.issues.join("; ")}.\nWrite it again, correctly.`
+      : "";
+    const system = mode === "slots" ? SLOT_SYSTEM : SYSTEM;
+    const user = (mode === "slots" ? slotUser : freeUser) + correction;
+
+    result = await chat({ system, user });
+
+    if (mode === "slots") {
+      // Structural check on the RAW output, before substitution. This is the
+      // step that makes a wrong figure impossible rather than merely caught.
+      const structural = validateSlotted(result.text, slots);
+      if (!structural.ok) {
+        check = structural;
+        continue;
+      }
+      rendered = renderSlots(result.text, slots);
+    } else {
+      // Free text mode has no placeholders, but a model that has just been
+      // corrected in slot mode sometimes carries the habit over and emits
+      // "{days since last sale}". Strip anything brace-wrapped rather than
+      // print it.
+      rendered = result.text.replace(/\{[^{}]*\}/g, "").replace(/\s{2,}/g, " ").trim();
+    }
+
+    // Slots cannot stop the model calling a margin figure "sales" or hedging
+    // with "nearly": those are the words around the number, and they stay the
+    // model's own. So the verifier still runs, on the rendered text.
+    check = verifyExplanation(rendered, facts);
     if (check.ok) break;
 
-    const action = onDriftDetected({ attempt: attempts, issues: check.issues, text: result.text });
+    const action = onDriftDetected({ attempt: attempts, issues: check.issues, text: rendered });
     if (action === "accept") break;
-    if (action === "reject") {
+    if (attempts === MAX_ATTEMPTS + 1) {
       throw new LlmUnavailable(
-        `The model's answer did not match the source figures (${check.issues.join("; ")}).`
+        `The model's answer did not match the source figures after ${attempts} attempts (${check.issues.join("; ")}).`
       );
     }
-    // "retry" falls through to the next loop pass. On the last pass there is no
-    // next attempt, so an unresolved drift is rejected rather than shown.
-    if (attempts === MAX_ATTEMPTS) {
-      throw new LlmUnavailable(
-        `The model's answer did not match the source figures after ${MAX_ATTEMPTS} attempts (${check.issues.join("; ")}).`
-      );
-    }
+  }
+
+  if (!rendered) {
+    throw new LlmUnavailable(
+      `The model could not produce a usable explanation (${check.issues.join("; ")}).`
+    );
   }
 
   const ms = Date.now() - started;
@@ -375,9 +460,12 @@ async function explainAlert(sku, alert) {
       provider: result.provider,
       model: result.model,
       fact_count: facts.split("\n").length,
+      mode,
+      slots_offered: Object.keys(slots).length,
     },
     output: {
-      explanation: result.text,
+      explanation: rendered,
+      raw_template: mode === "slots" ? result.text : null,
       latency_ms: ms,
       attempts,
       verified: check.ok,
@@ -387,7 +475,7 @@ async function explainAlert(sku, alert) {
     },
   });
 
-  const value = { text: result.text, model: result.model, provider: result.provider, usage: result.usage };
+  const value = { text: rendered, mode, model: result.model, provider: result.provider, usage: result.usage };
   if (key) cache.set(key, { at: Date.now(), value });
   return { ...value, cached: false };
 }

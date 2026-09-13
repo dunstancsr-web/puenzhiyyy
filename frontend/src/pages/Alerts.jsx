@@ -524,7 +524,13 @@ function AiModal({ aiModal, onClose }) {
             }}>
               <Cpu size={12} /> Summary
               <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0, color: "var(--text-muted)" }}>
-                {narrative.model}{narrative.cached ? " · reused" : ""}
+                {narrative.model}
+                {/* Worth naming. In slot mode the model writes prose with named
+                    placeholders and cannot emit a digit at all, so the figures
+                    are inserted by the engine rather than typed by the model.
+                    That is a stronger claim than "we checked it afterwards". */}
+                {narrative.mode === "slots" ? " · figures inserted by the engine" : ""}
+                {narrative.cached ? " · reused" : ""}
               </span>
             </div>
             <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text-primary)", whiteSpace: "pre-line" }}>
