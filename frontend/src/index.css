@@ -467,3 +467,94 @@ input[type="range"].sf-range:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ── Warehouse handheld (TASK-47) ───────────────────────────────────────────
+   A separate surface from the Control Tower because it is a different device
+   in a different place: a shared rugged terminal held in one gloved hand on a
+   loading dock, not a desktop in an office.
+
+   Light by default, deliberately. An industrial context invites a dark high
+   contrast treatment, but light is the theme this project is designed and
+   demoed in, so the device look comes from SCALE and FOCUS (one action per
+   screen, oversized targets, a real keypad) rather than from inverting the
+   palette. Dark still works: every colour below is a token.
+
+   Touch targets are 56px minimum, above the 44px floor in Apple's HIG, because
+   the user may be wearing gloves and standing up. */
+
+.hh-screen {
+  max-width: 460px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  /* The rails read as the edge of a device once the viewport is wider than the
+     screen itself. On a real handheld they simply vanish. */
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.hh-body {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hh-tap {
+  min-height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.06s ease, background 0.12s ease, border-color 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.hh-tap:active { transform: scale(0.97); background: var(--surface-2); }
+.hh-tap:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.hh-tap--primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  min-height: 62px;
+  font-size: 17px;
+}
+.hh-tap--primary:active { background: var(--blue); filter: brightness(0.94); }
+
+/* Keypad keys are square and large. A number pad beats a text input here: it
+   cannot receive a letter, it needs no keyboard to appear, and it is the
+   control every warehouse terminal already uses. */
+.hh-key {
+  height: 60px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: transform 0.06s ease, background 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.hh-key:active { transform: scale(0.94); background: var(--border); }
+
+.hh-steps { display: flex; gap: 6px; }
+.hh-steps > span {
+  flex: 1;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--border);
+}
+.hh-steps > span[data-on="true"] { background: var(--blue); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hh-tap, .hh-key { transition: none; }
+  .hh-tap:active, .hh-key:active { transform: none; }
+}

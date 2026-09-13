@@ -137,7 +137,7 @@ export default function Sidebar() {
         it works the same way in both Light and Dark mode. */}
     <nav className="app-topbar-glass" aria-label="Primary">
       <div className="app-topbar-glass__inner">
-        <Link to="/dashboard" aria-label="StockSense home" style={{ display: "flex", flexShrink: 0 }}>
+        <Link to="/" aria-label="All modes" style={{ display: "flex", flexShrink: 0 }}>
           <div style={{ width: 30, height: 30, background: "var(--blue)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <TrendingUp size={16} color="#fff" />
           </div>

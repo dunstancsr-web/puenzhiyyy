@@ -1401,6 +1401,47 @@ awkwardly around injected values ("too much 620 MT, which includes both 580 MT a
 third of the time. The architecture should suit the Bedrock tier far better, where the model follows
 constrained formats more reliably.
 
+## TASK-47 - The launcher and the Goods In handheld flow (2026-09-13)
+
+Stan's model of the business: stock enters, stock leaves, and the Control Tower decides what to do
+about what is left. Those are three jobs done by different people on different devices, so the app now
+opens on a launcher rather than on the dashboard.
+
+- [x] `Launcher` at `/`. Three cards in the order stock actually moves. Each names the device and the
+      place it belongs to, which is the fastest way to tell someone a screen is not meant for them.
+- [x] Control Tower routes wrapped in `Layout` via an `Outlet`; the floor screens deliberately are not.
+      A handheld has no room for navigation, and an operator at a dock has one job on screen at a time.
+- [x] PIN sign in. Four digits, submitted on the fourth, dots rather than a field so the PIN is never
+      visible to whoever is standing behind you. Demo PINs are printed on screen and labelled as a
+      prototype affordance.
+- [x] Four step receiving wizard against an open purchase order: pick the delivery, verify the SKU,
+      count it, confirm. Live variance feedback on the count screen, framed as information rather than
+      as an error, because a short delivery is a fact about the world and not a mistake by the person
+      counting it.
+- [x] A GRN styled as the document it stands in for, with its number, because that is what the driver
+      waits for and what accounts reconcile against.
+- [x] Guidance at two levels. The per screen instruction answers "what do I press now". A collapsed
+      "How this works" answers "what am I doing and how much is left", which is what a new starter
+      needs before beginning and anyone needs after an interruption.
+
+**Light theme, on Stan's correction.** An industrial tool invites a dark high contrast treatment and I
+proposed one. He was right to reject it: this project is designed and demoed in light. The device
+character comes from SCALE and FOCUS instead, one action per screen with 56px targets and a real
+keypad, which is above the 44px floor in Apple's HIG because the operator may be wearing gloves.
+
+**A React bug worth recording.** The PIN filled and nothing happened. The submit effect had `busy` in
+its dependency array AND set it inside, so setting it re-ran the effect, whose cleanup set
+`cancelled = true` and discarded the very request it had just started. Fixed with a `useRef` guard,
+which does not trigger a render and so cannot retrigger the effect.
+
+Three smaller fixes after walking the flow: `textTransform: uppercase` on the scan input was shouting
+the PLACEHOLDER at the operator; the variance reasons offered "Over shipped by supplier" as an
+explanation for a SHORT receipt, which cannot be true; and the Goods Out card linked to a route that
+does not exist yet, so it now reads "Next up" and is not clickable.
+
+Verified end to end in the browser: signed in as Rahman B., received PO-2026-0001 short by 5 MT with a
+reason, and got GRN-0001 with stock moving 620 to 815 MT.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

@@ -84,6 +84,15 @@ export const api = {
   getLlmMode: () => request("/llm/mode"),
   setLlmMode: (mode) => request("/llm/mode", { method: "POST", body: { mode } }),
 
+  // Warehouse floor (TASK-46/47)
+  getOperators: () => request("/warehouse/operators"),
+  warehouseLogin: (pin) => request("/warehouse/login", { method: "POST", body: { pin } }),
+  getInbound: () => request("/warehouse/inbound"),
+  receiveGoods: (body) => request("/warehouse/inbound/receive", { method: "POST", body }),
+  getOutbound: () => request("/warehouse/outbound"),
+  pickGoods: (body) => request("/warehouse/outbound/pick", { method: "POST", body }),
+  getMovements: () => request("/warehouse/movements"),
+
   // Audit log (TASK-31) - every state change the API made, newest first.
   // Resolves to { events, counts }, not a bare array: `counts` is the whole
   // table's totals per event type, which the filter chips need even when the
