@@ -67,3 +67,14 @@ built file is correct both from disk and published.
 
 The font is Ma Shan Zheng (SIL OFL), subset to nine glyphs: 5.86 MB down to 3.7 KB. Regenerate
 with `pyftsubset mz.ttf --text="四海米行友合业粮" --flavor=woff2 --output-file=mz-sub.woff2`.
+
+## home-layouts.html
+
+Four Home layouts answering a design critique, drawn at full size in a fixed 560px viewport so
+vertical placement can be judged rather than described. Published at
+https://claude.ai/code/artifact/91f9d7dd-3e2b-47c8-ae4a-9cd122799013
+
+Also generated: edit `src/home-template.html`, then from `src/` run
+`python3 build-page.py home-template.html ../home-layouts.html`. `build-page.py` is the generic
+version of `build-logo.py` and does the same two jobs, inlining the font and escaping every
+non-ASCII character.

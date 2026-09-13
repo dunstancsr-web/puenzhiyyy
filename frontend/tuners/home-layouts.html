@@ -1,0 +1,480 @@
+<title>Home Layout Options</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+<style>
+@font-face {
+  font-family: "Brush";
+  src: url(data:font/woff2;base64,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) format("woff2");
+  font-display: block;
+}
+
+:root {
+  --ground: #fbfcfd; --panel: #ffffff; --sunk: #f4f6f8;
+  --line: #e3e8ee; --line-soft: #eef1f5;
+  --ink: #16202c; --ink-2: #4a5766; --ink-3: #7b8794;
+  --accent: #2563eb; --accent-sk: #eff4ff;
+  --bad: #b42318; --bad-sk: #fdf2f1;
+  --ok: #027a48; --ok-sk: #eaf6ee;
+  --shadow: 0 1px 2px rgba(16,32,44,.05), 0 8px 24px -12px rgba(16,32,44,.14);
+
+  /* The app's own tokens, so a mockup is not a different product. */
+  --app-bg: #f0f2f5; --app-card: #ffffff; --app-border: #e2e6ea;
+  --app-ink: #1a202c; --app-ink2: #475569; --app-ink3: #64748b;
+  --seal: #b3271e; --mark: #1d4ed8;
+  --green: #22c55e; --green-l: #f0fdf4;
+  --blue: #3b82f6;  --blue-l: #eff6ff;
+  --purple: #8b5cf6; --purple-l: #f5f3ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0e1319; --panel: #161d26; --sunk: #1d2631;
+    --line: #2a3541; --line-soft: #222b36;
+    --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+    --accent: #6b9bff; --accent-sk: #17233b;
+    --bad: #f0837a; --bad-sk: #2e1a19; --ok: #5ac08d; --ok-sk: #12261a;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0e1319; --panel: #161d26; --sunk: #1d2631;
+  --line: #2a3541; --line-soft: #222b36;
+  --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+  --accent: #6b9bff; --accent-sk: #17233b;
+  --bad: #f0837a; --bad-sk: #2e1a19; --ok: #5ac08d; --ok-sk: #12261a;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground); color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 30px 22px 70px; }
+
+.mast { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 26px; }
+.mast h1 {
+  font-family: Newsreader, Georgia, serif; font-size: 34px; font-weight: 600;
+  line-height: 1.1; margin: 0 0 6px; letter-spacing: -.01em;
+}
+.mast p { margin: 0; color: var(--ink-2); max-width: 70ch; }
+
+.opt { margin-bottom: 34px; }
+.opt__hd { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+.opt__n {
+  font-family: Newsreader, Georgia, serif; font-size: 26px; font-weight: 600; line-height: 1;
+  color: var(--ink-3); min-width: 26px;
+}
+.opt__t { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.opt__pick {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  background: var(--ok-sk); color: var(--ok); padding: 3px 8px; border-radius: 4px;
+}
+.opt__lede { color: var(--ink-2); font-size: 13.5px; margin: 0 0 12px; max-width: 78ch; }
+
+/* Browser frame: a fixed 560px viewport, because the complaint is about
+   vertical placement and a mockup that grows to fit its content cannot show
+   it. Every option below is drawn in the same box. */
+.frame { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.frame__bar {
+  display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+  background: var(--sunk); border-bottom: 1px solid var(--line);
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.frame__url {
+  margin-left: 8px; font-size: 11px; color: var(--ink-3);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 2px 9px;
+}
+.view { height: 560px; background: var(--app-bg); overflow: hidden; position: relative; }
+
+/* Overlay that measures the dead space, shown on the "now" frame only. */
+.void {
+  position: absolute; left: 0; right: 0; top: 0;
+  background: repeating-linear-gradient(45deg, rgba(180,35,24,.07) 0 8px, transparent 8px 16px);
+  border-bottom: 1px dashed rgba(180,35,24,.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--bad); letter-spacing: .04em;
+}
+
+/* &#x2500;&#x2500; App mockup pieces &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500; */
+.app { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--app-ink); }
+.col { max-width: 880px; }
+
+.seal4 {
+  width: 52px; height: 52px; border-radius: 12px; padding: 5px; flex-shrink: 0;
+  background: var(--seal); color: #fff; font-family: Brush, serif;
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  grid-auto-flow: column; direction: rtl; gap: 1px; font-size: 20px; line-height: 1;
+}
+.seal4 > span { display: grid; place-items: center; }
+.cn { font-family: Brush, serif; font-size: 27px; color: var(--app-ink); letter-spacing: .05em; line-height: 1.15; }
+.en { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--app-ink3); margin-top: 3px; }
+.ask { font-size: 20px; font-weight: 600; line-height: 1.25; margin: 0; }
+.sub { font-size: 13px; color: var(--app-ink2); margin: 3px 0 0; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.card {
+  background: var(--app-card); border: 1px solid var(--app-border); border-radius: 14px;
+  padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  display: flex; flex-direction: column; gap: 8px;
+}
+/* The hover state the real page does not have. One card per mockup is drawn
+   in it, labelled, so the affordance can be judged rather than imagined. */
+.card--hover {
+  border-color: var(--green); transform: translateY(-2px);
+  box-shadow: 0 6px 18px -6px rgba(16,32,44,.22);
+}
+.card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sq { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; }
+.card h4 { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.2; }
+.card .role { font-size: 11px; font-weight: 600; margin-top: 2px; }
+.card .who { font-size: 11px; color: var(--app-ink3); }
+.arrow { flex-shrink: 0; }
+.badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  border: 1px solid var(--app-border); color: var(--app-ink3); border-radius: 99px; padding: 2px 8px;
+  white-space: nowrap;
+}
+/* Not dimmed wholesale. Only the text mutes; the badge stays crisp because it
+   is the element carrying the message. */
+.card--soon h4, .card--soon .role { color: #94a3b8; }
+.card--soon .sq { opacity: .5; }
+.card--soon .badge { color: var(--app-ink2); border-color: #cbd5e1; background: #f8f9fb; }
+
+.det { border-top: 1px solid var(--app-border); padding-top: 9px; margin-top: 2px; font-size: 11px; color: var(--app-ink3); font-weight: 600; }
+.foot { font-size: 11px; color: var(--app-ink3); line-height: 1.6; }
+.foot b { color: var(--app-ink2); font-weight: 600; }
+.runon { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--app-ink2); font-weight: 600; }
+.mark { width: 24px; height: 24px; border-radius: 6px; background: var(--mark); display: grid; place-items: center; flex-shrink: 0; }
+
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 12px; }
+.note {
+  border-left: 2px solid var(--line); padding: 9px 12px; font-size: 12.5px;
+  color: var(--ink-2); line-height: 1.5; background: var(--panel); border-radius: 0 8px 8px 0;
+}
+.note b { color: var(--ink); }
+.note--win { border-left-color: var(--ok); }
+.note--cost { border-left-color: var(--bad); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <h1>Home Layout Options</h1>
+    <p>Four ways to answer the critique, drawn at full size in a fixed 560px viewport so vertical
+      placement can actually be judged. Every option fixes the same five things: the float, the mixed
+      alignment, the arrow's position, the repeated "What is this?", and the wholesale dimming of the
+      disabled card. They differ in how far they go beyond that.</p>
+  </header>
+
+  <!-- &#x2550;&#x2550; NOW &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+  <section class="opt">
+    <div class="opt__hd"><span class="opt__n">0</span><span class="opt__t">Now</span></div>
+    <p class="opt__lede">For comparison. The hatched band is measured, not drawn to make a point:
+      214px of the viewport passes before the first pixel of content.</p>
+    <div class="frame">
+      <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__url">stocksense.app</span></div>
+      <div class="view">
+        <div class="void" style="height:129px">214px of nothing</div>
+        <div class="app" style="padding:129px 40px 0">
+          <div class="col">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+              <div class="seal4"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+              <div><div class="cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="en">Four Seas Rice Trading</div></div>
+            </div>
+            <p class="ask">Where are you working today?</p>
+            <p class="sub" style="margin-bottom:16px">Three workspaces, one inventory. Pick one to begin.</p>
+            <div class="cards">
+              <div class="card">
+                <div class="sq" style="background:var(--green-l)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg></div>
+                <div><h4>Goods In</h4><div class="role" style="color:var(--green)">Receiving</div></div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span class="who">Warehouse floor, handheld</span>
+                  <svg class="arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <div class="det">What is this?</div>
+              </div>
+              <div class="card" style="opacity:.6">
+                <div class="sq" style="background:var(--blue-l)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M12 21V8M6 13l6-6 6 6M4 3h16"/></svg></div>
+                <div><h4>Goods Out <span class="badge">Next up</span></h4><div class="role" style="color:var(--blue)">Picking and dispatch</div></div>
+                <div><span class="who">Warehouse floor, handheld</span></div>
+                <div class="det">What is this?</div>
+              </div>
+              <div class="card">
+                <div class="sq" style="background:var(--purple-l)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+                <div><h4>Control Tower</h4><div class="role" style="color:var(--purple)">Analysis and decisions</div></div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <span class="who">Office, desktop</span>
+                  <svg class="arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <div class="det">What is this?</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- &#x2550;&#x2550; A &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+  <section class="opt">
+    <div class="opt__hd"><span class="opt__n">A</span><span class="opt__t">Corrected</span>
+      <span class="opt__pick">safest</span></div>
+    <p class="opt__lede">The same layout with the five faults fixed and nothing else touched.
+      Anchored near the top, one alignment, arrow in the title row, hover state, disabled card no
+      longer dimmed wholesale, and the detail toggle reduced to an icon.</p>
+    <div class="frame">
+      <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__url">stocksense.app</span></div>
+      <div class="view">
+        <div class="app" style="padding:52px 40px 0">
+          <div class="col">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px">
+              <div class="seal4"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+              <div><div class="cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="en">Four Seas Rice Trading</div></div>
+            </div>
+            <p class="ask">Where are you working today?</p>
+            <p class="sub" style="margin-bottom:18px">Pick a workspace to begin.</p>
+            <div class="cards">
+              <div class="card card--hover">
+                <div class="card__top">
+                  <div class="sq" style="background:var(--green-l)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg></div>
+                  <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <div><h4>Goods In</h4><div class="role" style="color:var(--green)">Receiving</div></div>
+                <span class="who">Warehouse floor, handheld</span>
+                <div class="det" style="display:flex;align-items:center;gap:5px">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.1"/></svg> Details
+                </div>
+              </div>
+              <div class="card card--soon">
+                <div class="card__top">
+                  <div class="sq" style="background:var(--blue-l)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M12 21V8M6 13l6-6 6 6M4 3h16"/></svg></div>
+                  <span class="badge">Next up</span>
+                </div>
+                <div><h4>Goods Out</h4><div class="role">Picking and dispatch</div></div>
+                <span class="who">Warehouse floor, handheld</span>
+                <div class="det" style="display:flex;align-items:center;gap:5px">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.1"/></svg> Details
+                </div>
+              </div>
+              <div class="card">
+                <div class="card__top">
+                  <div class="sq" style="background:var(--purple-l)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+                  <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <div><h4>Control Tower</h4><div class="role" style="color:var(--purple)">Analysis and decisions</div></div>
+                <span class="who">Office, desktop</span>
+                <div class="det" style="display:flex;align-items:center;gap:5px">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.1"/></svg> Details
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;margin-top:24px;padding-top:14px;border-top:1px solid var(--app-border)">
+              <div class="runon"><span class="mark"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="15" width="4.4" height="6" rx="1.2" fill="#fff" opacity=".55"/><rect x="9.8" y="11" width="4.4" height="10" rx="1.2" fill="#fff" opacity=".55"/><rect x="16.6" y="6" width="4.4" height="15" rx="1.2" fill="#fff"/><path d="M4 12.5 L11 8.5 L18.8 3.4" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></span>Running on StockSense</div>
+              <div class="foot" style="margin-left:auto;text-align:right">AWS NUS-ISS SMYA 2026 &middot; <b>Team Puenzhiyyy</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note note--win"><b>Lowest risk.</b> Nothing structural changes, so nothing new can
+        break. The hover state on Goods In is drawn so the affordance can be judged.</div>
+      <div class="note"><b>Copy.</b> "Three workspaces" becomes "Pick a workspace": only two work
+        today, and a reader who counts should not catch the product out.</div>
+      <div class="note note--cost"><b>Cost.</b> Still a left column in a wide frame, so there is
+        visible empty space to the right of the masthead.</div>
+    </div>
+  </section>
+
+  <!-- &#x2550;&#x2550; B &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+  <section class="opt">
+    <div class="opt__hd"><span class="opt__n">B</span><span class="opt__t">Centred portal</span></div>
+    <p class="opt__lede">Commit to the centre instead of the left. The identity, the question and the
+      three cards all sit on one axis, which is the arrangement a chooser screen usually takes.</p>
+    <div class="frame">
+      <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__url">stocksense.app</span></div>
+      <div class="view">
+        <div class="app" style="padding:46px 40px 0;text-align:center">
+          <div class="col" style="margin:0 auto">
+            <div style="display:flex;align-items:center;gap:13px;justify-content:center;margin-bottom:16px">
+              <div class="seal4"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+              <div style="text-align:left"><div class="cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="en">Four Seas Rice Trading</div></div>
+            </div>
+            <p class="ask">Where are you working today?</p>
+            <p class="sub" style="margin-bottom:20px">Pick a workspace to begin.</p>
+            <div class="cards" style="text-align:left">
+              <div class="card">
+                <div class="card__top">
+                  <div class="sq" style="background:var(--green-l)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg></div>
+                  <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <div><h4>Goods In</h4><div class="role" style="color:var(--green)">Receiving</div></div>
+                <span class="who">Warehouse floor, handheld</span>
+              </div>
+              <div class="card card--soon">
+                <div class="card__top">
+                  <div class="sq" style="background:var(--blue-l)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M12 21V8M6 13l6-6 6 6M4 3h16"/></svg></div>
+                  <span class="badge">Next up</span>
+                </div>
+                <div><h4>Goods Out</h4><div class="role">Picking and dispatch</div></div>
+                <span class="who">Warehouse floor, handheld</span>
+              </div>
+              <div class="card card--hover" style="border-color:var(--purple)">
+                <div class="card__top">
+                  <div class="sq" style="background:var(--purple-l)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+                  <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <div><h4>Control Tower</h4><div class="role" style="color:var(--purple)">Analysis and decisions</div></div>
+                <span class="who">Office, desktop</span>
+              </div>
+            </div>
+            <div style="margin-top:26px;padding-top:16px;border-top:1px solid var(--app-border)">
+              <div class="runon" style="justify-content:center;margin-bottom:7px"><span class="mark"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="15" width="4.4" height="6" rx="1.2" fill="#fff" opacity=".55"/><rect x="9.8" y="11" width="4.4" height="10" rx="1.2" fill="#fff" opacity=".55"/><rect x="16.6" y="6" width="4.4" height="15" rx="1.2" fill="#fff"/><path d="M4 12.5 L11 8.5 L18.8 3.4" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></span>Running on StockSense</div>
+              <div class="foot">AWS NUS-ISS SMYA 2026<br><b>Team Puenzhiyyy</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note note--win"><b>No empty right side.</b> Centring removes the lopsidedness rather
+        than filling it, and the footer's existing centring finally agrees with everything above it.</div>
+      <div class="note"><b>The "What is this?" toggle is gone entirely</b>, not just shrunk. It exists
+        for phones; a wide screen has room to simply not need it.</div>
+      <div class="note note--cost"><b>Cost.</b> Centred mastheads read as a marketing page. This is a
+        tool, and tools are usually left-aligned.</div>
+    </div>
+  </section>
+
+  <!-- &#x2550;&#x2550; C &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+  <section class="opt">
+    <div class="opt__hd"><span class="opt__n">C</span><span class="opt__t">Split</span>
+      <span class="opt__pick">recommended</span></div>
+    <p class="opt__lede">Identity and question hold the left column; the workspaces stack down the
+      right as a list. The empty space is not reduced, it is used, and the cards become full-width
+      rows, which is a more button-like shape than a square tile.</p>
+    <div class="frame">
+      <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__url">stocksense.app</span></div>
+      <div class="view">
+        <div class="app" style="padding:54px 44px 0">
+          <div style="display:grid;grid-template-columns:300px 1fr;gap:52px;align-items:start">
+            <div>
+              <div class="seal4" style="width:64px;height:64px;font-size:25px;margin-bottom:16px"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+              <div class="cn" style="font-size:30px">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div>
+              <div class="en" style="margin-bottom:18px">Four Seas Rice Trading</div>
+              <p class="ask" style="font-size:18px">Where are you working today?</p>
+              <p class="sub">Pick a workspace to begin.</p>
+              <div style="margin-top:28px;padding-top:15px;border-top:1px solid var(--app-border)">
+                <div class="runon" style="margin-bottom:8px"><span class="mark"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="15" width="4.4" height="6" rx="1.2" fill="#fff" opacity=".55"/><rect x="9.8" y="11" width="4.4" height="10" rx="1.2" fill="#fff" opacity=".55"/><rect x="16.6" y="6" width="4.4" height="15" rx="1.2" fill="#fff"/><path d="M4 12.5 L11 8.5 L18.8 3.4" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></span>Running on StockSense</div>
+                <div class="foot">AWS NUS-ISS SMYA 2026<br><b>Team Puenzhiyyy</b></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div class="card card--hover" style="flex-direction:row;align-items:center;gap:16px;padding:18px 20px">
+                <div class="sq" style="background:var(--green-l);width:44px;height:44px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg></div>
+                <div style="flex:1;min-width:0">
+                  <h4 style="font-size:18px">Goods In</h4>
+                  <div class="role" style="color:var(--green);font-size:12px">Receiving &middot; <span style="color:var(--app-ink3);font-weight:400">warehouse floor, handheld</span></div>
+                </div>
+                <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </div>
+              <div class="card card--soon" style="flex-direction:row;align-items:center;gap:16px;padding:18px 20px">
+                <div class="sq" style="background:var(--blue-l);width:44px;height:44px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M12 21V8M6 13l6-6 6 6M4 3h16"/></svg></div>
+                <div style="flex:1;min-width:0">
+                  <h4 style="font-size:18px">Goods Out</h4>
+                  <div class="role" style="font-size:12px">Picking and dispatch &middot; <span style="color:var(--app-ink3);font-weight:400">warehouse floor, handheld</span></div>
+                </div>
+                <span class="badge">Next up</span>
+              </div>
+              <div class="card" style="flex-direction:row;align-items:center;gap:16px;padding:18px 20px">
+                <div class="sq" style="background:var(--purple-l);width:44px;height:44px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+                <div style="flex:1;min-width:0">
+                  <h4 style="font-size:18px">Control Tower</h4>
+                  <div class="role" style="color:var(--purple);font-size:12px">Analysis and decisions &middot; <span style="color:var(--app-ink3);font-weight:400">office, desktop</span></div>
+                </div>
+                <svg class="arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note note--win"><b>The width is used, not centred away.</b> The identity gets a
+        column of its own, so the seal can be larger without competing with the cards.</div>
+      <div class="note note--win"><b>Rows read as buttons.</b> A full-width row with an icon, a label
+        and an arrow at the far edge is the shape of a list item you tap; a square tile is the shape
+        of a thing you read.</div>
+      <div class="note"><b>Device and role merge onto one line</b>, which is what makes the row short
+        enough to work. Three cards became three rows and the page got shorter, not taller.</div>
+      <div class="note note--cost"><b>Cost.</b> The most change, so the most to re-check at narrow
+        widths, where the two columns must stack.</div>
+    </div>
+  </section>
+
+  <!-- &#x2550;&#x2550; D &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+  <section class="opt">
+    <div class="opt__hd"><span class="opt__n">D</span><span class="opt__t">Desktop-aware</span></div>
+    <p class="opt__lede">C, plus an opinion. Two of three workspaces are for a handheld, and this is a
+      desktop browser, so the one you can actually use here leads and the other two are offered as
+      what they are: screens for a device you are not holding.</p>
+    <div class="frame">
+      <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__url">stocksense.app</span></div>
+      <div class="view">
+        <div class="app" style="padding:54px 44px 0">
+          <div style="display:grid;grid-template-columns:300px 1fr;gap:52px;align-items:start">
+            <div>
+              <div class="seal4" style="width:64px;height:64px;font-size:25px;margin-bottom:16px"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+              <div class="cn" style="font-size:30px">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div>
+              <div class="en" style="margin-bottom:18px">Four Seas Rice Trading</div>
+              <p class="ask" style="font-size:18px">Where are you working today?</p>
+              <p class="sub">Pick a workspace to begin.</p>
+              <div style="margin-top:28px;padding-top:15px;border-top:1px solid var(--app-border)">
+                <div class="runon" style="margin-bottom:8px"><span class="mark"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="15" width="4.4" height="6" rx="1.2" fill="#fff" opacity=".55"/><rect x="9.8" y="11" width="4.4" height="10" rx="1.2" fill="#fff" opacity=".55"/><rect x="16.6" y="6" width="4.4" height="15" rx="1.2" fill="#fff"/><path d="M4 12.5 L11 8.5 L18.8 3.4" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></span>Running on StockSense</div>
+                <div class="foot">AWS NUS-ISS SMYA 2026<br><b>Team Puenzhiyyy</b></div>
+              </div>
+            </div>
+            <div>
+              <div class="card card--hover" style="border-color:var(--purple);gap:10px;padding:22px 24px;margin-bottom:20px">
+                <div class="card__top">
+                  <div class="sq" style="background:var(--purple-l);width:46px;height:46px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+                  <span class="badge" style="border-color:var(--purple);color:var(--purple)">For this device</span>
+                </div>
+                <div><h4 style="font-size:21px">Control Tower</h4><div class="role" style="color:var(--purple);font-size:12.5px">Analysis and decisions</div></div>
+                <span class="who">See what needs a decision today, and approve or reject what the system recommends.</span>
+                <div style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--purple);margin-top:2px">
+                  Open Control Tower
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+              </div>
+              <div style="font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--app-ink3);margin-bottom:9px">On the warehouse floor</div>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <div class="card" style="flex-direction:row;align-items:center;gap:14px;padding:13px 18px">
+                  <div class="sq" style="background:var(--green-l);width:34px;height:34px;border-radius:9px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg></div>
+                  <div style="flex:1"><h4 style="font-size:15px">Goods In</h4><div class="who">Receiving &middot; handheld</div></div>
+                  <svg class="arrow" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <div class="card card--soon" style="flex-direction:row;align-items:center;gap:14px;padding:13px 18px">
+                  <div class="sq" style="background:var(--blue-l);width:34px;height:34px;border-radius:9px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M12 21V8M6 13l6-6 6 6M4 3h16"/></svg></div>
+                  <div style="flex:1"><h4 style="font-size:15px">Goods Out</h4><div class="who">Picking &middot; handheld</div></div>
+                  <span class="badge">Next up</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note note--win"><b>It answers the question it asks.</b> "Where are you working
+        today?" is rhetorical if two of the three answers need a device you are not holding.</div>
+      <div class="note note--win"><b>One primary action per surface</b>, which is the standing rule
+        everywhere else in this app and the one Home currently breaks with three equal cards.</div>
+      <div class="note note--cost"><b>Cost, and it is the real one.</b> Goods In is the flow that is
+        actually built and demoed. Demoting it on the first screen to make a UX point would put the
+        finished feature second. Only pick D if the demo opens in the Control Tower.</div>
+    </div>
+  </section>
+
+</div>
