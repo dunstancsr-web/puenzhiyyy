@@ -297,39 +297,62 @@ router.put("/skus/:id", (req, res) => {
 // server decides this rather than the chart, because the server is the only
 // side that knows the real coverage window.
 router.get("/dashboard/history", (req, res) => {
-  const months = Math.min(24, Math.max(1, Number(req.query.months) || 6));
+  const months = Math.min(36, Math.max(1, Number(req.query.months) || 6));
   try {
     const db = getDb();
-    const span = db.prepare(`
-      SELECT MIN(sale_date) first, MAX(sale_date) last FROM sales_transactions`).get();
-    if (!span?.first) return res.json({ success: true, data: { months: [], coverage: null } });
 
-    const rows = db.prepare(`
-      SELECT substr(t.sale_date, 1, 7) AS month,
-             ROUND(SUM(t.quantity_mt), 1) AS qty_mt,
-             ROUND(SUM(t.quantity_mt * s.unit_cost_sgd)) AS value_sgd,
-             COUNT(*) AS txns
-        FROM sales_transactions t
-        JOIN skus s ON s.sku_id = t.sku_id
-       WHERE t.status = 'fulfilled'
-       GROUP BY month
-       ORDER BY month`).all();
+    // Closing stock and its value, straight from inventory_history. The value
+    // is derived here rather than stored, and it uses each row's OWN
+    // unit_cost_sgd, so a price change today cannot rewrite what last year's
+    // stock was worth.
+    const stock = db.prepare(`
+      SELECT period,
+             ROUND(SUM(closing_qty), 1)                   AS closing_qty_mt,
+             ROUND(SUM(closing_qty * unit_cost_sgd))      AS closing_value_sgd,
+             ROUND(SUM(receipts_qty), 1)                  AS receipts_qty_mt,
+             ROUND(SUM(issues_qty), 1)                    AS issues_qty_mt
+        FROM inventory_history
+       GROUP BY period
+       ORDER BY period`).all();
 
-    const firstMonth = span.first.slice(0, 7);
-    const lastMonth = span.last.slice(0, 7);
-    // A month is partial when the data window opens after the 1st or closes
-    // before the month is over. Only the two edge months can ever qualify.
-    const partialOf = (m) =>
-      (m === firstMonth && span.first.slice(8) !== "01") || m === lastMonth;
+    // Consumption, from the transactions. Kept separate from issues_qty above
+    // on purpose: they should agree, and two independent readings of the same
+    // fact are how a disagreement becomes visible instead of silent.
+    const consumed = new Map(
+      db.prepare(`
+        SELECT substr(t.sale_date, 1, 7) AS period,
+               ROUND(SUM(t.quantity_mt), 1)                     AS consumed_qty_mt,
+               ROUND(SUM(t.quantity_mt * s.unit_cost_sgd))      AS consumed_value_sgd,
+               COUNT(*)                                         AS txns
+          FROM sales_transactions t
+          JOIN skus s ON s.sku_id = t.sku_id
+         WHERE t.status = 'fulfilled'
+         GROUP BY period`).all().map((r) => [r.period, r])
+    );
 
-    const series = rows.slice(-months).map((r) => ({ ...r, partial: partialOf(r.month) }));
+    if (!stock.length) return res.json({ success: true, data: { months: [], coverage: null } });
+
+    const thisMonth = new Date().toISOString().slice(0, 7);
+    const series = stock.slice(-months).map((r) => {
+      const c = consumed.get(r.period) || { consumed_qty_mt: 0, consumed_value_sgd: 0, txns: 0 };
+      return {
+        ...r, ...c,
+        // Only the current month is partial now. History rows are whole
+        // months by construction, so the old first-month edge case is gone.
+        partial: r.period === thisMonth,
+      };
+    });
+
     const full = series.filter((r) => !r.partial);
-    // The reference line is the mean of the COMPLETE months only. Including a
-    // half month would drag it down and make every full month look like an
-    // overshoot.
     const average = full.length
-      ? Math.round(full.reduce((a, r) => a + r.value_sgd, 0) / full.length)
+      ? Math.round(full.reduce((a, r) => a + r.consumed_value_sgd, 0) / full.length)
       : null;
+
+    // Previous-period comparison, replacing the hardcoded PRIOR constants that
+    // used to drive every trend arrow. Null when there is no prior period
+    // rather than a fabricated fallback.
+    const latest = series[series.length - 1] || null;
+    const prior = series.length > 1 ? series[series.length - 2] : null;
 
     res.json({
       success: true,
@@ -337,12 +360,238 @@ router.get("/dashboard/history", (req, res) => {
         months: series,
         average,
         fullMonths: full.length,
-        coverage: { from: span.first, to: span.last },
+        latest,
+        prior,
+        coverage: stock.length
+          ? { from: stock[0].period, to: stock[stock.length - 1].period, periods: stock.length }
+          : null,
       },
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to build history" });
+  }
+});
+
+// ── Monthly history as CSV (TASK-85) ─────────────────────────────────────────
+//
+// A SECOND file rather than more columns on the SKU export, because the two
+// have different grains: one row per SKU there, one row per SKU per month
+// here. Merging them would mean either repeating every SKU field 24 times or
+// adding a column per month, and the column-per-month shape is exactly what
+// stops working past a year.
+const HISTORY_KEY = ["sku_id", "period"];
+const HISTORY_EDITABLE = ["opening_qty", "receipts_qty", "issues_qty", "closing_qty", "unit_cost_sgd"];
+const HISTORY_COLUMNS = [...HISTORY_KEY, ...HISTORY_EDITABLE];
+const HISTORY_CONTEXT = ["product_name", "closing_value_sgd"];
+
+// GET /api/skus/history/export?months=N — monthly history, newest N periods
+router.get("/skus/history/export", (req, res) => {
+  const months = Math.min(120, Math.max(1, Number(req.query.months) || 24));
+  try {
+    const db = getDb();
+    const periods = db.prepare(
+      `SELECT DISTINCT period FROM inventory_history ORDER BY period DESC LIMIT ?`
+    ).all(months).map((r) => r.period);
+
+    if (!periods.length) {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      return res.send(toCsv([...HISTORY_COLUMNS, ...HISTORY_CONTEXT], []));
+    }
+
+    const placeholders = periods.map(() => "?").join(",");
+    const rows = db.prepare(`
+      SELECT h.sku_id, h.period, h.opening_qty, h.receipts_qty, h.issues_qty,
+             h.closing_qty, h.unit_cost_sgd,
+             s.product_name,
+             ROUND(h.closing_qty * h.unit_cost_sgd, 2) AS closing_value_sgd
+        FROM inventory_history h
+        JOIN skus s ON s.sku_id = h.sku_id
+       WHERE h.period IN (${placeholders})
+       ORDER BY h.sku_id, h.period`).all(...periods);
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition",
+      `attachment; filename="stocksense-history-${today()}.csv"`);
+    res.send(toCsv([...HISTORY_COLUMNS, ...HISTORY_CONTEXT], rows));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to export history" });
+  }
+});
+
+// POST /api/skus/history/import — { csv, apply }
+//
+// Same preview-then-apply contract as the SKU import, plus the checks that
+// make this dataset self-verifying. A spreadsheet whose arithmetic does not
+// balance cannot enter the database, which is what keeps the dashboard's
+// history honest without anyone having to trust it.
+router.post("/skus/history/import", (req, res) => {
+  const { csv, apply = false } = req.body || {};
+  if (typeof csv !== "string" || !csv.trim()) {
+    return res.status(400).json({ success: false, message: "No CSV content was received" });
+  }
+
+  let parsed;
+  try {
+    parsed = parseCsv(csv);
+  } catch (err) {
+    return res.status(400).json({ success: false, message: `Could not read the file: ${err.message}` });
+  }
+  for (const k of HISTORY_KEY) {
+    if (!parsed.columns.includes(k)) {
+      return res.status(400).json({
+        success: false,
+        message: `The file has no ${k} column, so there is no way to tell which row each line is for.`,
+      });
+    }
+  }
+
+  try {
+    const db = getDb();
+    // product_name is joined in so the review panel can name the SKU rather
+    // than show only its code.
+    const current = db.prepare(`
+      SELECT h.*, s.product_name
+        FROM inventory_history h
+        JOIN skus s ON s.sku_id = h.sku_id`).all();
+    const byKey = new Map(current.map((r) => [`${r.sku_id}|${r.period}`, r]));
+    const knownSku = new Set(db.prepare(`SELECT sku_id FROM skus`).all().map((r) => r.sku_id));
+
+    const editable = parsed.columns.filter((c) => HISTORY_EDITABLE.includes(c));
+    const ignored = parsed.columns.filter((c) => !HISTORY_COLUMNS.includes(c));
+
+    const changes = [];
+    const errors = [];
+    const seen = new Set();
+    let unchanged = 0;
+
+    for (const row of parsed.rows) {
+      const line = row.__line;
+      const sku = row.sku_id;
+      const period = row.period;
+      if (!sku || !period) { errors.push({ line, message: `Row ${line} is missing sku_id or period` }); continue; }
+      if (!/^\d{4}-\d{2}$/.test(period)) {
+        errors.push({ line, message: `${sku} ${period}: period must look like 2026-04 (line ${line})` });
+        continue;
+      }
+      const key = `${sku}|${period}`;
+      if (seen.has(key)) { errors.push({ line, message: `${sku} ${period} appears more than once (line ${line})` }); continue; }
+      seen.add(key);
+      if (!knownSku.has(sku)) { errors.push({ line, message: `${sku} is not a known SKU (line ${line})` }); continue; }
+
+      const existing = byKey.get(key);
+      if (!existing) { errors.push({ line, message: `${sku} has no ${period} row to update (line ${line})` }); continue; }
+
+      const fields = {};
+      let failed = false;
+      for (const f of editable) {
+        const delta = cellChange(f, row[f], existing[f]);
+        if (!delta) continue;
+        if (delta.error) { errors.push({ line, message: `${sku} ${period}: ${delta.error} (line ${line})` }); failed = true; continue; }
+        fields[f] = delta;
+      }
+      if (failed) continue;
+
+      // The balance check. Applied to the row AS IT WOULD BE after the edit,
+      // not as it is now, so a half-finished correction is caught here rather
+      // than after it is written.
+      const after = { ...existing };
+      for (const [f, d] of Object.entries(fields)) after[f] = d.to;
+      const expected = after.opening_qty + after.receipts_qty - after.issues_qty;
+      if (Math.abs(expected - after.closing_qty) > 0.05) {
+        errors.push({
+          line,
+          message: `${sku} ${period} does not balance: ${after.opening_qty} + ${after.receipts_qty} - ${after.issues_qty} = ${Math.round(expected * 10) / 10}, but closing is ${after.closing_qty} (line ${line})`,
+        });
+        continue;
+      }
+
+      if (Object.keys(fields).length === 0) { unchanged++; continue; }
+      changes.push({ sku_id: sku, period, name: existing.product_name, line, fields, after });
+    }
+
+    // Continuity across periods, checked once over the whole file rather than
+    // per row: each period's opening must be the previous period's closing.
+    // This can only be judged after every edit in the file is known.
+    if (!errors.length && changes.length) {
+      const merged = new Map(current.map((r) => [`${r.sku_id}|${r.period}`, { ...r }]));
+      for (const c of changes) merged.set(`${c.sku_id}|${c.period}`, { ...merged.get(`${c.sku_id}|${c.period}`), ...c.after });
+      const bySku = new Map();
+      for (const r of merged.values()) {
+        if (!bySku.has(r.sku_id)) bySku.set(r.sku_id, []);
+        bySku.get(r.sku_id).push(r);
+      }
+      for (const [sku, rows] of bySku) {
+        rows.sort((a, b) => a.period.localeCompare(b.period));
+        for (let i = 1; i < rows.length; i++) {
+          if (Math.abs(rows[i - 1].closing_qty - rows[i].opening_qty) > 0.05) {
+            errors.push({
+              line: 0,
+              message: `${sku} ${rows[i].period}: opening ${rows[i].opening_qty} does not continue from ${rows[i - 1].period} closing ${rows[i - 1].closing_qty}`,
+            });
+          }
+        }
+      }
+    }
+
+    // A WARNING, not an error: the newest closing should equal the stock
+    // actually on hand, but someone correcting history may legitimately fix
+    // the months first and the position afterwards.
+    const warnings = [];
+    if (changes.length) {
+      const newest = db.prepare(`SELECT MAX(period) p FROM inventory_history`).get().p;
+      const touched = new Set(changes.filter((c) => c.period === newest).map((c) => c.sku_id));
+      for (const sku of touched) {
+        const c = changes.find((x) => x.sku_id === sku && x.period === newest);
+        const onHand = db.prepare(`SELECT on_hand_qty FROM inventory_positions WHERE sku_id = ?`).get(sku);
+        if (onHand && Math.abs(c.after.closing_qty - onHand.on_hand_qty) > 0.05) {
+          warnings.push(`${sku}: ${newest} closing would be ${c.after.closing_qty}, but ${onHand.on_hand_qty} is on hand today.`);
+        }
+      }
+    }
+
+    const summary = {
+      rows: parsed.rows.length,
+      changed: changes.length,
+      unchanged,
+      errors,
+      warnings,
+      ignoredColumns: ignored,
+      applied: false,
+    };
+
+    if (!apply || errors.length || !changes.length) {
+      return res.json({ success: true, data: { ...summary, changes } });
+    }
+
+    const run = db.transaction(() => {
+      for (const c of changes) {
+        const set = Object.keys(c.fields).map((f) => `${f} = @${f}`).join(", ");
+        const values = Object.fromEntries(Object.entries(c.fields).map(([f, d]) => [f, d.to]));
+        db.prepare(`UPDATE inventory_history SET ${set} WHERE sku_id = @sku_id AND period = @period`)
+          .run({ ...values, sku_id: c.sku_id, period: c.period });
+      }
+    });
+    run();
+
+    for (const c of changes) {
+      logEvent(EVENTS.SKU_UPDATED, {
+        skuId: c.sku_id,
+        input: {
+          source: "history_csv_import",
+          period: c.period,
+          changed_fields: Object.keys(c.fields),
+          changes: Object.fromEntries(Object.entries(c.fields).map(([f, d]) => [f, d])),
+        },
+        output: { closing_qty: c.after.closing_qty, closing_value_sgd: Math.round(c.after.closing_qty * c.after.unit_cost_sgd) },
+      });
+    }
+
+    res.json({ success: true, data: { ...summary, changes, applied: true } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to import history" });
   }
 });
 
@@ -373,7 +622,15 @@ const IMPORT_COLUMNS = [IMPORT_KEY, ...IMPORT_EDITABLE];
 // its own, and ignored on the way back in, since they are computed.
 const EXPORT_CONTEXT = ["available_qty", "health_status", "days_of_cover", "abc_class"];
 
-const NUMERIC_IMPORT_FIELDS = new Set([...NONNEGATIVE_NUMERIC_FIELDS, "on_hand_qty"]);
+// Every column either import treats as a non-negative number. The history
+// quantities join the set so cellChange validates and compares them the same
+// way, including the 1e-9 tolerance that stops a spreadsheet round trip of
+// 0.95 into 0.9500000000000001 being reported as an edit.
+const NUMERIC_IMPORT_FIELDS = new Set([
+  ...NONNEGATIVE_NUMERIC_FIELDS,
+  "on_hand_qty",
+  "opening_qty", "receipts_qty", "issues_qty", "closing_qty",
+]);
 
 // Compare an incoming cell against the stored value. Returns null when nothing
 // moved, so an untouched spreadsheet produces an empty change list.
