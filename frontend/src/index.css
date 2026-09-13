@@ -163,19 +163,15 @@
   .dash-row--even,
   .dash-row--wide-right { grid-template-columns: 1fr; gap: var(--space-5); }
 
-  /* Everything at the top, in two rows.
+  /* Everything at the top, in ONE row.
      This is a desktop web app that can be viewed narrow, not a native mobile
-     app, and the web convention is navigation at the top. An earlier version
-     put the tabs along the bottom on thumb-reach grounds, which is the right
-     answer for an app you install and the wrong one for a page you open.
-
-     Two rows rather than one because leaving the Control Tower, moving inside
-     it, and changing a setting are three unrelated jobs. The top row holds the
-     two that are not navigation, pushed to opposite edges; the second row is
-     navigation alone, and having it to itself is what buys room for labels. */
+     app, so navigation belongs at the top where a web user looks for it. The
+     row holds three separate groups with space between them, because leaving
+     the Control Tower, moving inside it and changing a setting are three
+     unrelated jobs. */
   .app-topbar-glass {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 8px;
     position: fixed;
     top: 0;
@@ -185,14 +181,7 @@
     padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 0;
     pointer-events: none;   /* the strip is a layout container, not a target */
   }
-  .app-topbar-glass__row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-  }
 
-  /* Shared surface for every floating group in the strip. */
   .app-topbar-glass__island,
   .app-topbar-glass__nav {
     pointer-events: auto;
@@ -209,23 +198,40 @@
     align-items: center;
     min-height: 44px;
     padding: 0 10px;
+    flex-shrink: 0;
   }
-  /* The settings popover opens downward from here and anchors to this box
-     rather than to the strip. */
-  .app-topbar-glass__island--settings { position: relative; padding: 0 8px; }
-  .app-topbar-glass__island--settings > div { min-width: 150px; }
+  .app-topbar-glass__island--settings { position: relative; padding: 4px; }
 
-  /* Navigation gets the full width and nothing else in it, which is the only
-     reason four icons with names fit across a phone. */
+  /* Navigation takes whatever is left after Home and the gear. */
   .app-topbar-glass__nav {
     display: flex;
+    flex: 1;
+    min-width: 0;
     padding: 4px;
     gap: 2px;
   }
 
-  /* Clears the two-row strip above. */
+  /* Labels are a CLASS, not an inline style, so this breakpoint can reach them.
+     An inline `display` beats any stylesheet rule without !important, which is
+     exactly how both navigations once rendered on top of each other.
+
+     Below 560px the arithmetic does not work: after Home and the gear there is
+     about 65px per tab, and "Dashboard" needs roughly 84px. Above it there is
+     100px per tab and the labels fit, which covers the narrow desktop window
+     this app is actually used in. */
+  .tab-label { display: inline; }
+  /* The active tab's count needs display: flex to centre its digits, so it
+     cannot share .tab-label, whose display: inline would flatten it. Same
+     breakpoint, different display value. */
+  .tab-badge { display: flex; }
+  @media (max-width: 559px) {
+    .tab-label, .tab-badge { display: none; }
+    .app-topbar-glass__nav a { justify-content: center; }
+  }
+
+  /* Clears the single row strip above. */
   .app-main {
-    padding: 128px 16px 24px;
+    padding: 78px 16px 24px;
   }
 }
 

@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, ChevronDown } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// THE LAUNCHPAD (TASK-47, renamed TASK-48)
+// HOME (TASK-47, renamed TASK-48, renamed again TASK-50)
 //
-// The first screen, and the name we use for it in conversation. "Launchpad" is
-// the established term for a screen of entry points into separate workspaces
-// (SAP Fiori, macOS), so it carries its meaning without explanation and is
-// unambiguous spoken aloud, which "home" or "the menu" are not.
+// The first screen, and the name we use for it in conversation. It was briefly
+// called the Launchpad, after SAP Fiori and macOS, on the grounds that "home"
+// is ambiguous once three workspaces exist. Stan chose Home, and he is right
+// that the ambiguity is theoretical while the familiarity is not: every user
+// already knows what Home means and nobody needs the distinction explained.
 //
 // Three ways into the same inventory, ordered the way stock actually moves: it
 // arrives, it leaves, and somebody upstairs decides what to do about what is
@@ -91,7 +92,7 @@ function Detail({ body }) {
   );
 }
 
-export default function Launchpad() {
+export default function Home() {
   return (
     <div style={{
       minHeight: "100vh", background: "var(--bg)",

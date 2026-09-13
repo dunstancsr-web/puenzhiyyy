@@ -23,7 +23,7 @@ import SettingsMenu from "./SettingsMenu";
 //
 // Two rows rather than one pill, because leaving the Control Tower, moving
 // inside it, and changing a setting are three unrelated jobs. The old single
-// island also placed the Launchpad grid icon immediately beside the Dashboard
+// island also placed the Home grid icon immediately beside the Dashboard
 // grid icon: two near-identical glyphs one tap apart. The top row now holds the
 // two things that are not navigation, pushed to opposite edges; the second row
 // is navigation alone, and having it to itself is what buys room for labels.
@@ -90,7 +90,7 @@ export default function Sidebar() {
           fontSize: 13.5, fontWeight: 600,
         }}>
           <LayoutGrid size={15} />
-          Launchpad
+          Home
           <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>Switch</span>
         </Link>
 
@@ -136,29 +136,23 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* ── Narrow: two row strip, all at the top ────────────────────────── */}
+      {/* ── Narrow: one row at the top, three groups ─────────────────────────
+          Home, navigation, settings. The settings trigger collapses to a gear,
+          which is what freed the roughly 150px that let this fit on one row. */}
       <div className="app-topbar-glass">
-        {/* Row one: the two jobs that are not navigation, at opposite edges. */}
-        <div className="app-topbar-glass__row">
-          <div className="app-topbar-glass__island">
-            <Link to="/" aria-label="Launchpad" style={{
-              display: "flex", alignItems: "center", gap: 7, textDecoration: "none",
-              color: "var(--text-primary)", fontSize: 13.5, fontWeight: 600, padding: "0 4px",
-            }}>
-              <LayoutGrid size={16} />
-              Launchpad
-            </Link>
-          </div>
-
-          <div className="app-topbar-glass__island app-topbar-glass__island--settings">
-            <SettingsMenu align="down" />
-          </div>
+        <div className="app-topbar-glass__island">
+          <Link to="/" aria-label="Home" style={{
+            display: "flex", alignItems: "center", gap: 7, textDecoration: "none",
+            color: "var(--text-primary)", fontSize: 13.5, fontWeight: 600, padding: "0 4px",
+          }}>
+            <LayoutGrid size={16} />
+            Home
+          </Link>
         </div>
 
-        {/* Row two: navigation, with the whole width to itself. */}
         <nav className="app-topbar-glass__nav" aria-label="Primary">
           {navItems.map(({ to, label, icon: Icon, badge }) => (
-            <NavLink key={to} to={to}
+            <NavLink key={to} to={to} title={label}
               style={({ isActive }) => ({
                 flex: 1, minWidth: 0,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
@@ -183,17 +177,19 @@ export default function Sidebar() {
                       </span>
                     )}
                   </span>
-                  <span style={{
+                  {/* className, not an inline display, so the 560px rule can
+                      hide it. See the note in index.css. */}
+                  <span className="tab-label" style={{
                     fontSize: 12, fontWeight: isActive ? 700 : 500,
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
                     {label}
                   </span>
                   {badge > 0 && isActive && (
-                    <span style={{
+                    <span className="tab-badge" style={{
                       background: "rgba(255,255,255,0.28)", color: "#fff",
                       fontSize: 10, fontWeight: 700, minWidth: 16, height: 16,
-                      borderRadius: 99, display: "flex", alignItems: "center",
+                      borderRadius: 99, alignItems: "center",
                       justifyContent: "center", padding: "0 4px", flexShrink: 0,
                     }}>
                       {badge}
@@ -204,6 +200,10 @@ export default function Sidebar() {
             </NavLink>
           ))}
         </nav>
+
+        <div className="app-topbar-glass__island app-topbar-glass__island--settings">
+          <SettingsMenu align="down" compact />
+        </div>
       </div>
     </>
   );

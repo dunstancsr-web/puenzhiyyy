@@ -71,9 +71,9 @@ feedback, not suggestions to re-litigate.
 
 ### Names we use
 
-- **The Launchpad** is the screen at `/` with the three workspace cards. Use this
-  name in conversation; "home" and "the menu" are ambiguous when three separate
-  workspaces exist. `frontend/src/pages/Launchpad.jsx`.
+- **Home** is the screen at `/` with the three workspace cards.
+  `frontend/src/pages/Home.jsx`. It was briefly called the Launchpad; Stan
+  renamed it, on the grounds that everyone already knows what Home means.
 - **The Control Tower** is the desktop analysis side: Dashboard, Inventory,
   Alerts, Activity. It is the only part that wears the sidebar.
 - **Goods In** and **Goods Out** are the handheld warehouse floor flows. Industry

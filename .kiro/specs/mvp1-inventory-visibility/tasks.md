@@ -1499,6 +1499,28 @@ group when they are three unrelated jobs.
 viewport unchanged, as it has all session, so the two islands and the tab bar have only been reasoned
 about, not seen. The desktop sidebar and the settings popover were both checked in the browser.
 
+## TASK-50 - Home, and one row (2026-09-13)
+
+- [x] The Launchpad is now **Home**. It briefly carried the SAP Fiori name on the grounds that "home" is
+      ambiguous once three workspaces exist. Stan renamed it, and he is right: the ambiguity is
+      theoretical while the familiarity is not. Every user already knows what Home means and nobody
+      needs the distinction explained. File, component and CLAUDE.md updated.
+- [x] The narrow-screen settings trigger collapses to a gear. The state label was costing roughly 150px
+      that navigation needed more, and it moves into the tooltip and the aria-label rather than
+      disappearing. The desktop sidebar has the room and keeps the text.
+- [x] Two rows collapse to one: Home, navigation, settings, with space between the three groups.
+
+**The arithmetic, stated because it constrains the result.** At 420px, after Home (78px), the gear
+(42px), padding and gaps, roughly 65px per tab remains, and "Dashboard" needs about 84px. So labels
+cannot show on a phone no matter how the row is arranged. They are hidden below 560px and shown above
+it, which covers the narrow desktop window this app is actually used in.
+
+Two implementation notes. The label visibility is a CLASS, never an inline style, because an inline
+`display` beats any stylesheet rule without `!important` and that is exactly how both navigations once
+rendered on top of each other. And the active tab's count needs `display: flex` to centre its digits, so
+it cannot share `.tab-label`, whose `display: inline` would flatten it; it has `.tab-badge` on the same
+breakpoint with a different display value.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

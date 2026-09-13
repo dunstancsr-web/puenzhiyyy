@@ -26,7 +26,7 @@ import { api } from "../api/inventory";
 
 const MODE_ICON = { rules: Calculator, local: Cpu, cloud: Cloud };
 
-export default function SettingsMenu({ align = "up" }) {
+export default function SettingsMenu({ align = "up", compact = false }) {
   const { theme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(null);      // { mode, modes }
@@ -64,12 +64,24 @@ export default function SettingsMenu({ align = "up" }) {
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
       {/* The trigger carries the state. Collapsing the controls should not cost
-          the operator the ability to see which engine is answering. */}
+          the operator the ability to see which engine is answering.
+
+          Compact is the gear alone. In the top strip the state label was
+          costing roughly 150px that navigation needed more, and the state moves
+          into the tooltip and the aria-label rather than disappearing. The
+          desktop sidebar has the room, so it keeps the text. */}
       <button
         onClick={() => { setOpen((v) => !v); setPending(null); }}
         aria-expanded={open}
         aria-haspopup="dialog"
-        style={{
+        aria-label={compact ? `Settings. ${activeMode ? activeMode.label : ""}, ${themeLabel}` : undefined}
+        title={compact && activeMode ? `${activeMode.label} · ${themeLabel}` : undefined}
+        style={compact ? {
+          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 34, height: 34, borderRadius: 999, flexShrink: 0,
+          border: "none", background: open ? "var(--surface-2)" : "transparent",
+          color: "var(--text-secondary)", cursor: "pointer",
+        } : {
           display: "flex", alignItems: "center", gap: 9, width: "100%",
           padding: "9px 10px", borderRadius: "var(--radius)",
           border: "1px solid var(--sidebar-border)",
@@ -78,18 +90,24 @@ export default function SettingsMenu({ align = "up" }) {
           fontSize: 13, fontWeight: 600, textAlign: "left",
         }}
       >
-        <Settings size={15} style={{ flexShrink: 0 }} />
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {activeMode ? activeMode.label : "Settings"}
-          <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> · {themeLabel}</span>
-        </span>
+        <Settings size={compact ? 17 : 15} style={{ flexShrink: 0 }} />
+        {!compact && (
+          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {activeMode ? activeMode.label : "Settings"}
+            <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> · {themeLabel}</span>
+          </span>
+        )}
       </button>
 
       {open && (
         <div role="dialog" aria-label="Settings"
           style={{
-            position: "absolute", left: 0, right: 0, zIndex: 60,
+            position: "absolute", zIndex: 60,
             [align === "up" ? "bottom" : "top"]: "calc(100% + 8px)",
+            // Anchored to the right when compact: the trigger sits at the right
+            // edge of the strip, so a left-anchored panel would open off screen.
+            ...(compact ? { right: 0 } : { left: 0, right: 0 }),
+            width: compact ? 256 : undefined,
             minWidth: 248,
             background: "var(--card-bg)", border: "1px solid var(--border)",
             borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-md)",
