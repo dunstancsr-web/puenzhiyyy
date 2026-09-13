@@ -48,6 +48,33 @@ export function Seal({ size = 30 }) {
   );
 }
 
+// The full 2x2 chop, for surfaces with room. Read top to bottom then right to
+// left, which is why the grid flows by column under direction: rtl: 四 sits
+// top-right and 米 top-left. Left to right would read 四米海行, which is
+// nothing. Unusable in the sidebar at 30px, where four glyphs get about 13px
+// each and the mark becomes texture; comfortable from roughly 48px up.
+export function FullSeal({ size = 56 }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="brush"
+      style={{
+        width: size, height: size, flexShrink: 0, padding: Math.round(size * 0.09),
+        background: "var(--seal)", color: "#fff",
+        borderRadius: Math.round(size * 0.22),
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr",
+        gridAutoFlow: "column", direction: "rtl", gap: 1,
+        fontSize: Math.round(size * 0.37), lineHeight: 1,
+      }}
+    >
+      {["四", "海", "米", "行"].map((c) => (
+        <span key={c} style={{ display: "grid", placeItems: "center" }}>{c}</span>
+      ))}
+    </span>
+  );
+}
+
 export default function Tenant({ compact = false }) {
   if (compact) return <Seal size={26} />;
 

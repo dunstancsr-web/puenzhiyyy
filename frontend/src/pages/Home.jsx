@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, ChevronDown } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, ChevronDown, ArrowRight } from "lucide-react";
 import EventCredit from "../components/EventCredit";
 import AppMark from "../components/AppMark";
+import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME (TASK-47, renamed TASK-48, renamed again TASK-50)
@@ -101,17 +102,46 @@ export default function Home() {
       display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px",
     }}>
       <div style={{ width: "100%", maxWidth: 940 }}>
-        <div style={{ marginBottom: 30 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>
-            <AppMark size={56} />
+        {/* CLIENT-LED masthead. The company owns this screen and StockSense
+            signs the bottom, which is how a deployed system actually presents
+            itself. The trade is real and was made deliberately: the product
+            being judged is no longer the largest thing on the first screen. It
+            is mitigated by the foot of this page and by the Control Tower
+            sidebar, which still leads with StockSense.
+
+            Home is also the only surface with room for the full 2x2 chop. At
+            56px each character has space; at the sidebar's 30px the same mark
+            is texture. */}
+        <div style={{ marginBottom: 26 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
+            <FullSeal size={56} />
             <div>
-              <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, lineHeight: 1.1 }}>StockSense</h1>
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Rice inventory, from the dock to the decision</div>
+              <h1 className="brush" style={{
+                fontSize: "var(--text-xl)", fontWeight: 400, lineHeight: 1.15,
+                color: "var(--text-primary)",
+              }}>
+                {CLIENT_HAN}
+              </h1>
+              <div style={{
+                fontSize: "var(--text-xs)", fontWeight: 600, letterSpacing: "0.12em",
+                textTransform: "uppercase", color: "var(--text-muted)", marginTop: 3,
+              }}>
+                {CLIENT_EN}
+              </div>
             </div>
           </div>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.55, maxWidth: 620 }}>
-            Stock arrives, stock leaves, and somebody has to decide what to do about what is left.
-            Pick where you are.
+
+          {/* The old copy was a sentence about inventory ("stock arrives, stock
+              leaves..."). It read as a mission statement, which is the wrong
+              job for the top of a portal: it described the domain instead of
+              asking for a decision. A question plus a count tells the reader
+              what this screen wants from them, and that there are exactly
+              three answers. */}
+          <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 600, lineHeight: 1.25 }}>
+            Where are you working today?
+          </h2>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4 }}>
+            Three workspaces, one inventory. Pick one to begin.
           </p>
         </div>
 
@@ -155,8 +185,17 @@ export default function Home() {
 
                 {/* Naming the device and the place is the fastest way to tell
                     someone a screen is not meant for them, and it is two words
-                    rather than three lines. */}
-                <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{m.who}</div>
+                    rather than three lines.
+
+                    The arrow beside it is what makes the card read as a button
+                    rather than a panel. A card with a title and a paragraph is
+                    a description; the same card with a direction cue is an
+                    invitation. The disabled one has no arrow, because it goes
+                    nowhere and an arrow would promise that it does. */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{m.who}</div>
+                  {!m.soon && <ArrowRight size={17} style={{ color: m.tint, flexShrink: 0 }} />}
+                </div>
 
                 <Detail body={m.body} />
               </Card>
@@ -164,7 +203,18 @@ export default function Home() {
           })}
         </div>
 
-        <div style={{ marginTop: 26 }}>
+        <div style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--border)" }}>
+          {/* StockSense signs the foot of the page, the way a deployed system
+              credits the platform it runs on. */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
+            marginBottom: 12,
+          }}>
+            <AppMark size={26} />
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 600 }}>
+              Running on <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>StockSense</span>
+            </span>
+          </div>
           <EventCredit align="center" />
         </div>
       </div>
