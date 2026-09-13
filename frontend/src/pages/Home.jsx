@@ -1,9 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, ArrowRight } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, ArrowRight } from "lucide-react";
 import EventCredit from "../components/EventCredit";
 import AppMark from "../components/AppMark";
 import ColHint from "../components/ColHint";
+import TowerIcon from "../components/TowerIcon";
 import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 
 const HERE = {
   to: "/dashboard",
-  icon: LayoutDashboard,
+  icon: TowerIcon,
   tint: "var(--purple)",
   bg: "var(--purple-light)",
   label: "Control Tower",
@@ -80,7 +81,7 @@ function Glyph({ m, size }) {
       background: m.bg, display: "grid", placeItems: "center", flexShrink: 0,
       opacity: m.soon ? 0.5 : 1,
     }}>
-      <I size={Math.round(size * 0.48)} color={m.tint} />
+      <I size={Math.round(size * 0.56)} color={m.tint} />
     </span>
   );
 }
@@ -98,6 +99,20 @@ function Name({ m, size, muted }) {
           looking. Deliberately not a visible button: 12px and muted until
           hovered or focused, so it costs the card no weight. */}
       <ColHint label={m.label} what={m.help} />
+      {/* On the name row. "Building in progress" was too long to sit here and
+          had to go underneath, which pushed the card taller than its partner;
+          "Coming soon" fits beside the name, where a status about the card
+          reads as part of its title rather than as another line of detail. */}
+      {m.soon && (
+        <span style={{
+          fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.03em",
+          textTransform: "uppercase", color: "var(--text-secondary)",
+          border: "1px solid var(--border)", background: "var(--surface-2)",
+          borderRadius: 99, padding: "2px 8px", whiteSpace: "nowrap",
+        }}>
+          Coming soon
+        </span>
+      )}
     </span>
   );
 }
@@ -110,7 +125,7 @@ function Hero({ m }) {
       padding: "var(--space-5)", textDecoration: "none", color: "inherit",
       textAlign: "left", borderColor: m.tint,
     }}>
-      <Glyph m={m} size={52} />
+      <Glyph m={m} size={62} />
       <span style={{ flex: 1, minWidth: 0 }}>
         <Name m={m} size="var(--text-lg)" />
         <span style={{ display: "block", fontSize: "var(--text-sm)", color: m.tint, fontWeight: 600, marginTop: 2 }}>
@@ -137,31 +152,16 @@ function Floor({ m }) {
   const Card = m.soon ? "div" : Link;
   return (
     <Card {...(m.soon ? {} : { to: m.to })} className={`card${m.soon ? "" : " home-card"}`} style={{
-      display: "flex", alignItems: "flex-start", gap: "var(--space-3)",
+      display: "flex", alignItems: "center", gap: "var(--space-3)",
       padding: "var(--space-4)", textDecoration: "none", color: "inherit",
       textAlign: "left", cursor: m.soon ? "default" : "pointer",
     }}>
-      <Glyph m={m} size={40} />
+      <Glyph m={m} size={50} />
       <span style={{ flex: 1, minWidth: 0 }}>
         <Name m={m} size="var(--text-base)" muted={m.soon} />
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 1 }}>
           {m.sub} · {m.who}
         </span>
-        {/* Under the label, not beside it. Alongside, a badge this long left
-            the text about 120px and wrapped "Picking and dispatch · handheld"
-            onto three lines, so the two cards in the pair no longer matched.
-            A status about the whole card belongs under it either way. */}
-        {m.soon && (
-          <span style={{
-            display: "inline-block", marginTop: 8,
-            fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.03em",
-            textTransform: "uppercase", color: "var(--text-secondary)",
-            border: "1px solid var(--border)", background: "var(--surface-2)",
-            borderRadius: 99, padding: "3px 9px", whiteSpace: "nowrap",
-          }}>
-            Building in progress
-          </span>
-        )}
       </span>
       {!m.soon && <ArrowRight size={17} style={{ color: m.tint, flexShrink: 0 }} />}
     </Card>
