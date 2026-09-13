@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
 } from "recharts";
@@ -304,7 +304,14 @@ function buildNeedsAttention(skus) {
 // Collapse-by-default is right for a section that is long, situational or
 // usually irrelevant, which is why the compliance position is folded. This is
 // none of those.
-const NEEDS_ATTENTION_PREVIEW = 5;
+//
+// Three rows read in full, and a fourth rendered underneath a fade. The fade
+// row is the honest version of a scroll cue: it shows that the list continues
+// and roughly how, where a hard cut at row three implies the list simply ends.
+// It is decoration over real content, never a fake row, so the count in the
+// button still describes rows nobody has read yet.
+const NEEDS_ATTENTION_PREVIEW = 3;
+const NEEDS_ATTENTION_TEASE = 1;
 
 // ── Coverage vs (lead time + safety) - one row per SKU, worst gap first ──────
 function buildCoverageData(skus) {
@@ -362,6 +369,21 @@ export default function Dashboard() {
   // the short page it exists to protect.
   const [showAllAttention, setShowAllAttention] = useState(false);
 
+  // Needs Attention now sits ABOVE the charts that filter it, so clicking a
+  // health colour or a matrix cell changes something off screen. Scrolling the
+  // table back into view is what keeps that feedback visible, and it is the
+  // one real cost of putting the worklist first.
+  //
+  // Only on SET, never on clear: clearing usually happens at the table's own
+  // chip, where the user is already looking, and yanking the page at that
+  // moment would be motion with nothing to show for it.
+  const attentionRef = useRef(null);
+  useEffect(() => {
+    if (!filter || !attentionRef.current) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    attentionRef.current.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+  }, [filter]);
+
   const load = useCallback(() => {
     setError(null);
     setSkus(null);
@@ -394,8 +416,16 @@ export default function Dashboard() {
   // Filter first, cap for display second - a filter must search every real
   // exception, not just the top slice that happened to fit on screen.
   const filteredAttention = attention.filter((a) => matchesFilter(a, filter, skuIndex));
-  const shownAttention = showAllAttention ? filteredAttention : filteredAttention.slice(0, NEEDS_ATTENTION_PREVIEW);
-  const hiddenAttentionCount = filteredAttention.length - shownAttention.length;
+  const shownAttention = showAllAttention
+    ? filteredAttention
+    : filteredAttention.slice(0, NEEDS_ATTENTION_PREVIEW + NEEDS_ATTENTION_TEASE);
+  // Counted against the rows READ IN FULL, not against the rows rendered. The
+  // teased fourth row is half legible behind the fade, so counting it as seen
+  // would make the button under-report what is left.
+  const hiddenAttentionCount = showAllAttention
+    ? 0
+    : Math.max(0, filteredAttention.length - NEEDS_ATTENTION_PREVIEW);
+  const teasing = !showAllAttention && filteredAttention.length > NEEDS_ATTENTION_PREVIEW;
   // The badge takes its colour from the worst row present, and the list is
   // already sorted worst first, so that is simply the first one. A count alone
   // would say "7 things"; the colour says how bad the worst of them is.
@@ -422,9 +452,20 @@ export default function Dashboard() {
 
           One card, because these are one thought, separated internally by a
           hairline rather than being five floating islands on the page
-          background. It carries no visible heading: it is the first thing on
-          the page and a label would be chrome explaining the obvious. ── */}
+          background.
+
+          It now carries the heading too. I had argued it did not need one,
+          being the first thing on the page, but a name you can only find in a
+          source comment is not much of a shared name: seeing "Key Metrics" on
+          screen is what makes it usable in conversation. ── */}
       <div className="card" style={{ marginBottom: "var(--space-5)" }}>
+        {/* Matches the Section heading treatment exactly, so this card reads as
+            a peer of Needs Attention and the rest rather than as a different
+            kind of object. No subtitle: the two group labels inside already
+            carry the questions this card answers. */}
+        <div style={{ fontWeight: 600, fontSize: "var(--text-lg)", marginBottom: "var(--space-4)" }}>
+          Key Metrics
+        </div>
         {/* No justifyContent: space-between here. It pinned the chart to the
             far edge of a ~1300px card, leaving ~700px of gap between a number
             and the chart that exists to explain that number - which reads as
@@ -542,7 +583,7 @@ export default function Dashboard() {
           analysis (health mix, ABC x XYZ) sits below it. It used to be the
           other way round, which pushed the single most actionable widget on
           the page off-screen behind a segmentation matrix. ── */}
-      <div className="dash-row dash-row--full" style={{ marginBottom: "var(--space-5)" }}>
+      <div ref={attentionRef} className="dash-row dash-row--full" style={{ marginBottom: "var(--space-5)", scrollMarginTop: "var(--space-5)" }}>
         <Section title="Needs Attention" subtitle="Every open exception, ranked by urgency then financial exposure" hint={HINTS.needsAttention}
           badge={filteredAttention.length} badgeTone={attentionTone}
           collapsible storageKey="needs-attention" defaultOpen>
@@ -565,6 +606,18 @@ export default function Dashboard() {
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
+              {/* The fade is anchored to a wrapper around the TABLE ALONE, not
+                  around the table plus the button. A first version put both in
+                  one relative container, so bottom: 0 was below the button and
+                  the fade washed out the very control it exists to advertise. */}
+              <div style={{ position: "relative" }}>
+              {teasing && (
+                <div aria-hidden="true" style={{
+                  position: "absolute", left: 0, right: 0, bottom: 0, height: 78,
+                  pointerEvents: "none",
+                  background: "linear-gradient(to bottom, transparent, var(--card-bg) 86%)",
+                }} />
+              )}
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
                 <thead>
                   <tr>
@@ -598,18 +651,24 @@ export default function Dashboard() {
                   ))}
                 </tbody>
               </table>
+              </div>
               {/* The reveal names what is behind it rather than saying "Show
-                  more", so the choice to press it is informed. */}
+                  more", so the choice to press it is informed. Centred and
+                  full-width-ish because it sits directly under the fade and is
+                  the obvious next move; a small link tucked left would read as
+                  a footnote to the table rather than its continuation. */}
               {(hiddenAttentionCount > 0 || showAllAttention) && (
-                <div style={{ paddingTop: "var(--space-3)" }}>
+                <div style={{ display: "flex", justifyContent: "center", paddingTop: "var(--space-3)" }}>
                   <button type="button" onClick={() => setShowAllAttention((v) => !v)}
                     style={{
-                      display: "inline-flex", alignItems: "center", gap: 6,
-                      background: "none", border: "none", cursor: "pointer", padding: "4px 8px",
-                      marginLeft: 2, borderRadius: "var(--radius)",
-                      color: "var(--blue)", fontSize: "var(--text-sm)", fontWeight: 600,
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      minWidth: 240, padding: "13px 26px",
+                      background: "var(--surface-2)", border: "1px solid var(--border)",
+                      borderRadius: 99, cursor: "pointer",
+                      color: "var(--blue)", fontSize: "var(--text-base)", fontWeight: 600,
+                      transition: "background 0.15s, border-color 0.15s",
                     }}>
-                    <ChevronDown size={15} style={{ transform: showAllAttention ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+                    <ChevronDown size={18} style={{ transform: showAllAttention ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
                     {showAllAttention
                       ? `Show fewer`
                       : `Show ${hiddenAttentionCount} more`}
