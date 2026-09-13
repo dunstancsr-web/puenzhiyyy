@@ -75,21 +75,39 @@ const moneyTrend = (d) => ({ dir: d.dir, good: d.good, text: fmt$(Math.abs(d.dif
 
 // ── Plain-language help text (ELI18: assume zero prior inventory-ops
 // knowledge, but not childish) for every ColHint on this page ─────────────────
+//
+// `term` is the industry name for a metric whose LABEL is now plain English.
+// Six of the eight Key Metrics were named in trade jargon that means nothing
+// to the SME owner this project is built for, so the label answers "what risk
+// is this?" and the tooltip footer keeps the real term one hover away. Two
+// labels, Stockout Risk and Overstock, carry no `term` because they were
+// already the plain words and renaming them for symmetry would have traded
+// precision for nothing.
+//
+// Worth knowing, because it is the reason the E&O copy below is as long as it
+// is: the five risks a rice trader actually thinks in do NOT map one-to-one
+// onto these eight cards. Slow moving and idle are two risks fused into one
+// number, and ageing has no card at all - it is a per-SKU status that surfaces
+// in Needs Attention. The copy says so rather than letting the reader assume a
+// missing risk is an absent one.
 const HINTS = {
   heroValue: {
     what: "The total dollar value of every bag of rice currently sitting in the warehouse, valued at what it cost to buy - not what it would sell for.",
-    how: "The figure beside it is the change against last month's closing stock, read from 24 months of stored month-end history rather than a fixed reference. Going up isn't automatically good or bad - check Overstock and Excess & Obsolete below to see whether it's deliberate stocking up or stock quietly piling up unsold.",
+    how: "The figure beside it is the change against last month's closing stock, read from stored month-end history rather than a fixed reference. Going up isn't automatically good or bad - check Overstock and Stock That Is Not Selling below to see whether it's deliberate stocking up or stock quietly piling up unsold.\n\nEach bar is split in two. The pale top band is stock that arrived that month; the solid bottom band was already in the warehouse. A bar that stays the same height while the pale band shrinks means you are living off old stock and buying less of it.",
   },
   turnover: {
+    term: "Inventory Turnover",
     what: "How many times your entire stock would sell out and get fully replaced in a year, at the current sales pace.",
-    how: "Higher is usually better - it means cash isn't sitting on a shelf as unsold rice. A low number alongside a high Excess & Obsolete number means stock is piling up faster than it sells.",
+    how: "Higher is usually better - it means cash isn't sitting on a shelf as unsold rice. A low number alongside a high Stock That Is Not Selling figure means stock is piling up faster than it sells.",
   },
   fillRate: {
-    what: "Of everything customers wanted to buy, what percentage did you actually have in stock to sell them?",
+    term: "Fill Rate",
+    what: "Of everything customers wanted to buy, what percentage did you actually have in stock to sell them? This is stockout risk that has already cost you money, rather than a warning about the future.",
     how: "Should be close to 100%. A drop means real sales were turned away somewhere in the portfolio because of a stockout - check Needs Attention for which SKU.",
   },
   gmroi: {
-    what: "Gross Margin Return on Inventory - for every $1 of stock sitting in the warehouse, how many dollars of profit did it generate?",
+    term: "GMROI (Gross Margin Return on Inventory)",
+    what: "For every $1 of stock sitting in the warehouse, how many dollars of profit did it generate?",
     how: "Above $1 means the inventory earns more than it costs to hold. Below $1 means it's tying up more cash than it's returning.",
   },
   stockoutRisk: {
@@ -101,12 +119,19 @@ const HINTS = {
     how: "Overstock ties up cash and warehouse space. It isn't automatically a mistake (e.g. a bulk discount), but it should be a deliberate choice, not a surprise.",
   },
   eo: {
-    what: "Excess & Obsolete - stock that's slow-moving or hasn't sold in a long time, and may need discounting, redirecting, or writing off.",
-    how: "A rising percentage here is money sitting on the shelf that isn't earning its keep. Compare against Turnover: low turnover + high E&O is the clearest warning sign.",
+    term: "Excess & Obsolete (E&O)",
+    what: "Two risks in one number: stock that is barely selling (slow moving) and stock that hasn't sold at all in 90+ days (idle). Both may need discounting, redirecting, or writing off. The figures underneath split it so you can see which of the two you actually have.",
+    how: "A rising share here is money sitting on the shelf not earning its keep. Compare against Times Stock Sold a Year: slow turnover plus a large figure here is the clearest warning sign. The dot beside the label turns amber past 15% of total stock value and red past 30%.\n\nAgeing stock is a third, separate risk and is not in this number. A SKU can be selling perfectly well and still be creeping towards its holding-day limit, so ageing is tracked per SKU and shows up in Needs Attention below.",
   },
   coverageBand: {
-    what: "The share of your portfolio sitting in the sweet spot - not so low you risk running out, not so high you're wasting money holding it.",
-    how: "Target is 80% or higher. Below that, too much of the portfolio is either running low or piled up above what's needed.",
+    term: "Coverage in Target Band",
+    what: "The share of your money sitting at a sensible stock level - not so low you risk running out, not so high you're paying to hold rice nobody has ordered yet.",
+    how: "Target is 80% or higher. Below that, too much of the portfolio is either running low or piled up above what's needed. The two figures underneath say which way it is going wrong.",
+  },
+  compliance: {
+    term: "Compliance Position",
+    what: "How much rice you are holding above (or below) the buffer a stockpile mandate requires you to keep on hand at all times.",
+    how: "A positive figure means you are covered with room to spare. Negative means the buffer is short and needs topping up regardless of what demand looks like. This one is illustrative: the real scheme is company-wide and the required quantity here is a stand-in.",
   },
   needsAttention: {
     what: "Every SKU with an open problem right now - running low, sitting idle, overstocked, or ageing past its shelf-life target - combined into one list instead of three separate ones.",
@@ -409,7 +434,10 @@ export default function Dashboard() {
     setSkus(null);
     setStats(null);
     setFilter(null);
-    Promise.all([api.getSkus(), api.getDashboardStats(), api.getDashboardHistory(24)])
+    // 36, the API's own cap, not 24. The chart's ALL window has to mean
+    // "everything stored", and asking for exactly as many months as happen to
+    // exist today would quietly start lying the first time history grows.
+    Promise.all([api.getSkus(), api.getDashboardStats(), api.getDashboardHistory(36)])
       .then(([skusData, statsData, historyData]) => {
         setSkus(skusData); setStats(statsData); setHistory(historyData);
       })
@@ -549,14 +577,19 @@ export default function Dashboard() {
           between groups; row 1 simply leaves its last cell empty. */}
       <KpiGroup label="Service & availability" note="Can we supply what customers order?" />
       <div className="kpi-grid">
-        <StatCard label="Fill Rate" value={`${s.fillRate}%`} icon={ShieldCheck} hint={HINTS.fillRate}
+        {/* Plain-English labels since 2026-09-13. The industry term for each
+            lives in its hint's `term` field and renders as an "Also called:"
+            footer in the tooltip, so nothing is lost, it is one hover away.
+            Stockout Risk and Overstock below keep their names: they were
+            already plain words. */}
+        <StatCard label="Orders We Could Fill" value={`${s.fillRate}%`} icon={ShieldCheck} hint={HINTS.fillRate}
           status={s.fillRate < 90 ? "bad" : s.fillRate < 98 ? "warn" : "ok"} sub={`${s.lostSales30d} MT unfilled`} />
         <StatCard label="Stockout Risk" value={`SGD ${fmt$(s.stockoutRiskMargin)}`} icon={AlertTriangle} hint={HINTS.stockoutRisk}
           status={s.stockoutSkuCount > 0 ? "bad" : "ok"} sub={`${s.stockoutSkuCount} SKU`} />
         {/* Sits with service because the half that matters most here is the
             "below band" share, which is a stockout signal. Its sub-line names
             both sides, since the metric genuinely straddles the two groups. */}
-        <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
+        <StatCard label="Stock Level Just Right" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
           status={s.coverageInBandPct < 50 ? "bad" : s.coverageInBandPct < 80 ? "warn" : "ok"}
           sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
         {/* Fourth column of the service row since 2026-09-14, rather than a
@@ -571,9 +604,9 @@ export default function Dashboard() {
             render through fmt$ and displayed "+$1K" for what is actually
             +1,058 MT of rice - wrong unit and, via the K-rounding, wrong
             magnitude too. */}
-        <StatCard label="Compliance Position"
+        <StatCard label="Stockpile Buffer"
           value={`${s.compliancePosition >= 0 ? "+" : ""}${fmtMt(s.compliancePosition)} MT`}
-          icon={ShieldCheck} status={s.compliancePosition < 0 ? "bad" : "ok"}
+          icon={ShieldCheck} hint={HINTS.compliance} status={s.compliancePosition < 0 ? "bad" : "ok"}
           sub={`${fmtMt(s.complianceEligibleQty)} MT eligible vs ${fmtMt(s.complianceRequiredQty)} MT required · illustrative`} />
       </div>
 
@@ -581,19 +614,31 @@ export default function Dashboard() {
 
       <KpiGroup label="Working capital" note="Is cash tied up in the right stock?" />
       <div className="kpi-grid">
-        <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
+        <StatCard label="Times Stock Sold a Year" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
           status={s.turnover < 2.5 ? "bad" : s.turnover < 4.0 ? "warn" : "ok"} sub={`${s.dio}d of supply`} />
-        <StatCard label="GMROI" value={`$${s.gmroi.toFixed(2)}`} icon={Target} hint={HINTS.gmroi}
+        <StatCard label="Profit per $1 of Stock" value={`$${s.gmroi.toFixed(2)}`} icon={Target} hint={HINTS.gmroi}
           status={s.gmroi < 1.0 ? "bad" : s.gmroi < 1.5 ? "warn" : "ok"} sub="per $1 of stock" />
         <StatCard label="Overstock" value={`SGD ${fmt$(s.overstockValue)}`} icon={TrendingUp} hint={HINTS.overstock}
           status={s.overstockPct > 10 ? "bad" : s.overstockPct > 5 ? "warn" : "ok"} sub={`${s.overstockPct}% of inventory`} />
         {/* Gross E&O is the headline, but the risk-adjusted figure is what the
             Needs Attention rows below actually use. Showing only the gross
             number up here meant the same concept appeared as $1.36M in one
-            place and $273K in another with nothing explaining the gap. */}
-        <StatCard label="Excess & Obsolete" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX} hint={HINTS.eo}
+            place and $273K in another with nothing explaining the gap.
+
+            The sub-line now SPLITS the headline rather than restating it as a
+            percentage. This card is two distinct risks added together, slow
+            moving and idle, and "36.7% of inventory" said nothing about which
+            one you have - a portfolio that is all slow moving needs a pricing
+            conversation, one that is all idle needs a disposition decision.
+            eoPct is dropped from the line rather than squeezed in: three
+            dollar figures and a percentage do not fit, the split is the more
+            actionable half, and eoPct still drives the status dot with its
+            thresholds named in the hint.
+            Both figures come from portfolioStats(), which partitions the same
+            eoSkus array it summed for the headline, so they add back to it. */}
+        <StatCard label="Stock That Is Not Selling" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX} hint={HINTS.eo}
           status={s.eoPct > 30 ? "bad" : s.eoPct > 15 ? "warn" : "ok"}
-          sub={`${s.eoPct}% of inventory · ${fmt$(s.eoValueRiskAdjusted)} risk-adjusted`} />
+          sub={`${fmt$(s.eoSlowValue)} slow moving · ${fmt$(s.eoIdleValue)} idle · ${fmt$(s.eoValueRiskAdjusted)} risk-adjusted`} />
       </div>
 
       {/* ── One real disclosure: Compliance Position is the only genuinely
@@ -752,44 +797,90 @@ export default function Dashboard() {
 // the month's stock level and what left the warehouse that month belong
 // together, and a second chart to hold one extra number was never worth the
 // control it cost.
-const WINDOWS = [6, 12, 24];
+//
+// Each bar is STACKED into the stock that arrived that month and the stock
+// carried over from before it. The total was never the interesting part: over
+// 24 months inventory value only ranges SGD 2.77M to 3.71M, so on an honest
+// zero baseline every bar sits between 75% and 100% height and the picture
+// reads as flat. The split is what moves (measured: 15% to 31% new), and it
+// answers a question the total cannot - whether a steady stock level is being
+// held by fresh buying or by old stock that is not leaving.
+//
+// The zero baseline stays. Truncating the axis to make a 30% range look
+// dramatic is the classic misleading-bar-chart trick, and the fix for "the
+// bars look similar" is more information inside them, not less axis.
+//
+// Windows are objects rather than month counts because YTD is a DATE FILTER,
+// not a lookback: in September it means 9 months, in January it means 1, and
+// no integer expresses that. Ordered by the span each covers so the row reads
+// as a progression.
+//
+// There is no 24M button. With 24 months stored it would draw exactly the same
+// chart as ALL, and a control that provably does nothing is worse than one
+// fewer control. ALL also stays correct as history grows.
+const WINDOWS = [
+  { key: "6M", label: "6M", slice: (rows) => rows.slice(-6) },
+  { key: "YTD", label: "YTD", slice: (rows) => rows.filter((r) => r.period >= `${new Date().getFullYear()}-01`) },
+  { key: "12M", label: "12M", slice: (rows) => rows.slice(-12) },
+  { key: "ALL", label: "ALL", slice: (rows) => rows },
+];
 const CHART_H = 122;
 
+// How the CURRENT month is drawn differently from a finished one.
+//
+// This used to be a diagonal hatch fill, and that no longer works: the bar is
+// now two coloured segments, and a hatch over both erases the very split the
+// chart exists to show. So the marker has to be something that layers ON TOP
+// of a fill rather than replacing it.
+//
+// What makes this month different is real but mild. Its closing figure is
+// today's actual stock rather than a month-end position, so it is a true
+// number read at a different moment, not an incomplete one. Consumption for
+// the month genuinely is partial, and that lives in the tooltip.
+//
+// Returns props spread onto a <Cell>, so it can reach fillOpacity, stroke,
+// strokeWidth, strokeDasharray - anything SVG takes.
+function partialCellProps(partial) {
+  if (!partial) return {};
+  // TODO(human)
+  return {};
+}
+
 function HeroChart({ history }) {
-  const [months, setMonths] = useState(6);
+  const [windowKey, setWindowKey] = useState("6M");
 
   if (!history?.months?.length) {
     return <div style={{ height: CHART_H + 34 }} />;
   }
-  const rows = history.months.slice(-months).map((d) => ({ ...d, name: MONTH_LABEL(d.period) }));
+  const win = WINDOWS.find((w) => w.key === windowKey) || WINDOWS[0];
+  const rows = win.slice(history.months).map((d) => ({ ...d, name: MONTH_LABEL(d.period) }));
+  // Value labels only while there is room. Past a year they collide into a
+  // grey band and the axis carries the story on its own.
+  const showLabels = rows.length <= 12;
 
   return (
     <div style={{ flex: "1 1 380px", minWidth: 300, maxWidth: 860 }}>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 4 }}>
-        {WINDOWS.map((w) => (
-          <button key={w} type="button" onClick={() => setMonths(w)} aria-pressed={months === w}
-            style={{
-              padding: "3px 9px", borderRadius: 99, cursor: "pointer",
-              border: `1px solid ${months === w ? "var(--blue)" : "var(--border)"}`,
-              background: months === w ? "var(--blue-light)" : "transparent",
-              color: months === w ? "var(--blue)" : "var(--text-muted)",
-              fontSize: "var(--text-xs)", fontWeight: months === w ? 700 : 500,
-            }}>
-            {w}M
-          </button>
-        ))}
+        {WINDOWS.map((w) => {
+          const on = w.key === windowKey;
+          return (
+            <button key={w.key} type="button" onClick={() => setWindowKey(w.key)} aria-pressed={on}
+              style={{
+                padding: "3px 9px", borderRadius: 99, cursor: "pointer",
+                border: `1px solid ${on ? "var(--blue)" : "var(--border)"}`,
+                background: on ? "var(--blue-light)" : "transparent",
+                color: on ? "var(--blue)" : "var(--text-muted)",
+                fontSize: "var(--text-xs)", fontWeight: on ? 700 : 500,
+              }}>
+              {w.label}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ height: CHART_H }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 18, right: 6, bottom: 0, left: 6 }}>
-            <defs>
-              {/* Diagonal hatch for a month still running. */}
-              <pattern id="na-partial" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-                <rect width="6" height="6" fill="var(--surface-2)" />
-                <line x1="0" y1="0" x2="0" y2="6" stroke="var(--text-muted)" strokeWidth="2.5" opacity="0.55" />
-              </pattern>
-            </defs>
             <Tooltip
               cursor={{ fill: "var(--surface-2)" }}
               content={({ active, payload }) => {
@@ -798,6 +889,9 @@ function HeroChart({ history }) {
                 return (
                   <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 11px", fontSize: "var(--text-xs)", boxShadow: "var(--shadow)", lineHeight: 1.55 }}>
                     <strong>{d.name}</strong>: SGD {fmt$(d.closing_value_sgd)} closing
+                    <div style={{ color: "var(--text-muted)" }}>
+                      {fmt$(d.new_value_sgd)} arrived this month · {fmt$(d.carried_value_sgd)} carried over
+                    </div>
                     <div style={{ color: "var(--text-muted)" }}>
                       {fmtMt(d.closing_qty_mt)} MT on hand · {fmtMt(d.consumed_qty_mt)} MT consumed
                       {d.partial && " · month still in progress"}
@@ -808,25 +902,61 @@ function HeroChart({ history }) {
             />
             <XAxis dataKey="name" axisLine={false} tickLine={false}
               tick={{ fontSize: 11, fill: "var(--text-muted)" }} interval="preserveStartEnd" />
-            <Bar dataKey="closing_value_sgd" radius={[3, 3, 0, 0]} isAnimationActive={false} maxBarSize={96}>
-              {/* Labels only while there is room for them. At 24 months they
-                  collide into a grey band and the axis carries the story. */}
-              {months <= 12 && (
-                <LabelList dataKey="closing_value_sgd" position="top" formatter={(v) => fmt$(v)}
-                  style={{ fontSize: 10, fontWeight: 700, fill: "var(--text-secondary)" }} />
+            {/* Bottom of the stack: what was already in the warehouse. Drawn
+                first so the layers sit the way stock physically does, old
+                underneath and new on top. Square corners, since this segment
+                is never the top of the bar. */}
+            <Bar dataKey="carried_value_sgd" stackId="v" isAnimationActive={false} maxBarSize={96}>
+              {rows.map((d, i) => (
+                <Cell key={i} fill="var(--blue)" {...partialCellProps(d.partial)} />
+              ))}
+            </Bar>
+            {/* Top of the stack: what arrived that month. */}
+            <Bar dataKey="new_value_sgd" stackId="v" radius={[3, 3, 0, 0]} isAnimationActive={false} maxBarSize={96}>
+              {/* The label sits on the top segment but must read the TOTAL.
+                  LabelList's default dataKey behaviour would print the
+                  new-arrivals figure alone, with nothing on screen saying it
+                  is a part rather than the whole, which is a worse failure
+                  than no label: it would contradict the hero number beside it
+                  by roughly 70%. `content` reads the row instead. */}
+              {showLabels && (
+                <LabelList dataKey="new_value_sgd" position="top"
+                  content={({ x, y, width, index }) => (
+                    <text x={x + width / 2} y={y - 5} textAnchor="middle"
+                      style={{ fontSize: 10, fontWeight: 700, fill: "var(--text-secondary)" }}>
+                      {fmt$(rows[index].closing_value_sgd)}
+                    </text>
+                  )} />
               )}
               {rows.map((d, i) => (
-                <Cell key={i} fill={d.partial ? "url(#na-partial)" : "var(--blue)"} />
+                <Cell key={i} fill="var(--blue-soft)" {...partialCellProps(d.partial)} />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 3, textAlign: "right" }}>
-        Stock at each month end, at cost · {history.coverage?.periods} months stored
+      {/* Two shades of one hue are not self-explaining, so the split needs a
+          key. It joins the caption line that already existed rather than
+          taking a row of its own, which costs no vertical space. */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap",
+        gap: "0 12px", fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 3,
+      }}>
+        <Swatch fill="var(--blue-soft)" label="arrived that month" />
+        <Swatch fill="var(--blue)" label="carried over" />
+        <span>At cost · {history.coverage?.periods} months stored</span>
       </div>
     </div>
+  );
+}
+
+function Swatch({ fill, label }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+      <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 2, background: fill, flexShrink: 0 }} />
+      {label}
+    </span>
   );
 }
 

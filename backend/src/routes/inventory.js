@@ -305,10 +305,27 @@ router.get("/dashboard/history", (req, res) => {
     // is derived here rather than stored, and it uses each row's OWN
     // unit_cost_sgd, so a price change today cannot rewrite what last year's
     // stock was worth.
+    //
+    // new_value_sgd splits that closing value into the stock that ARRIVED in
+    // the month and the stock CARRIED OVER from before it, under FIFO (oldest
+    // issued first, which is what a rice warehouse does and what the ageing
+    // engine already assumes):
+    //
+    //   arrived = MIN(receipts_qty, closing_qty)
+    //
+    // Both cases fall out of that one expression. If the month's issues did
+    // not exhaust the opening stock, everything received is still on hand and
+    // arrived = receipts. If issues ran past the opening stock, the only stock
+    // left is new and arrived = closing. No branch needed.
+    //
+    // The MIN is INSIDE the SUM on purpose, so it is evaluated per SKU row
+    // before aggregation. Applying it to portfolio totals would let one SKU's
+    // receipts offset another SKU's issues and quietly overstate the new band.
     const stock = db.prepare(`
       SELECT period,
              ROUND(SUM(closing_qty), 1)                   AS closing_qty_mt,
              ROUND(SUM(closing_qty * unit_cost_sgd))      AS closing_value_sgd,
+             ROUND(SUM(MIN(receipts_qty, closing_qty) * unit_cost_sgd)) AS new_value_sgd,
              ROUND(SUM(receipts_qty), 1)                  AS receipts_qty_mt,
              ROUND(SUM(issues_qty), 1)                    AS issues_qty_mt
         FROM inventory_history
@@ -337,6 +354,11 @@ router.get("/dashboard/history", (req, res) => {
       const c = consumed.get(r.period) || { consumed_qty_mt: 0, consumed_value_sgd: 0, txns: 0 };
       return {
         ...r, ...c,
+        // Subtracted rather than summed a second time, so the two stacked
+        // segments add up to closing_value_sgd exactly. Rounding each half
+        // independently would leave a dollar or two of daylight between the
+        // stack and the hero figure beside it.
+        carried_value_sgd: r.closing_value_sgd - r.new_value_sgd,
         // Only the current month is partial now. History rows are whole
         // months by construction, so the old first-month edge case is gone.
         partial: r.period === thisMonth,

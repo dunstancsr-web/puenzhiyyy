@@ -21,6 +21,13 @@
 
   --blue:           #3b82f6;
   --blue-light:     #eff6ff;
+  /* A second DATA shade of blue, for the lighter half of a stacked bar.
+     --blue-light is a surface tint (used behind pressed buttons and active
+     chips) and is far too pale to read as a filled bar against a white card,
+     so it cannot do this job. Deliberately not redefined in the dark block:
+     unlike the -light tints, which are backgrounds and must flip, this is ink
+     on a chart and reads on both the white and the #1e293b card ground. */
+  --blue-soft:      #93c5fd;
   --green:          #22c55e;
   --green-light:    #f0fdf4;
   --yellow:         #f59e0b;

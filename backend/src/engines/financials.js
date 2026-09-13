@@ -85,6 +85,17 @@ function portfolioStats(skus, demand) {
   const eoSkus = active.filter((s) => s.eo_value > 0);
   const eoValue = sum(eoSkus, "eo_value");
   const eoValueRiskAdjusted = sum(eoSkus, "eo_value_risk_adjusted");
+  // E&O is two different risks added together: stock that is barely selling,
+  // and stock that has not sold at all. The dashboard says so on screen now,
+  // so the split has to come from here rather than being re-derived there.
+  //
+  // Note what this is NOT doing: it does not re-decide what counts as E&O. It
+  // partitions the SAME eoSkus array and sums the SAME eo_value field, so the
+  // two parts add back to eoValue by construction. Filtering `active` again on
+  // movement_class would have been a second definition of E&O, and this repo
+  // has been bitten twice by the same figure derived in two places.
+  const eoSlowValue = sum(eoSkus.filter((s) => s.movement_class === "Slow Moving"), "eo_value");
+  const eoIdleValue = sum(eoSkus.filter((s) => s.movement_class === "Idle"), "eo_value");
 
   // Compliance Position (REQ-16, glossary #38) — illustrative, portfolio-level: the real rice-
   // stockpile scheme is company-wide, not per-SKU. Uses demand as an honest stand-in for real
@@ -123,6 +134,8 @@ function portfolioStats(skus, demand) {
     overstockPct: round((overstockValue / totalInventoryValue) * 100),
     overstockSkuCount: overstockSkus.length,
     eoValue: r0(eoValue),
+    eoSlowValue: r0(eoSlowValue),
+    eoIdleValue: r0(eoIdleValue),
     eoValueRiskAdjusted: r0(eoValueRiskAdjusted),
     eoPct: round((eoValue / totalInventoryValue) * 100),
     eoSkuCount: eoSkus.length,

@@ -7,8 +7,9 @@ import ColHint from "./ColHint";
 // color reserved for state and meaning, never decoration. Icon is muted in
 // the neutral case; label/value use standard text tokens. Separates from
 // neighbors via the caller's own hairline divider, not a border+shadow box.
-// `hint` (optional {what, how}) adds a ColHint ⓘ next to the label - plain-
-// language help for jargon terms like "GMROI" or "turnover".
+// `hint` (optional {what, how, term}) adds a ColHint ⓘ next to the label -
+// plain-language help, plus the industry term for any label that has been
+// written in plain English rather than in trade jargon.
 export default function StatCard({ label, value, icon: Icon, sub, target, trend, status = "ok", hint }) {
   // Only a genuine "bad" recolours the number itself. "warn" gets a small
   // amber dot next to the label instead: with this portfolio, six of seven
@@ -41,7 +42,7 @@ export default function StatCard({ label, value, icon: Icon, sub, target, trend,
             />
           )}
           {label}
-          {hint && <ColHint label={label} what={hint.what} how={hint.how} />}
+          {hint && <ColHint label={label} what={hint.what} how={hint.how} term={hint.term} />}
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)", marginTop: 2, flexWrap: "wrap" }}>
           <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: statusColor, lineHeight: 1.2 }}>
