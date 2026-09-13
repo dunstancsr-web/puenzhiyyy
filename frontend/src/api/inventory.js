@@ -76,9 +76,23 @@ export const api = {
   },
   importSkusCsv: (csv, apply) => request("/skus/import", { method: "POST", body: { csv, apply } }),
 
+  // Monthly history (TASK-85). A separate file from the SKU export because it
+  // has a different grain: one row per SKU per month, not one per SKU.
+  exportHistoryCsv: async (months = 24) => {
+    let res;
+    try {
+      res = await fetch(`${BASE}/skus/history/export?months=${months}`);
+    } catch {
+      throw new Error(UNREACHABLE);
+    }
+    if (!res.ok) throw new Error("Could not export the history. Check the backend log.");
+    return res.text();
+  },
+  importHistoryCsv: (csv, apply) => request("/skus/history/import", { method: "POST", body: { csv, apply } }),
+
   // Dashboard
   getDashboardStats: () => request("/dashboard/stats"),
-  getDashboardHistory: (months = 6) => request(`/dashboard/history?months=${months}`),
+  getDashboardHistory: (months = 24) => request(`/dashboard/history?months=${months}`),
 
   // Alerts
   getAlerts: () => request("/alerts"),

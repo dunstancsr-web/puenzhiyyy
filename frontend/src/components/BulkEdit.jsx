@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Table2, Download, Upload, AlertTriangle, Check, ChevronRight } from "lucide-react";
+import { Table2, Download, Upload, CalendarRange, AlertTriangle, Check, ChevronRight } from "lucide-react";
 import Modal, { ModalBtn } from "./Modal";
 import { api } from "../api/inventory";
 
@@ -22,6 +22,29 @@ import { api } from "../api/inventory";
 // step is the product.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// The two datasets this menu can move. Keeping them in one table rather than
+// duplicating the export and import handlers means the review dialog, the
+// error handling and the toast are shared: a second file to edit, not a second
+// code path to maintain.
+const DATASETS = {
+  skus: {
+    label: "SKUs",
+    downloadNote: "Every SKU and every editable field",
+    uploadNote: "Review the changes before anything is saved",
+    file: () => `stocksense-inventory-${new Date().toISOString().slice(0, 10)}.csv`,
+    export: () => api.exportSkusCsv(),
+    import: (csv, apply) => api.importSkusCsv(csv, apply),
+  },
+  history: {
+    label: "monthly history",
+    downloadNote: "24 months of stock movement, one row per SKU per month",
+    uploadNote: "Rows must balance and follow on from each other",
+    file: () => `stocksense-history-${new Date().toISOString().slice(0, 10)}.csv`,
+    export: () => api.exportHistoryCsv(24),
+    import: (csv, apply) => api.importHistoryCsv(csv, apply),
+  },
+};
+
 export default function BulkEdit({ onImported }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(null);       // "export" | "read" | "apply"
@@ -29,6 +52,10 @@ export default function BulkEdit({ onImported }) {
   const [preview, setPreview] = useState(null); // server's dry-run result
   const [csv, setCsv] = useState(null);         // held so apply sends the same bytes
   const [done, setDone] = useState(null);
+  // Which dataset the open file picker is for. Held in a ref, not state: it is
+  // set immediately before the picker opens and read in its change handler,
+  // and a state update would not have landed by then.
+  const datasetRef = useRef("skus");
   const wrapRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -41,16 +68,17 @@ export default function BulkEdit({ onImported }) {
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
   }, [menuOpen]);
 
-  const doExport = useCallback(async () => {
+  const doExport = useCallback(async (which) => {
+    const ds = DATASETS[which];
     setMenuOpen(false); setError(null); setBusy("export");
     try {
-      const text = await api.exportSkusCsv();
+      const text = await ds.export();
       // Built here rather than linking straight at /api/skus/export so a failed
       // export surfaces as a message in the UI instead of a browser error page.
       const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `stocksense-inventory-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = ds.file();
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -71,9 +99,10 @@ export default function BulkEdit({ onImported }) {
     setError(null); setDone(null); setBusy("read");
     try {
       const text = await file.text();
-      const result = await api.importSkusCsv(text, false);
+      const which = datasetRef.current;
+      const result = await DATASETS[which].import(text, false);
       setCsv(text);
-      setPreview({ ...result, fileName: file.name });
+      setPreview({ ...result, fileName: file.name, dataset: which });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -84,7 +113,7 @@ export default function BulkEdit({ onImported }) {
   const applyImport = useCallback(async () => {
     setBusy("apply"); setError(null);
     try {
-      const result = await api.importSkusCsv(csv, true);
+      const result = await DATASETS[preview?.dataset || "skus"].import(csv, true);
       setPreview(null);
       setCsv(null);
       setDone(result);
@@ -94,7 +123,7 @@ export default function BulkEdit({ onImported }) {
     } finally {
       setBusy(null);
     }
-  }, [csv, onImported]);
+  }, [csv, preview, onImported]);
 
   const blocked = preview ? preview.errors.length > 0 || preview.changed === 0 : false;
 
@@ -124,12 +153,21 @@ export default function BulkEdit({ onImported }) {
           background: "var(--card-bg)", border: "1px solid var(--border)",
           borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-md)",
         }}>
-          <MenuItem icon={Download} title="Download CSV"
-            note="Every SKU and every editable field"
-            onClick={doExport} />
-          <MenuItem icon={Upload} title="Upload CSV"
-            note="Review the changes before anything is saved"
-            onClick={() => { setMenuOpen(false); fileRef.current?.click(); }} />
+          <MenuItem icon={Download} title="Download SKUs"
+            note={DATASETS.skus.downloadNote}
+            onClick={() => doExport("skus")} />
+          <MenuItem icon={Upload} title="Upload SKUs"
+            note={DATASETS.skus.uploadNote}
+            onClick={() => { setMenuOpen(false); datasetRef.current = "skus"; fileRef.current?.click(); }} />
+
+          <div style={{ height: 1, background: "var(--border)", margin: "5px 8px" }} />
+
+          <MenuItem icon={CalendarRange} title="Download history"
+            note={DATASETS.history.downloadNote}
+            onClick={() => doExport("history")} />
+          <MenuItem icon={Upload} title="Upload history"
+            note={DATASETS.history.uploadNote}
+            onClick={() => { setMenuOpen(false); datasetRef.current = "history"; fileRef.current?.click(); }} />
         </div>
       )}
 
@@ -176,7 +214,7 @@ function MenuItem({ icon: Icon, title, note, onClick }) {
 // stop; changes second, grouped by SKU so the unit of review is "this product"
 // rather than "this cell".
 function ImportPreview({ preview }) {
-  const { fileName, rows, changed, unchanged, errors, ignoredColumns } = preview;
+  const { fileName, rows, changed, unchanged, errors, warnings, ignoredColumns } = preview;
   const halt = errors.length > 0;
 
   return (
@@ -206,6 +244,15 @@ function ImportPreview({ preview }) {
         </Panel>
       )}
 
+      {warnings?.length > 0 && (
+        <Panel tone="warn" icon={AlertTriangle} title="Worth checking, but not blocking"
+          body="These rows can be saved. The newest month no longer matches the stock recorded as being on hand today, which is expected if you are correcting the months first and the position afterwards.">
+          <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: "var(--text-sm)", lineHeight: 1.6 }}>
+            {warnings.slice(0, 8).map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </Panel>
+      )}
+
       {!halt && changed === 0 && (
         <Panel tone="muted" icon={Check} title="Nothing to apply"
           body="Every row in this file matches what is already stored, so there is no change to make." />
@@ -218,6 +265,10 @@ function ImportPreview({ preview }) {
               <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginBottom: 6 }}>
                 {c.name}
                 <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> · {c.sku_id}</span>
+                {/* History rows are identified by SKU AND period, so the period
+                    has to appear or two edited months look like one row edited
+                    twice. */}
+                {c.period && <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> · {c.period}</span>}
               </div>
               {Object.entries(c.fields).map(([field, d]) => (
                 <div key={field} style={{
@@ -259,12 +310,14 @@ function Stat({ n, label, tone }) {
 }
 
 function Panel({ tone, icon: Icon, title, body, children }) {
-  const color = tone === "bad" ? "var(--red)" : "var(--text-muted)";
+  const color = tone === "bad" ? "var(--red)" : tone === "warn" ? "var(--yellow)" : "var(--text-muted)";
+  const edge = tone === "bad" ? "var(--red)" : tone === "warn" ? "var(--yellow)" : "var(--border)";
+  const fill = tone === "bad" ? "var(--red-light)" : tone === "warn" ? "var(--yellow-light)" : "var(--surface-2)";
   return (
     <div style={{
       padding: "13px 15px", borderRadius: "var(--radius)", marginBottom: 16,
-      border: `1px solid ${tone === "bad" ? "var(--red)" : "var(--border)"}`,
-      background: tone === "bad" ? "var(--red-light)" : "var(--surface-2)",
+      border: `1px solid ${edge}`,
+      background: fill,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--text-sm)", color }}>
         <Icon size={15} /> {title}

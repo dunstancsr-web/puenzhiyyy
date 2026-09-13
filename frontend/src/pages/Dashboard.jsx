@@ -14,24 +14,21 @@ import ErrorState from "../components/ErrorState";
 import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
 
-// Reference baseline - hand-set illustrative comparison, not derived from
-// stored history (this project has no historical snapshots yet). Carried over
-// unchanged from the mock era; feeds the trend arrows via delta() below.
-// Deliberately labeled "vs baseline" everywhere in the UI, not "vs last
-// month" - the latter asserts a real, live month-over-month feed that
-// doesn't exist yet, and would silently go stale the moment a real month
-// passes without this constant being hand-updated.
-const PRIOR = {
-  totalInventoryValue: 3_560_000,
-  turnover: 3.3,
-  gmroi: 0.62,
-  fillRate: 96.1,
-  stockoutRiskMargin: 12_000,
-  overstockPct: 6.1,
-  eoPct: 34.0,
-  coverageInBandPct: 41.0,
-};
-
+// The hand-set PRIOR baseline that used to live here is GONE (TASK-85). It was
+// eight constants driving every trend arrow on this page, and the dashboard now
+// reads real month-end figures from inventory_history instead.
+//
+// Only ONE arrow survived that change, and the reason is worth keeping: of the
+// eight, inventory value is the only metric with a like-for-like historical
+// basis. Today's figure is the sum of on-hand times cost, and a past month's is
+// the sum of that month's closing times the cost recorded for it: the same
+// measurement. Every other KPI on this page is built from rolling 30 and 90 day
+// velocity, from current reservations, or from today's policy thresholds, none
+// of which are stored per month. Back-computing them would mean comparing a
+// rolling window against a calendar month and calling the difference a trend.
+//
+// So seven arrows were removed rather than faked. The way to get them back is
+// to snapshot the KPIs monthly from here on, not to reconstruct them.
 function delta(cur, prev, { higherIsBetter = true, unit = "", pp = false } = {}) {
   const diff = +(cur - prev).toFixed(2);
   const dir = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
@@ -73,15 +70,15 @@ const fmtMt = (v) => Math.round(v).toLocaleString("en-SG");
 
 // Trend chip builders (magnitude formatted for the metric type)
 const moneyTrend = (d) => ({ dir: d.dir, good: d.good, text: fmt$(Math.abs(d.diff)) });
-const ppTrend = (d) => ({ dir: d.dir, good: d.good, text: `${Math.abs(d.diff).toFixed(1)} pp` });
-const numTrend = (d, p = "") => ({ dir: d.dir, good: d.good, text: `${p}${Math.abs(d.diff).toFixed(2)}` });
+// ppTrend and numTrend went with the seven arrows they formatted. moneyTrend
+// stays: inventory value is the one metric with a real month-on-month basis.
 
 // ── Plain-language help text (ELI18: assume zero prior inventory-ops
 // knowledge, but not childish) for every ColHint on this page ─────────────────
 const HINTS = {
   heroValue: {
     what: "The total dollar value of every bag of rice currently sitting in the warehouse, valued at what it cost to buy - not what it would sell for.",
-    how: "The number next to it compares to a fixed reference baseline, not a live month-over-month feed - this project doesn't store historical snapshots yet, so treat it as illustrative until that's built. Going up isn't automatically good or bad either way - check Overstock and Excess & Obsolete below to see whether it's deliberate stocking up or stock quietly piling up unsold.",
+    how: "The figure beside it is the change against last month's closing stock, read from 24 months of stored month-end history rather than a fixed reference. Going up isn't automatically good or bad - check Overstock and Excess & Obsolete below to see whether it's deliberate stocking up or stock quietly piling up unsold.",
   },
   turnover: {
     what: "How many times your entire stock would sell out and get fully replaced in a year, at the current sales pace.",
@@ -389,6 +386,7 @@ export default function Dashboard() {
   // widget is a standing preference; expanding a list to see two more rows is
   // a momentary thing, and restoring it on the next visit would quietly undo
   // the short page it exists to protect.
+  const [history, setHistory] = useState(null);
   const [showAllAttention, setShowAllAttention] = useState(false);
 
   // Needs Attention now sits ABOVE the charts that filter it, so clicking a
@@ -411,8 +409,10 @@ export default function Dashboard() {
     setSkus(null);
     setStats(null);
     setFilter(null);
-    Promise.all([api.getSkus(), api.getDashboardStats()])
-      .then(([skusData, statsData]) => { setSkus(skusData); setStats(statsData); })
+    Promise.all([api.getSkus(), api.getDashboardStats(), api.getDashboardHistory(24)])
+      .then(([skusData, statsData, historyData]) => {
+        setSkus(skusData); setStats(statsData); setHistory(historyData);
+      })
       .catch((err) => setError(err.message || "Failed to load dashboard"));
   }, []);
 
@@ -422,15 +422,15 @@ export default function Dashboard() {
   if (!skus || !stats) return <LoadingState label="Loading dashboard…" />;
 
   const s = stats;
+  // One trend, and it is measured rather than assumed. `prior` is last month's
+  // closing value straight from inventory_history; when there is no prior
+  // period the arrow simply does not render, which is the honest result of
+  // having nothing to compare against.
+  const priorValue = history?.prior?.closing_value_sgd ?? null;
   const t = {
-    inventoryValue: delta(s.totalInventoryValue, PRIOR.totalInventoryValue, { higherIsBetter: false, unit: "$" }),
-    turnover: delta(s.turnover, PRIOR.turnover, { higherIsBetter: true }),
-    gmroi: delta(s.gmroi, PRIOR.gmroi, { higherIsBetter: true, unit: "$" }),
-    fillRate: delta(s.fillRate, PRIOR.fillRate, { higherIsBetter: true, pp: true }),
-    stockoutRiskMargin: delta(s.stockoutRiskMargin, PRIOR.stockoutRiskMargin, { higherIsBetter: false, unit: "$" }),
-    overstockPct: delta(s.overstockPct, PRIOR.overstockPct, { higherIsBetter: false, pp: true }),
-    eoPct: delta(s.eoPct, PRIOR.eoPct, { higherIsBetter: false, pp: true }),
-    coverageInBandPct: delta(s.coverageInBandPct, PRIOR.coverageInBandPct, { higherIsBetter: true, pp: true }),
+    inventoryValue: priorValue == null
+      ? null
+      : delta(s.totalInventoryValue, priorValue, { higherIsBetter: false, unit: "$" }),
   };
   const attention = buildNeedsAttention(skus);
   const coverageData = buildCoverageData(skus);
@@ -452,12 +452,7 @@ export default function Dashboard() {
   // already sorted worst first, so that is simply the first one. A count alone
   // would say "7 things"; the colour says how bad the worst of them is.
   const attentionTone = filteredAttention.length > 0 ? filteredAttention[0].tagColor : null;
-  // "Baseline"/"Now" rather than "Last month"/"This month": the comparison
-  // point is a fixed hand-set constant, not a real previous month.
-  const monthTrendData = [
-    { name: "Baseline", value: PRIOR.totalInventoryValue },
-    { name: "Now", value: s.totalInventoryValue },
-  ];
+
 
   return (
     <div>
@@ -527,12 +522,14 @@ export default function Dashboard() {
                 genuinely ambiguous (deliberate stock-up vs stock piling up
                 unsold) and this metric's own hint says exactly that, so
                 painting it red asserted a judgement the copy disclaims. */}
-            <div title="vs a fixed reference baseline - not a live month-over-month feed yet"
-              style={{ fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-secondary)", marginTop: 6 }}>
-              {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs baseline
-            </div>
+            {t.inventoryValue && (
+              <div title={`Closing stock at ${history?.prior?.period}, valued at the cost recorded for that month`}
+                style={{ fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-secondary)", marginTop: 6 }}>
+                {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs last month
+              </div>
+            )}
           </div>
-          <HeroChart baselineData={monthTrendData} />
+          <HeroChart history={history} />
         </div>
 
       {/* ── Secondary strip: core numbers, demoted but never hidden. Every
@@ -553,14 +550,14 @@ export default function Dashboard() {
       <KpiGroup label="Service & availability" note="Can we supply what customers order?" />
       <div className="kpi-grid">
         <StatCard label="Fill Rate" value={`${s.fillRate}%`} icon={ShieldCheck} hint={HINTS.fillRate}
-          status={s.fillRate < 90 ? "bad" : s.fillRate < 98 ? "warn" : "ok"} trend={ppTrend(t.fillRate)} sub={`${s.lostSales30d} MT unfilled`} />
+          status={s.fillRate < 90 ? "bad" : s.fillRate < 98 ? "warn" : "ok"} sub={`${s.lostSales30d} MT unfilled`} />
         <StatCard label="Stockout Risk" value={`SGD ${fmt$(s.stockoutRiskMargin)}`} icon={AlertTriangle} hint={HINTS.stockoutRisk}
-          status={s.stockoutSkuCount > 0 ? "bad" : "ok"} trend={moneyTrend(t.stockoutRiskMargin)} sub={`${s.stockoutSkuCount} SKU`} />
+          status={s.stockoutSkuCount > 0 ? "bad" : "ok"} sub={`${s.stockoutSkuCount} SKU`} />
         {/* Sits with service because the half that matters most here is the
             "below band" share, which is a stockout signal. Its sub-line names
             both sides, since the metric genuinely straddles the two groups. */}
         <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
-          status={s.coverageInBandPct < 50 ? "bad" : s.coverageInBandPct < 80 ? "warn" : "ok"} trend={ppTrend(t.coverageInBandPct)}
+          status={s.coverageInBandPct < 50 ? "bad" : s.coverageInBandPct < 80 ? "warn" : "ok"}
           sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
         {/* Fourth column of the service row since 2026-09-14, rather than a
             disclosure of its own below the card. It belongs here on the
@@ -585,17 +582,17 @@ export default function Dashboard() {
       <KpiGroup label="Working capital" note="Is cash tied up in the right stock?" />
       <div className="kpi-grid">
         <StatCard label="Turnover" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
-          status={s.turnover < 2.5 ? "bad" : s.turnover < 4.0 ? "warn" : "ok"} trend={numTrend(t.turnover)} sub={`${s.dio}d of supply`} />
+          status={s.turnover < 2.5 ? "bad" : s.turnover < 4.0 ? "warn" : "ok"} sub={`${s.dio}d of supply`} />
         <StatCard label="GMROI" value={`$${s.gmroi.toFixed(2)}`} icon={Target} hint={HINTS.gmroi}
-          status={s.gmroi < 1.0 ? "bad" : s.gmroi < 1.5 ? "warn" : "ok"} trend={numTrend(t.gmroi, "$")} sub="per $1 of stock" />
+          status={s.gmroi < 1.0 ? "bad" : s.gmroi < 1.5 ? "warn" : "ok"} sub="per $1 of stock" />
         <StatCard label="Overstock" value={`SGD ${fmt$(s.overstockValue)}`} icon={TrendingUp} hint={HINTS.overstock}
-          status={s.overstockPct > 10 ? "bad" : s.overstockPct > 5 ? "warn" : "ok"} trend={ppTrend(t.overstockPct)} sub={`${s.overstockPct}% of inventory`} />
+          status={s.overstockPct > 10 ? "bad" : s.overstockPct > 5 ? "warn" : "ok"} sub={`${s.overstockPct}% of inventory`} />
         {/* Gross E&O is the headline, but the risk-adjusted figure is what the
             Needs Attention rows below actually use. Showing only the gross
             number up here meant the same concept appeared as $1.36M in one
             place and $273K in another with nothing explaining the gap. */}
         <StatCard label="Excess & Obsolete" value={`SGD ${fmt$(s.eoValue)}`} icon={PackageX} hint={HINTS.eo}
-          status={s.eoPct > 30 ? "bad" : s.eoPct > 15 ? "warn" : "ok"} trend={ppTrend(t.eoPct)}
+          status={s.eoPct > 30 ? "bad" : s.eoPct > 15 ? "warn" : "ok"}
           sub={`${s.eoPct}% of inventory · ${fmt$(s.eoValueRiskAdjusted)} risk-adjusted`} />
       </div>
 
@@ -742,183 +739,99 @@ export default function Dashboard() {
 // zero baseline stays (truncating it to exaggerate a 4% move is the classic
 // misleading-bar-chart trick); the labels are what make it readable, and the
 // near-equal heights are themselves the honest message.
-// ── Hero chart, two views ───────────────────────────────────────────────────
+// ── Hero chart ──────────────────────────────────────────────────────────────
 //
-// "Baseline" is the two-bar comparison this card has always had: today's
-// inventory value against a fixed hand-set reference.
+// Inventory value at each month end, read from inventory_history. This used to
+// be two bars, a hand-set "Baseline" against "Now", because no history existed
+// to draw. It does now: 24 stored month-end closings per SKU, and the figure
+// for the newest period equals stats.totalInventoryValue exactly, because both
+// are the same sum over the same quantities.
 //
-// "6 months" charts MONTHLY CONSUMPTION AT COST, and the label says so, because
-// it is emphatically not a history of inventory value. Nothing records what
-// stock was worth on a past date, and reconstructing it backwards from sales
-// would have to assume no goods were ever received. That draws a smooth line
-// rising into the past: completely plausible, completely wrong. Consumption is
-// recorded, 241 transactions deep, and it is what draws inventory down, which
-// is why it belongs beside this number rather than somewhere else.
-//
-// Partial months are hatched, not hidden. The data opens mid-March and the
-// current month is still running, so each holds roughly half a month of sales;
-// plain bars beside a full month would read as demand collapsing, which is a
-// false story told with true numbers. Hatching is the same encoding
-// StockPositionBar uses for idle stock: present, but not what it looks like.
-function HeroChart({ baselineData }) {
-  const [mode, setMode] = useState("baseline");
-  const [history, setHistory] = useState(null);
-  const [failed, setFailed] = useState(false);
+// The window buttons pick how far back to look rather than switching what is
+// measured. Consumption has not been dropped, it has moved into the tooltip:
+// the month's stock level and what left the warehouse that month belong
+// together, and a second chart to hold one extra number was never worth the
+// control it cost.
+const WINDOWS = [6, 12, 24];
+const CHART_H = 122;
 
-  // Fetched on first switch, not on mount. Most visits never open this view,
-  // and the dashboard already makes two calls before anything renders.
-  useEffect(() => {
-    if (mode !== "months" || history || failed) return;
-    api.getDashboardHistory(6).then(setHistory).catch(() => setFailed(true));
-  }, [mode, history, failed]);
+function HeroChart({ history }) {
+  const [months, setMonths] = useState(6);
 
-  const months = history?.months || [];
+  if (!history?.months?.length) {
+    return <div style={{ height: CHART_H + 34 }} />;
+  }
+  const rows = history.months.slice(-months).map((d) => ({ ...d, name: MONTH_LABEL(d.period) }));
 
   return (
-    // The frame follows the mode, and that is not a compromise, it is the
-    // point: the two views want different widths.
-    //
-    // Baseline is a comparison of TWO numbers. Stretched across 800px its bars
-    // sit at opposite ends of the card, far from the value they explain, which
-    // is the disconnection the original note here warned about. It stays
-    // compact and tight against the number.
-    //
-    // Six months is a real series, and at 400px in a 1605px card it left the
-    // card 46% empty while squeezing six labelled bars into a sparkline slot.
-    // It takes the width instead.
-    //
-    // HEIGHT is fixed across both. Height is what reflows the page below, so
-    // holding it constant is what keeps the toggle from feeling like the page
-    // rearranging itself; a width change inside a deliberate mode switch reads
-    // as the chart changing, which is what it is.
-    <div style={mode === "months"
-      ? { flex: "1 1 380px", minWidth: 300, maxWidth: 860 }
-      : { flexShrink: 0, width: 248 }}>
+    <div style={{ flex: "1 1 380px", minWidth: 300, maxWidth: 860 }}>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 4 }}>
-        {[["baseline", "Baseline"], ["months", "6 months"]].map(([id, label]) => (
-          <button key={id} type="button" onClick={() => setMode(id)} aria-pressed={mode === id}
+        {WINDOWS.map((w) => (
+          <button key={w} type="button" onClick={() => setMonths(w)} aria-pressed={months === w}
             style={{
               padding: "3px 9px", borderRadius: 99, cursor: "pointer",
-              border: `1px solid ${mode === id ? "var(--blue)" : "var(--border)"}`,
-              background: mode === id ? "var(--blue-light)" : "transparent",
-              color: mode === id ? "var(--blue)" : "var(--text-muted)",
-              fontSize: "var(--text-xs)", fontWeight: mode === id ? 700 : 500,
+              border: `1px solid ${months === w ? "var(--blue)" : "var(--border)"}`,
+              background: months === w ? "var(--blue-light)" : "transparent",
+              color: months === w ? "var(--blue)" : "var(--text-muted)",
+              fontSize: "var(--text-xs)", fontWeight: months === w ? 700 : 500,
             }}>
-            {label}
+            {w}M
           </button>
         ))}
       </div>
 
-      {mode === "baseline" ? (
-        <BaselineChart data={baselineData} />
-      ) : failed ? (
-        <div style={{ height: CHART_H, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-          Could not load history.
-        </div>
-      ) : !history ? (
-        // Reserves the frame while loading. Without it the row collapses and
-        // then springs back, which is worse than a beat of blank space.
-        <div style={{ height: CHART_H }} />
-      ) : (
-        <ConsumptionChart data={months} average={history.average} />
-      )}
+      <div style={{ height: CHART_H }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} margin={{ top: 18, right: 6, bottom: 0, left: 6 }}>
+            <defs>
+              {/* Diagonal hatch for a month still running. */}
+              <pattern id="na-partial" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                <rect width="6" height="6" fill="var(--surface-2)" />
+                <line x1="0" y1="0" x2="0" y2="6" stroke="var(--text-muted)" strokeWidth="2.5" opacity="0.55" />
+              </pattern>
+            </defs>
+            <Tooltip
+              cursor={{ fill: "var(--surface-2)" }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0].payload;
+                return (
+                  <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 11px", fontSize: "var(--text-xs)", boxShadow: "var(--shadow)", lineHeight: 1.55 }}>
+                    <strong>{d.name}</strong>: SGD {fmt$(d.closing_value_sgd)} closing
+                    <div style={{ color: "var(--text-muted)" }}>
+                      {fmtMt(d.closing_qty_mt)} MT on hand · {fmtMt(d.consumed_qty_mt)} MT consumed
+                      {d.partial && " · month still in progress"}
+                    </div>
+                  </div>
+                );
+              }}
+            />
+            <XAxis dataKey="name" axisLine={false} tickLine={false}
+              tick={{ fontSize: 11, fill: "var(--text-muted)" }} interval="preserveStartEnd" />
+            <Bar dataKey="closing_value_sgd" radius={[3, 3, 0, 0]} isAnimationActive={false} maxBarSize={96}>
+              {/* Labels only while there is room for them. At 24 months they
+                  collide into a grey band and the axis carries the story. */}
+              {months <= 12 && (
+                <LabelList dataKey="closing_value_sgd" position="top" formatter={(v) => fmt$(v)}
+                  style={{ fontSize: 10, fontWeight: 700, fill: "var(--text-secondary)" }} />
+              )}
+              {rows.map((d, i) => (
+                <Cell key={i} fill={d.partial ? "url(#na-partial)" : "var(--blue)"} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
 
       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 3, textAlign: "right" }}>
-        {mode === "baseline"
-          ? "Inventory value vs a fixed reference"
-          : `Consumed per month, at cost${history?.average ? ` · dashed = ${history.fullMonths}-month average` : ""}`}
+        Stock at each month end, at cost · {history.coverage?.periods} months stored
       </div>
-    </div>
-  );
-}
-
-// One height for both views, so switching changes the bars and nothing else.
-// The old layout jumped from 200x92 to 400x116 on toggle, which read as the
-// page rearranging itself rather than as a chart changing.
-const CHART_H = 122;
-
-function BaselineChart({ data }) {
-  return (
-    <div style={{ height: CHART_H }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 18, right: 6, bottom: 0, left: 6 }}>
-          <Tooltip
-            cursor={{ fill: "var(--surface-2)" }}
-            content={({ active, payload }) => {
-              if (!active || !payload?.length) return null;
-              const d = payload[0].payload;
-              return (
-                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: "var(--text-xs)", boxShadow: "var(--shadow)" }}>
-                  <strong>{d.name}</strong>: SGD {fmt$(d.value)}
-                </div>
-              );
-            }}
-          />
-          <XAxis dataKey="name" axisLine={false} tickLine={false}
-            tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
-          {/* Capped, or two bars in an 800px frame become slabs. The baseline
-              view is a comparison of two numbers, not a use of the space. */}
-          <Bar dataKey="value" radius={[3, 3, 0, 0]} isAnimationActive={false} maxBarSize={86}>
-            <LabelList dataKey="value" position="top" formatter={(v) => fmt$(v)}
-              style={{ fontSize: 11, fontWeight: 700, fill: "var(--text-secondary)" }} />
-            {data.map((d, i) => <Cell key={i} fill={i === data.length - 1 ? "var(--blue)" : "var(--border)"} />)}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
     </div>
   );
 }
 
 const MONTH_LABEL = (m) =>
   new Date(`${m}-01T00:00:00`).toLocaleDateString("en-SG", { month: "short" });
-
-function ConsumptionChart({ data, average }) {
-  const rows = data.map((d) => ({ ...d, name: MONTH_LABEL(d.month) }));
-  return (
-    <div style={{ height: CHART_H }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} margin={{ top: 18, right: 6, bottom: 0, left: 6 }}>
-          <defs>
-            {/* Diagonal hatch for an incomplete month. Declared once and
-                referenced by the Cells that need it. */}
-            <pattern id="na-partial" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-              <rect width="6" height="6" fill="var(--surface-2)" />
-              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--text-muted)" strokeWidth="2.5" opacity="0.55" />
-            </pattern>
-          </defs>
-          <Tooltip
-            cursor={{ fill: "var(--surface-2)" }}
-            content={({ active, payload }) => {
-              if (!active || !payload?.length) return null;
-              const d = payload[0].payload;
-              return (
-                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: "var(--text-xs)", boxShadow: "var(--shadow)", lineHeight: 1.5 }}>
-                  <strong>{d.name}</strong>: SGD {fmt$(d.value_sgd)}
-                  <div style={{ color: "var(--text-muted)" }}>
-                    {d.qty_mt} MT over {d.txns} sales
-                    {d.partial && " · month still in progress"}
-                  </div>
-                </div>
-              );
-            }}
-          />
-          <XAxis dataKey="name" axisLine={false} tickLine={false}
-            tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
-          {average && (
-            <ReferenceLine y={average} stroke="var(--text-muted)" strokeDasharray="4 3" strokeWidth={1} />
-          )}
-          <Bar dataKey="value_sgd" radius={[3, 3, 0, 0]} isAnimationActive={false} maxBarSize={96}>
-            <LabelList dataKey="value_sgd" position="top" formatter={(v) => fmt$(v)}
-              style={{ fontSize: 10, fontWeight: 700, fill: "var(--text-secondary)" }} />
-            {rows.map((d, i) => (
-              <Cell key={i} fill={d.partial ? "url(#na-partial)" : "var(--blue)"} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
 
 // Labeled 100%-stacked bar. Each segment is a real <button> - clickable
 // (filters Needs Attention to that health status) and keyboard-reachable.
