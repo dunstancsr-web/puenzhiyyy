@@ -132,16 +132,11 @@ export default function Sidebar() {
 
         <nav style={{ flex: 1, paddingTop: 6 }}>
           {navItems.map(({ to, label, icon: Icon, badge }) => (
+            // All styling is in .nav-item (index.css). NavLink's own `active`
+            // class carries the selected state, so the hover rule can sit
+            // beside it in the cascade instead of losing to an inline prop.
             <NavLink key={to} to={to}
-              style={({ isActive }) => ({
-                display: "flex", alignItems: "center", gap: 11,
-                padding: "10px 12px", marginBottom: 3, borderRadius: "var(--radius)",
-                textDecoration: "none", fontSize: "var(--text-sm)",
-                fontWeight: isActive ? 600 : 400,
-                background: isActive ? "var(--blue)" : "transparent",
-                color: isActive ? "#fff" : "var(--text-secondary)",
-                transition: "background 0.15s, color 0.15s",
-              })}>
+              className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}>
               {({ isActive }) => (
                 <>
                   {/* 20px, up from 17. Home's glyphs grew and the two screens

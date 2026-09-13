@@ -407,14 +407,39 @@ input, select, textarea {
   border-color: var(--blue);
   color: var(--blue);
 }
-/* The icon steps toward the edge it leads to. One gesture, three properties
-   moving together, rather than a decorative flourish: the control lights up
-   and the mark takes a step out. */
-.sidebar-exit svg { transition: transform 0.16s ease; }
-.sidebar-exit:hover svg, .sidebar-exit:focus-visible svg { transform: translateX(-3px); }
+/* The icon grows in place rather than stepping sideways. Shifting it left
+   moved the label with it, so the whole row twitched; scaling from the centre
+   keeps every other element exactly where it was and still reads as the
+   control waking up. */
+.sidebar-exit svg { transition: transform 0.16s ease; transform-origin: center; }
+.sidebar-exit:hover svg, .sidebar-exit:focus-visible svg { transform: scale(1.18); }
 @media (prefers-reduced-motion: reduce) {
   .sidebar-exit:hover svg, .sidebar-exit:focus-visible svg { transform: none; }
 }
+
+/* ── Sidebar navigation ──────────────────────────────────────────────────────
+   Declared here rather than as inline style props on the NavLink, because an
+   inline background beats a stylesheet rule lacking !important, so a :hover
+   could never have reached it. These rows had no hover state at all: at rest
+   and under the pointer they were pixel-identical, so the only feedback that a
+   row was live was the cursor. */
+.nav-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 12px; margin-bottom: 3px;
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-size: var(--text-sm); font-weight: 400;
+  color: var(--text-secondary); background: transparent;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.nav-item:hover, .nav-item:focus-visible {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.nav-item.active { background: var(--blue); color: #fff; font-weight: 600; }
+/* The active row keeps its fill under the pointer. A grey wash over blue would
+   read as the selection being cleared. */
+.nav-item.active:hover, .nav-item.active:focus-visible { background: var(--blue); color: #fff; }
 
 /* ── Modal entry animations ─────────────────────────────────────────────── */
 @keyframes inv-overlay-in { from { opacity: 0; } to { opacity: 1; } }
