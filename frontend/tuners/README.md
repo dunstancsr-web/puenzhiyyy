@@ -78,3 +78,20 @@ Also generated: edit `src/home-template.html`, then from `src/` run
 `python3 build-page.py home-template.html ../home-layouts.html`. `build-page.py` is the generic
 version of `build-logo.py` and does the same two jobs, inlining the font and escaping every
 non-ASCII character.
+
+## home-editor.html
+
+Option C, editable by drag and drop. Move the blocks of Home between three zones, reorder within a
+zone, adjust the geometry, then Copy layout and paste the result back. Published at
+https://claude.ai/code/artifact/249620f0-343a-46e3-8da4-d3280d20fad4
+
+It snaps to **zones and order**, never to pixels. A layout positioned at absolute coordinates looks
+right in an editor and cannot be built responsively; everything this editor can express maps onto a
+CSS grid with flex columns, so anything arranged in it can actually ship. That constraint is the
+point, not a limitation of the tool.
+
+It also argues back: a live critique panel under the canvas objects as you arrange, so the
+conversation happens while you are deciding rather than afterwards.
+
+Generated: edit `src/editor-template.html`, then from `src/` run
+`python3 build-page.py editor-template.html ../home-editor.html`.

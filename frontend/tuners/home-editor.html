@@ -1,0 +1,428 @@
+<title>Home Layout Editor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+<style>
+@font-face {
+  font-family: "Brush";
+  src: url(data:font/woff2;base64,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) format("woff2");
+  font-display: block;
+}
+
+:root {
+  --ground: #fbfcfd; --panel: #ffffff; --sunk: #f4f6f8;
+  --line: #e3e8ee; --line-soft: #eef1f5;
+  --ink: #16202c; --ink-2: #4a5766; --ink-3: #7b8794;
+  --accent: #2563eb; --accent-sk: #eff4ff;
+  --bad: #b42318; --ok: #027a48; --ok-sk: #eaf6ee;
+  --shadow: 0 1px 2px rgba(16,32,44,.05), 0 8px 24px -12px rgba(16,32,44,.14);
+
+  --app-bg: #f0f2f5; --app-card: #ffffff; --app-border: #e2e6ea;
+  --app-ink: #1a202c; --app-ink2: #475569; --app-ink3: #64748b;
+  --seal: #b3271e; --mark: #1d4ed8;
+  --green: #22c55e; --green-l: #f0fdf4;
+  --blue: #3b82f6;  --blue-l: #eff6ff;
+  --purple: #8b5cf6; --purple-l: #f5f3ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0e1319; --panel: #161d26; --sunk: #1d2631;
+    --line: #2a3541; --line-soft: #222b36;
+    --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+    --accent: #6b9bff; --accent-sk: #17233b; --bad: #f0837a; --ok: #5ac08d; --ok-sk: #12261a;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0e1319; --panel: #161d26; --sunk: #1d2631;
+  --line: #2a3541; --line-soft: #222b36;
+  --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+  --accent: #6b9bff; --accent-sk: #17233b; --bad: #f0837a; --ok: #5ac08d; --ok-sk: #12261a;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground); color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1320px; margin: 0 auto; padding: 26px 22px 60px; }
+
+.mast { border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 22px; }
+.mast h1 { font-family: Newsreader, Georgia, serif; font-size: 32px; font-weight: 600; line-height: 1.1; margin: 0 0 6px; }
+.mast p { margin: 0; color: var(--ink-2); max-width: 76ch; }
+.mast b { color: var(--ink); }
+
+.cols { display: grid; grid-template-columns: 280px minmax(0,1fr); gap: 20px; align-items: start; }
+@media (max-width: 1040px) { .cols { grid-template-columns: 1fr; } .rail { position: static !important; } }
+
+.rail {
+  position: sticky; top: 16px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 15px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 14px;
+  max-height: calc(100vh - 32px); overflow-y: auto;
+}
+.rail h2 {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); margin: 0 0 8px;
+}
+.grp + .grp { border-top: 1px solid var(--line-soft); padding-top: 13px; }
+.row { display: grid; grid-template-columns: 92px minmax(0,1fr) 44px; gap: 8px; align-items: center; margin-bottom: 7px; }
+.row label { font-size: 12px; color: var(--ink-2); }
+.row input[type=range] { width: 100%; accent-color: var(--accent); }
+.row output { font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+.chk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 6px; cursor: pointer; }
+.chk input { accent-color: var(--accent); }
+.btns { display: flex; gap: 6px; }
+.btn {
+  flex: 1; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  padding: 8px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--sunk); color: var(--ink-2);
+}
+.btn--go { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hint { font-size: 11.5px; color: var(--ink-3); line-height: 1.5; }
+
+/* &#x2500;&#x2500; Canvas &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500; */
+.frame { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.frame__bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--sunk); border-bottom: 1px solid var(--line); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.frame__url { margin-left: 8px; font-size: 11px; color: var(--ink-3); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 2px 9px; }
+.view { height: 600px; background: var(--app-bg); overflow: auto; }
+.stage { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--app-ink); }
+
+.zone { min-height: 46px; border-radius: 8px; transition: background .12s, outline-color .12s; outline: 1px dashed transparent; }
+body.editing .zone { outline-color: rgba(37,99,235,.32); background: rgba(37,99,235,.03); }
+.zone.over { outline-color: var(--accent); background: rgba(37,99,235,.09); }
+.zone__tag {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--accent); opacity: 0; padding: 2px 0 4px;
+}
+body.editing .zone__tag { opacity: .75; }
+
+.blk { position: relative; border-radius: 8px; outline: 1px solid transparent; }
+body.editing .blk { cursor: grab; outline-color: rgba(22,32,44,.12); }
+body.editing .blk:hover { outline-color: var(--accent); }
+.blk.dragging { opacity: .35; }
+.blk__grip {
+  position: absolute; top: 3px; right: 3px; z-index: 2;
+  width: 20px; height: 20px; border-radius: 5px; background: var(--accent); color: #fff;
+  display: none; align-items: center; justify-content: center; font-size: 11px; line-height: 1;
+}
+body.editing .blk:hover .blk__grip { display: flex; }
+
+/* &#x2500;&#x2500; App pieces &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500; */
+.seal4 {
+  border-radius: 12px; padding: 5px; background: var(--seal); color: #fff;
+  font-family: Brush, serif; display: grid;
+  grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  grid-auto-flow: column; direction: rtl; gap: 1px; line-height: 1;
+}
+.seal4 > span { display: grid; place-items: center; }
+.cn { font-family: Brush, serif; color: var(--app-ink); letter-spacing: .05em; line-height: 1.15; }
+.en { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--app-ink3); margin-top: 3px; }
+.ask { font-size: 19px; font-weight: 600; line-height: 1.25; margin: 0; }
+.sub { font-size: 13px; color: var(--app-ink2); margin: 3px 0 0; }
+.wsrow {
+  background: var(--app-card); border: 1px solid var(--app-border); border-radius: 14px;
+  padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  display: flex; align-items: center; gap: 15px;
+}
+.wsrow.tile { flex-direction: column; align-items: flex-start; gap: 9px; }
+.sq { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; }
+.wsrow h4 { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.2; }
+.wsrow .meta { font-size: 11.5px; font-weight: 600; margin-top: 2px; }
+.wsrow .meta span { color: var(--app-ink3); font-weight: 400; }
+.badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  border: 1px solid #cbd5e1; color: var(--app-ink2); background: #f8f9fb;
+  border-radius: 99px; padding: 2px 8px; white-space: nowrap;
+}
+.soon h4, .soon .meta { color: #94a3b8; }
+.soon .sq { opacity: .5; }
+.runon { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--app-ink2); font-weight: 600; }
+.mark { width: 24px; height: 24px; border-radius: 6px; background: var(--mark); display: grid; place-items: center; flex-shrink: 0; }
+.credit { font-size: 11px; color: var(--app-ink3); line-height: 1.6; }
+.credit b { color: var(--app-ink2); font-weight: 600; }
+
+.code {
+  background: #0d1520; color: #d6e2f0; border-radius: 9px; padding: 13px 15px; margin-top: 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; line-height: 1.55; overflow-x: auto; white-space: pre; border: 1px solid #1d2a3a;
+}
+.code .c { color: #6f8199; }
+.code .k { color: #8ab4ff; }
+.code .v { color: #9fe0a8; }
+
+.crit { margin-top: 14px; display: grid; gap: 8px; }
+.crit__i { border-left: 2px solid var(--line); background: var(--panel); border-radius: 0 8px 8px 0; padding: 9px 13px; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.crit__i b { color: var(--ink); }
+.crit__i.warn { border-left-color: var(--bad); }
+.crit__i.good { border-left-color: var(--ok); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <h1>Home Layout Editor</h1>
+    <p>Option C, editable. Drag any block between the three zones and reorder it within one, then
+      press <b>Copy layout</b> and paste the result back into the chat. <b>It snaps to zones and
+      order rather than to pixels, on purpose:</b> a layout positioned at exact coordinates looks
+      right in an editor and breaks the moment the window changes width. Everything expressible here
+      maps onto a real CSS grid, so anything you build can actually ship.</p>
+  </header>
+
+  <div class="cols">
+    <aside class="rail">
+      <div class="grp">
+        <h2>Mode</h2>
+        <label class="chk"><input type="checkbox" id="edit" checked> Show drop zones and handles</label>
+        <p class="hint">Turn off to judge the layout without the editing chrome on top of it.</p>
+      </div>
+
+      <div class="grp">
+        <h2>Geometry</h2>
+        <div class="row"><label for="split">Left column</label><input type="range" id="split" min="180" max="460" step="10"><output id="o-split"></output></div>
+        <div class="row"><label for="gap">Column gap</label><input type="range" id="gap" min="16" max="96" step="4"><output id="o-gap"></output></div>
+        <div class="row"><label for="top">Top space</label><input type="range" id="top" min="16" max="160" step="4"><output id="o-top"></output></div>
+        <div class="row"><label for="side">Side space</label><input type="range" id="side" min="16" max="96" step="4"><output id="o-side"></output></div>
+        <div class="row"><label for="stack">Block gap</label><input type="range" id="stack" min="4" max="40" step="2"><output id="o-stack"></output></div>
+      </div>
+
+      <div class="grp">
+        <h2>Pieces</h2>
+        <div class="row"><label for="seal">Seal size</label><input type="range" id="seal" min="36" max="104" step="4"><output id="o-seal"></output></div>
+        <div class="row"><label for="cn">Wordmark</label><input type="range" id="cn" min="18" max="46" step="1"><output id="o-cn"></output></div>
+        <label class="chk"><input type="checkbox" id="tiles"> Workspaces as tiles, not rows</label>
+        <label class="chk"><input type="checkbox" id="center"> Centre text inside blocks</label>
+      </div>
+
+      <div class="btns">
+        <button class="btn" id="reset" type="button">Reset</button>
+        <button class="btn btn--go" id="copy" type="button">Copy layout</button>
+      </div>
+      <p class="hint">Your arrangement is saved in this browser, so closing the tab does not lose it.</p>
+    </aside>
+
+    <main>
+      <div class="frame">
+        <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__url">stocksense.app</span></div>
+        <div class="view">
+          <div class="stage" id="stage">
+            <div class="zone" id="z-top" data-zone="top"><div class="zone__tag">Full width</div></div>
+            <div id="grid" style="display:grid;align-items:start">
+              <div class="zone" id="z-left" data-zone="left"><div class="zone__tag">Left column</div></div>
+              <div class="zone" id="z-right" data-zone="right"><div class="zone__tag">Right column</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="code" id="out"></div>
+      <div class="crit" id="crit"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+// &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
+// Zone-and-order editing, not free positioning.
+//
+// The blocks below are the real pieces of Home. Dragging moves a block between
+// three zones and reorders it inside one, which is exactly what a CSS grid with
+// flex columns can express. Absolute x/y would let a layout be designed here
+// that cannot be built responsively, so it is not offered.
+// &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
+const ARROW = (c) => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="' + c + '" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+const MARK = '<span class="mark"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="15" width="4.4" height="6" rx="1.2" fill="#fff" opacity=".55"/><rect x="9.8" y="11" width="4.4" height="10" rx="1.2" fill="#fff" opacity=".55"/><rect x="16.6" y="6" width="4.4" height="15" rx="1.2" fill="#fff"/><path d="M4 12.5 L11 8.5 L18.8 3.4" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></span>';
+
+const ICON = {
+  in:  (c) => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg>',
+  out: (c) => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round"><path d="M12 21V8M6 13l6-6 6 6M4 3h16"/></svg>',
+  ct:  (c) => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="' + c + '" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+};
+
+function ws({ id, name, role, who, tint, bg, icon, soon }) {
+  const tiles = S.tiles;
+  const right = soon
+    ? '<span class="badge">Next up</span>'
+    : (tiles ? "" : ARROW(tint));
+  return '<div class="wsrow' + (tiles ? " tile" : "") + (soon ? " soon" : "") + '">' +
+    '<div class="sq" style="background:' + bg + '">' + icon(tint) + "</div>" +
+    '<div style="flex:1;min-width:0">' +
+      "<h4>" + name + "</h4>" +
+      '<div class="meta" style="color:' + (soon ? "inherit" : tint) + '">' + role +
+        ' <span>&middot; ' + who + "</span></div>" +
+    "</div>" + right + "</div>";
+}
+
+const BLOCKS = {
+  seal:     { name: "Seal", html: () => '<span class="seal4" style="width:' + S.seal + "px;height:" + S.seal + "px;font-size:" + Math.round(S.seal * 0.39) + 'px;display:inline-grid"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></span>' },
+  wordmark: { name: "Wordmark", html: () => '<div><div class="cn" style="font-size:' + S.cn + 'px">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="en">Four Seas Rice Trading</div></div>' },
+  question: { name: "Question", html: () => '<p class="ask">Where are you working today?</p>' },
+  subtext:  { name: "Sub-line", html: () => '<p class="sub">Pick a workspace to begin.</p>' },
+  goodsin:  { name: "Goods In", html: () => ws({ name: "Goods In", role: "Receiving", who: "warehouse floor, handheld", tint: "var(--green)", bg: "var(--green-l)", icon: ICON.in }) },
+  goodsout: { name: "Goods Out", html: () => ws({ name: "Goods Out", role: "Picking and dispatch", who: "warehouse floor, handheld", tint: "var(--blue)", bg: "var(--blue-l)", icon: ICON.out, soon: true }) },
+  tower:    { name: "Control Tower", html: () => ws({ name: "Control Tower", role: "Analysis and decisions", who: "office, desktop", tint: "var(--purple)", bg: "var(--purple-l)", icon: ICON.ct }) },
+  runon:    { name: "Running on", html: () => '<div class="runon">' + MARK + "Running on <b style='margin-left:-3px'>StockSense</b></div>" },
+  credit:   { name: "Team credit", html: () => '<div class="credit">AWS NUS-ISS SMYA 2026<br><b>Team Puenzhiyyy</b></div>' },
+};
+
+const DEFAULTS = {
+  zones: { top: [], left: ["seal", "wordmark", "question", "subtext", "runon", "credit"], right: ["goodsin", "goodsout", "tower"] },
+  split: 300, gap: 52, top: 54, side: 44, stack: 12,
+  seal: 64, cn: 30, tiles: false, center: false,
+};
+const KEY = "stocksense.home-layout.v1";
+
+let S = JSON.parse(JSON.stringify(DEFAULTS));
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY) || "null");
+  if (saved && saved.zones) S = Object.assign(S, saved);
+} catch (e) { /* first visit */ }
+
+const $ = (id) => document.getElementById(id);
+const SLIDERS = ["split", "gap", "top", "side", "stack", "seal", "cn"];
+const CHECKS = { tiles: "tiles", center: "center" };
+
+SLIDERS.forEach((k) => $(k).addEventListener("input", (e) => {
+  const n = Number(e.target.value);
+  if (e.target.value === "" || !Number.isFinite(n)) return;
+  S[k] = n; render();
+}));
+Object.entries(CHECKS).forEach(([k, id]) => $(id).addEventListener("change", (e) => { S[k] = e.target.checked; render(); }));
+$("edit").addEventListener("change", (e) => document.body.classList.toggle("editing", e.target.checked));
+$("reset").addEventListener("click", () => { S = JSON.parse(JSON.stringify(DEFAULTS)); render(); });
+$("copy").addEventListener("click", async (e) => {
+  const b = e.currentTarget;
+  try { await navigator.clipboard.writeText($("out").innerText); b.textContent = "Copied"; }
+  catch (err) {
+    const r = document.createRange(); r.selectNodeContents($("out"));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Selected";
+  }
+  setTimeout(() => { b.textContent = "Copy layout"; }, 1600);
+});
+
+// &#x2500;&#x2500; Drag and drop &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
+let dragId = null;
+
+function makeBlock(id) {
+  const el = document.createElement("div");
+  el.className = "blk";
+  el.draggable = true;
+  el.dataset.id = id;
+  el.innerHTML = '<span class="blk__grip">&#10021;</span>' + BLOCKS[id].html();
+  if (S.center) el.style.textAlign = "center";
+  el.addEventListener("dragstart", (ev) => {
+    dragId = id; el.classList.add("dragging");
+    ev.dataTransfer.effectAllowed = "move";
+    // Firefox refuses to start a drag without data set.
+    ev.dataTransfer.setData("text/plain", id);
+  });
+  el.addEventListener("dragend", () => { dragId = null; el.classList.remove("dragging"); });
+  return el;
+}
+
+// Insertion point is decided by comparing the pointer against the MIDPOINT of
+// each existing block, which is what makes the gap open where the cursor is
+// rather than always appending to the end.
+function insertBefore(zone, y) {
+  const kids = [...zone.querySelectorAll(":scope > .blk:not(.dragging)")];
+  return kids.find((k) => {
+    const b = k.getBoundingClientRect();
+    return y < b.top + b.height / 2;
+  }) || null;
+}
+
+["z-top", "z-left", "z-right"].forEach((zid) => {
+  const zone = $(zid);
+  zone.addEventListener("dragover", (ev) => {
+    ev.preventDefault();
+    zone.classList.add("over");
+  });
+  zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+  zone.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    zone.classList.remove("over");
+    if (!dragId) return;
+    const target = zone.dataset.zone;
+    const before = insertBefore(zone, ev.clientY);
+    // Remove from wherever it was, then insert at the computed index.
+    for (const z of Object.keys(S.zones)) S.zones[z] = S.zones[z].filter((x) => x !== dragId);
+    const list = S.zones[target];
+    const idx = before ? list.indexOf(before.dataset.id) : list.length;
+    list.splice(idx < 0 ? list.length : idx, 0, dragId);
+    render();
+  });
+});
+
+// &#x2500;&#x2500; Render &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;
+function render() {
+  SLIDERS.forEach((k) => { $(k).value = S[k]; $("o-" + k).textContent = S[k] + "px"; });
+  $("tiles").checked = S.tiles;
+  $("center").checked = S.center;
+
+  $("stage").style.padding = S.top + "px " + S.side + "px " + S.side + "px";
+  const grid = $("grid");
+  const twoCols = S.zones.left.length && S.zones.right.length;
+  grid.style.gridTemplateColumns = twoCols ? S.split + "px minmax(0,1fr)" : "minmax(0,1fr)";
+  grid.style.gap = S.gap + "px";
+
+  for (const [zoneName, ids] of Object.entries(S.zones)) {
+    const zone = $("z-" + zoneName);
+    [...zone.querySelectorAll(":scope > .blk")].forEach((n) => n.remove());
+    zone.style.display = "flex";
+    zone.style.flexDirection = "column";
+    zone.style.gap = S.stack + "px";
+    zone.style.marginBottom = zoneName === "top" && ids.length ? S.gap + "px" : "0";
+    ids.forEach((id) => zone.appendChild(makeBlock(id)));
+  }
+
+  emit();
+  critique();
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* fine */ }
+}
+
+function emit() {
+  const line = (k, v) => '  <span class="k">' + (k + ":").padEnd(11) + '</span><span class="v">' + v + "</span>,";
+  const zone = (n) => '    <span class="k">' + (n + ":").padEnd(9) + "</span>[" +
+    S.zones[n].map((i) => '<span class="v">"' + i + '"</span>').join(", ") + "],";
+  $("out").innerHTML =
+    '<span class="c">// Home layout, arranged ' + new Date().toISOString().slice(0, 10) + "</span>\n" +
+    "const HOME_LAYOUT = {\n" +
+    "  zones: {\n" + zone("top") + "\n" + zone("left") + "\n" + zone("right") + "\n  },\n" +
+    line("split", S.split) + "\n" + line("gap", S.gap) + "\n" + line("top", S.top) + "\n" +
+    line("side", S.side) + "\n" + line("stack", S.stack) + "\n" +
+    line("seal", S.seal) + "\n" + line("cn", S.cn) + "\n" +
+    line("tiles", S.tiles) + "\n" + line("center", S.center) + "\n};";
+}
+
+// Live critique. The point of the editor is a conversation, so it argues back
+// as you go rather than waiting to be asked.
+function critique() {
+  const out = [];
+  const L = S.zones.left, R = S.zones.right, T = S.zones.top;
+  const all = [...T, ...L, ...R];
+  const ws = ["goodsin", "goodsout", "tower"];
+  const split = ws.filter((w) => L.includes(w)).length && ws.filter((w) => R.includes(w)).length;
+
+  if (split) out.push(["warn", "The three workspaces are spread across two zones. They are one choice with three answers, so splitting them makes the reader look in two places for one decision."]);
+  if (T.length && L.length && R.length) out.push(["", "A full-width band above two columns is a masthead. It works, but it costs vertical space, which is what the current layout already spends too much of."]);
+  if (!all.includes("runon")) out.push(["warn", "StockSense is not on the page. On a client-led Home it is the only thing naming the product being judged."]);
+  if (L.indexOf("wordmark") > -1 && L.indexOf("seal") > L.indexOf("wordmark")) out.push(["", "The seal sits below the wordmark. Unusual but not wrong: a chop under a name reads like a signature."]);
+  if (all.indexOf("subtext") > -1 && all.indexOf("question") > all.indexOf("subtext")) out.push(["warn", "The sub-line comes before the question it explains, so the answer arrives before the ask."]);
+  if (S.tiles) out.push(["", "Tiles read as things to look at; rows with an arrow at the far edge read as things to press. Tiles are the weaker choice for a chooser screen, which is what this is."]);
+  if (S.center && R.length) out.push(["warn", "Centred text inside full-width rows leaves the labels floating away from their icons, which breaks the left edge the eye follows down a list."]);
+  if (S.split < 240 && L.length) out.push(["warn", "A left column under 240px will wrap the wordmark awkwardly at the larger seal sizes."]);
+  if (S.top < 32) out.push(["warn", "Under about 32px the masthead crowds the top of the window, which reads as a rendering fault rather than as a tight layout."]);
+  if (S.top > 120) out.push(["warn", "Above about 120px the float returns: the page starts to look centred in a tall window again, which is the fault this layout exists to fix."]);
+  if (R.length && !L.length) out.push(["", "Everything in one column. Simpler, and closer to option A than to C, so the extra width goes unused again."]);
+  if (!out.length) out.push(["good", "Nothing to argue with. The workspaces are together, the order reads ask-then-answer, and the spacing is inside the range that keeps the page anchored."]);
+
+  document.getElementById("crit").innerHTML = out
+    .map(([k, t]) => '<div class="crit__i ' + k + '">' + (k === "warn" ? "<b>Worth reconsidering.</b> " : k === "good" ? "<b>Looks sound.</b> " : "<b>Note.</b> ") + t + "</div>")
+    .join("");
+}
+
+document.body.classList.add("editing");
+render();
+</script>
