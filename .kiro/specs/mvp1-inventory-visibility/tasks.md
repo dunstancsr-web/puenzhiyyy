@@ -1521,6 +1521,36 @@ rendered on top of each other. And the active tab's count needs `display: flex` 
 it cannot share `.tab-label`, whose `display: inline` would flatten it; it has `.tab-badge` on the same
 breakpoint with a different display value.
 
+## TASK-51 - Liquid glass on the top bar and the settings popover (2026-09-13)
+
+- [x] Home's icon is a house. It was `LayoutGrid`, a grid of squares sitting one tap from the Dashboard
+      grid icon, which is the confusion Stan spotted two tasks ago and I had only half fixed.
+- [x] Nav icons 16 to 19px, label 12 to 13px, tap targets and island height up with them.
+- [x] `.glass-surface`, factored from the hint panel Stan tuned in the Glass Tooltip Tuner, so the bar
+      and the popover share his treatment rather than each approximating it. What makes it read as glass
+      is the gradient, the specular highlight on the top edge and the contact ring, not the transparency
+      alone: a flat translucent fill just looks faded.
+
+**Two deliberate departures from the hint panel, both about legibility.**
+
+`--hint-blur` is 3px, which suits a tooltip appearing over a known background for a few seconds. The top
+bar sits over whatever is scrolling beneath it all day, and at 3px the text underneath stays sharp
+enough to fight the label on top, so the bar takes a heavier blur. Heavy blur averages the backdrop into
+a smooth wash, and that wash is what buys legibility at low alpha.
+
+The popover keeps the full hint drop shadow because it genuinely floats. The bar gets a lighter one: a
+60px shadow on a persistent strip reads as heavy rather than as glass. The desktop sidebar's popover
+stays a solid card, because it opens against the sidebar's own flat panel where glass has nothing
+interesting to refract and only looks murky.
+
+**Verified by temporarily widening the breakpoint** so the narrow bar rendered at desktop width. That
+runs the real rules on the real elements and only changes the trigger width, so it verifies the GLASS;
+it does not verify the narrow fit, which still needs a real narrow viewport. The file was diffed against
+a backup afterwards and is byte identical.
+
+**Third repeat of a known mistake, now recorded in CLAUDE.md.** A `//` comment inside a JSX opening tag.
+esbuild tolerates it and the build passes, so it never announces itself, but it is not valid JSX.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

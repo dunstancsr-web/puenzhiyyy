@@ -60,6 +60,10 @@ feedback, not suggestions to re-litigate.
   quantity was calculated two ways and differed by 257 MT; months of cover was
   computed two ways and differed by 0.2. Read the engine's own field rather than
   re-deriving it. `engines/duration.js` and `suggested_order_qty` exist for this.
+- **Never put a `//` comment inside a JSX opening tag.** esbuild tolerates it and
+  the build passes, so it does not announce itself, but it is not valid JSX and
+  other toolchains reject it. Put the comment above the element as `{/* ... */}`
+  or a plain `//` line before the tag. This happened three times in one session.
 - **Verify against the real cascade, not a mock of it.** Injecting `!important`
   to force a breakpoint state once produced a green result on broken code.
 - **Do not test only for bad things.** A verifier that looks for errors scores an

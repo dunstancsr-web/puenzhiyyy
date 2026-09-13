@@ -78,7 +78,7 @@ export default function SettingsMenu({ align = "up", compact = false }) {
         title={compact && activeMode ? `${activeMode.label} · ${themeLabel}` : undefined}
         style={compact ? {
           display: "flex", alignItems: "center", justifyContent: "center",
-          width: 34, height: 34, borderRadius: 999, flexShrink: 0,
+          width: 38, height: 38, borderRadius: 999, flexShrink: 0,
           border: "none", background: open ? "var(--surface-2)" : "transparent",
           color: "var(--text-secondary)", cursor: "pointer",
         } : {
@@ -90,7 +90,7 @@ export default function SettingsMenu({ align = "up", compact = false }) {
           fontSize: 13, fontWeight: 600, textAlign: "left",
         }}
       >
-        <Settings size={compact ? 17 : 15} style={{ flexShrink: 0 }} />
+        <Settings size={compact ? 19 : 15} style={{ flexShrink: 0 }} />
         {!compact && (
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {activeMode ? activeMode.label : "Settings"}
@@ -100,7 +100,10 @@ export default function SettingsMenu({ align = "up", compact = false }) {
       </button>
 
       {open && (
+        /* Compact uses the same glass as the hint panel, with its full drop
+           shadow, because it genuinely floats above the page. */
         <div role="dialog" aria-label="Settings"
+          className={compact ? "glass-surface glass-surface--floating" : undefined}
           style={{
             position: "absolute", zIndex: 60,
             [align === "up" ? "bottom" : "top"]: "calc(100% + 8px)",
@@ -109,8 +112,14 @@ export default function SettingsMenu({ align = "up", compact = false }) {
             ...(compact ? { right: 0 } : { left: 0, right: 0 }),
             width: compact ? 256 : undefined,
             minWidth: 248,
-            background: "var(--card-bg)", border: "1px solid var(--border)",
-            borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-md)",
+            // The desktop sidebar popover stays a solid card: it opens against
+            // the sidebar's own flat panel, where glass has nothing interesting
+            // to refract and just looks murky.
+            ...(compact ? {} : {
+              background: "var(--card-bg)", border: "1px solid var(--border)",
+              boxShadow: "var(--shadow-md)",
+            }),
+            borderRadius: "var(--radius-lg)",
             padding: 14,
           }}>
 

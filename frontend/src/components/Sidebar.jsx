@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, LayoutGrid } from "lucide-react";
+import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, Home as HomeIcon } from "lucide-react";
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 
@@ -23,8 +23,8 @@ import SettingsMenu from "./SettingsMenu";
 //
 // Two rows rather than one pill, because leaving the Control Tower, moving
 // inside it, and changing a setting are three unrelated jobs. The old single
-// island also placed the Home grid icon immediately beside the Dashboard
-// grid icon: two near-identical glyphs one tap apart. The top row now holds the
+// island also placed a grid icon for Home immediately beside the Dashboard
+// grid icon: two near-identical glyphs one tap apart. Home is a house now. The top row now holds the
 // two things that are not navigation, pushed to opposite edges; the second row
 // is navigation alone, and having it to itself is what buys room for labels.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ export default function Sidebar() {
           color: "var(--text-secondary)", textDecoration: "none",
           fontSize: 13.5, fontWeight: 600,
         }}>
-          <LayoutGrid size={15} />
+          <HomeIcon size={17} />
           Home
           <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>Switch</span>
         </Link>
@@ -140,23 +140,23 @@ export default function Sidebar() {
           Home, navigation, settings. The settings trigger collapses to a gear,
           which is what freed the roughly 150px that let this fit on one row. */}
       <div className="app-topbar-glass">
-        <div className="app-topbar-glass__island">
+        <div className="app-topbar-glass__island glass-surface">
           <Link to="/" aria-label="Home" style={{
             display: "flex", alignItems: "center", gap: 7, textDecoration: "none",
-            color: "var(--text-primary)", fontSize: 13.5, fontWeight: 600, padding: "0 4px",
+            color: "var(--text-primary)", fontSize: 14, fontWeight: 600, padding: "0 4px",
           }}>
-            <LayoutGrid size={16} />
+            <HomeIcon size={19} />
             Home
           </Link>
         </div>
 
-        <nav className="app-topbar-glass__nav" aria-label="Primary">
+        <nav className="app-topbar-glass__nav glass-surface" aria-label="Primary">
           {navItems.map(({ to, label, icon: Icon, badge }) => (
             <NavLink key={to} to={to} title={label}
               style={({ isActive }) => ({
                 flex: 1, minWidth: 0,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "8px 4px", borderRadius: 999, textDecoration: "none",
+                padding: "9px 6px", borderRadius: 999, textDecoration: "none",
                 background: isActive ? "var(--blue)" : "transparent",
                 color: isActive ? "#fff" : "var(--text-secondary)",
                 transition: "background 0.15s, color 0.15s",
@@ -164,7 +164,7 @@ export default function Sidebar() {
               {({ isActive }) => (
                 <>
                   <span style={{ position: "relative", display: "flex", flexShrink: 0 }}>
-                    <Icon size={16} strokeWidth={isActive ? 2.4 : 2} />
+                    <Icon size={19} strokeWidth={isActive ? 2.4 : 2} />
                     {badge > 0 && !isActive && (
                       <span style={{
                         position: "absolute", top: -4, right: -6,
@@ -180,7 +180,7 @@ export default function Sidebar() {
                   {/* className, not an inline display, so the 560px rule can
                       hide it. See the note in index.css. */}
                   <span className="tab-label" style={{
-                    fontSize: 12, fontWeight: isActive ? 700 : 500,
+                    fontSize: 13, fontWeight: isActive ? 700 : 500,
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
                     {label}
@@ -201,7 +201,7 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        <div className="app-topbar-glass__island app-topbar-glass__island--settings">
+        <div className="app-topbar-glass__island app-topbar-glass__island--settings glass-surface">
           <SettingsMenu align="down" compact />
         </div>
       </div>
