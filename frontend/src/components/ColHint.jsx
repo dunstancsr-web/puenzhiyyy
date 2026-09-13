@@ -15,11 +15,18 @@ export default function ColHint({ label, what, how }) {
       content={
         <>
           <div className="hint-panel__hdr">What is this?</div>
-          <div className="hint-panel__body" style={{ marginBottom: 12, whiteSpace: "normal", overflowWrap: "anywhere" }}>
+          <div className="hint-panel__body" style={{ marginBottom: how ? 12 : 0, whiteSpace: "normal", overflowWrap: "anywhere" }}>
             {what}
           </div>
-          <div className="hint-panel__hdr">How to read it</div>
-          <div className="hint-panel__body" style={{ whiteSpace: "pre-line" }}>{how}</div>
+          {/* Optional since TASK-78. The Home cards have one description
+              rather than a what/how pair, and rendering an empty "How to read
+              it" header under them would be a heading with nothing beneath. */}
+          {how && (
+            <>
+              <div className="hint-panel__hdr">How to read it</div>
+              <div className="hint-panel__body" style={{ whiteSpace: "pre-line" }}>{how}</div>
+            </>
+          )}
         </>
       }
     >

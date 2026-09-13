@@ -1,34 +1,54 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, ChevronDown, ArrowRight } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, ArrowRight } from "lucide-react";
 import EventCredit from "../components/EventCredit";
 import AppMark from "../components/AppMark";
+import ColHint from "../components/ColHint";
 import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOME (TASK-47, renamed TASK-48, renamed again TASK-50)
+// HOME (TASK-47, renamed TASK-48 and TASK-50, rebuilt TASK-74 and TASK-78)
 //
 // The first screen, and the name we use for it in conversation. It was briefly
-// called the Launchpad, after SAP Fiori and macOS, on the grounds that "home"
-// is ambiguous once three workspaces exist. Stan chose Home, and he is right
-// that the ambiguity is theoretical while the familiarity is not: every user
-// already knows what Home means and nobody needs the distinction explained.
+// called the Launchpad, after SAP Fiori and macOS; Stan chose Home, on the
+// grounds that the ambiguity is theoretical while the familiarity is not.
 //
 // Three ways into the same inventory, ordered the way stock actually moves: it
 // arrives, it leaves, and somebody upstairs decides what to do about what is
-// left. They are different jobs done by different people on different devices.
-// A receiver on a loading dock and a manager reviewing working capital share a
-// database and nothing else, so making them share a navigation would serve
-// neither.
+// left. Different jobs, different people, different devices. A receiver on a
+// loading dock and a manager reviewing working capital share a database and
+// nothing else, so making them share a navigation would serve neither.
 //
-// Cards are deliberately SHORT. The description is the one thing a returning
-// user never needs, and three paragraphs of it forced scrolling on a phone, so
-// it collapses behind a tap. Not a hover tooltip: HoverHint is hover and focus
-// only, which would put the text out of reach on exactly the small screens the
-// change is for.
+// LAYOUT. One centre axis, with the workspaces grouped by the device they need
+// rather than listed flat. The grouping is done by LABELLED RULES, not by
+// splitting the page into columns: a rule with a word in it costs one line of
+// height and leaves the centre line unbroken, where a split makes the reader
+// look in two places for a single decision.
+//
+// Wide and narrow are the same markup. The pair goes from two columns to one
+// and the column narrows, which is the entire difference between the two
+// layouts Stan picked. See .home-shell and .home-pair in index.css: those are
+// classes rather than inline styles, because an inline grid-template-columns
+// beats a stylesheet rule and the breakpoint could never reach it.
+//
+// HELP. An ⓘ beside each name, the same ColHint used on every table header in
+// this app: muted until hovered or focused, and reachable by tap because it
+// responds to focus too. It replaces three repeated "What is this?" buttons,
+// which read as chrome and nested a button inside a link.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MODES = [
+const HERE = {
+  to: "/dashboard",
+  icon: LayoutDashboard,
+  tint: "var(--purple)",
+  bg: "var(--purple-light)",
+  label: "Control Tower",
+  sub: "Analysis and decisions",
+  who: "office, desktop",
+  help: "See what needs a decision today, why it was flagged, and approve or reject what the system recommends.",
+};
+
+const FLOOR = [
   {
     to: "/warehouse/inbound",
     icon: ArrowDownToLine,
@@ -36,8 +56,8 @@ const MODES = [
     bg: "var(--green-light)",
     label: "Goods In",
     sub: "Receiving",
-    body: "Check a delivery against its purchase order, count what actually arrived, and record any shortfall.",
-    who: "Warehouse floor, handheld",
+    who: "handheld",
+    help: "Check a delivery against its purchase order, count what actually arrived, and record any shortfall.",
   },
   {
     to: null,
@@ -47,51 +67,104 @@ const MODES = [
     bg: "var(--blue-light)",
     label: "Goods Out",
     sub: "Picking and dispatch",
-    body: "Pick a customer order, confirm what leaves the building, and release the stock that was reserved for it.",
-    who: "Warehouse floor, handheld",
-  },
-  {
-    to: "/dashboard",
-    icon: LayoutDashboard,
-    tint: "var(--purple)",
-    bg: "var(--purple-light)",
-    label: "Control Tower",
-    sub: "Analysis and decisions",
-    body: "See what needs a decision today, why it was flagged, and approve or reject what the system recommends.",
-    who: "Office, desktop",
+    who: "handheld",
+    help: "Pick a customer order, confirm what leaves the building, and release the stock that was reserved for it.",
   },
 ];
 
-/**
- * The description, collapsed.
- *
- * A button rather than a hover target, because this exists for small screens
- * and a phone has no hover. stopPropagation keeps a tap on it from also
- * following the card's link, which would open the workspace instead of
- * explaining it.
- */
-function Detail({ body }) {
-  const [open, setOpen] = useState(false);
+function Glyph({ m, size }) {
+  const I = m.icon;
   return (
-    <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 2 }}>
-      <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v); }}
-        aria-expanded={open}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 5, padding: 0,
-          background: "none", border: "none", cursor: "pointer",
-          fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
-        }}
-      >
-        <ChevronDown size={13} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
-        {open ? "Less" : "What is this?"}
-      </button>
-      {open && (
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.55, marginTop: 8 }}>
-          {body}
-        </p>
-      )}
-    </div>
+    <span style={{
+      width: size, height: size, borderRadius: Math.round(size * 0.26),
+      background: m.bg, display: "grid", placeItems: "center", flexShrink: 0,
+      opacity: m.soon ? 0.5 : 1,
+    }}>
+      <I size={Math.round(size * 0.48)} color={m.tint} />
+    </span>
+  );
+}
+
+function Name({ m, size, muted }) {
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <span style={{
+        fontSize: size, fontWeight: 700, lineHeight: 1.2,
+        color: muted ? "var(--text-muted)" : "var(--text-primary)",
+      }}>
+        {m.label}
+      </span>
+      {/* Beside the name, where someone wondering "what is this" is already
+          looking. Deliberately not a visible button: 12px and muted until
+          hovered or focused, so it costs the card no weight. */}
+      <ColHint label={m.label} what={m.help} />
+    </span>
+  );
+}
+
+/** The workspace this device can actually use, as one wide card. */
+function Hero({ m }) {
+  return (
+    <Link to={m.to} className="card home-card" style={{
+      display: "flex", alignItems: "center", gap: "var(--space-4)",
+      padding: "var(--space-5)", textDecoration: "none", color: "inherit",
+      textAlign: "left", borderColor: m.tint,
+    }}>
+      <Glyph m={m} size={52} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <Name m={m} size="var(--text-lg)" />
+        <span style={{ display: "block", fontSize: "var(--text-sm)", color: m.tint, fontWeight: 600, marginTop: 2 }}>
+          {m.sub}
+          <span style={{ color: "var(--text-muted)", fontWeight: 400 }}> · {m.who}</span>
+        </span>
+      </span>
+      <span style={{
+        display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
+        fontSize: "var(--text-base)", fontWeight: 700, color: m.tint,
+      }}>
+        Open <ArrowRight size={18} />
+      </span>
+    </Link>
+  );
+}
+
+/**
+ * A floor workspace. Rendered as a div when it goes nowhere, so it cannot be
+ * tabbed into or clicked by accident, and with no arrow, because an arrow
+ * promises a destination.
+ */
+function Floor({ m }) {
+  const Card = m.soon ? "div" : Link;
+  return (
+    <Card {...(m.soon ? {} : { to: m.to })} className={`card${m.soon ? "" : " home-card"}`} style={{
+      display: "flex", alignItems: "flex-start", gap: "var(--space-3)",
+      padding: "var(--space-4)", textDecoration: "none", color: "inherit",
+      textAlign: "left", cursor: m.soon ? "default" : "pointer",
+    }}>
+      <Glyph m={m} size={40} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <Name m={m} size="var(--text-base)" muted={m.soon} />
+        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 1 }}>
+          {m.sub} · {m.who}
+        </span>
+        {/* Under the label, not beside it. Alongside, a badge this long left
+            the text about 120px and wrapped "Picking and dispatch · handheld"
+            onto three lines, so the two cards in the pair no longer matched.
+            A status about the whole card belongs under it either way. */}
+        {m.soon && (
+          <span style={{
+            display: "inline-block", marginTop: 8,
+            fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.03em",
+            textTransform: "uppercase", color: "var(--text-secondary)",
+            border: "1px solid var(--border)", background: "var(--surface-2)",
+            borderRadius: 99, padding: "3px 9px", whiteSpace: "nowrap",
+          }}>
+            Building in progress
+          </span>
+        )}
+      </span>
+      {!m.soon && <ArrowRight size={17} style={{ color: m.tint, flexShrink: 0 }} />}
+    </Card>
   );
 }
 
@@ -99,116 +172,61 @@ export default function Home() {
   return (
     <div style={{
       minHeight: "100vh", background: "var(--bg)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px",
+      // flex-start, not centre. Centring a short page in a tall viewport put
+      // 214px of nothing above the first pixel of content, so the eye landed
+      // on empty space. clamp anchors it without crowding the top edge.
+      display: "flex", justifyContent: "center", alignItems: "flex-start",
+      padding: "clamp(40px, 9vh, 96px) 20px 48px",
     }}>
-      <div style={{ width: "100%", maxWidth: 940 }}>
-        {/* CLIENT-LED masthead. The company owns this screen and StockSense
-            signs the bottom, which is how a deployed system actually presents
-            itself. The trade is real and was made deliberately: the product
-            being judged is no longer the largest thing on the first screen. It
-            is mitigated by the foot of this page and by the Control Tower
-            sidebar, which still leads with StockSense.
+      <div className="home-shell">
 
-            Home is also the only surface with room for the full 2x2 chop. At
-            56px each character has space; at the sidebar's 30px the same mark
-            is texture. */}
-        <div style={{ marginBottom: 26 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
-            <FullSeal size={56} />
-            <div>
-              <h1 className="brush" style={{
-                fontSize: "var(--text-xl)", fontWeight: 400, lineHeight: 1.15,
-                color: "var(--text-primary)",
-              }}>
-                {CLIENT_HAN}
-              </h1>
-              <div style={{
-                fontSize: "var(--text-xs)", fontWeight: 600, letterSpacing: "0.12em",
-                textTransform: "uppercase", color: "var(--text-muted)", marginTop: 3,
-              }}>
-                {CLIENT_EN}
-              </div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: "var(--space-4)",
+          justifyContent: "center", marginBottom: "var(--space-5)",
+        }}>
+          <FullSeal size={56} />
+          <div style={{ textAlign: "left" }}>
+            <h1 className="brush" style={{
+              fontSize: "var(--text-xl)", fontWeight: 400, lineHeight: 1.15,
+              color: "var(--text-primary)",
+            }}>
+              {CLIENT_HAN}
+            </h1>
+            <div style={{
+              fontSize: "var(--text-xs)", fontWeight: 600, letterSpacing: "0.12em",
+              textTransform: "uppercase", color: "var(--text-muted)", marginTop: 3,
+            }}>
+              {CLIENT_EN}
             </div>
           </div>
-
-          {/* The old copy was a sentence about inventory ("stock arrives, stock
-              leaves..."). It read as a mission statement, which is the wrong
-              job for the top of a portal: it described the domain instead of
-              asking for a decision. A question plus a count tells the reader
-              what this screen wants from them, and that there are exactly
-              three answers. */}
-          <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 600, lineHeight: 1.25 }}>
-            Where are you working today?
-          </h2>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4 }}>
-            Three workspaces, one inventory. Pick one to begin.
-          </p>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 16 }}>
-          {MODES.map((m) => {
-            const Icon = m.icon;
-            // A card that navigates to a blank screen is worse than one that
-            // says it is not ready. Rendered as a div, not a Link, so it cannot
-            // be tabbed into or clicked by accident.
-            const Card = m.soon ? "div" : Link;
-            return (
-              <Card key={m.label} {...(m.soon ? {} : { to: m.to })} className="card"
-                style={{
-                  textDecoration: "none", color: "inherit", display: "flex", flexDirection: "column",
-                  gap: 9, padding: 20,
-                  opacity: m.soon ? 0.6 : 1,
-                  cursor: m.soon ? "default" : "pointer",
-                }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12, background: m.bg,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <Icon size={21} color={m.tint} />
-                </div>
+        {/* Both sizes moved together. Taking the sub-line two steps up on its
+            own would have landed it on --text-lg, the same step as the
+            question, and two lines of identical size read as a paragraph
+            rather than as an ask and its answer. */}
+        <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, lineHeight: 1.2 }}>
+          Where are you working today?
+        </h2>
+        <p style={{ fontSize: "var(--text-lg)", color: "var(--text-secondary)", marginTop: 6, lineHeight: 1.35 }}>
+          Pick a workspace to begin.
+        </p>
 
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "var(--text-lg)", fontWeight: 700, lineHeight: 1.2 }}>{m.label}</span>
-                    {m.soon && (
-                      <span style={{
-                        fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase",
-                        color: "var(--text-muted)", border: "1px solid var(--border)",
-                        borderRadius: 99, padding: "2px 8px",
-                      }}>
-                        Next up
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: "var(--text-xs)", color: m.tint, fontWeight: 600, marginTop: 2 }}>{m.sub}</div>
-                </div>
+        <div className="home-rule">For this device</div>
+        <Hero m={HERE} />
 
-                {/* Naming the device and the place is the fastest way to tell
-                    someone a screen is not meant for them, and it is two words
-                    rather than three lines.
-
-                    The arrow beside it is what makes the card read as a button
-                    rather than a panel. A card with a title and a paragraph is
-                    a description; the same card with a direction cue is an
-                    invitation. The disabled one has no arrow, because it goes
-                    nowhere and an arrow would promise that it does. */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{m.who}</div>
-                  {!m.soon && <ArrowRight size={17} style={{ color: m.tint, flexShrink: 0 }} />}
-                </div>
-
-                <Detail body={m.body} />
-              </Card>
-            );
-          })}
+        <div className="home-rule">On the warehouse floor</div>
+        <div className="home-pair">
+          {FLOOR.map((m) => <Floor key={m.label} m={m} />)}
         </div>
 
-        <div style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--border)" }}>
-          {/* StockSense signs the foot of the page, the way a deployed system
-              credits the platform it runs on. */}
+        <div style={{
+          marginTop: "var(--space-6)", paddingTop: "var(--space-4)",
+          borderTop: "1px solid var(--border)",
+        }}>
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
-            marginBottom: 12,
+            marginBottom: "var(--space-3)",
           }}>
             <AppMark size={26} />
             <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 600 }}>

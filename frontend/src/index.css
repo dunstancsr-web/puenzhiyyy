@@ -335,6 +335,47 @@ input, select, textarea {
 /* ── Inventory table ─────────────────────────────────────────────────────── */
 .inv-table tbody tr:hover { background: var(--surface-2); }
 
+/* ── Home portal (TASK-78) ───────────────────────────────────────────────────
+   One markup, two layouts. Wide: a hero card above a pair side by side.
+   Narrow: the same blocks in a single column. Stan picked E1 for large screens
+   and E3 for small, and they differ only in the pair's column count and the
+   column width, so a breakpoint covers both without a second tree.
+
+   Declared as classes, never as inline style props. An inline
+   grid-template-columns beats a stylesheet rule without !important, so the
+   breakpoint could never reach it. That has shipped as a real bug here before. */
+.home-shell { width: 100%; max-width: 780px; margin: 0 auto; text-align: center; }
+.home-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+
+@media (max-width: 780px) {
+  .home-shell { max-width: 520px; }
+  .home-pair { grid-template-columns: 1fr; }
+}
+
+/* A rule with a word in it: the way a form names a group of fields without
+   drawing a container around it. One line of height, and the centre axis
+   stays unbroken. */
+.home-rule {
+  display: flex; align-items: center; gap: var(--space-4);
+  font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--text-muted);
+  margin: var(--space-6) 0 var(--space-4);
+}
+.home-rule::before, .home-rule::after {
+  content: ""; flex: 1; height: 1px; background: var(--border);
+}
+
+/* The affordance the cards previously had none of: at rest and on hover they
+   were pixel-identical, so the only clickability signal was the cursor. */
+.home-card { transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease; }
+.home-card:hover, .home-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px -8px rgba(15, 23, 42, 0.22);
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-card:hover, .home-card:focus-visible { transform: none; }
+}
+
 /* ── Modal entry animations ─────────────────────────────────────────────── */
 @keyframes inv-overlay-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes inv-modal-in {
