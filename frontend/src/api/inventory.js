@@ -62,6 +62,20 @@ export const api = {
     request("/inventory/restock", { method: "POST", body: { sku_id: skuId, quantity } }),
   getSkuProjection: (id) => request(`/skus/${id}/projection`),
 
+  // Bulk edit (TASK-60). Export bypasses request() because the response is
+  // text/csv, not the { success, data } envelope everything else returns.
+  exportSkusCsv: async () => {
+    let res;
+    try {
+      res = await fetch(`${BASE}/skus/export`);
+    } catch {
+      throw new Error(UNREACHABLE);
+    }
+    if (!res.ok) throw new Error("Could not export the inventory. Check the backend log.");
+    return res.text();
+  },
+  importSkusCsv: (csv, apply) => request("/skus/import", { method: "POST", body: { csv, apply } }),
+
   // Dashboard
   getDashboardStats: () => request("/dashboard/stats"),
 

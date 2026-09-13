@@ -16,6 +16,8 @@ import { api } from "../api/inventory";
 // below. Formulas are identical post the domain-alignment rename, so the preview
 // matches what the server will return.
 import { computeSkuAnalytics } from "../mock/analytics";
+import Modal, { ModalBtn } from "../components/Modal";
+import BulkEdit from "../components/BulkEdit";
 
 const HEALTH_STATUSES = ["All", "RED", "ORANGE", "YELLOW", "GREEN"];
 const MOVEMENT_CLASSES = ["All", "Fast Moving", "Normal", "Slow Moving", "Idle"];
@@ -300,17 +302,24 @@ export default function Inventory() {
               : " · all healthy"}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          style={{
-            display: "flex", alignItems: "center", gap: 7,
-            background: "var(--blue)", color: "#fff",
-            padding: "9px 18px", borderRadius: "var(--radius)",
-            fontWeight: 600, fontSize: "var(--text-sm)", border: "none",
-          }}
-        >
-          <Plus size={15} /> Add SKU
-        </button>
+        {/* Bulk edit sits to the LEFT of Add SKU and stays outlined rather than
+            filled. Add SKU is the one primary action on this surface; two solid
+            blue buttons side by side is a rainbow, not a hierarchy. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0 }}>
+          <BulkEdit onImported={loadSkus} />
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 7,
+              background: "var(--blue)", color: "#fff",
+              padding: "9px 18px", borderRadius: "var(--radius)",
+              fontWeight: 600, fontSize: "var(--text-sm)", border: "none",
+              cursor: "pointer", flexShrink: 0,
+            }}
+          >
+            <Plus size={15} /> Add SKU
+          </button>
+        </div>
       </div>
 
       {/* ── Filters ── */}
@@ -547,61 +556,6 @@ function ActionBtn({ label, onClick, variant }) {
       border: "1px solid var(--border)",
       background: variant === "ghost" ? "transparent" : "var(--surface)",
       color: "var(--text-primary)", cursor: "pointer",
-    }}>
-      {label}
-    </button>
-  );
-}
-
-function Modal({ title, onClose, children, wide }) {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [onClose]);
-
-  return createPortal(
-    <div
-      className="inv-overlay"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 1000, padding: "5vh 20px 20px" }}
-    >
-      <div
-        className="inv-modal"
-        style={{
-          background: "var(--modal-bg)", border: "1px solid var(--border)",
-          borderRadius: "var(--radius-lg)", padding: "28px 30px",
-          width: wide ? 680 : 460, maxWidth: "100%", maxHeight: "88vh", overflowY: "auto",
-          boxShadow: "var(--shadow-md)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{title}</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}>
-            <X size={18} />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>,
-    document.body
-  );
-}
-
-function ModalBtn({ label, onClick, primary, type = "button", disabled }) {
-  return (
-    <button type={type} onClick={onClick} disabled={disabled} style={{
-      padding: "8px 20px", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", fontWeight: 600,
-      border: "1px solid var(--border)",
-      background: primary ? "var(--blue)" : "var(--surface)",
-      color: primary ? "#fff" : "var(--text-primary)",
-      cursor: disabled ? "not-allowed" : "pointer",
-      opacity: disabled ? 0.5 : 1,
     }}>
       {label}
     </button>

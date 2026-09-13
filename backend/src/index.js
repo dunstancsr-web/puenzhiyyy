@@ -37,7 +37,7 @@ const isProduction = process.env.NODE_ENV === "production";
 // origin request happens at all. CORS_ORIGIN stays configurable for the case of
 // running the Vite dev server against a deployed API.
 app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:5173" }));
-app.use(express.json());
+app.use(express.json({ limit: "8mb" })); // 8mb: a CSV import posts the whole spreadsheet as a string
 
 // Routes
 app.use("/api/products", productRoutes); // legacy in-memory demo store, unrelated to the SQLite schema below

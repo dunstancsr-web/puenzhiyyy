@@ -16,6 +16,7 @@ const { buildAnalytics } = require("../engines/index");
 const { explainAlert, providerInfo, LlmUnavailable } = require("../llm/explain");
 const { listModes, getMode, setMode } = require("../llm/provider");
 const { projectInventory } = require("../engines/projection");
+const { toCsv, parseCsv } = require("../db/csv");
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -56,6 +57,40 @@ router.get("/skus", (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to load SKUs" });
+  }
+});
+
+// Registered BEFORE /skus/:id on purpose. Express matches in order, so with
+// the other ordering "export" is read as an id and the request 404s as an
+// unknown SKU, which is a confusing way to fail.
+// GET /api/skus/export — every SKU, every editable field, as CSV
+router.get("/skus/export", (req, res) => {
+  try {
+    const db = getDb();
+    const rows = db.prepare(`
+      SELECT s.*, p.on_hand_qty, p.reserved_qty, p.quality_hold_qty
+        FROM skus s
+        LEFT JOIN inventory_positions p ON p.sku_id = s.sku_id
+       WHERE s.active = 1
+       ORDER BY s.sku_id`).all();
+
+    // Computed context comes from the engine, never recomputed here. Reading
+    // the engine's own field is the standing rule in this repo.
+    const { skus } = getAnalytics();
+    const computed = new Map(skus.map((s) => [s.sku_id, s]));
+    const merged = rows.map((r) => {
+      const c = computed.get(r.sku_id) || {};
+      return { ...r, ...Object.fromEntries(EXPORT_CONTEXT.map((k) => [k, c[k]])) };
+    });
+
+    const csv = toCsv([...IMPORT_COLUMNS, ...EXPORT_CONTEXT], merged);
+    const stamp = today();
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="stocksense-inventory-${stamp}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to export SKUs" });
   }
 });
 
@@ -242,6 +277,180 @@ router.put("/skus/:id", (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to update SKU" });
+  }
+});
+
+// ── Bulk edit: CSV out, CSV back in (TASK-60) ────────────────────────────────
+//
+// The workflow this exists for is "export everything, fix fifty rows in a
+// spreadsheet, put it back", which is how inventory data is actually corrected
+// in the field and which the one-SKU-at-a-time edit modal makes miserable.
+//
+// Three deliberate decisions:
+//
+//   1. sku_id is the KEY, and it is never updated. A row whose sku_id matches
+//      updates that SKU; one that does not is reported as unknown and skipped.
+//      Import cannot create or delete SKUs. "Amend the database completely"
+//      means every editable value, not the set of SKUs itself: a typo in a key
+//      column should not silently delete a product line.
+//   2. Every import is validated in full BEFORE anything is written, and the
+//      writes then run in one transaction. A half-applied spreadsheet is the
+//      worst outcome available, because nobody can tell which half.
+//   3. The preview is the same code path as the apply, with the write skipped.
+//      A preview computed by different code than the write is a preview of
+//      something else.
+const IMPORT_KEY = "sku_id";
+const IMPORT_EDITABLE = [...SKU_TABLE_FIELDS, "on_hand_qty", ...POSITION_TABLE_FIELDS];
+const IMPORT_COLUMNS = [IMPORT_KEY, ...IMPORT_EDITABLE];
+
+// Read-only context columns. Exported so the spreadsheet is worth looking at on
+// its own, and ignored on the way back in, since they are computed.
+const EXPORT_CONTEXT = ["available_qty", "health_status", "days_of_cover", "abc_class"];
+
+const NUMERIC_IMPORT_FIELDS = new Set([...NONNEGATIVE_NUMERIC_FIELDS, "on_hand_qty"]);
+
+// Compare an incoming cell against the stored value. Returns null when nothing
+// moved, so an untouched spreadsheet produces an empty change list.
+function cellChange(field, raw, current) {
+  if (raw === undefined || raw === "") return null;   // blank means "leave alone"
+  if (NUMERIC_IMPORT_FIELDS.has(field)) {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return { error: `${field} is not a number` };
+    if (n < 0) return { error: `${field} must be >= 0` };
+    if (field === "target_service_level" && n > 1) return { error: `${field} must be <= 1` };
+    // Tolerance, not equality: a spreadsheet round trip turns 0.95 into
+    // 0.9500000000000001 often enough that exact comparison would report every
+    // untouched row as changed.
+    if (Math.abs(n - Number(current ?? 0)) < 1e-9) return null;
+    return { from: Number(current ?? 0), to: n };
+  }
+  const s = String(raw);
+  if (s === String(current ?? "")) return null;
+  return { from: current ?? "", to: s };
+}
+
+// POST /api/skus/import — { csv, apply } → what would change, or what did
+router.post("/skus/import", (req, res) => {
+  const { csv, apply = false } = req.body || {};
+  if (typeof csv !== "string" || !csv.trim()) {
+    return res.status(400).json({ success: false, message: "No CSV content was received" });
+  }
+
+  let parsed;
+  try {
+    parsed = parseCsv(csv);
+  } catch (err) {
+    return res.status(400).json({ success: false, message: `Could not read the file: ${err.message}` });
+  }
+
+  if (!parsed.columns.includes(IMPORT_KEY)) {
+    return res.status(400).json({
+      success: false,
+      message: `The file has no ${IMPORT_KEY} column, so there is no way to tell which SKU each row is for.`,
+    });
+  }
+
+  try {
+    const db = getDb();
+    const current = db.prepare(`
+      SELECT s.*, p.on_hand_qty, p.reserved_qty, p.quality_hold_qty
+        FROM skus s
+        LEFT JOIN inventory_positions p ON p.sku_id = s.sku_id`).all();
+    const bySku = new Map(current.map((r) => [r.sku_id, r]));
+
+    // Columns present in the file that we will edit. A file may legitimately
+    // carry fewer columns than the export, and any column we do not recognise
+    // (including the computed context ones) is reported and ignored.
+    const editable = parsed.columns.filter((c) => IMPORT_EDITABLE.includes(c));
+    const ignored = parsed.columns.filter((c) => c !== IMPORT_KEY && !IMPORT_EDITABLE.includes(c));
+
+    const changes = [];   // one entry per row that actually moves
+    const errors = [];
+    const seen = new Set();
+    let unchanged = 0;
+
+    for (const row of parsed.rows) {
+      const id = row[IMPORT_KEY];
+      const line = row.__line;
+      if (!id) { errors.push({ line, message: `Row ${line} has no ${IMPORT_KEY}` }); continue; }
+      if (seen.has(id)) { errors.push({ line, message: `${id} appears more than once (line ${line})` }); continue; }
+      seen.add(id);
+
+      const existing = bySku.get(id);
+      if (!existing) { errors.push({ line, message: `${id} is not a known SKU (line ${line})` }); continue; }
+
+      const fields = {};
+      let rowFailed = false;
+      for (const field of editable) {
+        const delta = cellChange(field, row[field], existing[field]);
+        if (!delta) continue;
+        if (delta.error) { errors.push({ line, message: `${id}: ${delta.error} (line ${line})` }); rowFailed = true; continue; }
+        fields[field] = delta;
+      }
+      if (rowFailed) continue;
+      if (Object.keys(fields).length === 0) { unchanged++; continue; }
+      changes.push({ sku_id: id, name: existing.product_name, line, fields });
+    }
+
+    const summary = {
+      rows: parsed.rows.length,
+      changed: changes.length,
+      unchanged,
+      errors,
+      ignoredColumns: ignored,
+      applied: false,
+    };
+
+    // Refuse to write anything while a single row is wrong. Applying the good
+    // rows and listing the bad ones sounds helpful and is not: it leaves the
+    // spreadsheet and the database in different states, with no record of which
+    // rows made it, which is exactly the situation a bulk edit must avoid.
+    if (!apply || errors.length || !changes.length) {
+      return res.json({ success: true, data: { ...summary, changes } });
+    }
+
+    const run = db.transaction(() => {
+      for (const c of changes) {
+        const skuSet = Object.keys(c.fields).filter((f) => SKU_TABLE_FIELDS.includes(f));
+        const posSet = Object.keys(c.fields).filter((f) => f === "on_hand_qty" || POSITION_TABLE_FIELDS.includes(f));
+        const values = Object.fromEntries(Object.entries(c.fields).map(([f, d]) => [f, d.to]));
+
+        if (skuSet.length) {
+          db.prepare(`UPDATE skus SET ${skuSet.map((f) => `${f} = @${f}`).join(", ")} WHERE sku_id = @sku_id`)
+            .run({ ...values, sku_id: c.sku_id });
+        }
+        if (posSet.length) {
+          db.prepare(`UPDATE inventory_positions SET ${posSet.map((f) => `${f} = @${f}`).join(", ")}, last_updated = datetime('now') WHERE sku_id = @sku_id`)
+            .run({ ...values, sku_id: c.sku_id });
+        }
+      }
+    });
+    run();
+
+    // One audit event per SKU, same shape the single-SKU edit writes, so the
+    // Activity tab reads the same either way and a bulk change is not a blind
+    // spot in the trail.
+    const { skus: after } = getAnalytics();
+    const afterIndex = new Map(after.map((s) => [s.sku_id, s]));
+    for (const c of changes) {
+      const updated = afterIndex.get(c.sku_id);
+      logEvent(EVENTS.SKU_UPDATED, {
+        skuId: c.sku_id,
+        input: {
+          source: "csv_import",
+          changed_fields: Object.keys(c.fields),
+          changes: Object.fromEntries(Object.entries(c.fields).map(([f, d]) => [f, d])),
+        },
+        output: updated
+          ? { health_status: updated.health_status, reorder_point_suggested: updated.reorder_point_suggested, available_qty: updated.available_qty }
+          : null,
+      });
+    }
+
+    res.json({ success: true, data: { ...summary, changes, applied: true } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to import SKUs" });
   }
 });
 
