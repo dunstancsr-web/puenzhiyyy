@@ -4,6 +4,7 @@ import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, Home as Home
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 import EventCredit from "./EventCredit";
+import Tenant from "./Tenant";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTROL TOWER NAVIGATION (TASK-49)
@@ -80,6 +81,13 @@ export default function Sidebar() {
             <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--text-primary)" }}>StockSense</div>
             <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Control Tower</div>
           </div>
+        </div>
+
+        {/* The account being worked in, directly under the product header. See
+            components/Tenant.jsx for why it sits here rather than replacing
+            the header above it. */}
+        <div style={{ marginBottom: 18 }}>
+          <Tenant />
         </div>
 
         {/* The way out, styled as leaving rather than as a fifth page. */}
