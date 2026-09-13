@@ -1,222 +1,195 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, Sun, Moon, LayoutGrid } from "lucide-react";
-import { useTheme, THEMES } from "../context/ThemeContext";
+import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, LayoutGrid } from "lucide-react";
 import { api } from "../api/inventory";
-import AiModeSwitch from "./AiModeSwitch";
+import SettingsMenu from "./SettingsMenu";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTROL TOWER NAVIGATION (TASK-49)
+//
+// Two presentations of the same four destinations.
+//
+// DESKTOP, a left panel carrying navigation and nothing else. The settings that
+// used to sit expanded below the links (three explanation tiers, a caption, two
+// theme buttons) now live behind one entry at the bottom, which is where
+// Linear, Notion, Stripe and Vercel all put them. A sidebar is a map, and a map
+// that also holds the car's controls is harder to read as either.
+//
+// NARROW, a top bar plus a bottom tab bar, deliberately split rather than one
+// pill holding everything. Leaving the Control Tower, moving inside it, and
+// changing a setting are three unrelated jobs, and a single island implied they
+// were one group. It also placed the Launchpad grid icon immediately beside the
+// Dashboard grid icon: two near-identical glyphs one tap apart.
+//
+// Navigation sits at the BOTTOM on narrow screens because that is where a thumb
+// reaches, which is why iOS, Android and every mobile app worth copying put
+// their tab bars there. Moving it down also buys the room for labels: four
+// named destinations fit across a phone, where they never fit in a pill already
+// holding a logo and two settings controls.
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
-  const { theme, setTheme } = useTheme();
   const location = useLocation();
   const [alertCount, setAlertCount] = useState(0);
 
-  // Sidebar persists across page navigation (mounted once above <Routes> in
-  // App.jsx) rather than remounting per page, so refetch on every route change
-  // to stay live - e.g. dismissing an alert on /alerts should update the badge
-  // the moment you navigate away, not just on a hard refresh.
+  // Mounted once above <Routes>, so it never remounts on navigation. Refetching
+  // per route keeps the badge live: dismissing an alert should update it the
+  // moment you navigate away, not on a hard refresh.
   useEffect(() => {
     api.getAlerts().then((data) => setAlertCount(data.length)).catch(() => {});
   }, [location.pathname]);
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
-    { to: "/inventory", label: "Inventory",  icon: PackageSearch,  badge: null },
-    { to: "/alerts",    label: "Alerts",     icon: Bell,           badge: alertCount },
-    // Last in the list on purpose: Activity is a record to consult, not a
-    // queue to work, so it sits after the three pages that drive daily action.
-    { to: "/activity",  label: "Activity",   icon: History,        badge: null },
+    { to: "/inventory", label: "Inventory", icon: PackageSearch, badge: null },
+    { to: "/alerts", label: "Alerts", icon: Bell, badge: alertCount },
+    // Last on purpose: Activity is a record to consult, not a queue to work.
+    { to: "/activity", label: "Activity", icon: History, badge: null },
   ];
 
   return (
     <>
-    {/* Full side panel - shown at 769px and up; hidden below that via CSS
-        (see .app-sidebar-panel in index.css). Note `display` and
-        `flex-direction` live in that CSS class, NOT in the inline style
-        below: an inline `display` beats any stylesheet rule that lacks
-        !important, so the breakpoint's `display: none` could never hide this
-        panel and both navs rendered on top of each other. */}
-    <aside
-      className="app-sidebar-panel"
-      style={{
-        width: 230,
-        background: "var(--sidebar-bg)",
-        borderRight: "1px solid var(--sidebar-border)",
-        padding: "24px 16px",
-        flexShrink: 0,
-        position: "sticky",
-        top: 0,
-        height: "100vh",
-      }}
-    >
-      {/* Logo */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px", marginBottom: 32 }}>
-        <div style={{ width: 34, height: 34, background: "var(--blue)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <TrendingUp size={18} color="#fff" />
-        </div>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-primary)" }}>StockSense</div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Rice Inventory AI</div>
-        </div>
-      </div>
-
-      {/* The way back to the Launchpad. The logo links there too, but a logo
-          that navigates is a convention people know rather than a signpost they
-          can see, and the Control Tower was otherwise a room with no visible
-          door. Placed above Menu, and styled as a leave-this-place action
-          rather than as a fifth page, because it is not a peer of the four
-          below it. */}
-      <Link
-        to="/"
+      {/* ── Desktop panel ────────────────────────────────────────────────────
+          `display` and `flex-direction` live in .app-sidebar-panel, NOT in the
+          inline style below. An inline display beats any stylesheet rule
+          without !important, so the breakpoint's `display: none` could never
+          hide this and both navigations rendered on top of each other. */}
+      <aside
+        className="app-sidebar-panel"
         style={{
+          width: 230,
+          background: "var(--sidebar-bg)",
+          borderRight: "1px solid var(--sidebar-border)",
+          padding: "24px 16px",
+          flexShrink: 0,
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px", marginBottom: 22 }}>
+          <div style={{
+            width: 34, height: 34, background: "var(--blue)", borderRadius: 8,
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <TrendingUp size={18} color="#fff" />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-primary)" }}>StockSense</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Control Tower</div>
+          </div>
+        </div>
+
+        {/* The way out, styled as leaving rather than as a fifth page. */}
+        <Link to="/" style={{
           display: "flex", alignItems: "center", gap: 9,
-          padding: "9px 10px", marginBottom: 16, borderRadius: "var(--radius)",
+          padding: "9px 10px", marginBottom: 18, borderRadius: "var(--radius)",
           border: "1px solid var(--sidebar-border)",
           color: "var(--text-secondary)", textDecoration: "none",
           fontSize: 13.5, fontWeight: 600,
-        }}
-      >
-        <LayoutGrid size={15} />
-        Launchpad
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
-          Switch
-        </span>
-      </Link>
+        }}>
+          <LayoutGrid size={15} />
+          Launchpad
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>Switch</span>
+        </Link>
 
-      {/* Nav */}
-      <nav style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", padding: "0 8px", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-          Menu
+        <nav style={{ flex: 1 }}>
+          {navItems.map(({ to, label, icon: Icon, badge }) => (
+            <NavLink key={to} to={to}
+              style={({ isActive }) => ({
+                display: "flex", alignItems: "center", gap: 11,
+                padding: "10px 12px", marginBottom: 3, borderRadius: "var(--radius)",
+                textDecoration: "none", fontSize: 15,
+                fontWeight: isActive ? 600 : 400,
+                background: isActive ? "var(--blue)" : "transparent",
+                color: isActive ? "#fff" : "var(--text-secondary)",
+                transition: "background 0.15s, color 0.15s",
+              })}>
+              {({ isActive }) => (
+                <>
+                  <Icon size={17} />
+                  <span style={{ flex: 1 }}>{label}</span>
+                  {badge > 0 && (
+                    <span style={{
+                      background: isActive ? "rgba(255,255,255,0.25)" : "var(--red)",
+                      color: "#fff", fontSize: 11, fontWeight: 700,
+                      minWidth: 19, height: 19, borderRadius: 99,
+                      display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px",
+                    }}>
+                      {badge}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+
+        <SettingsMenu align="up" />
+
+        <div style={{
+          padding: "12px 8px 0", marginTop: 12, borderTop: "1px solid var(--sidebar-border)",
+          fontSize: 12, color: "var(--text-muted)",
+        }}>
+          AWS NUS-ISS SMYA 2026
         </div>
+      </aside>
+
+      {/* ── Narrow: top bar, two islands ─────────────────────────────────────
+          Leaving and configuring are separate jobs, so they sit in separate
+          containers with space between them rather than in one pill that
+          implied they belonged together. */}
+      <div className="app-topbar-glass">
+        <div className="app-topbar-glass__island">
+          <Link to="/" aria-label="Launchpad" style={{
+            display: "flex", alignItems: "center", gap: 7, textDecoration: "none",
+            color: "var(--text-primary)", fontSize: 13.5, fontWeight: 600, padding: "0 4px",
+          }}>
+            <LayoutGrid size={16} />
+            Launchpad
+          </Link>
+        </div>
+
+        <div className="app-topbar-glass__island app-topbar-glass__island--settings">
+          <SettingsMenu align="down" />
+        </div>
+      </div>
+
+      {/* ── Narrow: bottom tab bar ───────────────────────────────────────────
+          At the bottom because that is where a thumb reaches, and with labels
+          because four named destinations fit across a phone once they are not
+          sharing a pill with a logo and two settings controls. */}
+      <nav className="app-tabbar" aria-label="Primary">
         {navItems.map(({ to, label, icon: Icon, badge }) => (
-          <NavLink
-            key={to}
-            to={to}
+          <NavLink key={to} to={to}
             style={({ isActive }) => ({
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 16px", borderRadius: "var(--radius)",
-              color: isActive ? "#fff" : "var(--text-secondary)",
-              background: isActive ? "var(--blue)" : "transparent",
-              fontWeight: 500, fontSize: 15,
-              marginBottom: 4, transition: "all 0.15s",
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+              justifyContent: "center", gap: 3, padding: "7px 2px",
               textDecoration: "none",
-            })}
-          >
-            <Icon size={17} />
-            <span style={{ flex: 1 }}>{label}</span>
-            {badge > 0 && (
-              <span style={{ background: "var(--red)", color: "#fff", borderRadius: 99, fontSize: 12, fontWeight: 700, padding: "1px 7px", lineHeight: 1.5 }}>
-                {badge}
-              </span>
+              color: isActive ? "var(--blue)" : "var(--text-muted)",
+            })}>
+            {({ isActive }) => (
+              <>
+                <span style={{ position: "relative", display: "flex" }}>
+                  <Icon size={20} strokeWidth={isActive ? 2.4 : 2} />
+                  {badge > 0 && (
+                    <span style={{
+                      position: "absolute", top: -5, right: -8,
+                      background: "var(--red)", color: "#fff",
+                      fontSize: 10, fontWeight: 700, minWidth: 16, height: 16,
+                      borderRadius: 99, display: "flex", alignItems: "center",
+                      justifyContent: "center", padding: "0 4px",
+                    }}>
+                      {badge}
+                    </span>
+                  )}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: isActive ? 700 : 500 }}>{label}</span>
+              </>
             )}
           </NavLink>
         ))}
       </nav>
-
-      {/* Which engine answers "Why?", and what it costs. Sits above Theme
-          because it changes behaviour and spending, not just appearance. */}
-      <AiModeSwitch />
-
-      {/* Theme switcher */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", padding: "0 8px", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-          Theme
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {THEMES.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTheme(t.id)}
-              style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "7px 12px", borderRadius: "var(--radius)",
-                border: `1px solid ${theme === t.id ? "var(--blue)" : "var(--border)"}`,
-                background: theme === t.id ? "var(--blue-light)" : "transparent",
-                color: theme === t.id ? "var(--blue)" : "var(--text-secondary)",
-                fontSize: 14, fontWeight: theme === t.id ? 600 : 400,
-                cursor: "pointer", textAlign: "left",
-                transition: "all 0.15s",
-              }}
-            >
-              <span style={{ fontSize: 15 }}>{t.icon}</span>
-              {t.label}
-              {theme === t.id && (
-                <span style={{ marginLeft: "auto", width: 6, height: 6, borderRadius: "50%", background: "var(--blue)" }} />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ padding: "12px 8px", borderTop: "1px solid var(--sidebar-border)", fontSize: 13, color: "var(--text-muted)" }}>
-        AWS NUS-ISS SMYA 2026
-      </div>
-    </aside>
-
-    {/* Floating glass top bar - shown below 769px instead of the panel above
-        (see .app-topbar-glass in index.css). A frosted, translucent strip
-        pinned to the top of the screen: brand mark, icon-only nav with the
-        alert badge, and a single tap to flip Light/Dark. This is a one-off
-        visual treatment for this bar, not the removed "Liquid Glass" theme -
-        it works the same way in both Light and Dark mode. */}
-    <nav className="app-topbar-glass" aria-label="Primary">
-      <div className="app-topbar-glass__inner">
-        <Link to="/" aria-label="All modes" style={{ display: "flex", flexShrink: 0 }}>
-          <div style={{ width: 30, height: 30, background: "var(--blue)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <TrendingUp size={16} color="#fff" />
-          </div>
-        </Link>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: "center" }}>
-          {/* Same exit on the phone bar: it never shows the sidebar, so without
-              this the Launchpad is unreachable on a small screen. */}
-          <Link to="/" aria-label="Launchpad"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-              color: "var(--text-secondary)", textDecoration: "none",
-            }}>
-            <LayoutGrid size={17} />
-          </Link>
-          {navItems.map(({ to, label, icon: Icon, badge }) => (
-            <NavLink
-              key={to}
-              to={to}
-              aria-label={label}
-              style={({ isActive }) => ({
-                position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
-                width: 42, height: 42, borderRadius: "50%",
-                color: isActive ? "#fff" : "var(--text-secondary)",
-                background: isActive ? "var(--blue)" : "transparent",
-                transition: "all 0.15s",
-              })}
-            >
-              <Icon size={19} />
-              {badge > 0 && (
-                <span style={{
-                  position: "absolute", top: 3, right: 3, minWidth: 15, height: 15, padding: "0 3px",
-                  borderRadius: 99, background: "var(--red)", color: "#fff", fontSize: 10, fontWeight: 700,
-                  display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1,
-                }}>
-                  {badge}
-                </span>
-              )}
-            </NavLink>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-          aria-label={`Switch to ${theme === "light" ? "Dark" : "Light"} theme`}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            width: 38, height: 38, borderRadius: "50%", background: "none", color: "var(--text-secondary)",
-          }}
-        >
-          {theme === "light" ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
-      </div>
-    </nav>
     </>
   );
 }

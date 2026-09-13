@@ -120,6 +120,7 @@
    both navs rendered stacked on top of each other on a phone). */
 .app-sidebar-panel { display: flex; flex-direction: column; }
 .app-topbar-glass { display: none; }
+.app-tabbar { display: none; }
 .app-main { padding: 28px 32px; }
 
 /* Card: the default container for a dashboard widget. Restored 2026-09-13 at
@@ -163,21 +164,28 @@
   .dash-row--even,
   .dash-row--wide-right { grid-template-columns: 1fr; gap: var(--space-5); }
 
+  /* Two islands, not one. Leaving the Control Tower and changing a setting are
+     unrelated jobs, and one pill holding both implied they were a group. The
+     gap between them is the message. */
   .app-topbar-glass {
-    display: block;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     z-index: 40;
     padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 0;
+    pointer-events: none;   /* the strip is a layout container, not a target */
   }
-  .app-topbar-glass__inner {
+  .app-topbar-glass__island {
+    pointer-events: auto;
     display: flex;
     align-items: center;
-    gap: 4px;
-    height: 48px;
-    padding: 0 6px;
+    min-height: 44px;
+    padding: 0 10px;
     border-radius: 999px;
     background: var(--glass-bar-bg);
     border: 1px solid var(--border);
@@ -185,9 +193,31 @@
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
+  /* The settings popover needs room to open downward without the island
+     clipping it, and it anchors to this box rather than to the strip. */
+  .app-topbar-glass__island--settings { position: relative; padding: 0 8px; }
+  .app-topbar-glass__island--settings > div { min-width: 150px; }
 
+  /* Bottom tab bar: where the thumb is. Labels fit here because this bar holds
+     only navigation, unlike the pill it replaced. */
+  .app-tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    background: var(--glass-bar-bg);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Clear both fixed bars. The bottom padding is the tab bar plus the home
+     indicator on a notched phone. */
   .app-main {
-    padding: 76px 16px 24px;
+    padding: 76px 16px calc(78px + env(safe-area-inset-bottom, 0px));
   }
 }
 

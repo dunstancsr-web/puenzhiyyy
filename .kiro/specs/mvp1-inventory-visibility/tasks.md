@@ -1462,6 +1462,43 @@ reason, and got GRN-0001 with stock moving 620 to 815 MT.
 - [x] The same exit on the phone top bar, which never shows the sidebar and would otherwise have left
       the Launchpad unreachable on a small screen.
 
+## TASK-49 - Declutter the sidebar, split the narrow-screen navigation (2026-09-13)
+
+The sidebar had grown three competing sections: four navigation links, three explanation tiers with a
+caption, and two theme buttons. Twelve interactive elements, of which four were navigation and eight
+were settings nobody changes twice in a session.
+
+**What the well-made tools do.** Linear puts settings behind the workspace menu, Notion behind one
+"Settings" row at the bottom, Stripe and Vercel move them out of the left nav entirely. None of them
+keep a theme switcher permanently expanded beside their page links. The pattern is consistent: a
+sidebar is for NAVIGATION, and settings collapse into a single entry at its edge.
+
+- [x] `SettingsMenu`: one entry holding the explanation tier and the theme, opening as a popover, with
+      outside-click and Escape to dismiss. `AiModeSwitch` deleted, its logic absorbed.
+- [x] The trigger carries the STATE, not just a label: it reads "Local model · Light". Collapsing the
+      controls should not cost the ability to see which engine is answering, which was the whole point
+      of putting the tier in the sidebar.
+- [x] Sidebar is now logo, Launchpad, four links, settings, footer. Twelve interactive elements down to
+      six.
+
+**Narrow screens: two islands and a bottom tab bar.** The single pill held the logo, a Launchpad grid
+icon, a Dashboard grid icon, alerts, activity and a theme toggle. Two near-identical grid glyphs sat one
+tap apart, and leaving the Control Tower, moving inside it, and changing a setting were presented as one
+group when they are three unrelated jobs.
+
+- [x] Top strip is now two islands with space between them: Launchpad on the left, settings on the
+      right. The strip itself is `pointer-events: none` so only the islands are targets.
+- [x] Navigation moved to a bottom tab bar with icon AND label. At the bottom because that is where a
+      thumb reaches, which is why iOS and Android put tab bars there. Moving it down also bought the
+      room for labels: four named destinations fit across a phone once they are not sharing a pill with
+      a logo and two settings controls.
+- [x] `.app-main` bottom padding clears the tab bar plus `env(safe-area-inset-bottom)` for a notched
+      phone.
+
+**Not verified: the narrow layout itself.** The browser resize tool reports success while leaving the
+viewport unchanged, as it has all session, so the two islands and the tab bar have only been reasoned
+about, not seen. The desktop sidebar and the settings popover were both checked in the browser.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

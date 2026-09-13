@@ -388,3 +388,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, CLAUDE.md, DEVLOG.md, frontend/src/App.jsx, frontend/src/components/Sidebar.jsx
 - **New files:** frontend/src/pages/Launchpad.jsx (renamed from Launcher.jsx)
 - **Notes:** TASK-48. Stan asked for a name for the three card screen so he could refer to it precisely, and for the cards to stop being wordy enough to force scrolling on a phone. Named it the Launchpad, after SAP Fiori and macOS, and recorded it in CLAUDE.md with the other names. Cards lost their body text to a tap-to-expand disclosure, which is a button rather than a HoverHint because HoverHint binds mouseenter and focus only and would have hidden the text on exactly the small screens the change is for. Also gave the Control Tower a visible way out: the logo already linked to the Launchpad, but a logo that navigates is a convention rather than a signpost.
+
+---
+
+## Session: 2026-09-13 20:30
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/components/Sidebar.jsx, frontend/src/index.css
+- **New files:** frontend/src/components/SettingsMenu.jsx (AiModeSwitch.jsx deleted)
+- **Notes:** TASK-49. Stan asked to declutter the sidebar with reference to well-designed products, and to stop the narrow-screen bar lumping unrelated buttons into one island. The sidebar had twelve interactive elements of which eight were settings; Linear, Notion, Stripe and Vercel all collapse settings behind a single entry and keep the sidebar for navigation, so that is what this does. The trigger still shows the state ("Local model · Light") because seeing which engine is answering was the original reason the tier lived in the sidebar. On narrow screens the one pill became two islands plus a bottom tab bar with labels; the pill had put the Launchpad grid icon immediately beside the Dashboard grid icon, which was my own doing last session. The narrow layout is still unverified: the resize tool has reported success while leaving the viewport unchanged all session.
