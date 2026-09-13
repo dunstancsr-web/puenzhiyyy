@@ -113,19 +113,14 @@ export default function Sidebar() {
         {/* Names the screen you are on, with the icon that marks it on Home.
             The repetition is the point: an icon is learnable when the same
             mark names the door and the room behind it. */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 9,
-          padding: "12px 6px", margin: "0 0 6px",
-          borderTop: "1px solid var(--sidebar-border)",
-          borderBottom: "1px solid var(--sidebar-border)",
-        }}>
-          {/* 24px, and --text-primary rather than purple. The tint is
-              wayfinding on Home, where three workspaces have to be told apart;
-              here there is only one workspace, so the colour distinguishes
-              nothing and just competes with the alert badge. Matching the
-              title's colour makes icon and label read as a single lockup. */}
-          <TowerIcon size={24} color="var(--text-primary)" />
-          <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)" }}>
+        <div className="section-id">
+          {/* Neutral at rest, purple on hover. The tint is wayfinding on Home,
+              where three workspaces have to be told apart; here there is one,
+              so spending the colour permanently buys nothing and competes with
+              the alert badge. The icon takes `currentColor` from its wrapper,
+              which is what lets one property carry the transition. */}
+          <span className="section-id__mark"><TowerIcon size={26} /></span>
+          <span style={{ fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-primary)" }}>
             Control Tower
           </span>
         </div>

@@ -120,14 +120,12 @@ export default function SettingsMenu({ align = "up", compact = false }) {
           width: 38, height: 38, borderRadius: 999, flexShrink: 0,
           border: "none", background: open ? "var(--surface-2)" : "transparent",
           color: "var(--text-secondary)", cursor: "pointer",
-        } : {
-          display: "flex", alignItems: "center", gap: 9, width: "100%",
-          padding: "9px 10px", borderRadius: "var(--radius)",
-          border: "1px solid var(--sidebar-border)",
-          background: open ? "var(--surface-2)" : "transparent",
-          color: "var(--text-secondary)", cursor: "pointer",
-          fontSize: "var(--text-xs)", fontWeight: 600, textAlign: "left",
-        }}
+        } : undefined}
+        // Sidebar styling lives in .sidebar-settings so :hover can reach it;
+        // the open state rides a data attribute rather than an inline
+        // background, which would beat the hover rule.
+        className={compact ? undefined : "sidebar-settings"}
+        data-open={!compact && open ? "" : undefined}
       >
         <Settings size={compact ? 19 : 15} style={{ flexShrink: 0 }} />
         {!compact && (
