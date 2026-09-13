@@ -25,7 +25,11 @@ const args = process.argv.slice(2);
 const repeatFlag = args.indexOf("--repeat");
 const REPEATS = repeatFlag >= 0 ? Number(args[repeatFlag + 1]) || 1 : 1;
 const MODELS = args.filter((a, i) => !a.startsWith("--") && i !== repeatFlag + 1);
-if (!MODELS.length) MODELS.push("llama3", "llama3.1:8b", "qwen3:8b");
+// Defaults to what is actually installed. qwen3:8b was benchmarked and removed:
+// slowest of the three, and the only one that renamed a money figure as "sales"
+// repeatedly. Naming a model that is no longer pulled would make the no-args
+// run fail for the next person.
+if (!MODELS.length) MODELS.push("llama3", "llama3.1:8b");
 
 async function generate(model, system, user) {
   const started = Date.now();

@@ -348,3 +348,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, backend/.env.example, backend/src/llm/explain.js, backend/src/llm/provider.js
 - **New files:** backend/scripts/bench-models.js
 - **Notes:** TASK-43. Hardened the prompt, then added the half that does not rely on the model cooperating: a deterministic verifier that checks every figure in the prose against the figures supplied. Pulled llama3.1:8b and qwen3:8b to compare. The first benchmark reported qwen3 at 7/7 clean and it was completely wrong: qwen3 is a reasoning model, spent its capped token budget on internal monologue, and returned nothing at all, and a verifier that only looks for bad things finds none in an empty string. Fixed by sending think:false (which also made it 36% faster) and by failing responses under 80 chars. Also nearly shipped a 1% numeric tolerance that passed 26000 for 26217. With 28 runs per model, llama3 that Stan already had wins on both accuracy and speed and is the only one with zero dangerous drift, so the two downloads produced evidence rather than a new model. Mid-edit I also destroyed explain.js by slicing between two string indices and deleting buildFacts and cacheKey with it; recovered from HEAD and redid it with anchored insert-only replacements.
+
+---
+
+## Session: 2026-09-13 15:55
+- **Branch:** main
+- **Files changed:** DEVLOG.md, backend/scripts/bench-models.js
+- **New files:** none
+- **Notes:** Removed qwen3:8b after the benchmark (slowest, and the only model that repeatedly renamed a money figure as "sales"). Kept llama3.1:8b at Stan's call, which is the better instinct: its weaker score came mostly from one alert it failed 4 of 4 times, a systematic and fixable trigger rather than general unreliability, so it is worth re-testing after the JP-5KG facts fix. llama2 stays, Stan uses it for another project. Also updated the benchmark's default model list, which still named qwen3:8b and would have made a no-args run fail for the next person.
