@@ -1,0 +1,358 @@
+<title>Centred Device-Aware Home</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+<style>
+@font-face {
+  font-family: "Brush";
+  src: url(data:font/woff2;base64,d09GMgABAAAAAA6gAA0AAAAAF+wAAA5RAAIAxQAAAAAAAAAAAAAAAAAAAAAAAAAAGyAcIAZgAGwRCAqmWJwkATYCJAMUCxQABCAFg14HIBvDESMRZm1sDvAXCTyXdfh94lCsDGI3fr9yQ7StZiMBCTEajAj0bLACMBujMDKuvIho/769yu375JpcRwLZdfBd532XmyFfbuZH0eQarj3TgfA8BqwYL6yIB1K/ASspMYOAN/9Babpp/ZbYAwqwAPj/71vasmFZJ3/kiSdya79t+63delHZvhgG1sP3o2V2mo8fwxEdYBwBGcuxQRv5HhWbXwEQAIAGukAfQIGScBkgAQoAADMz4LGdn+so8hgaAxgA8ACcAAAIo8+D0oAjZA+EGwlelJQoDgDHIrX7wpHymT4AkHdQdZocQH/DfwoSANj4jB5BPo9BMouC1IgHOKgcjtSWXpSRcQ9LapuUTVv6wnO35vwN299uctv4z3qLiZHOyc7E2kMAAg+CABRDjC2MFPJsRx8AfB4vEi6lDtIIPx0owID/FeIAVW3epuqgoZXI19bTDmBftOS5qm0q5HNZpfwY5+jCzc/Rjk4nVKwSsAgphaP8kW8z1LtNRY9Ac2WTu2LRbmai6QUvD11XM70XS8sHZwCE6N0Zx4WFYEh7FfBLdzRTAo1rTXgOgIVnWJ+jzS92Es7z/X6mMmfS9JBjMegZrmjNZrmeICDK5Xyfezs9jtlfOMxVFa5h8CjjCceZggqXgF8K04YPBMixARVd7j2LGZa7ggqLBk3DBeuYYlYMZlScLk4CJSC+M3UIQGleCktyXhs5526RONVU14tnL9Zf9Twm83uO5PvMURzShEOHUkWzGWuayBG7iF496yyjbS5vRbSl5pQAMHkBx/zus3zrsullnzpMniKgCVRYl3t6J9e/vDkrip4iJkBgFxAQVCiAxDUZar8BTmgzeURlzvpbEcvPRi0PPfnMjVTRWzxMhShHesjxs0gvyAlCmk4q6bCPS5lEfvZzDKrDHgELrASea9YS98VpOlwIiu/fboDCZ/IaAV+zNJ+3+xeYBALgVpqXKuc0Y/+eQwBA5WodLz418apKfe94KyLPvo2erdTYYrJPTaa1kYnZF31Prxosbl6dUaEogOaBI3Mm2/MOIp1QYRGwDPeR5j1Nbpuex71MpRMVg20DUU6Kgcgtxo1rG6N8f77Gu3b7ZpI1P6yjk+LpzVZKQCG0tc4VfAJTTT9UGTl9JqPy2Yt7T25dNrOanL8znzfSWwZo9lU+x6Kggcj1YBrukUu/Ri0fGXgAywXP9ACdUEPJJxC+844iFcVAKFwCpRA2pR9culWSzkgzrFOZnn6S+tjOZHqq4PvtpuCoMCnVp4zmXs9ueZ0jdne5AMRwq5QA7WHAVZI12WfS60rTRh69Oa4fZZJj9GzCEc3ldb0hFa7VCzjHZxN11134tqgYUCGUV0i5vHMdmZTaW/BL0ubIo5a8RtICAIE0ZL9eprdH7hWkgg8IAgNQdEF79g2mA7ESKI9g6Epeeh1EIXyjSuQeE8nNpDgh0OsMnc93CDGIq4rGpZQAR/OofdWujzOVH3FGRTcngAAQR7ILW6Tsd7BLo7tlm6XAq2gfVYmoOK/Xc5spm5LaGOxk0UQ/VTFQuhtZbfRH8e7heRpUxfvB6fdbog5gbxVOVcAotM+w2pO2lFJZM02HkgZrJmY2c6YQT9N7kBamTHr8YWZ6XZvjURU8iuryTxEopC8BAcmkp89iwrETJfqs19V13Lru/RZF6r5NhWW4K83BbDHC+gUAQYMlhxcr8KNDRawZT63qcLYwoQtBrwCNU07phTPtEYFDPkSD2HUIGADhqLEkdc82MWMyMz2OmHhPlLW2lpz9R1ZADJT0m+NDPa/pSe3yCWyoOFZ3/OKLTUkgXelmsnZB5RucUGEMRH3MMaC9yrlKodwtR0MD4tIGgU1ET4abe0AgrI0Y2zRIB44RM5kt71xnshIX4pfiBqh0hPxNlAQK1yqkFHrlh+8mfCbJjuzs+eYEBdyafRkVg9MKoYBK7p6oSfyrNdvVquGiWpRuzN+6Riwh6HmF+7+xySVxoQGS45xJm4V5qVc8rW+O651OwfclnIorsmGlZcyeTZJypnfzC+xWRTfLVs7NzuJFBTStAfFrUpoDyekQuBf1JysJXjzKM457r3aiuwlvp2quBz2IZOmOp0rbxvz9G0wQtwDgnDNcn0w1eXbQG09YNUbCFu645hzPS0pibtmUezpzTXo+EwpZS9FhU/NdZVNomL+ztbMeB4kpWjGy+/4tJ7nfNIr5+V3UW8FQLqVDElT0DY06IFgxJEKmbLQ/fdw2yFfYLyX9haaageyfKutmt0HvJesn/DXPLUthi1/dCHKdhzWpCen5HiJTgWn79kPJldXRXpAc1JIJc9qI4CLl8xtqpu69EshEzDwPtKQWTreuGZtZVOpYvYSi2dcm44qlZmw8QGZdO2A4e7oHT3BaY6JlFlO7VoqiDc4ZiZTrMv7KDY8pKdMgbmtWP7MDJ8TOS4bkZhPtJ+b/H0LheW8VvHxWSP4J10C1VE/Rb4nbhh72eUZOjJ+mlpAg1vBWp9i9CChOXGUUV90djWAEQBGWPeoZjBHxMUEBFxF6rYn4sDfl3b/N3C/ea/avWtbaG5cwDZQDERV5smjl75S0VdNZPc+XjIg8+eKBjUh52+ocJZdllJBAX21DseH/gfKJ5BLNyJlLMek9Z00jnvWHmGJxvRoc856sY92OOtFwjAZnEykWD6OwgaRlTJfOVTtqvr6qUVF46lhFvhqL2P0jz919uXOXJmdSskUS1mljpmlsN9UXBntKPtfSZNS4VKiFy6ef23dLdwYYqs78z9zCkuU4T/tr5sf3/NPv2/NrZN2TkBDGSgR9FNOxqUa+GUMbg4TzBp1ilj1Zs2pVSUv3fZEoXNq7AYPXJfti8xx3ZsBk9uGD6pt/HBqAIZUAuxvGSanCaHAFEmToXA8aNi8pSwV+Tnv8a/zKtJuNRK9rMlDVe3p3Zol1SjYd0HYb2otxqnmwv1ETIcf9rijCs7a7Lh2ybhzQ/bDKm8BokkCQZTu6JHcEpVqasx2GmLp9BSPX4MRFR1WMub4Zzv5buljxlrko86mrFxWF3YhCo9AwKpgbyysa/C3kUWHhKVxVy8GCQBbFsqs9jFPMWU8R9BM1rYnqbo7l8C8skTZzxIK+ZiPLEMYWsi5cpeNZPUE9Z5qC1Bd/Jq060TmoZVXq2vpgiYmGpOJ6oEmIeWlmCkc397iEZCB+WI2cIdWBEXr2iUXHjquwWMHJk6cv8Lg7fp+RG/UtV/VVW6bB3sC4yKC8jYwk/TwYlV4WizGjcM9E1NWv0z1sVrZSFcWv9s/i0XntY8MfcCbTHlfn7r77LWJ/WJHH+strznf36lHi3WYTHXV6QeWOjjBBwSzTCtm8NN6tLv9Llzbwa4+PN46efw1jnoTHYs08ay1eZrurHIZipPpsPrbH5MYyYw6D13/9WmamT734hU6m2QI9fyxuqpNMfMGL/iFWcVxeTdgYBNW6cGlWEAPBehuBl4ff8ltTO317CJ5DgBLBRAH+akWKZbEv5lw54OkTrEGmnPN1y0pO/iKDHZQXDnTfKOEKg/9Qn/l7/VwrTSGxoYZnvfwj79OjtWuJOKny+VhObqUvjL7OQJ0QKsq/m0EB3sjaGEFrI+kg0i5p/TJBTB7mKnUlize29Kn8Bbir+BiHElXO70dicPT1RJcvDMOqJhdhONxh9durBkgGnAGvnc2PRurN5l+c82xPoSLExLzvOJKXTSBfNJJMH0YavsWxUyj21TGh5jLFlNl/nL/muHOwYnMNZAjVI3Pw+MVHu8anf0Tow/NqtZCoB06Wvt6qxmKjxBUyh5U95I6tN5YRtMBhOYbGZk7Bwmc5jlXb02mnjd/GxhUP5+0h7uzuFVZX8Hdt1NTIr7MHmLVZKkgrz1kNhNcccw0rMhrQKMHgpccdlg5X38iN59Drpsj1B7dvLZl+XZlK4YcxPOYsOjkhs6E9d+lPFYhfNS9Va9pnJPEVOgjPoTDnORVKupf+sbjlWRxHxe+W9XGWnxXVY6YGPTfWGW7CZbW+p0WhWmZhEIcrDronm9JjUhAwzH+OM8vxbFUzxP5B1V5nBkaWwrudTYMqtmzKQ5b6kYrSFKPLNAbtWeuVGhKVszrZvb0jpf4Pztp/9aLVYicynexeCirmBGzVNhq7bYRq1z+WVuXuXW1nh1y/gh1LvxqETEbp6pb71nR7Z1b9E34T5UqlT/0iMOLI4qa70rclnz5rhTJSlFEDKDKpBMG0XIrl1tYu3ynXwlIQBzPhyzA1SslhJB94/HP61GPOFxFw5rkFWHetcPTzjSmQtBla+MLYGwA55Tgt49GHgTsn3DI/+B79cpenjX7I/nmct6KLyThcukAwVhBnAFrBQRj6XT1/8aW6ju1rpmYipnH6JLHgVCFHVaXkB98Uk30V6euf2LCJRKp3zWgLBoFCVvLJYOkGO7YleYUnDsRh1+z2F5qVQmzgqsOrJwGhS4/+O/9cX+NptiD6p1Eem1rMZ/uzzqwa00qNUM/bnEg6Rq9wHqhrWcNf/pR49PJHwtkCEtkkz5v8aP1vLIPBaUnh0JN0ttc0iSDvmOtq4a6LF9/07NKZ4fw/iHxGJk0DB3DI0B8v+LDNxPnE8gMhVLkLNANLYAASgBxYAyPgkeIwBQsABxQBDFmSMeSsECDpawqlAAB7ALAMAtpgD4OBCrjGEOAFnjAUWELaDAPaUODHcWAKpR0IKCuvr1TkF1QJHO0d3DnKUH0uj8iUCqCqpUk40JjvhtFhqawQi2Wf5FdNYwFOlUoZM48VLJYjJLJ7VvMVvnh1lm3IalmJC9BYZnhxbt6Jpf5IaeceyaSDaVsbYhZ5SgnsocBiLA2Gqotd+ysdbe2f5OTpjyeKA742KNEJm/CbpnNKYDEO8ZU5psj9gSDlXaSWQx6eZgaO) format("woff2");
+  font-display: block;
+}
+
+:root {
+  --ground: #fbfcfd; --panel: #ffffff; --sunk: #f4f6f8;
+  --line: #e3e8ee; --line-soft: #eef1f5;
+  --ink: #16202c; --ink-2: #4a5766; --ink-3: #7b8794;
+  --accent: #2563eb; --bad: #b42318; --ok: #027a48; --ok-sk: #eaf6ee;
+  --shadow: 0 1px 2px rgba(16,32,44,.05), 0 8px 24px -12px rgba(16,32,44,.14);
+
+  --app-bg: #f0f2f5; --app-card: #ffffff; --app-border: #e2e6ea;
+  --app-ink: #1a202c; --app-ink2: #475569; --app-ink3: #64748b;
+  --seal: #b3271e; --mark: #1d4ed8;
+  --green: #22c55e; --green-l: #f0fdf4;
+  --blue: #3b82f6;  --blue-l: #eff6ff;
+  --purple: #8b5cf6; --purple-l: #f5f3ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0e1319; --panel: #161d26; --sunk: #1d2631; --line: #2a3541; --line-soft: #222b36;
+    --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+    --accent: #6b9bff; --bad: #f0837a; --ok: #5ac08d; --ok-sk: #12261a;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0e1319; --panel: #161d26; --sunk: #1d2631; --line: #2a3541; --line-soft: #222b36;
+  --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+  --accent: #6b9bff; --bad: #f0837a; --ok: #5ac08d; --ok-sk: #12261a;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground); color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 30px 22px 70px; }
+
+.mast { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 26px; }
+.mast h1 { font-family: Newsreader, Georgia, serif; font-size: 34px; font-weight: 600; line-height: 1.1; margin: 0 0 6px; }
+.mast p { margin: 0 0 8px; color: var(--ink-2); max-width: 74ch; }
+.mast b { color: var(--ink); }
+
+.opt { margin-bottom: 34px; }
+.opt__hd { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+.opt__n { font-family: Newsreader, Georgia, serif; font-size: 26px; font-weight: 600; line-height: 1; color: var(--ink-3); min-width: 26px; }
+.opt__t { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.opt__pick { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; background: var(--ok-sk); color: var(--ok); padding: 3px 8px; border-radius: 4px; }
+.opt__lede { color: var(--ink-2); font-size: 13.5px; margin: 0 0 12px; max-width: 80ch; }
+
+.frame { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.frame__bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--sunk); border-bottom: 1px solid var(--line); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.frame__url { margin-left: 8px; font-size: 11px; color: var(--ink-3); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 2px 9px; }
+.view { height: 640px; background: var(--app-bg); overflow: hidden; }
+
+/* &#x2500;&#x2500; App &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500; */
+.app { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--app-ink); text-align: center; padding: 44px 40px 0; }
+.inner { max-width: 760px; margin: 0 auto; }
+
+.seal4 {
+  width: 58px; height: 58px; border-radius: 13px; padding: 5px; flex-shrink: 0;
+  background: var(--seal); color: #fff; font-family: Brush, serif;
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  grid-auto-flow: column; direction: rtl; gap: 1px; font-size: 22px; line-height: 1;
+}
+.seal4 > span { display: grid; place-items: center; }
+.cn { font-family: Brush, serif; font-size: 29px; color: var(--app-ink); letter-spacing: .05em; line-height: 1.15; }
+.en { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--app-ink3); margin-top: 3px; }
+
+/* The type change. Question up to --text-xl, sub-line up to --text-lg, which
+   is the requested two steps while keeping two steps between them. */
+.ask { font-size: 30px; font-weight: 700; line-height: 1.2; margin: 0; letter-spacing: -.01em; }
+.sub { font-size: 22px; font-weight: 400; color: var(--app-ink2); margin: 6px 0 0; line-height: 1.35; }
+
+/* Divider with a label in it: the standard way to name a group without
+   drawing a box around it. */
+.grouplbl {
+  display: flex; align-items: center; gap: 14px; margin: 26px 0 14px;
+  font-size: 11px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; color: var(--app-ink3);
+}
+.grouplbl::before, .grouplbl::after { content: ""; height: 1px; background: var(--app-border); flex: 1; }
+
+.card {
+  background: var(--app-card); border: 1px solid var(--app-border); border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06); text-align: left; position: relative;
+}
+.hero { padding: 22px 24px; display: flex; align-items: center; gap: 18px; border-color: var(--purple); box-shadow: 0 6px 20px -8px rgba(139,92,246,.4); }
+.hero .sq { width: 52px; height: 52px; border-radius: 14px; }
+.hero h4 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.2; }
+.hero .role { font-size: 13px; color: var(--purple); font-weight: 600; margin-top: 2px; }
+.hero .cta { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; color: var(--purple); white-space: nowrap; }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mini { padding: 15px 17px; display: flex; align-items: center; gap: 13px; }
+.mini .sq { width: 38px; height: 38px; border-radius: 11px; }
+.mini h4 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.2; }
+.mini .role { font-size: 11.5px; color: var(--app-ink3); margin-top: 1px; }
+.sq { display: grid; place-items: center; flex-shrink: 0; }
+.soon h4 { color: #94a3b8; }
+.soon .sq { opacity: .5; }
+.badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  border: 1px solid #cbd5e1; color: var(--app-ink2); background: #f8f9fb;
+  border-radius: 99px; padding: 2px 8px; white-space: nowrap;
+}
+.badge--here { border-color: var(--purple); color: var(--purple); background: transparent; }
+
+/* Help. An i in the corner, and a panel that only appears on hover or focus,
+   which is what HoverHint already does in the app. */
+.help {
+  position: absolute; top: 10px; right: 11px;
+  width: 21px; height: 21px; border-radius: 50%;
+  border: 1.4px solid var(--app-border); color: var(--app-ink3);
+  display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  font-family: Georgia, serif; background: var(--app-card); cursor: help;
+}
+.tip {
+  position: absolute; z-index: 5; width: 268px; right: 6px; top: 36px;
+  background: #1a202c; color: #f1f5f9; border-radius: 11px; padding: 12px 14px;
+  font-size: 12.5px; line-height: 1.5; text-align: left;
+  box-shadow: 0 14px 34px -10px rgba(16,32,44,.5);
+}
+.tip::before { content: ""; position: absolute; top: -5px; right: 16px; width: 10px; height: 10px; background: #1a202c; transform: rotate(45deg); }
+
+.foot { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--app-border); }
+.runon { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--app-ink2); font-weight: 600; }
+.mark { width: 24px; height: 24px; border-radius: 6px; background: var(--mark); display: grid; place-items: center; }
+.credit { font-size: 11px; color: var(--app-ink3); line-height: 1.6; margin-top: 7px; }
+.credit b { color: var(--app-ink2); font-weight: 600; }
+
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 12px; }
+.note { border-left: 2px solid var(--line); padding: 9px 13px; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; background: var(--panel); border-radius: 0 8px 8px 0; }
+.note b { color: var(--ink); }
+.note--win { border-left-color: var(--ok); }
+.note--cost { border-left-color: var(--bad); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <h1>Centred, device-aware</h1>
+    <p>Option B's single centre axis with option D's honesty about the device, and none of D's split
+      columns. Three ways to separate <b>what you can do here</b> from <b>what happens on the
+      floor</b>, all on one axis.</p>
+    <p>Two other changes are in every variant. The question moves up to <b>30px</b> and the sub-line
+      to <b>22px</b>, which is the two steps up you asked for while keeping two steps between them:
+      at 22px alone the sub-line would have matched the question exactly and flattened the pair. And
+      the help is back, as an <b>i</b> in each card's corner that opens on hover or focus, the same
+      behaviour <code>HoverHint</code> already has in the app, rather than three repeated "What is
+      this?" buttons.</p>
+  </header>
+
+  <!-- &#x2550;&#x2550;&#x2550; E1 &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+  <section class="opt">
+    <div class="opt__hd"><span class="opt__n">E1</span><span class="opt__t">Hero and pair</span>
+      <span class="opt__pick">recommended</span></div>
+    <p class="opt__lede">The workspace you can actually use is one wide card. A labelled rule separates
+      it from the two handheld flows, which sit side by side beneath it at a smaller size.</p>
+    <div class="frame">
+      <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__url">stocksense.app</span></div>
+      <div class="view">
+        <div class="app">
+          <div class="inner">
+            <div style="display:flex;align-items:center;gap:14px;justify-content:center;margin-bottom:20px">
+              <div class="seal4"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+              <div style="text-align:left"><div class="cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="en">Four Seas Rice Trading</div></div>
+            </div>
+            <p class="ask">Where are you working today?</p>
+            <p class="sub">Pick a workspace to begin.</p>
+
+            <div class="grouplbl" style="margin-top:30px">For this device</div>
+            <div class="card hero">
+              <div class="sq" style="background:var(--purple-l)"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+              <div style="flex:1;min-width:0">
+                <h4>Control Tower</h4>
+                <div class="role">Analysis and decisions &middot; <span style="color:var(--app-ink3);font-weight:400">office, desktop</span></div>
+              </div>
+              <div class="cta">Open <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+              <span class="help">i</span>
+            </div>
+
+            <div class="grouplbl">On the warehouse floor</div>
+            <div class="pair">
+              <div class="card mini">
+                <div class="sq" style="background:var(--green-l)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg></div>
+                <div style="flex:1"><h4>Goods In</h4><div class="role">Receiving &middot; handheld</div></div>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                <span class="help" style="top:8px;right:9px;width:19px;height:19px;font-size:11px">i</span>
+                <div class="tip" style="top:32px">Check a delivery against its purchase order, count what actually arrived, and record any shortfall.</div>
+              </div>
+              <div class="card mini soon">
+                <div class="sq" style="background:var(--blue-l)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M12 21V8M6 13l6-6 6 6M4 3h16"/></svg></div>
+                <div style="flex:1"><h4>Goods Out</h4><div class="role">Picking &middot; handheld</div></div>
+                <span class="badge">Next up</span>
+              </div>
+            </div>
+
+            <div class="foot">
+              <div class="runon"><span class="mark"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="15" width="4.4" height="6" rx="1.2" fill="#fff" opacity=".55"/><rect x="9.8" y="11" width="4.4" height="10" rx="1.2" fill="#fff" opacity=".55"/><rect x="16.6" y="6" width="4.4" height="15" rx="1.2" fill="#fff"/><path d="M4 12.5 L11 8.5 L18.8 3.4" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></span>Running on StockSense</div>
+              <div class="credit">AWS NUS-ISS SMYA 2026 &middot; <b>Team Puenzhiyyy</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note note--win"><b>One axis, one primary.</b> Nothing is side by side with the hero,
+        so the centre line holds all the way down and the eye never has to choose a column.</div>
+      <div class="note note--win"><b>The labels do the separating</b>, not a layout split. A rule with
+        a word in it is how a form groups fields, and it costs one line of height.</div>
+      <div class="note"><b>The help tip is shown open</b> on Goods In so it can be judged. In the app
+        it appears on hover and on keyboard focus, so it is reachable by tap too.</div>
+      <div class="note note--cost"><b>Cost.</b> Goods In, the flow that is actually finished and
+        demoed, is now visually the third thing on the page.</div>
+    </div>
+  </section>
+
+  <!-- &#x2550;&#x2550;&#x2550; E2 &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+  <section class="opt">
+    <div class="opt__hd"><span class="opt__n">E2</span><span class="opt__t">One row, one badge</span></div>
+    <p class="opt__lede">All three stay in a row as they are now. The only thing that changes is a
+      badge on the one that suits this device, and a caption under the other two.</p>
+    <div class="frame">
+      <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__url">stocksense.app</span></div>
+      <div class="view">
+        <div class="app">
+          <div class="inner" style="max-width:820px">
+            <div style="display:flex;align-items:center;gap:14px;justify-content:center;margin-bottom:20px">
+              <div class="seal4"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+              <div style="text-align:left"><div class="cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="en">Four Seas Rice Trading</div></div>
+            </div>
+            <p class="ask">Where are you working today?</p>
+            <p class="sub">Pick a workspace to begin.</p>
+
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:30px">
+              <div class="card" style="padding:17px">
+                <div class="sq" style="background:var(--green-l);width:40px;height:40px;border-radius:11px;margin-bottom:11px"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg></div>
+                <h4 style="margin:0;font-size:17px;font-weight:700">Goods In</h4>
+                <div style="font-size:12px;color:var(--green);font-weight:600;margin-top:2px">Receiving</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
+                  <span class="badge">Handheld</span>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <span class="help">i</span>
+              </div>
+              <div class="card soon" style="padding:17px">
+                <div class="sq" style="background:var(--blue-l);width:40px;height:40px;border-radius:11px;margin-bottom:11px"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M12 21V8M6 13l6-6 6 6M4 3h16"/></svg></div>
+                <h4 style="margin:0;font-size:17px;font-weight:700">Goods Out</h4>
+                <div style="font-size:12px;color:var(--app-ink3);font-weight:600;margin-top:2px">Picking and dispatch</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
+                  <span class="badge">Handheld</span><span class="badge">Next up</span>
+                </div>
+              </div>
+              <div class="card" style="padding:17px;border-color:var(--purple);box-shadow:0 6px 20px -8px rgba(139,92,246,.4)">
+                <div class="sq" style="background:var(--purple-l);width:40px;height:40px;border-radius:11px;margin-bottom:11px"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+                <h4 style="margin:0;font-size:17px;font-weight:700">Control Tower</h4>
+                <div style="font-size:12px;color:var(--purple);font-weight:600;margin-top:2px">Analysis and decisions</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
+                  <span class="badge badge--here">For this device</span>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </div>
+                <span class="help">i</span>
+              </div>
+            </div>
+
+            <div class="foot">
+              <div class="runon"><span class="mark"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="15" width="4.4" height="6" rx="1.2" fill="#fff" opacity=".55"/><rect x="9.8" y="11" width="4.4" height="10" rx="1.2" fill="#fff" opacity=".55"/><rect x="16.6" y="6" width="4.4" height="15" rx="1.2" fill="#fff"/><path d="M4 12.5 L11 8.5 L18.8 3.4" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></span>Running on StockSense</div>
+              <div class="credit">AWS NUS-ISS SMYA 2026 &middot; <b>Team Puenzhiyyy</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note note--win"><b>Least disruptive.</b> The three cards keep equal footing, so
+        Goods In is not demoted, and the device fact is carried by a badge rather than by the layout.</div>
+      <div class="note"><b>Handheld appears twice</b>, which is repetition, but it is the price of
+        saying it without a group label.</div>
+      <div class="note note--cost"><b>Cost.</b> A border and a badge are a weaker signal than
+        position. Someone scanning quickly still sees three equal choices.</div>
+    </div>
+  </section>
+
+  <!-- &#x2550;&#x2550;&#x2550; E3 &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
+  <section class="opt">
+    <div class="opt__hd"><span class="opt__n">E3</span><span class="opt__t">Stacked list</span></div>
+    <p class="opt__lede">No columns anywhere. One centred column of full-width rows, grouped by a
+      label, with the usable one first.</p>
+    <div class="frame">
+      <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__url">stocksense.app</span></div>
+      <div class="view">
+        <div class="app">
+          <div class="inner" style="max-width:580px">
+            <div style="display:flex;align-items:center;gap:14px;justify-content:center;margin-bottom:20px">
+              <div class="seal4"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+              <div style="text-align:left"><div class="cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="en">Four Seas Rice Trading</div></div>
+            </div>
+            <p class="ask">Where are you working today?</p>
+            <p class="sub">Pick a workspace to begin.</p>
+
+            <div class="grouplbl" style="margin-top:28px">For this device</div>
+            <div class="card mini" style="padding:17px 19px;border-color:var(--purple)">
+              <div class="sq" style="background:var(--purple-l);width:42px;height:42px"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+              <div style="flex:1"><h4 style="font-size:18px">Control Tower</h4><div class="role">Analysis and decisions</div></div>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              <span class="help" style="top:8px;right:44px;width:19px;height:19px;font-size:11px">i</span>
+            </div>
+
+            <div class="grouplbl">On the warehouse floor</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div class="card mini" style="padding:15px 19px">
+                <div class="sq" style="background:var(--green-l)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg></div>
+                <div style="flex:1"><h4>Goods In</h4><div class="role">Receiving &middot; handheld</div></div>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                <span class="help" style="top:7px;right:42px;width:19px;height:19px;font-size:11px">i</span>
+              </div>
+              <div class="card mini soon" style="padding:15px 19px">
+                <div class="sq" style="background:var(--blue-l)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M12 21V8M6 13l6-6 6 6M4 3h16"/></svg></div>
+                <div style="flex:1"><h4>Goods Out</h4><div class="role">Picking &middot; handheld</div></div>
+                <span class="badge">Next up</span>
+              </div>
+            </div>
+
+            <div class="foot">
+              <div class="runon"><span class="mark"><svg width="14" height="14" viewBox="0 0 24 24"><rect x="3" y="15" width="4.4" height="6" rx="1.2" fill="#fff" opacity=".55"/><rect x="9.8" y="11" width="4.4" height="10" rx="1.2" fill="#fff" opacity=".55"/><rect x="16.6" y="6" width="4.4" height="15" rx="1.2" fill="#fff"/><path d="M4 12.5 L11 8.5 L18.8 3.4" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg></span>Running on StockSense</div>
+              <div class="credit">AWS NUS-ISS SMYA 2026 &middot; <b>Team Puenzhiyyy</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note note--win"><b>The simplest structure of the three</b>, and the only one that
+        needs no layout change at all on a phone: it is already one column.</div>
+      <div class="note"><b>A narrow centred column</b> makes the rows short enough that the arrow
+        stays near the label rather than stranded at the far edge of the screen.</div>
+      <div class="note note--cost"><b>Cost.</b> Three stacked rows in a 580px column start to look
+        like a settings list rather than a front door.</div>
+    </div>
+  </section>
+
+  <div class="note" style="border-left-color:var(--accent)">
+    <b>On the type change.</b> Both sizes moved, not just one. The sub-line going two steps up on its
+    own would have landed it at 22px, the same size as the question, and two lines of identical size
+    do not read as a heading and a caption, they read as a paragraph. Moving the question to 30px at
+    the same time keeps the gap. If the pair now feels too loud for the top of the page, the fallback
+    is question 22 and sub-line 17, which is one step each and preserves the relationship.
+  </div>
+</div>

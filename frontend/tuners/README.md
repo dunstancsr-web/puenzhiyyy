@@ -95,3 +95,12 @@ conversation happens while you are deciding rather than afterwards.
 
 Generated: edit `src/editor-template.html`, then from `src/` run
 `python3 build-page.py editor-template.html ../home-editor.html`.
+
+## home-centred.html
+
+Option B's single centre axis carrying option D's device awareness, without D's split columns.
+Three variants, plus the larger question and sub-line and the help tooltip. Published at
+https://claude.ai/code/artifact/dcf9c35b-55a9-4ae5-a4cd-f47ca654179f
+
+Generated: edit `src/centred-template.html`, then from `src/` run
+`python3 build-page.py centred-template.html ../home-centred.html`.
