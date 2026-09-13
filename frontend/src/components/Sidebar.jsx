@@ -3,6 +3,7 @@ import { NavLink, Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, Sun, Moon } from "lucide-react";
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { api } from "../api/inventory";
+import AiModeSwitch from "./AiModeSwitch";
 
 export default function Sidebar() {
   const { theme, setTheme } = useTheme();
@@ -87,6 +88,10 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Which engine answers "Why?", and what it costs. Sits above Theme
+          because it changes behaviour and spending, not just appearance. */}
+      <AiModeSwitch />
 
       {/* Theme switcher */}
       <div style={{ marginBottom: 12 }}>

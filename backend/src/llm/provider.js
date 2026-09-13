@@ -22,6 +22,39 @@
 // a response, and never written to the audit trail.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Three tiers, in increasing order of what they cost you ───────────────────
+//
+//   rules  no model at all. The deterministic trace in frontend/src/lib/
+//          explain.js is the whole explanation. Free, offline, always correct.
+//   local  llama3 on this machine. Free and unlimited, slower, less precise.
+//   cloud  AWS Bedrock through the organizers' gateway, or the Anthropic API.
+//          METERED. Spends the team's shared credit on every uncached call.
+//
+// `cloud` is deliberately hard to reach by accident. It is never the startup
+// default, it cannot be entered unless credentials are actually configured, and
+// switching into it takes a separate explicit request. A tier that spends money
+// should not be reachable by a config typo.
+const MODES = ["rules", "local", "cloud"];
+
+// The startup tier. Defaults to local, and LLM_DEFAULT_MODE deliberately cannot
+// select cloud: paid spending starts from a human action in the running app,
+// never from a file someone copied.
+const DEFAULT_MODE = (() => {
+  const m = (process.env.LLM_DEFAULT_MODE || "local").toLowerCase();
+  return m === "rules" || m === "local" ? m : "local";
+})();
+
+let activeMode = DEFAULT_MODE;
+
+// Which concrete backend `cloud` resolves to. The organizers' gateway is
+// preferred over the direct Anthropic API when both are configured, because it
+// is the route they intend teams to use.
+function cloudProvider() {
+  if (process.env.LLM_GATEWAY_URL && process.env.LLM_GATEWAY_API_KEY) return "gateway";
+  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+  return null;
+}
+
 const PROVIDER = (process.env.LLM_PROVIDER || "ollama").toLowerCase();
 const MAX_TOKENS = Number(process.env.LLM_MAX_OUTPUT_TOKENS) || 280;
 
@@ -221,35 +254,91 @@ async function callAnthropic({ system, user, signal }) {
  *   laptop can genuinely take 20s or more (measured: llama3 at about 20s).
  */
 async function chat({ system, user, timeoutMs = 60_000 }) {
-  if (PROVIDER === "none") throw new LlmUnavailable("LLM_PROVIDER is set to none");
+  if (activeMode === "rules") {
+    throw new LlmUnavailable("Rule-based mode is active, so no model is called.");
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const args = { system, user, signal: controller.signal };
-    if (PROVIDER === "gateway") return await callGateway(args);
-    if (PROVIDER === "anthropic") return await callAnthropic(args);
-    if (PROVIDER === "ollama") return await callOllama(args);
-    throw new LlmUnavailable(`Unknown LLM_PROVIDER "${PROVIDER}". Use ollama, gateway, anthropic or none.`);
+    if (activeMode === "local") return await callOllama(args);
+
+    const cp = cloudProvider();
+    if (cp === "gateway") return await callGateway(args);
+    if (cp === "anthropic") return await callAnthropic(args);
+    throw new LlmUnavailable("No cloud credentials are configured. See backend/.env.example.");
   } finally {
     clearTimeout(timer);
   }
 }
 
-// What the UI is allowed to show about configuration. Deliberately does not
-// include the key, or whether the key looks valid, only whether one is present.
+// What the UI is allowed to know. Deliberately never includes a key, and never
+// whether a key LOOKS valid, only whether one is present at all.
+function listModes() {
+  const cp = cloudProvider();
+  return [
+    {
+      id: "rules",
+      label: "Rule-based",
+      detail: "Computed from live figures by the rules in design.md. No model, no cost.",
+      cost: "free",
+      available: true,
+    },
+    {
+      id: "local",
+      label: "Local model",
+      detail: `${process.env.OLLAMA_MODEL || "llama3"} running on this machine. Free and unlimited, slower, less precise.`,
+      cost: "free",
+      available: true,
+    },
+    {
+      id: "cloud",
+      label: "AWS Bedrock",
+      detail: cp === "gateway"
+        ? `${process.env.LLM_GATEWAY_MODEL || "Claude Sonnet 4.5"} through the hackathon gateway. Spends shared AWS credit.`
+        : cp === "anthropic"
+          ? `${process.env.ANTHROPIC_MODEL || "Claude Haiku"} through the Anthropic API. Spends shared credit.`
+          : "Not configured. Add gateway or Anthropic credentials to backend/.env.",
+      cost: "metered",
+      available: !!cp,
+      provider: cp,
+    },
+  ];
+}
+
+function getMode() {
+  return activeMode;
+}
+
+/**
+ * Switch tier. Returns the new mode.
+ * Throws on an unknown tier, or on cloud without configured credentials, so a
+ * UI can never put the app into a paid state that does not actually work.
+ */
+function setMode(mode) {
+  const m = String(mode || "").toLowerCase();
+  if (!MODES.includes(m)) throw new Error(`Unknown mode "${mode}". Use rules, local or cloud.`);
+  if (m === "cloud" && !cloudProvider()) {
+    throw new Error("Cloud mode needs credentials in backend/.env. Nothing was changed.");
+  }
+  activeMode = m;
+  return activeMode;
+}
+
+// Kept for the audit trail and the modal byline.
 function providerInfo() {
+  const cp = cloudProvider();
   return {
-    provider: PROVIDER,
+    mode: activeMode,
+    provider: activeMode === "local" ? "ollama" : activeMode === "cloud" ? cp : "rules",
     model:
-      PROVIDER === "anthropic" ? (process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001")
-      : PROVIDER === "gateway" ? (process.env.LLM_GATEWAY_MODEL || "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
-      : (process.env.OLLAMA_MODEL || "llama3"),
-    configured:
-      PROVIDER === "ollama" ||
-      (PROVIDER === "anthropic" && !!process.env.ANTHROPIC_API_KEY) ||
-      (PROVIDER === "gateway" && !!process.env.LLM_GATEWAY_URL && !!process.env.LLM_GATEWAY_API_KEY),
+      activeMode === "local" ? (process.env.OLLAMA_MODEL || "llama3")
+      : activeMode === "cloud" && cp === "gateway" ? (process.env.LLM_GATEWAY_MODEL || "claude-sonnet-4-5")
+      : activeMode === "cloud" && cp === "anthropic" ? (process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001")
+      : null,
+    configured: activeMode !== "cloud" || !!cp,
   };
 }
 
-module.exports = { chat, providerInfo, LlmUnavailable };
+module.exports = { chat, providerInfo, listModes, getMode, setMode, LlmUnavailable };

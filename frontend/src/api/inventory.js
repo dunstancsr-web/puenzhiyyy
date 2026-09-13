@@ -80,6 +80,10 @@ export const api = {
   explainAlert: (skuId, alertType) =>
     request("/alerts/explain", { method: "POST", body: { sku_id: skuId, alert_type: alertType } }),
 
+  // Model tier (TASK-42). Which engine answers "Why?", and what it costs.
+  getLlmMode: () => request("/llm/mode"),
+  setLlmMode: (mode) => request("/llm/mode", { method: "POST", body: { mode } }),
+
   // Audit log (TASK-31) - every state change the API made, newest first.
   // Resolves to { events, counts }, not a bare array: `counts` is the whole
   // table's totals per event type, which the filter chips need even when the

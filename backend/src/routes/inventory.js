@@ -14,6 +14,7 @@ const { getDb } = require("../db/init");
 const { EVENTS, logEvent, readEvents, eventCounts, diffFields } = require("../db/audit");
 const { buildAnalytics } = require("../engines/index");
 const { explainAlert, providerInfo, LlmUnavailable } = require("../llm/explain");
+const { listModes, getMode, setMode } = require("../llm/provider");
 const { projectInventory } = require("../engines/projection");
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -526,6 +527,37 @@ router.post("/alerts/explain", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to build explanation" });
+  }
+});
+
+// ── Model tier (TASK-42) ─────────────────────────────────────────────────────
+// Three tiers in increasing order of cost: rules (free, no model), local (free,
+// on this machine), cloud (metered, spends shared AWS credit).
+
+// GET /api/llm/mode - current tier plus what is available to switch to
+router.get("/llm/mode", (req, res) => {
+  res.json({ success: true, data: { mode: getMode(), modes: listModes() } });
+});
+
+// POST /api/llm/mode  { mode }
+// The only way into the metered tier. Refuses when credentials are absent
+// rather than switching into a state that then fails on first use.
+router.post("/llm/mode", (req, res) => {
+  try {
+    const previous = getMode();
+    const mode = setMode(req.body?.mode);
+
+    // Entering or leaving the paid tier is a spending decision, so it belongs
+    // in the same trail as every other decision the app records.
+    if (mode !== previous) {
+      logEvent(EVENTS.LLM_MODE_CHANGED, {
+        input: { from: previous, to: mode },
+        output: { metered: mode === "cloud", ...providerInfo() },
+      });
+    }
+    res.json({ success: true, data: { mode, modes: listModes() } });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 });
 

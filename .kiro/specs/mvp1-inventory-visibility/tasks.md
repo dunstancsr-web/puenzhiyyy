@@ -1248,6 +1248,32 @@ re-asks, and renaming the supplier costs nothing.
 
 Measured: 6.9s uncached against local llama3, 0.03s cached.
 
+## TASK-42 - Three cost tiers, with the paid one behind an explicit action (2026-09-13)
+
+Stan's requirement: default to the free local model, fall back to no-AI templates, and reach the paid
+tier only by deliberate human action, with an always visible indicator of which is in use. The $100 is
+an AWS credit from the organizers, so the metered tier draws on Bedrock.
+
+- [x] Three tiers in `provider.js`: `rules` (no model, the deterministic trace is the whole answer),
+      `local` (llama3, free and unlimited), `cloud` (metered, AWS Bedrock via the gateway or the
+      Anthropic API).
+- [x] `LLM_DEFAULT_MODE` cannot select `cloud`. Paid spending has to begin with a click in the running
+      app, so nobody inherits a billing state by copying a config file or a `.env` from a teammate.
+- [x] `setMode("cloud")` refuses when no credentials are configured, rather than switching into a state
+      that then fails on first use.
+- [x] `LLM_MODE_CHANGED` audit event. Entering or leaving a metered tier is a spending decision, so it
+      belongs in the same trail as every other decision the app records.
+- [x] `AiModeSwitch` in the sidebar, always visible. The metered tier takes two clicks: the first turns
+      the button into "Spend credit?", the second commits. An inline confirm rather than
+      `window.confirm`, which blocks the page and reads as a browser error on a recording.
+- [x] The metered tier is marked with a `$` even when inactive, so the cost is visible before the click
+      rather than discovered after it.
+
+**Terminology.** "Hard-coded answers" was rejected as the label for the no-AI tier. Nothing is stored:
+the text is computed from live figures by documented rules, and "hard-coded" implies static strings,
+which undersells it to a judge. Settled on **Rule-based** / **Local model** / **AWS Bedrock**, the last
+naming the billing source so the cost is unmissable.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

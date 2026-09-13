@@ -28,6 +28,9 @@ const EVENTS = Object.freeze({
   ALERT_TRIGGERED: "ALERT_TRIGGERED",
   ALERT_ACKNOWLEDGED: "ALERT_ACKNOWLEDGED",
   DECISION_RECORDED: "DECISION_RECORDED",
+  // Switching into or out of the metered model tier is a spending decision, so
+  // it is recorded like any other decision rather than living only in memory.
+  LLM_MODE_CHANGED: "LLM_MODE_CHANGED",
   // Reserved for TASK-11. The explanation layer is still rule-based, so nothing
   // emits this yet. The reader and the UI already handle it, so wiring the real
   // model call is a one-line addition at that call site.
