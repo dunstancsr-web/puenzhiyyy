@@ -13,6 +13,7 @@ const router = express.Router();
 const { getDb } = require("../db/init");
 const { EVENTS, logEvent, readEvents, eventCounts, diffFields } = require("../db/audit");
 const { buildAnalytics } = require("../engines/index");
+const { explainAlert, providerInfo, LlmUnavailable } = require("../llm/explain");
 const { projectInventory } = require("../engines/projection");
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -476,6 +477,55 @@ router.get("/audit", (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to load audit log" });
+  }
+});
+
+// ── AI explanation (TASK-11) ─────────────────────────────────────────────────
+// POST /api/alerts/explain  { sku_id, alert_type }
+//
+// Takes the SKU and alert type rather than an alert id, and re-derives the
+// alert from live analytics. Alert CONTENT is always freshly computed (see the
+// note above materializeAlerts), so accepting a client-supplied message would
+// let a stale tab put outdated figures in front of the model.
+//
+// Never 500s on a model problem. A missing key, a stopped ollama daemon, a
+// rate-limited gateway and a daily cap all return 200 with available:false and
+// a reason, because the frontend has a complete deterministic explanation of
+// its own to fall back on. The model is an enhancement, not a dependency.
+router.post("/alerts/explain", async (req, res) => {
+  const { sku_id, alert_type } = req.body || {};
+  if (!sku_id || !alert_type) {
+    return res.status(400).json({ success: false, message: "sku_id and alert_type are required" });
+  }
+  try {
+    const { skus, alerts } = getAnalytics();
+    const sku = skus.find((s) => s.sku_id === sku_id);
+    const alert = alerts.find((a) => a.sku_id === sku_id && a.alert_type === alert_type);
+    if (!sku || !alert) {
+      return res.status(404).json({ success: false, message: "No live alert of that type for this SKU" });
+    }
+
+    try {
+      const out = await explainAlert(sku, alert);
+      res.json({
+        success: true,
+        data: {
+          available: true,
+          explanation: out.text,
+          provider: out.provider,
+          model: out.model,
+          cached: out.cached,
+        },
+      });
+    } catch (err) {
+      if (err instanceof LlmUnavailable) {
+        return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo() } });
+      }
+      throw err;
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to build explanation" });
   }
 });
 

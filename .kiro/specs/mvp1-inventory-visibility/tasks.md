@@ -1208,6 +1208,46 @@ widgets, the Inventory table, the Activity timeline and even the Alerts tile row
 
 Verified in both themes plus the filtered-to-empty state. WRITEUP.md screenshot re-captured again.
 
+## TASK-11 - AI explanation layer, unblocked (2026-09-13)
+
+Blocked since 2026-09-12 on an API key. Unblocked without one, by not depending on a single provider.
+
+- [x] `backend/src/llm/provider.js`. One `chat()` behind four settings: `ollama` (local, free, the dev
+      default), `gateway` (the organizers' AWS Bedrock gateway from the ShowMeYourAgent starter kit),
+      `anthropic` (the team's own credit), `none`. The gateway is deliberately Ollama compatible, same
+      POST /api/chat and message shape plus an X-API-Key header, so it shares the local code path.
+- [x] Gateway 403s are retried at 3s, 6s, 9s. A 403 there is a rate limit wearing a permissions status
+      code, and treating it as an auth failure sends you to check a key that is fine.
+- [x] `backend/src/llm/explain.js`. The model NARRATES, it never computes. A llama3 smoke test called
+      SGD 26,217 of margin "potential sales" and misread a 17 day shortfall, so the facts block labels
+      every figure with its unit and the system prompt forbids inventing or renaming numbers. After
+      labelling, the same model got the margin right.
+- [x] `POST /api/alerts/explain` re-derives the alert from live analytics rather than trusting a client
+      supplied message, so a stale tab cannot feed old figures to the model. It never 500s on a model
+      problem: missing key, stopped daemon, rate limit and daily cap all return available:false, and the
+      frontend falls back to the deterministic trace it already had.
+- [x] The `LLM_CALL` audit event that db/audit.js reserved from the start now actually fires, recording
+      provider, model, latency and token counts. No credential is ever logged.
+- [x] Modal shows the model summary above the four step deterministic trace, so the prose is readable
+      and the audited figures remain visible underneath it.
+
+**Cost controls,** because the team shares one $100 pool with no per developer limit:
+ollama as the default so development is free, Haiku on the direct path, a hard max_tokens ceiling, a
+rolling daily call cap, and a response cache.
+
+**Cache key, decided by Stan:** reuse while the situation is materially the same. Volatile figures are
+bucketed (10 MT, 1 MT/day, 5 days) so small drift reuses the answer and material change re-asks.
+
+A test of the intended behaviour caught a real bug in the first implementation: 160 MT drifting to
+158 MT was supposed to be free and was not. The key included both `days_of_cover` and
+`suggested_order_qty`, which are DERIVED from `available_qty`, so one stock movement got three
+independent chances to cross a bucket boundary and cover falling 28 to 27 straddled the 27.5 line on
+its own. Keying on the independent inputs (stock, inbound, demand rate) covers the same ground with one
+boundary instead of three. Verified: 2 MT and 5 MT drift reuse, a 40 MT drop re-asks, a reclassification
+re-asks, and renaming the supplier costs nothing.
+
+Measured: 6.9s uncached against local llama3, 0.03s cached.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

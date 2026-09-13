@@ -73,6 +73,13 @@ export const api = {
   getDecisions: () => request("/decisions"),
   createDecision: (body) => request("/decisions", { method: "POST", body }),
 
+  // AI explanation (TASK-11). Always resolves, never rejects on a model
+  // problem: the backend answers { available: false, reason } when no model is
+  // configured or reachable, because the caller already has a deterministic
+  // explanation to show instead.
+  explainAlert: (skuId, alertType) =>
+    request("/alerts/explain", { method: "POST", body: { sku_id: skuId, alert_type: alertType } }),
+
   // Audit log (TASK-31) - every state change the API made, newest first.
   // Resolves to { events, counts }, not a bare array: `counts` is the whole
   // table's totals per event type, which the filter chips need even when the

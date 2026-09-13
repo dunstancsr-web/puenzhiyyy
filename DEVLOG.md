@@ -324,3 +324,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, docs/images/alerts-human-in-the-loop.jpg, frontend/src/pages/Alerts.jsx
 - **New files:** none
 - **Notes:** TASK-41. Stan pointed out the alert content was reading against the grey page background. He was right and it was an inconsistency rather than a preference: every other surface in the app (dashboard widgets, inventory table, activity timeline, and the alert tile row directly above) sits on .card, and the alert list alone sat on bare --bg. Each alert is now its own card rather than the list being one surface, because an alert is a single decision and dismissing it removes exactly one card. Also removed the per-row bottom border, which was redundant with the parent's 14px gap, and added overflow hidden so the 3px severity stripe does not square off the rounded corners.
+
+---
+
+## Session: 2026-09-13 13:10
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, backend/src/routes/inventory.js, frontend/src/api/inventory.js, frontend/src/pages/Alerts.jsx
+- **New files:** backend/.env.example, backend/src/llm/provider.js, backend/src/llm/explain.js
+- **Notes:** TASK-11 unblocked, and not by finding a key. Built a provider seam with four settings (ollama, gateway, anthropic, none) for a budget reason: the team shares one $100 pool with no per developer limit. Then Stan surfaced the organizers' starter kit, whose Bedrock gateway turns out to be deliberately Ollama compatible, so supporting it was a refactor rather than a rewrite and the seam paid off for a reason it was not built for. Most of that starter kit is solving tool-calling problems StockSense does not have, so it is deliberately not adopted. The model narrates and never computes: a llama3 test mislabelled margin as sales, which is why the facts block names the unit on every figure. Stan chose bucketed caching, and writing a test of his chosen behaviour immediately caught a bug in my first key, which included figures derived from available_qty and so gave one stock movement three chances to bust the cache.

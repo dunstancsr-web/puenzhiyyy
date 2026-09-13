@@ -160,9 +160,21 @@ export default function Alerts() {
     }
   };
 
+  // Opens immediately with the deterministic trace, then fills in the model
+  // written summary when it arrives. Deliberately not the other way round: a
+  // local model takes several seconds, and a spinner where the explanation
+  // should be makes the button feel broken when the answer already exists.
   const handleAskAI = (alert) => {
     const sku = skus.find((s) => s.sku_id === alert.sku_id);
-    setAiModal({ alert, ...buildExplanation(alert, sku) });
+    setAiModal({ alert, ...buildExplanation(alert, sku), narrative: { loading: true } });
+
+    api.explainAlert(alert.sku_id, alert.alert_type)
+      .then((d) => setAiModal((prev) =>
+        prev && prev.alert.id === alert.id ? { ...prev, narrative: { loading: false, ...d } } : prev))
+      .catch((err) => setAiModal((prev) =>
+        prev && prev.alert.id === alert.id
+          ? { ...prev, narrative: { loading: false, available: false, reason: err.message } }
+          : prev));
   };
 
   // Deliberately doesn't catch: ApprovalModal awaits this and needs the
@@ -458,7 +470,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
 
 // ── AI explanation modal ───────────────────────────────────────────────────────
 function AiModal({ aiModal, onClose }) {
-  const { alert, sections, degraded } = aiModal;
+  const { alert, sections, degraded, narrative } = aiModal;
   useModalEscape(onClose);
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -486,8 +498,40 @@ function AiModal({ aiModal, onClose }) {
         <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--yellow)", marginBottom: 18 }}>
           {degraded
             ? "\u26A0\uFE0F This SKU's current figures could not be loaded, so only the alert's own text is shown. Reopen after a refresh for the full reasoning."
-            : "\u26A0\uFE0F Traced from this SKU's computed figures by the rules in design.md, not yet written by a live model. Every number below can be checked against the Inventory page. All recommendations require manager approval before action is taken."}
+            : narrative?.available
+              ? "\u26A0\uFE0F The summary is written by a model from the figures below, which the engines computed. The model is told never to calculate anything itself, so every number is checkable against the Inventory page. All recommendations require manager approval before action is taken."
+              : "\u26A0\uFE0F Traced from this SKU's computed figures by the rules in design.md. Every number below can be checked against the Inventory page. All recommendations require manager approval before action is taken."}
         </div>
+
+        {/* Model written summary, above the trace it was built from. Shown
+            only when a model actually answered: if none is configured or
+            reachable, the deterministic steps below are the whole explanation
+            and nothing announces an absence the reader did not ask about. */}
+        {narrative?.loading && (
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
+            Asking the model for a plain English summary...
+          </div>
+        )}
+        {narrative && !narrative.loading && narrative.available && (
+          <div style={{
+            marginBottom: 18, padding: "13px 15px",
+            background: "var(--purple-light)", borderRadius: "var(--radius)",
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6, marginBottom: 7,
+              fontSize: 11, fontWeight: 700, letterSpacing: "0.05em",
+              textTransform: "uppercase", color: "var(--purple)",
+            }}>
+              <Cpu size={12} /> Summary
+              <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0, color: "var(--text-muted)" }}>
+                {narrative.model}{narrative.cached ? " · reused" : ""}
+              </span>
+            </div>
+            <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text-primary)", whiteSpace: "pre-line" }}>
+              {narrative.explanation}
+            </div>
+          </div>
+        )}
 
         {/* The four steps, each labelled. A numbered rail is used here because
             these genuinely ARE a sequence: measurement, derivation,
