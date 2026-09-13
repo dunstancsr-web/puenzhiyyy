@@ -261,10 +261,14 @@ function seed() {
   // ── Operators ──────────────────────────────────────────────────────────────
   // Demo PINs, printed on the login screen. Not secrets. See db/init.js.
   const insertOp = db.prepare(`INSERT INTO operators (name, pin, role) VALUES (?, ?, ?)`);
+  // The team, so a demo signs in as a real person rather than a placeholder.
+  // Stan is "both" and keeps the PIN he chose, since he is the one driving
+  // the demo and should not have to pick an operator to get through a screen.
   const OPERATORS = [
-    ["Rahman B.", "1234", "receiving"],
-    ["Siti K.", "2345", "both"],
-    ["Wei Ming L.", "3456", "dispatch"],
+    ["Wenjin", "1234", "receiving"],
+    ["Taw", "2345", "dispatch"],
+    ["CY", "3456", "both"],
+    ["Stan", "6767", "both"],
   ];
   for (const o of OPERATORS) insertOp.run(...o);
 
