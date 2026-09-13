@@ -1,18 +1,27 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, ChevronDown } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LAUNCHER (TASK-47)
+// THE LAUNCHPAD (TASK-47, renamed TASK-48)
 //
-// The first screen. Three ways into the same inventory, ordered the way stock
-// actually moves through a warehouse: it arrives, it leaves, and somebody
-// upstairs decides what to do about what is left.
+// The first screen, and the name we use for it in conversation. "Launchpad" is
+// the established term for a screen of entry points into separate workspaces
+// (SAP Fiori, macOS), so it carries its meaning without explanation and is
+// unambiguous spoken aloud, which "home" or "the menu" are not.
 //
-// This exists because the three are different jobs done by different people on
-// different devices. A receiver on a loading dock and a manager reviewing
-// working capital share a database and nothing else, and making them share a
-// navigation would serve neither.
+// Three ways into the same inventory, ordered the way stock actually moves: it
+// arrives, it leaves, and somebody upstairs decides what to do about what is
+// left. They are different jobs done by different people on different devices.
+// A receiver on a loading dock and a manager reviewing working capital share a
+// database and nothing else, so making them share a navigation would serve
+// neither.
+//
+// Cards are deliberately SHORT. The description is the one thing a returning
+// user never needs, and three paragraphs of it forced scrolling on a phone, so
+// it collapses behind a tap. Not a hover tooltip: HoverHint is hover and focus
+// only, which would put the text out of reach on exactly the small screens the
+// change is for.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MODES = [
@@ -49,7 +58,40 @@ const MODES = [
   },
 ];
 
-export default function Launcher() {
+/**
+ * The description, collapsed.
+ *
+ * A button rather than a hover target, because this exists for small screens
+ * and a phone has no hover. stopPropagation keeps a tap on it from also
+ * following the card's link, which would open the workspace instead of
+ * explaining it.
+ */
+function Detail({ body }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 2 }}>
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v); }}
+        aria-expanded={open}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 5, padding: 0,
+          background: "none", border: "none", cursor: "pointer",
+          fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)",
+        }}
+      >
+        <ChevronDown size={13} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
+        {open ? "Less" : "What is this?"}
+      </button>
+      {open && (
+        <p style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.55, marginTop: 8 }}>
+          {body}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default function Launchpad() {
   return (
     <div style={{
       minHeight: "100vh", background: "var(--bg)",
@@ -90,7 +132,7 @@ export default function Launcher() {
               <Card key={m.label} {...(m.soon ? {} : { to: m.to })} className="card"
                 style={{
                   textDecoration: "none", color: "inherit", display: "flex", flexDirection: "column",
-                  gap: 12, padding: 22, minHeight: 210,
+                  gap: 9, padding: 20,
                   opacity: m.soon ? 0.6 : 1,
                   cursor: m.soon ? "default" : "pointer",
                 }}>
@@ -117,15 +159,12 @@ export default function Launcher() {
                   <div style={{ fontSize: 13, color: m.tint, fontWeight: 600, marginTop: 2 }}>{m.sub}</div>
                 </div>
 
-                <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55, flex: 1 }}>
-                  {m.body}
-                </p>
-
                 {/* Naming the device and the place is the fastest way to tell
-                    someone a screen is not meant for them. */}
-                <div style={{ fontSize: 12, color: "var(--text-muted)", borderTop: "1px solid var(--border)", paddingTop: 11 }}>
-                  {m.who}
-                </div>
+                    someone a screen is not meant for them, and it is two words
+                    rather than three lines. */}
+                <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{m.who}</div>
+
+                <Detail body={m.body} />
               </Card>
             );
           })}

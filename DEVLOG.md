@@ -380,3 +380,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, CLAUDE.md, DEVLOG.md, backend/src/db/seed.js, frontend/src/App.jsx, frontend/src/api/inventory.js, frontend/src/components/Sidebar.jsx, frontend/src/index.css
 - **New files:** frontend/src/pages/Launcher.jsx, frontend/src/warehouse/{Handheld,Login,Inbound}.jsx
 - **Notes:** TASK-47. Built the launcher and the Goods In handheld flow while Stan was away. He corrected my proposal of a dark high contrast device theme: light is the default and the priority in this project, so the device character comes from scale and focus rather than from inverting the palette. He also asked for that preference to be durable, so CLAUDE.md now carries an onboarding section for future agents covering design preferences, the writing style rule, and the five quirks that have actually caused bugs here (inline styles beating media queries, Number(null) being a finite zero, derived values computed twice disagreeing, verifying against a mock of the cascade, and verifiers that only look for bad things). One real React bug on the way: the PIN submit effect had `busy` in its deps and set it inside, so the effect re-ran and its cleanup cancelled the request it had just started.
+
+---
+
+## Session: 2026-09-13 19:55
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, CLAUDE.md, DEVLOG.md, frontend/src/App.jsx, frontend/src/components/Sidebar.jsx
+- **New files:** frontend/src/pages/Launchpad.jsx (renamed from Launcher.jsx)
+- **Notes:** TASK-48. Stan asked for a name for the three card screen so he could refer to it precisely, and for the cards to stop being wordy enough to force scrolling on a phone. Named it the Launchpad, after SAP Fiori and macOS, and recorded it in CLAUDE.md with the other names. Cards lost their body text to a tap-to-expand disclosure, which is a button rather than a HoverHint because HoverHint binds mouseenter and focus only and would have hidden the text on exactly the small screens the change is for. Also gave the Control Tower a visible way out: the logo already linked to the Launchpad, but a logo that navigates is a convention rather than a signpost.

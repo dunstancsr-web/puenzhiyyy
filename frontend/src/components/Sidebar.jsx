@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, Sun, Moon, LayoutGrid } from "lucide-react";
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { api } from "../api/inventory";
 import AiModeSwitch from "./AiModeSwitch";
@@ -58,6 +58,29 @@ export default function Sidebar() {
           <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Rice Inventory AI</div>
         </div>
       </div>
+
+      {/* The way back to the Launchpad. The logo links there too, but a logo
+          that navigates is a convention people know rather than a signpost they
+          can see, and the Control Tower was otherwise a room with no visible
+          door. Placed above Menu, and styled as a leave-this-place action
+          rather than as a fifth page, because it is not a peer of the four
+          below it. */}
+      <Link
+        to="/"
+        style={{
+          display: "flex", alignItems: "center", gap: 9,
+          padding: "9px 10px", marginBottom: 16, borderRadius: "var(--radius)",
+          border: "1px solid var(--sidebar-border)",
+          color: "var(--text-secondary)", textDecoration: "none",
+          fontSize: 13.5, fontWeight: 600,
+        }}
+      >
+        <LayoutGrid size={15} />
+        Launchpad
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
+          Switch
+        </span>
+      </Link>
 
       {/* Nav */}
       <nav style={{ flex: 1 }}>
@@ -144,6 +167,16 @@ export default function Sidebar() {
         </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, justifyContent: "center" }}>
+          {/* Same exit on the phone bar: it never shows the sidebar, so without
+              this the Launchpad is unreachable on a small screen. */}
+          <Link to="/" aria-label="Launchpad"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              color: "var(--text-secondary)", textDecoration: "none",
+            }}>
+            <LayoutGrid size={17} />
+          </Link>
           {navItems.map(({ to, label, icon: Icon, badge }) => (
             <NavLink
               key={to}

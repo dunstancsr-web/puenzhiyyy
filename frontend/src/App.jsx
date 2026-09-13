@@ -1,7 +1,7 @@
 import React from "react";
 import { Routes, Route, Outlet } from "react-router-dom";
 import Layout from "./components/Layout";
-import Launcher from "./pages/Launcher";
+import Launchpad from "./pages/Launchpad";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Alerts from "./pages/Alerts";
@@ -19,8 +19,8 @@ function ControlTower() {
 export default function App() {
   return (
     <Routes>
-      {/* The launcher is the front door: goods in, goods out, or the tower. */}
-      <Route path="/" element={<Launcher />} />
+      {/* The Launchpad is the front door: goods in, goods out, or the tower. */}
+      <Route path="/" element={<Launchpad />} />
 
       {/* Warehouse floor, no chrome. */}
       <Route path="/warehouse/inbound" element={<Inbound />} />

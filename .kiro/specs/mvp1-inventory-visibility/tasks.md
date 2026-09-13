@@ -1442,6 +1442,26 @@ does not exist yet, so it now reads "Next up" and is not clickable.
 Verified end to end in the browser: signed in as Rahman B., received PO-2026-0001 short by 5 MT with a
 reason, and got GRN-0001 with stock moving 620 to 815 MT.
 
+## TASK-48 - Name the Launchpad, and make it reachable (2026-09-13)
+
+- [x] The three card screen is now officially **the Launchpad**, renamed from Launcher in code and
+      recorded in CLAUDE.md. "Launchpad" is the established term for a screen of entry points into
+      separate workspaces (SAP Fiori, macOS), so it carries its meaning without explanation and is
+      unambiguous spoken aloud, which "home" and "the menu" are not once three workspaces exist.
+- [x] Cards compacted from roughly 265px to 190px. The description was the one thing a returning user
+      never needs, and three lines of it forced scrolling on a phone, so it now sits behind a
+      "What is this?" disclosure.
+- [x] Deliberately NOT a hover tooltip. `HoverHint` binds `onMouseEnter` and `onFocus` only, so reusing
+      it would have put the text out of reach on exactly the small screens this change is for. The
+      disclosure is a button, and it calls `stopPropagation` so a tap explains the card rather than
+      opening it.
+- [x] An explicit Launchpad link in the sidebar, above Menu, styled as a leave-this-place action rather
+      than as a fifth page, because it is not a peer of the four below it. The logo already linked
+      there, but a logo that navigates is a convention people know rather than a signpost they can see,
+      and the Control Tower was otherwise a room with no visible door.
+- [x] The same exit on the phone top bar, which never shows the sidebar and would otherwise have left
+      the Launchpad unreachable on a small screen.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

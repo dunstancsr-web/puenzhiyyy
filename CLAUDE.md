@@ -69,6 +69,16 @@ feedback, not suggestions to re-litigate.
   reasoning loop replays cleanly. Rerun it after any test that mutates stock.
 - **Servers stay running.** Do not stop them at the end of a task.
 
+### Names we use
+
+- **The Launchpad** is the screen at `/` with the three workspace cards. Use this
+  name in conversation; "home" and "the menu" are ambiguous when three separate
+  workspaces exist. `frontend/src/pages/Launchpad.jsx`.
+- **The Control Tower** is the desktop analysis side: Dashboard, Inventory,
+  Alerts, Activity. It is the only part that wears the sidebar.
+- **Goods In** and **Goods Out** are the handheld warehouse floor flows. Industry
+  terms: inbound / goods receipt, and outbound / goods issue.
+
 ### Where things live
 
 - `backend/src/engines/` deterministic analytics, the source of truth for every
