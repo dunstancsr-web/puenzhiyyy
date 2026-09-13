@@ -1,0 +1,656 @@
+<title>StockSense Type Scale Tuner</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+<style>
+/* ──────────────────────────────────────────────────────────────────────────
+   TOOL CHROME
+   Every size in here is FIXED in px on purpose. The controls must stay
+   readable while the specimens are being shrunk to 9px, so the tool's own
+   type can never be tied to the tokens being edited.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --ground:    #fbfcfd;
+  --panel:     #ffffff;
+  --sunk:      #f4f6f8;
+  --line:      #e3e8ee;
+  --line-soft: #eef1f5;
+  --ink:       #16202c;
+  --ink-2:     #4a5766;
+  --ink-3:     #7b8794;
+  --accent:    #2563eb;
+  --accent-sk: #eff4ff;
+  --warn:      #b45309;
+  --warn-sk:   #fdf6ec;
+  --bad:       #b42318;
+  --bad-sk:    #fdf2f1;
+  --good:      #027a48;
+  --shadow:    0 1px 2px rgba(16,32,44,.05), 0 8px 24px -12px rgba(16,32,44,.14);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0e1319; --panel: #161d26; --sunk: #1d2631; --line: #2a3541;
+    --line-soft: #222b36; --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+    --accent: #6b9bff; --accent-sk: #17233b; --warn: #e0a355; --warn-sk: #2b2316;
+    --bad: #f0837a; --bad-sk: #2e1a19; --good: #5ac08d;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0e1319; --panel: #161d26; --sunk: #1d2631; --line: #2a3541;
+  --line-soft: #222b36; --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+  --accent: #6b9bff; --accent-sk: #17233b; --warn: #e0a355; --warn-sk: #2b2316;
+  --bad: #f0837a; --bad-sk: #2e1a19; --good: #5ac08d;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1280px; margin: 0 auto; padding: 28px 22px 64px; }
+
+/* ── Masthead ── */
+.mast { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 24px; }
+.mast h1 {
+  font-family: Newsreader, Georgia, serif;
+  font-size: 34px; font-weight: 600; line-height: 1.1; margin: 0 0 6px;
+  letter-spacing: -.01em; text-wrap: balance;
+}
+.mast p { margin: 0; color: var(--ink-2); max-width: 62ch; font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.chip {
+  display: flex; align-items: baseline; gap: 7px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 7px; padding: 7px 11px;
+}
+.chip b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.chip span { font-size: 12px; color: var(--ink-3); }
+.chip--bad b { color: var(--bad); }
+.chip--warn b { color: var(--warn); }
+
+/* ── Layout ── */
+.cols { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 26px; align-items: start; }
+@media (max-width: 940px) { .cols { grid-template-columns: 1fr; } .rail { position: static !important; } }
+
+.rail {
+  position: sticky; top: 18px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 16px;
+  max-height: calc(100vh - 36px); overflow-y: auto;
+}
+.rail h2, .sect h2 {
+  font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-3); margin: 0 0 9px;
+}
+
+/* ── Presets ── */
+.presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.preset {
+  font: inherit; font-size: 12px; font-weight: 500; text-align: left;
+  padding: 7px 9px; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--sunk); color: var(--ink-2);
+}
+.preset:hover { border-color: var(--accent); color: var(--accent); }
+.preset[aria-pressed="true"] { background: var(--accent-sk); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.preset small { display: block; font-size: 10.5px; color: var(--ink-3); font-weight: 400; margin-top: 1px; }
+.preset[aria-pressed="true"] small { color: inherit; opacity: .75; }
+
+/* ── Token rows ── */
+.tok { display: grid; grid-template-columns: 66px 1fr 58px; gap: 9px; align-items: center; margin-bottom: 7px; }
+.tok label { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-2); }
+.tok input[type=range] { width: 100%; accent-color: var(--accent); }
+.tok .num {
+  display: flex; align-items: center; gap: 2px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--sunk); padding: 2px 5px;
+}
+.tok input[type=number] {
+  width: 100%; border: 0; background: transparent; color: var(--ink);
+  font: inherit; font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right;
+  -moz-appearance: textfield;
+}
+.tok input[type=number]::-webkit-outer-spin-button,
+.tok input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tok .unit { font-size: 10px; color: var(--ink-3); }
+.tok.is-below label { color: var(--bad); font-weight: 700; }
+
+.master { background: var(--sunk); border-radius: 8px; padding: 10px 11px; }
+.master .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.master strong { font-size: 12px; }
+.master output { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 700; }
+.master input { width: 100%; accent-color: var(--accent); margin-top: 6px; }
+.master p { margin: 6px 0 0; font-size: 11px; color: var(--ink-3); line-height: 1.4; }
+
+.railbtns { display: flex; gap: 6px; }
+.btn {
+  flex: 1; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  padding: 8px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--sunk); color: var(--ink-2);
+}
+.btn--go { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn:hover { filter: brightness(.97); }
+
+.toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); cursor: pointer; }
+.toggle input { accent-color: var(--accent); }
+
+/* ── Specimens ── */
+.sect { margin-bottom: 26px; }
+.sect > h2 { margin-bottom: 10px; }
+.sect__lead { font-size: 13px; color: var(--ink-2); margin: -4px 0 14px; max-width: 66ch; }
+
+.specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+.spec {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.spec__hd {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 12px; border-bottom: 1px solid var(--line-soft); background: var(--sunk);
+}
+.spec__hd b { font-size: 11.5px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-3); }
+.spec__hd em { font-style: normal; font-size: 11px; color: var(--ink-3); }
+.spec__body { padding: 14px; flex: 1; }
+
+/* The preview itself. System stack, because that is what StockSense ships. */
+.pv {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.45;
+}
+.pv * { box-sizing: border-box; }
+
+/* Token annotation. Shown only when the checkbox is on, so a clean look is
+   always one click away. */
+.t { position: relative; }
+body.show-tokens .t::after {
+  content: attr(data-tok);
+  position: absolute; top: -3px; right: -2px; transform: translateY(-100%);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px; line-height: 1.3; letter-spacing: 0;
+  background: var(--accent); color: #fff; padding: 1px 4px; border-radius: 3px;
+  white-space: nowrap; pointer-events: none; z-index: 3; opacity: .92;
+}
+body.show-tokens .t[data-below="1"]::after { background: var(--bad); }
+body.show-tokens .spec__body { padding-top: 24px; }
+body.show-tokens .pv > * + * { margin-top: 14px; }
+
+/* ── Export ── */
+.code {
+  background: #0d1520; color: #d6e2f0; border-radius: 9px; padding: 13px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; line-height: 1.55; overflow-x: auto; white-space: pre;
+  border: 1px solid #1d2a3a; tab-size: 2;
+}
+.code .c { color: #6f8199; }
+.code .k { color: #8ab4ff; }
+.code .v { color: #9fe0a8; }
+
+/* ── Tables ── */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th {
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--ink-3); font-weight: 700; padding: 0 10px 7px; border-bottom: 1px solid var(--line);
+}
+.tbl td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--ink-2); }
+.tbl .n { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.scroller { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 11px; padding: 14px; }
+.flag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+.flag--bad { background: var(--bad-sk); color: var(--bad); }
+.flag--warn { background: var(--warn-sk); color: var(--warn); }
+.flag--ok { background: var(--accent-sk); color: var(--accent); }
+
+.note {
+  border-left: 2px solid var(--accent); background: var(--accent-sk);
+  padding: 11px 14px; border-radius: 0 8px 8px 0; font-size: 13px; color: var(--ink-2);
+  margin-top: 12px;
+}
+.note b { color: var(--ink); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <h1>Type Scale Tuner</h1>
+    <p>Every text size StockSense actually renders, shown in the component it belongs to. Move the
+      sliders until it reads the way you want, then hand me the exported block and I will apply it.
+      The tool's own controls stay a fixed size, so they never shrink along with the specimens.</p>
+    <div class="chips">
+      <div class="chip"><b>6</b><span>tokens defined in index.css</span></div>
+      <div class="chip chip--warn"><b>177</b><span>inline sizes that bypass them</span></div>
+      <div class="chip chip--bad"><b>30</b><span>below the declared 12px floor</span></div>
+      <div class="chip"><b>11</b><span>distinct sizes in Alerts.jsx alone</span></div>
+    </div>
+  </header>
+
+  <div class="cols">
+
+    <!-- ── CONTROL RAIL ──────────────────────────────────────────────── -->
+    <aside class="rail">
+      <div>
+        <h2>Start from</h2>
+        <div class="presets" id="presets"></div>
+      </div>
+
+      <div class="master">
+        <div class="row"><strong>Scale everything</strong><output id="mout">100%</output></div>
+        <input type="range" id="master" min="80" max="150" step="1" value="100">
+        <p>Multiplies all seven at once, then fine tune below. Rounded to the nearest half pixel.</p>
+      </div>
+
+      <div>
+        <h2>Steps</h2>
+        <div id="toks"></div>
+        <div class="note" id="ratio" style="margin-top:10px;font-size:11.5px;padding:8px 11px"></div>
+      </div>
+
+      <label class="toggle"><input type="checkbox" id="showtok"> Label each specimen with its token</label>
+
+      <div class="railbtns">
+        <button class="btn" id="reset">Reset</button>
+        <button class="btn btn--go" id="copy">Copy CSS</button>
+      </div>
+    </aside>
+
+    <!-- ── SPECIMENS ─────────────────────────────────────────────────── -->
+    <main>
+
+      <section class="sect">
+        <h2>Live specimens</h2>
+        <p class="sect__lead">These are rebuilt from the real components, at the real sizes, in the
+          system font StockSense ships with. What you see here is what the app will look like.</p>
+
+        <div class="specs">
+
+          <!-- Working capital stat -->
+          <div class="spec">
+            <div class="spec__hd"><b>Dashboard stat</b><em>Dashboard.jsx</em></div>
+            <div class="spec__body"><div class="pv">
+              <div class="t" data-tok="--text-xs" style="font-size:var(--t-xs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)">Working capital</div>
+              <div style="display:flex;align-items:center;gap:7px;margin-top:8px">
+                <span style="width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none"></span>
+                <span class="t" data-tok="--text-sm" style="font-size:var(--t-sm);font-weight:600;color:var(--ink-2)">Overstock</span>
+              </div>
+              <div class="t" data-tok="--text-xl" style="font-size:var(--t-xl);font-weight:700;letter-spacing:-.02em;margin-top:2px">SGD 273K</div>
+              <div class="t" data-tok="--text-xs" style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px">7.4% of inventory</div>
+            </div></div>
+          </div>
+
+          <!-- Needs attention row -->
+          <div class="spec">
+            <div class="spec__hd"><b>Needs attention row</b><em>Dashboard.jsx</em></div>
+            <div class="spec__body"><div class="pv">
+              <div style="border-left:3px solid var(--bad);padding-left:10px">
+                <div class="t" data-tok="--text-sm" style="font-size:var(--t-sm);font-weight:700">Thai Jasmine 25KG</div>
+                <div class="t" data-tok="--text-xs" style="font-size:var(--t-xs);font-weight:700;letter-spacing:.04em;color:var(--bad);background:var(--bad-sk);display:inline-block;padding:2px 6px;border-radius:4px;margin-top:5px">STOCKOUT RISK</div>
+                <div class="t" data-tok="--text-sm" style="font-size:var(--t-sm);margin-top:6px;color:var(--ink-2);line-height:1.45">
+                  <b style="color:var(--ink)">Place PO - 597 MT</b> - 28d cover vs 55d (lead + safety) &middot; 17d gap &middot; no PO inbound
+                </div>
+                <div class="t" data-tok="--text-xs" style="font-size:var(--t-xs);color:var(--ink-3);margin-top:4px">SGD 26.2K lost margin</div>
+              </div>
+            </div></div>
+          </div>
+
+          <!-- Settings popover -->
+          <div class="spec">
+            <div class="spec__hd"><b>Settings popover</b><em>SettingsMenu.jsx</em></div>
+            <div class="spec__body"><div class="pv">
+              <div class="t" data-tok="--text-xs" style="font-size:var(--t-xs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)">Explanations</div>
+              <div class="t" data-tok="--text-xs" data-below="0" style="font-size:var(--t-xs);color:var(--ink-3);margin-top:3px;line-height:1.4">
+                Who writes the <b>Why?</b> explanations in the <b>Alerts</b> tab. The figures are the same in all 3 options, only the wording changes.
+              </div>
+              <div style="margin-top:9px;display:flex;flex-direction:column;gap:4px">
+                <div class="t" data-tok="--text-sm" style="font-size:var(--t-sm);padding:7px 9px;border-radius:7px;color:var(--ink-2)">Rule-based</div>
+                <div style="font-size:var(--t-sm);padding:7px 9px;border-radius:7px;border:1px solid var(--accent);background:var(--accent-sk);color:var(--accent);font-weight:600">Local model</div>
+              </div>
+            </div></div>
+          </div>
+
+          <!-- Alert card -->
+          <div class="spec">
+            <div class="spec__hd"><b>Alert card</b><em>Alerts.jsx</em></div>
+            <div class="spec__body"><div class="pv">
+              <div class="t" data-tok="--text-lg" style="font-size:var(--t-lg);font-weight:700;letter-spacing:-.01em">Vietnam Fragrant 10KG</div>
+              <div class="t" data-tok="--text-base" style="font-size:var(--t-base);color:var(--ink-2);margin-top:5px;line-height:1.5">
+                220 MT above maximum. Carrying cost of SGD 51.7K per year against a B class, normal velocity SKU.
+              </div>
+              <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+                <span class="t" data-tok="--text-sm" style="font-size:var(--t-sm);font-weight:600;padding:6px 11px;border-radius:7px;background:var(--accent);color:#fff">Suspend purchasing</span>
+                <span style="font-size:var(--t-sm);font-weight:600;padding:6px 11px;border-radius:7px;border:1px solid var(--line);color:var(--ink-2)">Why?</span>
+              </div>
+            </div></div>
+          </div>
+
+          <!-- Sidebar -->
+          <div class="spec">
+            <div class="spec__hd"><b>Sidebar</b><em>Sidebar.jsx</em></div>
+            <div class="spec__body"><div class="pv">
+              <div class="t" data-tok="--text-base" style="font-size:var(--t-base);font-weight:700">StockSense</div>
+              <div class="t" data-tok="--text-xs" style="font-size:var(--t-xs);color:var(--ink-3);margin-top:1px">Control Tower</div>
+              <div style="margin-top:11px;display:flex;flex-direction:column;gap:3px">
+                <div style="font-size:var(--t-base);font-weight:600;padding:9px 11px;border-radius:7px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:space-between">
+                  <span class="t" data-tok="--text-base">Dashboard</span>
+                </div>
+                <div style="font-size:var(--t-base);padding:9px 11px;border-radius:7px;color:var(--ink-2);display:flex;align-items:center;justify-content:space-between">
+                  Alerts
+                  <span class="t" data-tok="hardcoded 9px" data-below="1" style="font-size:9px;font-weight:700;background:var(--bad);color:#fff;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px">7</span>
+                </div>
+              </div>
+              <div class="t" data-tok="--text-xs" style="font-size:var(--t-xs);color:var(--ink-3);margin-top:11px;padding-top:9px;border-top:1px solid var(--line-soft)">AWS NUS-ISS SMYA 2026</div>
+            </div></div>
+          </div>
+
+          <!-- Hint panel -->
+          <div class="spec">
+            <div class="spec__hd"><b>Hover hint</b><em>HoverHint</em></div>
+            <div class="spec__body"><div class="pv">
+              <div style="border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--sunk)">
+                <div class="t" data-tok="--text-xs" style="font-size:var(--t-xs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)">GMROI</div>
+                <div class="t" data-tok="--text-base" style="font-size:var(--t-base);line-height:1.65;margin-top:5px;color:var(--ink-2)">
+                  Gross margin return on inventory investment. How many dollars of margin each dollar tied up in stock returns over a year.
+                </div>
+              </div>
+            </div></div>
+          </div>
+
+          <!-- Handheld -->
+          <div class="spec">
+            <div class="spec__hd"><b>Handheld, Goods In</b><em>warehouse/</em></div>
+            <div class="spec__body"><div class="pv">
+              <div class="t" data-tok="--text-xl" style="font-size:var(--t-xl);font-weight:700;line-height:1.2">Scan the SKU</div>
+              <div class="t" data-tok="--text-base" style="font-size:var(--t-base);color:var(--ink-2);margin-top:5px">Point the scanner at the barcode on the pallet label</div>
+              <div class="t" data-tok="--text-base" style="font-size:var(--t-base);font-weight:600;margin-top:12px;padding:15px;border-radius:11px;background:var(--accent);color:#fff;text-align:center">Confirm receipt</div>
+            </div></div>
+          </div>
+
+          <!-- Table -->
+          <div class="spec">
+            <div class="spec__hd"><b>Inventory table</b><em>Inventory.jsx</em></div>
+            <div class="spec__body"><div class="pv">
+              <div class="t" data-tok="--text-xs" style="font-size:var(--t-xs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between">
+                <span>SKU</span><span>On hand</span>
+              </div>
+              <div style="border-top:1px solid var(--line-soft);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline">
+                <span class="t" data-tok="--text-base" style="font-size:var(--t-base);font-weight:500">Basmati Bulk 25KG</span>
+                <span class="t" data-tok="--text-base" style="font-size:var(--t-base);font-variant-numeric:tabular-nums;font-weight:600">1,240 MT</span>
+              </div>
+              <div style="border-top:1px solid var(--line-soft);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:baseline">
+                <span style="font-size:var(--t-base);font-weight:500">Thai Jasmine 25KG</span>
+                <span style="font-size:var(--t-base);font-variant-numeric:tabular-nums;font-weight:600">318 MT</span>
+              </div>
+            </div></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ── EXPORT ─────────────────────────────────────────────────── -->
+      <section class="sect">
+        <h2>Hand this back to me</h2>
+        <p class="sect__lead">Copy this block and paste it into the chat. It is the exact shape of the
+          existing declaration in <code>frontend/src/index.css</code>, so I can apply it without
+          interpreting anything.</p>
+        <div class="code" id="out"></div>
+      </section>
+
+      <!-- ── AUDIT ──────────────────────────────────────────────────── -->
+      <section class="sect">
+        <h2>What the audit found</h2>
+        <p class="sect__lead">The scale is not missing. It is written down, with a comment calling 12px
+          the absolute floor, and then bypassed almost everywhere. These are the sizes below the floor,
+          counted by file.</p>
+        <div class="scroller">
+          <table class="tbl">
+            <thead><tr><th>File</th><th class="n">9px</th><th class="n">10px</th><th class="n">11px</th><th class="n">11.5px</th><th>Mostly</th></tr></thead>
+            <tbody>
+              <tr><td><code>Dashboard.jsx</code></td><td class="n">-</td><td class="n">-</td><td class="n">5</td><td class="n">-</td><td>Matrix cell captions, chart axis ticks</td></tr>
+              <tr><td><code>Inventory.jsx</code></td><td class="n">-</td><td class="n">-</td><td class="n">6</td><td class="n">-</td><td>Chart labels and axis ticks</td></tr>
+              <tr><td><code>Alerts.jsx</code></td><td class="n">-</td><td class="n">-</td><td class="n">4</td><td class="n">-</td><td>Severity labels, meta captions</td></tr>
+              <tr><td><code>SettingsMenu.jsx</code></td><td class="n">-</td><td class="n">1</td><td class="n">1</td><td class="n">3</td><td>Section labels, the cost warning</td></tr>
+              <tr><td><code>Sidebar.jsx</code></td><td class="n"><span class="flag flag--bad">1</span></td><td class="n">1</td><td class="n">2</td><td class="n">-</td><td>The alert count badge, "Switch"</td></tr>
+              <tr><td><code>StockPositionBar.jsx</code></td><td class="n">-</td><td class="n">-</td><td class="n">2</td><td class="n">-</td><td>Bar captions</td></tr>
+              <tr><td><code>Activity.jsx</code>, <code>Home.jsx</code>, <code>warehouse/</code></td><td class="n">-</td><td class="n">-</td><td class="n">4</td><td class="n">-</td><td>Uppercase section labels</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <b>Two of these are defensible and the rest are not.</b> Chart axis ticks are conventionally
+          small and sit beside a labelled axis, and the footer credit is exactly the kind of
+          low-value-but-present text you described. The uppercase section labels are the real problem:
+          uppercase at 11px is harder to read than sentence case at 11px, because the shape of a word
+          is part of how it is recognised, and uppercase throws that shape away.
+        </div>
+      </section>
+
+      <!-- ── STANDARDS ──────────────────────────────────────────────── -->
+      <section class="sect">
+        <h2>What the standards actually say</h2>
+        <p class="sect__lead">There is no single answer, but there is a clear split, and knowing which
+          side of it StockSense sits on decides the scale.</p>
+        <div class="scroller">
+          <table class="tbl">
+            <thead><tr><th>Source</th><th class="n">Body</th><th class="n">Floor</th><th>Its position</th></tr></thead>
+            <tbody>
+              <tr><td><b>WCAG 2.2</b></td><td class="n">-</td><td class="n">-</td><td>Sets no size, but requires text to survive 200% zoom without loss. Small fixed sizes usually fail this before large ones do.</td></tr>
+              <tr><td><b>Apple HIG, macOS</b></td><td class="n">13px</td><td class="n">11px</td><td>Dense desktop chrome, on the assumption of a close-viewed high density display.</td></tr>
+              <tr><td><b>Apple HIG, iOS</b></td><td class="n">17px</td><td class="n">11px</td><td>Notably larger body than macOS. Apple does not have one answer either.</td></tr>
+              <tr><td><b>Material 3</b></td><td class="n">14px</td><td class="n">11px</td><td>Body medium at 14, and it treats 11 as a label size, never running text.</td></tr>
+              <tr><td><b>Tailwind / web default</b></td><td class="n">16px</td><td class="n">12px</td><td>16px is the browser default body size and the de facto web floor.</td></tr>
+              <tr><td><b>Linear, Stripe</b></td><td class="n">13-14px</td><td class="n">11px</td><td>Deliberately dense. They are tools used all day by people who chose them.</td></tr>
+              <tr><td><b>StockSense today</b></td><td class="n">17px</td><td class="n">13px</td><td><span class="flag flag--ok">Large print</span> Past every standard here, deliberately. The declared floor is real in CSS; 30 inline styles still undercut it.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <b>Where this landed.</b> StockSense is a desktop tool, which argues for density, but it is
+          demoed on a projector and built for warehouse staff who skew older, which argues harder the
+          other way. It now sits past the Tailwind end of the table: a 17px body and a real 13px
+          floor. The other half of the fix was spending the range on <b>fewer steps rather than
+          smaller ones</b>. Seven steps over this range crowded the bottom, so --text-md, which sat
+          one pixel from the body size and named a job font-weight already does, is gone.
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// The seven tokens, in the order they appear in index.css.
+// ─────────────────────────────────────────────────────────────────────────────
+// SIX steps since 2026-09-13, not seven. --text-md sat one pixel from
+// --text-base and named the same job, which is work font-weight already does.
+const KEYS = ["xs", "sm", "base", "lg", "xl", "2xl"];
+const USE = {
+  xs:   "captions, uppercase labels, badges",
+  sm:   "table rows, dense secondary text",
+  base: "body text, nav links, buttons",
+  lg:   "card and section titles",
+  xl:   "page titles, big figures",
+  "2xl":"the one hero number",
+};
+
+const PRESETS = {
+  shipping: { name: "Shipping now", note: "large print, live", v: [13, 15, 17, 22, 30, 40] },
+  balanced: { name: "Balanced", note: "16px body", v: [12, 14, 16, 20, 26, 34] },
+  mac:      { name: "Apple macOS", note: "dense desktop", v: [11, 12, 13, 17, 22, 28] },
+  material: { name: "Material 3", note: "14px body", v: [11, 12, 14, 22, 28, 36] },
+  tailwind: { name: "Tailwind", note: "web default", v: [12, 14, 16, 20, 24, 36] },
+  larger:   { name: "Larger still", note: "projector and far viewing", v: [14, 16, 18, 24, 32, 44] },
+};
+
+const FLOOR = 12;
+let vals = PRESETS.shipping.v.slice();
+let baseline = vals.slice();   // what the master multiplier scales from
+
+// ── Restore a session in progress. Wrapped, because storage access itself can
+// throw in a private window or a thumbnailing context, not merely return null.
+try {
+  const saved = JSON.parse(localStorage.getItem("stocksense.type.v2") || "null");
+  if (Array.isArray(saved) && saved.length === KEYS.length && saved.every(n => typeof n === "number")) {
+    vals = saved; baseline = saved.slice();
+  }
+} catch (e) { /* no saved state, which is a normal first visit */ }
+
+// ── Build the preset buttons ────────────────────────────────────────────────
+const presetsEl = document.getElementById("presets");
+Object.entries(PRESETS).forEach(([id, p]) => {
+  const b = document.createElement("button");
+  b.className = "preset";
+  b.type = "button";
+  b.dataset.id = id;
+  b.innerHTML = p.name + "<small>" + p.note + "</small>";
+  b.setAttribute("aria-pressed", "false");
+  b.addEventListener("click", () => {
+    vals = p.v.slice();
+    baseline = vals.slice();
+    document.getElementById("master").value = 100;
+    render();
+  });
+  presetsEl.appendChild(b);
+});
+
+// ── Build the seven token rows ──────────────────────────────────────────────
+const toksEl = document.getElementById("toks");
+KEYS.forEach((k, i) => {
+  const row = document.createElement("div");
+  row.className = "tok";
+  row.dataset.k = k;
+  row.innerHTML =
+    '<label for="r-' + k + '" title="' + USE[k] + '">--text-' + k + '</label>' +
+    '<input type="range" id="r-' + k + '" min="8" max="48" step="0.5">' +
+    '<div class="num"><input type="number" id="n-' + k + '" min="8" max="48" step="0.5"><span class="unit">px</span></div>';
+  toksEl.appendChild(row);
+
+  const set = (v) => {
+    const n = Math.min(48, Math.max(8, Number(v)));
+    // Number("") is 0 and 0 is finite, so a cleared field must be rejected on
+    // presence rather than on Number.isFinite alone. This exact trap has bitten
+    // the main codebase three times.
+    if (v === "" || v === null || !Number.isFinite(n)) return;
+    vals[i] = n;
+    baseline = vals.slice();
+    document.getElementById("master").value = 100;
+    render();
+  };
+  row.querySelector("input[type=range]").addEventListener("input", e => set(e.target.value));
+  row.querySelector("input[type=number]").addEventListener("input", e => set(e.target.value));
+});
+
+// ── Master multiplier ───────────────────────────────────────────────────────
+const master = document.getElementById("master");
+master.addEventListener("input", () => {
+  const f = Number(master.value) / 100;
+  vals = baseline.map(v => Math.round(v * f * 2) / 2);
+  render();
+});
+
+document.getElementById("reset").addEventListener("click", () => {
+  vals = PRESETS.shipping.v.slice();
+  baseline = vals.slice();
+  master.value = 100;
+  render();
+});
+
+document.getElementById("showtok").addEventListener("change", e => {
+  document.body.classList.toggle("show-tokens", e.target.checked);
+});
+
+// ── Copy. The artifact sandbox can block clipboard access, so selecting the
+// text is the fallback rather than a silent failure.
+document.getElementById("copy").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  const text = document.getElementById("out").innerText;
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = "Copied";
+  } catch (err) {
+    const r = document.createRange();
+    r.selectNodeContents(document.getElementById("out"));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    btn.textContent = "Selected, press copy";
+  }
+  setTimeout(() => { btn.textContent = "Copy CSS"; }, 1800);
+});
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function render() {
+  const root = document.documentElement;
+
+  KEYS.forEach((k, i) => {
+    root.style.setProperty("--t-" + k, vals[i] + "px");
+    const row = toksEl.querySelector('[data-k="' + k + '"]');
+    row.querySelector("input[type=range]").value = vals[i];
+    row.querySelector("input[type=number]").value = vals[i];
+    row.classList.toggle("is-below", vals[i] < FLOOR);
+  });
+
+  // Which preset, if any, this exactly matches.
+  presetsEl.querySelectorAll(".preset").forEach(b => {
+    const p = PRESETS[b.dataset.id];
+    b.setAttribute("aria-pressed", String(p.v.every((n, i) => n === vals[i])));
+  });
+
+  master.previousElementSibling.querySelector("output").textContent = master.value + "%";
+
+  // Step health.
+  //
+  // An earlier version of this check demanded a near-constant ratio and called
+  // anything else "uneven". That advice was wrong. Real interface scales are
+  // deliberately not geometric: tight at the bottom, where two pixels is a
+  // visible difference and absolute size governs legibility, and wide at the
+  // top, where the jump is expressive. Tailwind and Material are both shaped
+  // this way and would both have failed that check. Enforcing one ratio pushes
+  // the body size around to satisfy a number, which is backwards.
+  //
+  // What actually goes wrong is two specific things, so test for those:
+  //   1. A pair too close to tell apart. Below 20px that means under 2px of
+  //      difference; above it, under 10 percent.
+  //   2. Ratios that zigzag rather than climb, which means a step is doing a
+  //      job an adjacent one already does.
+  const ratios = vals.slice(1).map((v, i) => v / vals[i]);
+  const tight = [];
+  for (let i = 1; i < vals.length; i++) {
+    const gap = vals[i] - vals[i - 1];
+    const close = vals[i] < 20 ? gap < 2 : gap / vals[i - 1] < 0.10;
+    if (close) tight.push("--text-" + KEYS[i - 1] + " and --text-" + KEYS[i]);
+  }
+  let zig = false;
+  for (let i = 1; i < ratios.length; i++) if (ratios[i] < ratios[i - 1] - 0.04) zig = true;
+
+  const el = document.getElementById("ratio");
+  if (tight.length) {
+    el.innerHTML = "<b>Too close to tell apart: " + tight.join(", ") + ".</b> " +
+      "Merge one into the other and use font-weight for the difference.";
+  } else if (zig) {
+    el.innerHTML = "<b>Ratios " + ratios.map(r => r.toFixed(2)).join(", ") + ".</b> " +
+      "They dip rather than climb, so a step is doing a job an adjacent one already does.";
+  } else {
+    el.innerHTML = "<b>Healthy. Ratios " + ratios.map(r => r.toFixed(2)).join(", ") + ".</b> " +
+      "Tight at the bottom, wider at the top, which is the shape a UI scale should have.";
+  }
+
+  // Export block, shaped exactly like the declaration in index.css.
+  const pad = (s) => (s + ":").padEnd(13, " ");
+  document.getElementById("out").innerHTML =
+    '<span class="c">/* Type scale, tuned ' + new Date().toISOString().slice(0, 10) + '. Floor is --text-xs. */</span>\n' +
+    ":root {\n" +
+    KEYS.map((k, i) =>
+      '  <span class="k">' + pad("--text-" + k) + '</span><span class="v">' + vals[i] + "px</span>;" +
+      '  <span class="c">/* ' + USE[k] + " */</span>"
+    ).join("\n") +
+    "\n}";
+
+  try { localStorage.setItem("stocksense.type.v2", JSON.stringify(vals)); } catch (e) { /* fine */ }
+}
+
+render();
+</script>

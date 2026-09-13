@@ -37,6 +37,30 @@ feedback, not suggestions to re-litigate.
   background. Alerts once shipped without this and it was flagged immediately.
 - **Visibility for older users.** The type scale is deliberately larger than a
   default. Do not shrink it back.
+- **Never write a raw font size. Use the scale.** Six steps are defined in
+  `frontend/src/index.css` and they are the only sizes this app has:
+
+  | token | px | for |
+  | --- | --- | --- |
+  | `--text-xs` | 13 | captions, uppercase labels, badges |
+  | `--text-sm` | 15 | table rows, dense secondary text |
+  | `--text-base` | 17 | body text, nav links, buttons |
+  | `--text-lg` | 22 | card and section titles |
+  | `--text-xl` | 30 | page titles, big figures |
+  | `--text-2xl` | 40 | the one hero number |
+
+  Write `fontSize: "var(--text-sm)"`, never `fontSize: 13`. If a size feels
+  wrong, the answer is the neighbouring step or a different `fontWeight`, not a
+  number in between: 14px is not a size this app has. `--text-xs` is the floor
+  and nothing goes below it, with one carve out, chart axis ticks, which are
+  conventionally smaller and sit beside a labelled axis.
+
+  Two consequences worth stating, because both have already bitten. Reaching for
+  a size to signal emphasis is what `fontWeight` is for, and a step that
+  duplicates a weight is one nobody applies correctly, which is why `--text-md`
+  was deleted. And roughly 150 inline sizes predate this rule, so matching the
+  surrounding code is the wrong instinct here: match the scale, and migrate the
+  literals you touch on the way past.
 - **One primary action per surface.** Four differently coloured buttons in a row
   is a rainbow, not a hierarchy.
 
@@ -109,3 +133,10 @@ feedback, not suggestions to re-litigate.
   shapes on purpose.
 - `backend/scripts/bench-models.js` measures model drift. Re-run it after
   changing a prompt rather than guessing whether the change helped.
+- `frontend/tuners/` holds the design tuners. See its README. These are how Stan
+  settles a visual question precisely: he moves sliders over a preview of the
+  real components and pastes back a block of CSS, instead of both sides trading
+  adjectives. **When a request is "make it bigger" or "less transparent" or
+  anything else that is really a number, offer the matching tuner rather than
+  guessing at a value.** Build a new one when a question comes up that neither
+  covers, and keep it in that directory beside them.
