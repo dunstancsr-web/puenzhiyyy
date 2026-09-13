@@ -1,0 +1,518 @@
+<title>Needs Attention Density</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+<style>
+/* ──────────────────────────────────────────────────────────────────────────
+   TOOL CHROME
+   Fixed sizes throughout. The controls must stay legible while the specimen
+   is squeezed to its tightest, so nothing here is bound to what is edited.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --ground: #fbfcfd; --panel: #ffffff; --sunk: #f4f6f8;
+  --line: #e3e8ee; --line-soft: #eef1f5;
+  --ink: #16202c; --ink-2: #4a5766; --ink-3: #7b8794;
+  --accent: #2563eb; --accent-sk: #eff4ff;
+  --bad: #b42318; --bad-sk: #fdf2f1;
+  --amber: #b45309; --amber-sk: #fdf6ec;
+  --violet: #6d28d9; --violet-sk: #f3f0fd;
+  --shadow: 0 1px 2px rgba(16,32,44,.05), 0 8px 24px -12px rgba(16,32,44,.14);
+  --shadow-md: 0 4px 12px rgba(16,32,44,.10), 0 16px 40px -18px rgba(16,32,44,.22);
+
+  /* The specimen's own dials. Every default below is the value that ships
+     today, so the tool opens on the real thing rather than on a guess. */
+  --rowPadY: 10px;
+  --fadeH: 78px;
+  --btnBottom: 7px;
+  --btnPadY: 10px;
+  --btnPadX: 24px;
+  --btnMinW: 216px;
+  --cardPad: 24px;
+  --headGap: 16px;
+  --expGap: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0e1319; --panel: #161d26; --sunk: #1d2631;
+    --line: #2a3541; --line-soft: #222b36;
+    --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+    --accent: #6b9bff; --accent-sk: #17233b;
+    --bad: #f0837a; --bad-sk: #2e1a19;
+    --amber: #e0a355; --amber-sk: #2b2316;
+    --violet: #b49bf5; --violet-sk: #241d3a;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.5), 0 16px 40px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0e1319; --panel: #161d26; --sunk: #1d2631;
+  --line: #2a3541; --line-soft: #222b36;
+  --ink: #e8edf3; --ink-2: #a8b4c2; --ink-3: #77848f;
+  --accent: #6b9bff; --accent-sk: #17233b;
+  --bad: #f0837a; --bad-sk: #2e1a19;
+  --amber: #e0a355; --amber-sk: #2b2316;
+  --violet: #b49bf5; --violet-sk: #241d3a;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.5), 0 16px 40px -18px rgba(0,0,0,.8);
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground); color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1420px; margin: 0 auto; padding: 26px 22px 64px; }
+
+.mast { border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 22px; }
+.mast h1 {
+  font-family: Newsreader, Georgia, serif; font-size: 32px; font-weight: 600;
+  line-height: 1.1; margin: 0 0 6px; letter-spacing: -.01em; text-wrap: balance;
+}
+.mast p { margin: 0; color: var(--ink-2); max-width: 66ch; font-size: 14px; }
+
+.cols { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 1000px) { .cols { grid-template-columns: 1fr; } .rail { position: static !important; max-height: none !important; } }
+
+.rail {
+  position: sticky; top: 16px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 12px; padding: 15px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 15px;
+  max-height: calc(100vh - 32px); overflow-y: auto;
+}
+.rail h2 {
+  font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-3); margin: 0 0 9px;
+}
+.grp + .grp { border-top: 1px solid var(--line-soft); padding-top: 14px; }
+
+.row { display: grid; grid-template-columns: 104px minmax(0,1fr) 50px; gap: 9px; align-items: center; margin-bottom: 8px; }
+.row label { font-size: 12px; color: var(--ink-2); }
+.row input[type=range] { width: 100%; accent-color: var(--accent); }
+.row output { font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); font-weight: 600; }
+
+.seg { display: flex; gap: 4px; background: var(--sunk); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+.seg button {
+  flex: 1; border: 0; background: transparent; cursor: pointer; font: inherit;
+  font-size: 12px; font-weight: 500; color: var(--ink-2); padding: 5px 8px; border-radius: 6px;
+}
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+.presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.preset {
+  font: inherit; font-size: 12px; font-weight: 500; text-align: left; cursor: pointer;
+  padding: 7px 9px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--sunk); color: var(--ink-2);
+}
+.preset:hover { border-color: var(--accent); color: var(--accent); }
+.preset small { display: block; font-size: 10.5px; color: var(--ink-3); font-weight: 400; margin-top: 1px; }
+
+.btns { display: flex; gap: 6px; }
+.btn {
+  flex: 1; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  padding: 8px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--sunk); color: var(--ink-2);
+}
+.btn--go { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.measure {
+  background: var(--accent-sk); border-radius: 7px; padding: 9px 11px;
+  font-size: 11.5px; color: var(--ink-2); line-height: 1.5;
+}
+.measure b { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* ── Stage ───────────────────────────────────────────────────────────────
+   The page background the real card sits on, so the card edge reads the way
+   it does in the app rather than floating on the tool's own panel. */
+.stage { background: var(--sunk); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+.stage__hd {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 14px; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3);
+}
+
+/* ── The specimen. Mirrors Dashboard.jsx's Needs Attention card ───────── */
+.na {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: var(--shadow);
+  padding: var(--cardPad);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.na__head { margin-bottom: var(--headGap); }
+.na__title { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 600; }
+.na__count {
+  font-size: 13px; font-weight: 700; line-height: 1; padding: 4px 9px;
+  border-radius: 99px; color: var(--bad); background: var(--bad-sk);
+}
+.na__sub { font-size: 15px; color: var(--ink-3); margin-top: 2px; }
+
+.na__tablewrap { position: relative; }
+table.na__t { width: 100%; border-collapse: collapse; font-size: 15px; }
+.na__t th {
+  text-align: left; font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .03em; color: var(--ink-3); padding: 0 8px 8px; white-space: nowrap;
+}
+.na__t th:last-child { text-align: right; }
+.na__t tr.data { border-top: 1px solid var(--line); }
+.na__t td { padding: var(--rowPadY) 8px; vertical-align: top; }
+.na__t td.sku { padding-left: 10px; border-left: 3px solid var(--tone); font-weight: 700; }
+.na__t td.val { text-align: right; white-space: nowrap; }
+.na__t td.val b { font-weight: 700; }
+.na__t td.val span { display: block; font-size: 13px; color: var(--ink-3); }
+.tag {
+  font-size: 13px; font-weight: 700; letter-spacing: .02em; white-space: nowrap;
+  padding: 2px 8px; border-radius: 99px; color: var(--tone); background: var(--tone-sk);
+}
+.act b { font-weight: 600; }
+.act { color: var(--ink-2); }
+
+.na__fade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: var(--fadeH);
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--panel) 86%);
+}
+.na__btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8;
+  gap: 8px; min-width: var(--btnMinW);
+  padding: var(--btnPadY) var(--btnPadX);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 99px;
+  cursor: pointer; color: var(--accent); font-size: 15px; font-weight: 600;
+  font-family: inherit;
+}
+.na__btn--float {
+  position: absolute; left: 50%; bottom: var(--btnBottom);
+  transform: translateX(-50%); z-index: 2; box-shadow: var(--shadow-md);
+}
+.na__btnrow { display: flex; justify-content: center; padding-top: var(--expGap); }
+
+/* Measurement overlay: draws the gaps being tuned, so a number on a slider
+   corresponds to something visible rather than to a feeling. */
+.na.show-rulers .na__tablewrap { outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent); }
+.na.show-rulers .na__t td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.na.show-rulers .na__btnrow { background: color-mix(in srgb, var(--bad) 8%, transparent); }
+
+.code {
+  background: #0d1520; color: #d6e2f0; border-radius: 9px; padding: 13px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; line-height: 1.55; overflow-x: auto; white-space: pre;
+  border: 1px solid #1d2a3a; margin-top: 20px;
+}
+.code .c { color: #6f8199; }
+.code .k { color: #8ab4ff; }
+.code .v { color: #9fe0a8; }
+
+.note {
+  border-left: 2px solid var(--accent); background: var(--accent-sk);
+  padding: 11px 14px; border-radius: 0 8px 8px 0; font-size: 13px;
+  color: var(--ink-2); margin-top: 16px; line-height: 1.55;
+}
+.note b { color: var(--ink); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <h1>Needs Attention Density</h1>
+    <p>Every gap in the Dashboard's Needs Attention card, on a slider, over the real rows. Set it the
+      way you want it and hand the exported block back to have it applied exactly. The controls
+      themselves stay a fixed size, so they never tighten along with the specimen.</p>
+  </header>
+
+  <div class="cols">
+    <aside class="rail">
+      <div class="grp">
+        <h2>Start from</h2>
+        <div class="presets" id="presets"></div>
+      </div>
+
+      <div class="grp">
+        <h2>Preview state</h2>
+        <div class="seg" id="stateSeg" role="group" aria-label="Which state to show"></div>
+      </div>
+
+      <div class="grp">
+        <h2>How much shows</h2>
+        <div id="rowsRows"></div>
+      </div>
+
+      <div class="grp">
+        <h2>Table</h2>
+        <div id="tableRows"></div>
+      </div>
+
+      <div class="grp">
+        <h2>Reveal button</h2>
+        <div id="btnRows"></div>
+      </div>
+
+      <div class="grp">
+        <div class="measure" id="measure"></div>
+      </div>
+
+      <div class="btns">
+        <button class="btn" id="rulers" type="button" aria-pressed="false">Rulers</button>
+        <button class="btn" id="reset" type="button">Reset</button>
+        <button class="btn btn--go" id="copy" type="button">Copy</button>
+      </div>
+    </aside>
+
+    <main>
+      <div class="stage">
+        <div class="stage__hd">
+          <span>Live specimen</span>
+          <span id="stateName">Collapsed</span>
+        </div>
+        <div class="na" id="na"></div>
+      </div>
+
+      <div class="code" id="out"></div>
+
+      <div class="note">
+        <b>What the numbers mean.</b> <b>Rows shown</b> is how many read in full before the fade.
+        <b>Fade height</b> is how far up the gradient reaches from the bottom of the table, so it wants
+        to be roughly one row tall: shorter and the fade stops mid-row, taller and it starts eating a
+        row you meant to be readable. <b>Button bottom</b> is the gap under the floating button, and
+        the one worth watching, since a button taller than the row it sits on will hang past the
+        table's edge. The measurement panel on the left flags that as it happens.
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Real Needs Attention rows, copied from the seeded demo data so the specimen
+// wraps and truncates exactly where the real card does. Fake filler text of a
+// uniform length would make every spacing decision look better than it is.
+// ─────────────────────────────────────────────────────────────────────────────
+const ROWS = [
+  { sku: "Thai Jasmine 25KG",    tag: "STOCKOUT RISK", tone: "bad",
+    action: "Place PO - 597 MT", reason: "28d cover vs 55d (lead + safety) \u00B7 17d gap \u00B7 no PO inbound",
+    value: "SGD $26.2K", vlabel: "lost margin" },
+  { sku: "Japonica Short Grain 5KG", tag: "IDLE STOCK \u00B7 OVERSTOCK \u00B7 AGEING", tone: "amber",
+    action: "Initiate disposition review", reason: "No sales 90+ days \u00B7 78 MT \u00B7 35% write-down risk \u00B7 81d to holding limit",
+    value: "SGD $87.4K", vlabel: "risk-adj. value" },
+  { sku: "Vietnam Fragrant 10KG", tag: "OVERSTOCK", tone: "violet",
+    action: "Suspend purchasing", reason: "220 MT above max \u00B7 B class, Normal",
+    value: "SGD $51.7K", vlabel: "carrying cost / yr" },
+  { sku: "Basmati Bulk 25KG",    tag: "SLOW MOVING", tone: "amber",
+    action: "Reduce next order", reason: "9 months and 8 days of cover \u00B7 demand stable",
+    value: "SGD $629K", vlabel: "inventory value" },
+  { sku: "Basmati Premium 5KG",  tag: "SLOW MOVING", tone: "amber",
+    action: "Reduce next order", reason: "9 months and 22 days of cover \u00B7 demand decelerating",
+    value: "SGD $389K", vlabel: "inventory value" },
+  { sku: "Brown Rice Organic 10KG", tag: "SLOW MOVING", tone: "amber",
+    action: "Reduce next order", reason: "5 months and 20 days of cover \u00B7 demand stable",
+    value: "SGD $160K", vlabel: "inventory value" },
+];
+
+// key, label, min, max, step, group. `previewRows` and `teaseRow` change the
+// markup; everything else is a CSS variable the specimen already reads.
+const DIALS = [
+  ["previewRows", "Rows shown",    1,  6,   1, "rowsRows"],
+  ["teaseRow",    "Faded row",     0,  1,   1, "rowsRows"],
+  ["fadeH",       "Fade height",  24, 150,  1, "rowsRows"],
+
+  ["rowPadY",     "Row padding",   3,  22,  1, "tableRows"],
+  ["cardPad",     "Card padding", 10,  40,  1, "tableRows"],
+  ["headGap",     "Below header",  0,  36,  1, "tableRows"],
+
+  ["btnBottom",   "Button bottom", 0,  34,  1, "btnRows"],
+  ["btnPadY",     "Button height", 3,  20,  1, "btnRows"],
+  ["btnPadX",     "Button width", 10,  44,  1, "btnRows"],
+  ["btnMinW",     "Min width",   120, 340,  4, "btnRows"],
+  ["expGap",      "Expanded gap",  0,  40,  1, "btnRows"],
+];
+
+const PRESETS = {
+  shipping: { name: "Shipping now", note: "3 rows, as live", v: { previewRows: 3, teaseRow: 1, fadeH: 78, rowPadY: 10, cardPad: 24, headGap: 16, btnBottom: 7, btnPadY: 10, btnPadX: 24, btnMinW: 216, expGap: 12 } },
+  two:      { name: "Two rows",     note: "3rd row faded",  v: { previewRows: 2, teaseRow: 1, fadeH: 74, rowPadY: 10, cardPad: 24, headGap: 16, btnBottom: 6, btnPadY: 9,  btnPadX: 24, btnMinW: 208, expGap: 10 } },
+  tight:    { name: "Tight",        note: "less air throughout", v: { previewRows: 3, teaseRow: 1, fadeH: 66, rowPadY: 7,  cardPad: 18, headGap: 12, btnBottom: 5, btnPadY: 8,  btnPadX: 22, btnMinW: 200, expGap: 6 } },
+  roomy:    { name: "Roomy",        note: "more air throughout", v: { previewRows: 4, teaseRow: 1, fadeH: 90, rowPadY: 14, cardPad: 28, headGap: 20, btnBottom: 10, btnPadY: 12, btnPadX: 28, btnMinW: 240, expGap: 18 } },
+};
+
+const PX = new Set(["fadeH", "rowPadY", "cardPad", "headGap", "btnBottom", "btnPadY", "btnPadX", "btnMinW", "expGap"]);
+const KEY = "stocksense.na-density.v1";
+
+let vals = { ...PRESETS.shipping.v };
+let state = "collapsed";
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY) || "null");
+  // Merge rather than replace, so a saved blob from an older version that is
+  // missing a dial does not leave that dial undefined.
+  if (saved && typeof saved === "object") vals = { ...vals, ...saved };
+} catch (e) { /* first visit, or storage blocked */ }
+
+const $ = (id) => document.getElementById(id);
+
+// ── Controls ────────────────────────────────────────────────────────────────
+for (const [key, label, min, max, step, host] of DIALS) {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML =
+    '<label for="d-' + key + '">' + label + "</label>" +
+    '<input type="range" id="d-' + key + '" min="' + min + '" max="' + max + '" step="' + step + '">' +
+    '<output id="o-' + key + '"></output>';
+  $(host).appendChild(row);
+  row.querySelector("input").addEventListener("input", (e) => {
+    const n = Number(e.target.value);
+    // Number("") is 0 and 0 is finite, so a presence check has to come first.
+    if (e.target.value === "" || !Number.isFinite(n)) return;
+    vals[key] = n;
+    render();
+  });
+}
+
+$("presets").innerHTML = "";
+for (const [id, p] of Object.entries(PRESETS)) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "preset";
+  b.innerHTML = p.name + "<small>" + p.note + "</small>";
+  b.addEventListener("click", () => { vals = { ...p.v }; render(); });
+  $("presets").appendChild(b);
+}
+
+function buildSeg() {
+  const host = $("stateSeg");
+  host.innerHTML = "";
+  for (const [id, label] of [["collapsed", "Collapsed"], ["expanded", "Expanded"]]) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label;
+    b.setAttribute("aria-pressed", String(state === id));
+    b.addEventListener("click", () => { state = id; render(); });
+    host.appendChild(b);
+  }
+}
+
+let rulers = false;
+$("rulers").addEventListener("click", (e) => {
+  rulers = !rulers;
+  e.currentTarget.setAttribute("aria-pressed", String(rulers));
+  render();
+});
+$("reset").addEventListener("click", () => { vals = { ...PRESETS.shipping.v }; render(); });
+$("copy").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  try {
+    await navigator.clipboard.writeText($("out").innerText);
+    btn.textContent = "Copied";
+  } catch (err) {
+    const r = document.createRange();
+    r.selectNodeContents($("out"));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    btn.textContent = "Selected";
+  }
+  setTimeout(() => { btn.textContent = "Copy"; }, 1600);
+});
+
+// ── Specimen ────────────────────────────────────────────────────────────────
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+function rowHtml(r) {
+  return '<tr class="data" style="--tone: var(--' + r.tone + '); --tone-sk: var(--' + r.tone + '-sk)">' +
+    '<td class="sku">' + esc(r.sku) + "</td>" +
+    '<td><span class="tag">' + esc(r.tag) + "</span></td>" +
+    '<td class="act"><b>' + esc(r.action) + "</b> - " + esc(r.reason) + "</td>" +
+    '<td class="val"><b>' + esc(r.value) + "</b><span>" + esc(r.vlabel) + "</span></td>" +
+    "</tr>";
+}
+
+function render() {
+  const root = document.documentElement;
+  for (const [key] of DIALS) {
+    const v = vals[key];
+    const slider = $("d-" + key);
+    if (slider) slider.value = v;
+    const out = $("o-" + key);
+    if (out) out.textContent = PX.has(key) ? v + "px" : (key === "teaseRow" ? (v ? "on" : "off") : v);
+    if (PX.has(key)) root.style.setProperty("--" + key, v + "px");
+  }
+
+  const expanded = state === "expanded";
+  const full = expanded ? ROWS.length : Math.min(vals.previewRows, ROWS.length);
+  const teasing = !expanded && vals.teaseRow && ROWS.length > full;
+  const shown = ROWS.slice(0, teasing ? full + 1 : full);
+  const hidden = Math.max(0, ROWS.length - full);
+
+  const btnLabel = expanded
+    ? '<span>&#9652;</span> Show fewer'
+    : '<span>&#9662;</span> Show ' + hidden + " more";
+
+  $("na").className = "na" + (rulers ? " show-rulers" : "");
+  $("na").innerHTML =
+    '<div class="na__head">' +
+      '<div class="na__title">Needs Attention <span class="na__count">' + ROWS.length + "</span></div>" +
+      '<div class="na__sub">Every open exception, ranked by urgency then financial exposure</div>' +
+    "</div>" +
+    '<div class="na__tablewrap">' +
+      '<table class="na__t"><thead><tr><th>SKU</th><th>Type</th><th>Action</th><th>Value</th></tr></thead>' +
+      "<tbody>" + shown.map(rowHtml).join("") + "</tbody></table>" +
+      (teasing ? '<div class="na__fade"></div>' : "") +
+      (teasing ? '<button class="na__btn na__btn--float">' + btnLabel + "</button>" : "") +
+    "</div>" +
+    (expanded ? '<div class="na__btnrow"><button class="na__btn">' + btnLabel + "</button></div>" : "");
+
+  $("stateName").textContent = expanded ? "Expanded" : "Collapsed";
+  buildSeg();
+  measure();
+  emit();
+
+  try { localStorage.setItem(KEY, JSON.stringify(vals)); } catch (e) { /* fine */ }
+}
+
+// Reads the rendered result rather than predicting it. The row height depends
+// on how the Action text wraps at the current width, which no formula here
+// would get right.
+function measure() {
+  const rows = document.querySelectorAll("#na tr.data");
+  const last = rows[rows.length - 1];
+  const btn = document.querySelector(".na__btn--float");
+  const bits = [];
+
+  if (last) {
+    const h = Math.round(last.getBoundingClientRect().height);
+    bits.push("Last row <b>" + h + "px</b> tall.");
+    if (vals.fadeH > h + 24) bits.push("Fade is taller than the row, so it reaches into the one above.");
+    else if (vals.fadeH < h * 0.55) bits.push("Fade is short, so the row it covers stays mostly readable.");
+  }
+  if (btn && last) {
+    const bh = Math.round(btn.getBoundingClientRect().height);
+    const rh = Math.round(last.getBoundingClientRect().height);
+    bits.push("Button <b>" + bh + "px</b> in a <b>" + rh + "px</b> row.");
+    if (bh + vals.btnBottom > rh) bits.push("It overhangs the row: reduce the height or the bottom gap.");
+  }
+  if (state === "expanded") {
+    bits.push("Gap under the last row is <b>" + (vals.expGap + vals.cardPad) + "px</b> (expanded gap + card padding).");
+  }
+  $("measure").innerHTML = bits.join(" ") || "Nothing to measure in this state.";
+}
+
+function emit() {
+  const pad = (s) => (s + ":").padEnd(15, " ");
+  const line = (k, v, note) =>
+    '  <span class="k">' + pad(k) + '</span><span class="v">' + v + "</span>," +
+    (note ? '  <span class="c">// ' + note + "</span>" : "");
+
+  $("out").innerHTML =
+    '<span class="c">// Needs Attention density, tuned ' + new Date().toISOString().slice(0, 10) + "</span>\n" +
+    "const NA_DENSITY = {\n" +
+    line("previewRows", vals.previewRows, "rows read in full") + "\n" +
+    line("teaseRow", vals.teaseRow ? "true" : "false", "render one more under the fade") + "\n" +
+    line("fadeH", vals.fadeH, "px, gradient height") + "\n" +
+    line("rowPadY", vals.rowPadY, "px, vertical cell padding") + "\n" +
+    line("cardPad", vals.cardPad, "px, card padding") + "\n" +
+    line("headGap", vals.headGap, "px, header to table") + "\n" +
+    line("btnBottom", vals.btnBottom, "px, under the floating button") + "\n" +
+    line("btnPadY", vals.btnPadY, "px") + "\n" +
+    line("btnPadX", vals.btnPadX, "px") + "\n" +
+    line("btnMinW", vals.btnMinW, "px") + "\n" +
+    line("expGap", vals.expGap, "px, above the expanded button") + "\n" +
+    "};";
+}
+
+render();
+// The measurement depends on laid-out text, and web fonts can land after the
+// first paint and change how a row wraps, so take it again once they settle.
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+window.addEventListener("resize", measure);
+</script>
