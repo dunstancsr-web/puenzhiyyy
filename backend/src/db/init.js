@@ -232,6 +232,41 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_mv_type ON goods_movements(movement_type, created_at);
 
     -- ================================================================
+    -- INVENTORY HISTORY  (TASK-85)
+    --
+    -- One row per SKU per month. LONG format, and that is the decision that
+    -- lets this carry any number of months: the header never changes, only the
+    -- row count grows. A wide layout (a column per month) would need the
+    -- schema, the CSV writer and the import validator edited every time the
+    -- window moved, and the column count would grow without bound.
+    --
+    -- The four quantity columns are a balance, not four independent numbers:
+    --   opening_qty + receipts_qty - issues_qty = closing_qty
+    -- and each period's opening_qty equals the previous period's closing_qty.
+    -- The CSV importer enforces both, so a spreadsheet that does not balance
+    -- cannot enter the database.
+    --
+    -- There is deliberately NO closing_value column. It is
+    -- closing_qty * unit_cost_sgd, derived in SQL. Storing it would be a third
+    -- place for the same number, and values computed twice have disagreed in
+    -- this repo twice already. unit_cost_sgd IS stored per row, because the
+    -- cost at that time is a point-in-time fact: a later price change must not
+    -- silently rewrite what last year's stock was worth.
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS inventory_history (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      sku_id        TEXT NOT NULL,
+      period        TEXT NOT NULL,              -- 'YYYY-MM'
+      opening_qty   REAL NOT NULL DEFAULT 0,
+      receipts_qty  REAL NOT NULL DEFAULT 0,
+      issues_qty    REAL NOT NULL DEFAULT 0,
+      closing_qty   REAL NOT NULL DEFAULT 0,
+      unit_cost_sgd REAL NOT NULL DEFAULT 0,
+      UNIQUE (sku_id, period),
+      FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
+    );
+
+    -- ================================================================
     -- AUDIT LOG  (Observability — every LLM_CALL, ALERT_TRIGGERED, RESTOCK)
     -- ================================================================
     CREATE TABLE IF NOT EXISTS audit_log (
@@ -266,6 +301,10 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_sales_sku_date ON sales_transactions(sku_id, sale_date);
     CREATE INDEX IF NOT EXISTS idx_po_sku_status  ON purchase_orders(sku_id, status);
     CREATE INDEX IF NOT EXISTS idx_alerts_status  ON alerts_log(status);
+    -- The dashboard reads history a period at a time across all SKUs, so the
+    -- period is the leading column here; the (sku_id, period) UNIQUE above
+    -- already serves the per-SKU direction.
+    CREATE INDEX IF NOT EXISTS idx_hist_period    ON inventory_history(period);
   `);
 
   console.log("✓ Database initialised at", DB_PATH);

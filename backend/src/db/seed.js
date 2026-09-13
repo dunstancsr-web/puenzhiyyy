@@ -119,7 +119,30 @@ const SKUS = [
   },
 ];
 
-// Build ~26 weeks of weekly sales transactions that hit the s30 / s60 / s90 targets.
+// How many months of history the seed builds. 24 rather than 12 so the
+// template is demonstrated past a year rather than merely claimed to work
+// there, and because a year-on-year comparison needs 13 months minimum.
+//
+// Safe to raise. velocity.js bounds its own fetch at 200 days and annual_cogs
+// annualises from the 30/90-day blend, so nothing behind today's KPIs, ABC
+// classes, health statuses or alerts reads past week 29. Verified before this
+// was changed, not assumed.
+const HISTORY_MONTHS = 24;
+const HISTORY_WEEKS = Math.ceil((HISTORY_MONTHS * 30.44) / 7); // 105
+
+// Build weekly sales transactions that hit the s30 / s60 / s90 targets and
+// then continue at the 60-90d rate for the rest of the window.
+/** Stable 32-bit seed from a SKU id, so each SKU's older history is its own
+ *  reproducible stream and is independent of SKU ordering. */
+function seedFrom(id) {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 function buildSales(sku, rng) {
   const { s30, s60, s90, lost_30d, idleSaleDaysAgo, idleSaleQty } = sku.sales;
   const rows = [];
@@ -131,25 +154,42 @@ function buildSales(sku, rng) {
     { weeks: [4, 5, 6, 7], total: Math.max(0, s60 - s30) },
     { weeks: [8, 9, 10, 11, 12], total: Math.max(0, s90 - s60) },
   ];
-  // Weeks 13–25 continue at the 60–90d weekly rate.
+  // Weeks 13-25 continue at the 60–90d weekly rate.
   const tailRate = Math.max(0, s90 - s60) / 5;
   for (let w = 13; w <= 25; w++) wk.push({ weeks: [w], total: tailRate });
+
+  const emit = (w, total, draw) => {
+    const qty = round1(total * (0.8 + draw() * 0.4)); // ±20% noise
+    if (qty <= 0) return;
+    rows.push({
+      sku_id: sku.sku_id,
+      quantity_mt: qty,
+      sale_date: dateOffset(w * 7 + 2 + Math.floor(draw() * 4)),
+      customer: pick(draw, CUSTOMERS),
+      channel: pick(draw, CHANNELS),
+      status: "fulfilled",
+    });
+  };
 
   for (const group of wk) {
     if (group.total <= 0) continue;
     const per = group.total / group.weeks.length;
-    for (const w of group.weeks) {
-      const qty = round1(per * (0.8 + rng() * 0.4)); // ±20% noise
-      if (qty <= 0) continue;
-      rows.push({
-        sku_id: sku.sku_id,
-        quantity_mt: qty,
-        sale_date: dateOffset(w * 7 + 2 + Math.floor(rng() * 4)),
-        customer: pick(rng, CUSTOMERS),
-        channel: pick(rng, CHANNELS),
-        status: "fulfilled",
-      });
-    }
+    for (const w of group.weeks) emit(w, per, rng);
+  }
+
+  // Weeks 26 onward are the older history, and they draw from a SEPARATE
+  // per-SKU stream rather than the shared one.
+  //
+  // This is not fussiness. `rng` is a single sequence threaded through every
+  // SKU in order, so drawing more numbers here would shift every subsequent
+  // SKU's draws and change the recent weeks too. It did: extending the shared
+  // loop moved GMROI from 0.68 to 0.67 and DIO from 106 to 108 without a
+  // single recent sale being intentionally altered. A separate stream keeps
+  // the last 26 weeks byte-identical to what the demo has always shown, so
+  // adding two years of history genuinely changes nothing on screen today.
+  if (tailRate > 0) {
+    const tailRng = mulberry32(seedFrom(sku.sku_id));
+    for (let w = 26; w <= HISTORY_WEEKS; w++) emit(w, tailRate, tailRng);
   }
 
   // Idle SKU: a single old sale so "days since last sale" is well past 90.
@@ -175,6 +215,98 @@ function buildSales(sku, rng) {
   return rows;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MONTHLY HISTORY (TASK-85)
+//
+// Walks BACKWARDS from the known ending state, which is what makes the chain
+// tie exactly rather than approximately. Going forwards from an invented
+// opening balance would land wherever it landed, and the newest closing figure
+// would disagree with inventory_positions.on_hand_qty: the chart would then
+// contradict the KPI strip, which is the one failure this feature must not
+// have.
+//
+//   closing[newest] = the SKU's actual on_hand_qty          (fixed)
+//   issues[m]       = SUM of that month's fulfilled sales   (never invented)
+//   receipts[m]     = a plausible lot, clamped so opening never goes negative
+//   opening[m]      = closing[m] + issues[m] - receipts[m]
+//   closing[m-1]    = opening[m]
+//
+// So the only constructed number is receipts, and its job is to make a real
+// ending balance and a real sales series meet. Everything else is either
+// measured or forced by arithmetic.
+// ─────────────────────────────────────────────────────────────────────────────
+function periodKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** The last HISTORY_MONTHS period keys, oldest first, ending with this month. */
+function historyPeriods(now = new Date(today)) {
+  const out = [];
+  for (let i = HISTORY_MONTHS - 1; i >= 0; i--) {
+    out.push(periodKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+  }
+  return out;
+}
+
+function buildHistory(sku, salesRows) {
+  // Its own stream, NOT the shared one. Threading the shared `rng` in here
+  // drew numbers mid-loop and shifted every later SKU's sales, which moved
+  // GMROI and DIO without a single recent sale being intentionally changed.
+  // The receipt pattern is a property of the SKU, so it is seeded from the
+  // SKU id and is independent of how many SKUs precede it.
+  const rng = mulberry32(seedFrom(sku.sku_id) ^ 0x9e3779b9);
+  const periods = historyPeriods();
+
+  // Issues come from the transactions themselves. "lost" rows are demand that
+  // was never shipped, so they move no stock and are excluded, exactly as
+  // velocity.js excludes them.
+  const issuesByPeriod = new Map();
+  for (const r of salesRows) {
+    if (r.status !== "fulfilled") continue;
+    const p = r.sale_date.slice(0, 7);
+    issuesByPeriod.set(p, round1((issuesByPeriod.get(p) || 0) + r.quantity_mt));
+  }
+
+  const lot = Math.max(sku.min_order_qty || 0, 10);
+  const rows = [];
+  let closing = sku.on_hand_qty;
+
+  for (let i = periods.length - 1; i >= 0; i--) {
+    const period = periods[i];
+    const issues = issuesByPeriod.get(period) || 0;
+
+    // A receipt roughly replaces what went out, lumpy rather than smooth: real
+    // importers buy in containers, not in daily trickles. Rounded to the SKU's
+    // own minimum order quantity so the figures look like purchases.
+    let receipts = 0;
+    if (issues > 0) {
+      const lots = Math.round((issues * (0.7 + rng() * 0.7)) / lot);
+      receipts = Math.max(0, lots) * lot;
+    }
+
+    // opening cannot be negative: you cannot start a month owing stock.
+    let opening = round1(closing + issues - receipts);
+    if (opening < 0) {
+      receipts = round1(closing + issues);
+      opening = 0;
+    }
+
+    rows.push({
+      sku_id: sku.sku_id,
+      period,
+      opening_qty: opening,
+      receipts_qty: round1(receipts),
+      issues_qty: issues,
+      closing_qty: round1(closing),
+      unit_cost_sgd: sku.unit_cost_sgd,
+    });
+
+    closing = opening;
+  }
+
+  return rows.reverse(); // oldest first
+}
+
 const CUSTOMERS = ["Sheng Siong", "FairPrice", "Prime Supermarket", "Kopitiam Group", "Select Catering", "Eastpoint Trading"];
 const CHANNELS = ["direct", "wholesale", "retail", "food-service"];
 const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
@@ -195,11 +327,11 @@ function seed() {
     // leave duplicate ALERT_TRIGGERED rows for conditions that were re-detected
     // on the fresh data, and clearing neither leaves the trail empty after a
     // reseed, because every alert is already materialized.
-    for (const t of ["sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "skus"]) {
+    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "skus"]) {
       db.exec(`DELETE FROM ${t}`);
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN
-      ('sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','skus')`);
+      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','skus')`);
   });
   wipe();
 
@@ -224,6 +356,10 @@ function seed() {
     INSERT INTO sales_transactions (sku_id, quantity_mt, sale_date, customer, channel, status)
     VALUES (@sku_id, @quantity_mt, @sale_date, @customer, @channel, @status)`);
 
+  const insHist = db.prepare(`
+    INSERT INTO inventory_history (sku_id, period, opening_qty, receipts_qty, issues_qty, closing_qty, unit_cost_sgd)
+    VALUES (@sku_id, @period, @opening_qty, @receipts_qty, @issues_qty, @closing_qty, @unit_cost_sgd)`);
+
   const insPo = db.prepare(`
     INSERT INTO purchase_orders (po_number, sku_id, ordered_qty, order_date, eta, status)
     VALUES (@po_number, @sku_id, @ordered_qty, @order_date, @eta, 'open')`);
@@ -231,6 +367,7 @@ function seed() {
   const rng = mulberry32(20260906);
   let poSeq = 1;
   let saleCount = 0;
+  let histCount = 0;
 
   const run = db.transaction(() => {
     for (const sku of SKUS) {
@@ -243,7 +380,13 @@ function seed() {
         last_received_date: dateOffset(sku.received_days_ago),
       });
 
-      for (const row of buildSales(sku, rng)) { insSale.run(row); saleCount++; }
+      // The SAME array is inserted and then summarised. Calling buildSales
+      // twice would consume the shared PRNG twice and produce a history whose
+      // issues did not match the transactions actually stored.
+      const sales = buildSales(sku, rng);
+      for (const row of sales) { insSale.run(row); saleCount++; }
+
+      for (const row of buildHistory(sku, sales)) { insHist.run(row); histCount++; }
 
       if (sku.po) {
         insPo.run({
@@ -301,8 +444,72 @@ function seed() {
   }
 
   console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${poSeq - 1} open POs, ${soCount} open sales orders, ${OPERATORS.length} operators`);
+  console.log(`✓ Seeded ${histCount} months of inventory history (${HISTORY_MONTHS} per SKU)`);
+
+  // ── Tie-out ────────────────────────────────────────────────────────────────
+  // Printed, and loud on failure, because a silently broken chain is the exact
+  // failure this feature cannot have: the hero chart would disagree with the
+  // KPI strip and both would look fine. Three things are asserted per SKU:
+  // every period balances, every opening equals the prior closing, and the
+  // newest closing equals the stock actually on hand.
+  const problems = verifyHistory(db);
+  if (problems.length) {
+    console.error(`✗ inventory_history does NOT tie (${problems.length} problems):`);
+    for (const p of problems.slice(0, 10)) console.error("   " + p);
+    process.exitCode = 1;
+  } else {
+    const val = db.prepare(`
+      SELECT ROUND(SUM(h.closing_qty * h.unit_cost_sgd)) v
+        FROM inventory_history h
+       WHERE h.period = (SELECT MAX(period) FROM inventory_history)`).get().v;
+    console.log(`✓ History ties: every period balances and the newest closing matches on-hand (SGD ${Number(val).toLocaleString("en-SG")})`);
+  }
+}
+
+/**
+ * Returns a list of human-readable problems; empty means the history is sound.
+ * Exported so a route or a script can run the same check rather than
+ * reimplementing it, which is how two versions of a rule drift apart.
+ */
+function verifyHistory(db) {
+  const problems = [];
+  const skus = db.prepare(`SELECT sku_id FROM skus ORDER BY sku_id`).all();
+  const onHand = new Map(
+    db.prepare(`SELECT sku_id, on_hand_qty FROM inventory_positions`).all().map((r) => [r.sku_id, r.on_hand_qty])
+  );
+  const near = (a, b) => Math.abs(a - b) < 0.05; // one decimal place of tolerance
+
+  for (const { sku_id } of skus) {
+    const rows = db.prepare(
+      `SELECT * FROM inventory_history WHERE sku_id = ? ORDER BY period`
+    ).all(sku_id);
+    if (!rows.length) { problems.push(`${sku_id}: no history rows`); continue; }
+
+    let prevClosing = null;
+    for (const r of rows) {
+      const expected = r.opening_qty + r.receipts_qty - r.issues_qty;
+      if (!near(expected, r.closing_qty)) {
+        problems.push(`${sku_id} ${r.period}: ${r.opening_qty} + ${r.receipts_qty} - ${r.issues_qty} = ${round1(expected)}, but closing is ${r.closing_qty}`);
+      }
+      if (prevClosing !== null && !near(prevClosing, r.opening_qty)) {
+        problems.push(`${sku_id} ${r.period}: opening ${r.opening_qty} does not continue from previous closing ${prevClosing}`);
+      }
+      if (r.opening_qty < -0.05 || r.closing_qty < -0.05) {
+        problems.push(`${sku_id} ${r.period}: negative stock (${r.opening_qty} -> ${r.closing_qty})`);
+      }
+      prevClosing = r.closing_qty;
+    }
+
+    const last = rows[rows.length - 1];
+    const actual = onHand.get(sku_id);
+    if (actual === undefined) problems.push(`${sku_id}: no inventory_positions row`);
+    else if (!near(last.closing_qty, actual)) {
+      problems.push(`${sku_id}: newest closing ${last.closing_qty} does not match on-hand ${actual}`);
+    }
+  }
+  return problems;
 }
 
 if (require.main === module) seed();
 
-module.exports = { seed, SKUS };
+module.exports = { seed, verifyHistory, SKUS };
