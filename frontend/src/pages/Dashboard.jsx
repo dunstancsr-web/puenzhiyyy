@@ -310,8 +310,31 @@ function buildNeedsAttention(skus) {
 // and roughly how, where a hard cut at row three implies the list simply ends.
 // It is decoration over real content, never a fake row, so the count in the
 // button still describes rows nobody has read yet.
-const NEEDS_ATTENTION_PREVIEW = 3;
-const NEEDS_ATTENTION_TEASE = 1;
+//
+// Tuned 2026-09-13 in frontend/tuners/table-density.html. Kept as one block
+// with the tuner's own key names, so its export maps onto this file line for
+// line and re-tuning is a paste rather than a hunt through inline styles.
+const NA_DENSITY = {
+  previewRows: 2,    // rows read in full
+  teaseRow:    true, // render one more under the fade
+  fadeH:       132,  // px, gradient height
+  rowPadY:     9,    // px, vertical cell padding
+  cardPad:     22,   // px, card padding
+  btnBottom:   0,    // px, under the floating button
+  btnPadY:     10,   // px
+  btnPadX:     24,   // px
+  btnMinW:     208,  // px
+  expGap:      3,    // px, above the expanded button
+};
+
+const NEEDS_ATTENTION_PREVIEW = NA_DENSITY.previewRows;
+const NEEDS_ATTENTION_TEASE = NA_DENSITY.teaseRow ? 1 : 0;
+
+// Cell padding, built once. The SKU cell carries the severity stripe so it
+// needs its own left inset, but its vertical padding must match the rest or
+// the row's baselines drift apart.
+const NA_CELL = `${NA_DENSITY.rowPadY}px 8px`;
+const NA_CELL_SKU = `${NA_DENSITY.rowPadY}px 8px ${NA_DENSITY.rowPadY}px 10px`;
 
 // ── Coverage vs (lead time + safety) - one row per SKU, worst gap first ──────
 function buildCoverageData(skus) {
@@ -585,7 +608,7 @@ export default function Dashboard() {
           the page off-screen behind a segmentation matrix. ── */}
       <div ref={attentionRef} className="dash-row dash-row--full" style={{ marginBottom: "var(--space-5)", scrollMarginTop: "var(--space-5)" }}>
         <Section title="Needs Attention" subtitle="Every open exception, ranked by urgency then financial exposure" hint={HINTS.needsAttention}
-          badge={filteredAttention.length} badgeTone={attentionTone}
+          badge={filteredAttention.length} badgeTone={attentionTone} pad={NA_DENSITY.cardPad}
           collapsible storageKey="needs-attention" defaultOpen>
           {filter && (
             <div style={{
@@ -613,7 +636,7 @@ export default function Dashboard() {
               <div style={{ position: "relative" }}>
               {teasing && (
                 <div aria-hidden="true" style={{
-                  position: "absolute", left: 0, right: 0, bottom: 0, height: 78,
+                  position: "absolute", left: 0, right: 0, bottom: 0, height: NA_DENSITY.fadeH,
                   pointerEvents: "none",
                   background: "linear-gradient(to bottom, transparent, var(--card-bg) 86%)",
                 }} />
@@ -633,17 +656,17 @@ export default function Dashboard() {
                 <tbody>
                   {shownAttention.map((a) => (
                     <tr key={a.sku_id} style={{ borderTop: "1px solid var(--border)" }}>
-                      <td style={{ padding: "10px 8px 10px 10px", borderLeft: `3px solid ${a.tagColor}`, fontWeight: 700 }}>{a.name}</td>
-                      <td style={{ padding: "10px 8px" }}>
+                      <td style={{ padding: NA_CELL_SKU, borderLeft: `3px solid ${a.tagColor}`, fontWeight: 700 }}>{a.name}</td>
+                      <td style={{ padding: NA_CELL }}>
                         <span style={{
                           fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.02em", whiteSpace: "nowrap",
                           color: a.tagColor, background: a.tagColor.replace(")", "-light)"), padding: "2px 8px", borderRadius: 99,
                         }}>{a.tag}</span>
                       </td>
-                      <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>
+                      <td style={{ padding: NA_CELL, color: "var(--text-secondary)" }}>
                         <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{a.action}</span> - {a.reason}
                       </td>
-                      <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      <td style={{ padding: NA_CELL, textAlign: "right", whiteSpace: "nowrap" }}>
                         <div style={{ fontWeight: 700 }}>SGD {fmt$(a.value)}</div>
                         <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{a.valueLabel}</div>
                       </td>
@@ -660,7 +683,7 @@ export default function Dashboard() {
               )}
               </div>
               {showAllAttention && (
-                <div style={{ display: "flex", justifyContent: "center", paddingTop: "var(--space-3)" }}>
+                <div style={{ display: "flex", justifyContent: "center", paddingTop: NA_DENSITY.expGap }}>
                   <RevealButton showAll count={0} onToggle={() => setShowAllAttention(false)} />
                 </div>
               )}
@@ -939,7 +962,8 @@ function RevealButton({ showAll, count, onToggle, floating = false }) {
     <button type="button" onClick={onToggle}
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
-        minWidth: 216, padding: floating ? "10px 24px" : "12px 26px",
+        minWidth: NA_DENSITY.btnMinW,
+        padding: floating ? `${NA_DENSITY.btnPadY}px ${NA_DENSITY.btnPadX}px` : "12px 26px",
         background: "var(--card-bg)",
         border: "1px solid var(--border)",
         borderRadius: 99, cursor: "pointer",
@@ -948,7 +972,7 @@ function RevealButton({ showAll, count, onToggle, floating = false }) {
         // than as another faded table element.
         boxShadow: floating ? "var(--shadow-md)" : "none",
         ...(floating ? {
-          position: "absolute", left: "50%", bottom: 7,
+          position: "absolute", left: "50%", bottom: NA_DENSITY.btnBottom,
           transform: "translateX(-50%)", zIndex: 2,
         } : {}),
       }}>
@@ -963,11 +987,14 @@ function RevealButton({ showAll, count, onToggle, floating = false }) {
 // which is the whole point: a folded section that gives no sign there are
 // seven open exceptions inside it is worse than no section at all.
 function Section({ title, subtitle, children, hint, badge = null, badgeTone = null,
-                  collapsible = false, storageKey, defaultOpen = true }) {
+                  pad = null, collapsible = false, storageKey, defaultOpen = true }) {
   const [storedOpen, setStoredOpen] = useCollapsed(storageKey || title, defaultOpen);
   const open = collapsible ? storedOpen : true;
   return (
-    <div className="card">
+    // `pad` overrides .card's padding for one section. Only Needs Attention
+    // uses it, and only because its density was tuned as a whole; every other
+    // card stays on --space-5 so they line up with each other.
+    <div className="card" style={pad ? { padding: pad } : undefined}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: open ? "var(--space-4)" : 0 }}>
         <div style={{ minWidth: 0 }}>
           {/* Card titles are the role --text-lg names, and until now nothing
