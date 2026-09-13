@@ -503,24 +503,33 @@ export default function Dashboard() {
             stacking the chart under the value would push Needs Attention down
             by roughly a chart's height, and that table was deliberately
             promoted to sit as high as possible. */}
-        <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)", display: "flex", alignItems: "flex-end", flexWrap: "wrap", gap: "var(--space-6)" }}>
+        {/* align-items: center, not flex-end. Bottom alignment made sense when
+            the chart was a 92px sparkline of the same visual weight as the
+            number. The chart now carries a toggle above it and a caption below
+            it, so its bars sit in the middle of a 167px block, and bottom
+            aligning put the number level with the caption instead of with the
+            data. Centring lines the number up with the bars. */}
+        <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)", display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--space-6)" }}>
           <div>
             <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, marginBottom: 2, display: "flex", alignItems: "center", gap: 5 }}>
               Total Inventory Value
               <ColHint label="Total Inventory Value" what={HINTS.heroValue.what} how={HINTS.heroValue.how} />
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap" }}>
-              <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
-                SGD {fmt$(s.totalInventoryValue)}
-              </div>
-              {/* Deliberately NOT coloured good/bad. A rising inventory value
-                  is genuinely ambiguous (deliberate stock-up vs stock piling
-                  up unsold) and this metric's own hint says exactly that, so
-                  painting it red asserted a judgement the copy disclaims. */}
-              <span title="vs a fixed reference baseline - not a live month-over-month feed yet"
-                style={{ fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-secondary)" }}>
-                {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs baseline
-              </span>
+            {/* Stacked, not inline beside the figure. Baseline-aligned next to
+                a 40px number the delta was a 17px tail that read as part of
+                the value itself, so "SGD $3.71M" and "$151K" sat on one line
+                as two money figures of very different meaning. On its own line
+                it reads as a caption to the number, which is what it is. */}
+            <div style={{ fontSize: "var(--text-2xl)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
+              SGD {fmt$(s.totalInventoryValue)}
+            </div>
+            {/* Deliberately NOT coloured good/bad. A rising inventory value is
+                genuinely ambiguous (deliberate stock-up vs stock piling up
+                unsold) and this metric's own hint says exactly that, so
+                painting it red asserted a judgement the copy disclaims. */}
+            <div title="vs a fixed reference baseline - not a live month-over-month feed yet"
+              style={{ fontSize: "var(--text-base)", fontWeight: 700, color: "var(--text-secondary)", marginTop: 6 }}>
+              {t.inventoryValue.dir === "up" ? "▲" : t.inventoryValue.dir === "down" ? "▼" : "▬"} {moneyTrend(t.inventoryValue).text} vs baseline
             </div>
           </div>
           <HeroChart baselineData={monthTrendData} />
