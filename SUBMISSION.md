@@ -12,6 +12,19 @@ deployment are prepared but need Stan: one needs a Render login, the other needs
 | 3 | YouTube demo video | script ready | Stan records |
 | 4 | PDF write-up | drafted, screenshots in, **needs the URL only** | Stan reviews and exports |
 
+## The client and the logo
+
+The demo is pitched at a fictional Singapore rice importer, **四海米行 / Four Seas Rice Trading**,
+named from the team name. The naming rationale, the logo in six treatments, the spoken pitch for
+judges, and three options for where the mark sits in the sidebar all live on one page:
+
+- Published: https://claude.ai/code/artifact/55f682c6-a10b-4219-a8cc-8def83a31fd6
+- In the repo: `frontend/tuners/brand.html` (generated; sources in `frontend/tuners/src/`)
+
+**The fifteen-second version to say out loud** is on that page, but the line that does the work is:
+*"the name keeps both halves of ours: the four, and the family."* That is the beat where a judge
+hears that the name was derived rather than decorated.
+
 Judging criteria to optimise for, from the steering doc: **Architecture & Reasoning Loop, Tool Use &
 Integration, Autonomy & Human-in-the-Loop, Observability.**
 

@@ -121,8 +121,8 @@ feedback, not suggestions to re-litigate.
 - **Goods In** and **Goods Out** are the handheld warehouse floor flows. Industry
   terms: inbound / goods receipt, and outbound / goods issue.
 - **Key Metrics** is the top card on the Dashboard: hero value, baseline
-  comparison, and the Service & Availability and Working Capital groups. It has
-  no visible heading, so the name exists for talking about it. The Dashboard's
+  comparison, and the Service & Availability and Working Capital groups. It
+  carries the heading on screen since TASK-67. The Dashboard's
   sections in order are then **Needs Attention** (full width, the only one
   carrying actions rather than analysis), **Cover vs Lead + Safety** beside
   **Inventory Health**, and **Value × Movement** full width.
@@ -139,7 +139,9 @@ feedback, not suggestions to re-litigate.
   shapes on purpose.
 - `backend/scripts/bench-models.js` measures model drift. Re-run it after
   changing a prompt rather than guessing whether the change helped.
-- `frontend/tuners/` holds the design tuners. See its README. These are how Stan
+- `frontend/tuners/` holds the design tuners and `brand.html`, the naming,
+  logo and pitch sheet for the fictional client 四海米行 / Four Seas Rice
+  Trading. See its README. These are how Stan
   settles a visual question precisely: he moves sliders over a preview of the
   real components and pastes back a block of CSS, instead of both sides trading
   adjectives. **When a request is "make it bigger" or "less transparent" or

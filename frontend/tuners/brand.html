@@ -156,6 +156,58 @@ tr.pick td.han { color: var(--seal); }
 .note b { color: var(--ink); }
 .note + .note { margin-top: 10px; }
 
+/* &#x2500;&#x2500; Pitch &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500; */
+.say {
+  background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--seal);
+  border-radius: 0 12px 12px 0; padding: 22px 26px; margin-bottom: 14px;
+}
+.say__k {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--seal); margin-bottom: 12px;
+}
+.say p {
+  font-family: Cormorant, Georgia, serif; font-size: 22px; line-height: 1.5;
+  margin: 0 0 14px; color: var(--ink);
+}
+.say p:last-child { margin-bottom: 0; }
+.say b { font-weight: 600; }
+.say .han { font-family: Brush, serif; font-size: 27px; vertical-align: -2px; color: var(--seal); }
+.say .beat { background: color-mix(in srgb, var(--seal) 11%, transparent); padding: 0 4px; border-radius: 2px; }
+
+.qa { display: grid; gap: 12px; margin-top: 16px; }
+.qa__i { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: var(--panel); }
+.qa__q { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+.qa__a { color: var(--ink-2); font-size: 13.5px; line-height: 1.6; }
+
+/* &#x2500;&#x2500; Sidebar options &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500; */
+.opt__stage { background: var(--slate); padding: 20px; display: flex; justify-content: center; }
+.side { width: 232px; border-radius: 10px; overflow: hidden; background: var(--slate); font-family: ui-sans-serif, system-ui, sans-serif; }
+.side__hd { display: flex; align-items: center; gap: 10px; padding: 13px 14px; }
+.side__nm b { display: block; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -.01em; line-height: 1.25; }
+.side__nm span { display: block; font-size: 11.5px; color: rgba(255,255,255,.58); }
+.side__nm .brush { font-family: Brush, serif; font-size: 19px; letter-spacing: .05em; }
+.side__rule { height: 1px; background: rgba(255,255,255,.10); margin: 0 14px; }
+.side__nav { padding: 10px 8px 12px; }
+.side__nav i {
+  display: block; font-style: normal; font-size: 13px; color: rgba(255,255,255,.66);
+  padding: 7px 10px; border-radius: 7px;
+}
+.side__nav i.on { background: var(--blue); color: #fff; font-weight: 600; }
+.side__ft { padding: 10px 14px 13px; font-size: 10.5px; color: rgba(255,255,255,.4); letter-spacing: .06em; text-transform: uppercase; }
+.chip {
+  display: flex; align-items: center; gap: 9px; margin: 8px 10px 0;
+  padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.09);
+}
+.chip .chev { margin-left: auto; color: rgba(255,255,255,.4); font-size: 11px; }
+.tile {
+  width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center;
+  font-family: Brush, serif; font-size: 20px; background: var(--seal); color: #fff; flex-shrink: 0;
+}
+.tile--blue { background: var(--blue); border-radius: 8px; }
+.cobrand { display: flex; align-items: center; gap: 11px; padding: 13px 14px; }
+.cobrand__bar { width: 1px; height: 26px; background: rgba(255,255,255,.16); }
+
 :focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
 </style>
 
@@ -308,6 +360,161 @@ tr.pick td.han { color: var(--seal); }
         strokes with a clear centre; &#x56DB;&#x6D77;&#x7C73;&#x884C; in the same square would be a red smudge.</div>
     </div>
 
+  </div>
+
+  <h2>How to explain it, out loud</h2>
+  <p style="max-width:70ch;margin:0 0 16px;color:var(--ink-2)">
+    Written to be said, not read. Lead with the team name: a judge cannot hold an unfamiliar phrase
+    and its explanation at the same time, so give them the familiar thing first and let the Chinese
+    be the payoff.
+  </p>
+
+  <div class="say">
+    <div class="say__k">Fifteen seconds &mdash; the one to use</div>
+    <p>Our team name is <b>Puenzhiyyy</b> &mdash; Bhutanese for <i>four siblings</i>, because there
+      are four of us.</p>
+    <p>So we named our client to match: <span class="han">&#x56DB;&#x6D77;&#x7C73;&#x884C;</span>, <b>Four Seas Rice
+      Trading</b>. <span class="han">&#x56DB;&#x6D77;</span> means <i>four seas</i>, and it is from a line in
+      Confucius: <i>within the four seas, all men are brothers</i>.</p>
+    <p><span class="beat">So the name keeps both halves of ours: the four, and the family.</span> And
+      it happens to describe the business, because their rice comes in from four different countries
+      &mdash; Thailand, Vietnam, India, Japan.</p>
+    <p>The red stamp is <span class="han">&#x7C73;</span>. It is the character for rice.</p>
+  </div>
+
+  <div class="say">
+    <div class="say__k">If you only get one sentence</div>
+    <p>Our team name means <i>four siblings</i>, so we named the client <b>Four Seas Rice
+      Trading</b>, from the Chinese saying <i>within the four seas, all men are brothers</i>. Four,
+      and family, same as us.</p>
+  </div>
+
+  <div class="note">
+    <b>The line that does the work</b> is "it keeps both halves of ours: the four, and the family."
+    That is the beat where a judge realises the name was derived rather than decorated. Land it and
+    the rest is colour. The Thailand / Vietnam / India / Japan detail is worth keeping because it is
+    checkable on screen in the Inventory tab, which turns a nice story into evidence that the data
+    was thought about.
+  </div>
+
+  <div class="qa">
+    <div class="qa__i">
+      <div class="qa__q">"Did you just make that up?"</div>
+      <div class="qa__a">No. <span style="font-family:Brush,serif;font-size:17px">&#x56DB;&#x6D77;&#x4E4B;&#x5185;&#x7686;&#x5144;&#x5F1F;</span>
+        is from the <i>Analects</i>. And <span style="font-family:Brush,serif;font-size:17px">&#x7C73;&#x884C;</span>
+        is not invented either: it is the traditional word for a rice dealer, what family rice shops in
+        Singapore and Malaysia actually call themselves.
+        <span style="font-family:Brush,serif;font-size:17px">&#x884C;</span> means trading house, the same
+        character as in <span style="font-family:Brush,serif;font-size:17px">&#x9280;&#x884C;</span>, bank.</div>
+    </div>
+    <div class="qa__i">
+      <div class="qa__q">"Why only one character in the stamp?"</div>
+      <div class="qa__a"><span style="font-family:Brush,serif;font-size:17px">&#x7C73;</span> is rice, and it
+        is the only part that survives being shrunk to a favicon. Four characters at that size is a red
+        smudge.</div>
+    </div>
+    <div class="qa__i">
+      <div class="qa__q">"What exactly does Puenzhi mean?"</div>
+      <div class="qa__a">Do not over-claim the Dzongkha. "<b>pun</b> is sibling or kin,
+        <b>zhi</b> is four" is as far as it is worth going: an accurate decomposition, offered as what
+        the team name means to us rather than a linguistic claim to defend.</div>
+    </div>
+  </div>
+
+  <h2>Where the mark goes: three options</h2>
+  <p style="max-width:70ch;margin:0 0 16px;color:var(--ink-2)">
+    Every one of these is a pattern a real product already ships. The question underneath them is the
+    same in each case: whose name is the sidebar for, the tool's or the company using it?
+  </p>
+
+  <div class="grid">
+
+    <div class="spec">
+      <div class="spec__hd"><b>A &middot; Workspace header</b><span>Slack, Notion, Linear</span></div>
+      <div class="spec__stage opt__stage">
+        <div class="side">
+          <div class="side__hd">
+            <div class="tile">&#x7C73;</div>
+            <div class="side__nm">
+              <b class="brush">&#x56DB;&#x6D77;&#x7C73;&#x884C;</b>
+              <span>Four Seas Rice</span>
+            </div>
+          </div>
+          <div class="side__rule"></div>
+          <div class="side__nav">
+            <i class="on">Dashboard</i><i>Inventory</i><i>Alerts</i><i>Activity</i>
+          </div>
+          <div class="side__ft">Powered by StockSense</div>
+        </div>
+      </div>
+      <div class="spec__note"><b>The company owns the header; the tool moves to the footer.</b> This is
+        what modern SaaS does, because the person signing in works at the company, not at the vendor.
+        It reads as <i>their</i> system, which is the strongest version of the demo story. The cost is
+        that StockSense, the thing being judged, is the smallest text on screen.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>B &middot; Product + account chip</b><span>Stripe, AWS, Salesforce</span></div>
+      <div class="spec__stage opt__stage">
+        <div class="side">
+          <div class="side__hd">
+            <div class="tile tile--blue">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="side__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip">
+            <div class="tile" style="width:24px;height:24px;font-size:16px;border-radius:6px">&#x7C73;</div>
+            <div class="side__nm"><b class="brush" style="font-size:16px">&#x56DB;&#x6D77;&#x7C73;&#x884C;</b></div>
+            <span class="chev">&#9662;</span>
+          </div>
+          <div class="side__nav" style="padding-top:12px">
+            <i class="on">Dashboard</i><i>Inventory</i><i>Alerts</i><i>Activity</i>
+          </div>
+        </div>
+      </div>
+      <div class="spec__note"><b>The tool keeps the header; the company is the account you are working
+        in.</b> The chip reads as switchable, which quietly says the product serves many customers and
+        this is one of them. Best balance for a hackathon: the judged thing stays named, and the SME
+        is unmistakably present.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>C &middot; Co-brand lockup</b><span>SAP, ServiceNow, on-prem</span></div>
+      <div class="spec__stage opt__stage">
+        <div class="side">
+          <div class="cobrand">
+            <div class="tile tile--blue">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="cobrand__bar"></div>
+            <div class="tile">&#x7C73;</div>
+            <div class="side__nm">
+              <b style="font-size:13.5px">StockSense</b>
+              <span class="brush" style="font-size:14px;color:rgba(255,255,255,.62)">&#x56DB;&#x6D77;&#x7C73;&#x884C;</span>
+            </div>
+          </div>
+          <div class="side__rule"></div>
+          <div class="side__nav">
+            <i class="on">Dashboard</i><i>Inventory</i><i>Alerts</i><i>Activity</i>
+          </div>
+        </div>
+      </div>
+      <div class="spec__note"><b>Both marks, one row, as equals.</b> The enterprise convention for a
+        deployed-on-site system. It is the most explicit about the relationship and the most crowded:
+        two logos in 232px leaves neither much room, and at this width the divider is doing a lot of
+        work to stop them reading as one mark.</div>
+    </div>
+
+  </div>
+
+  <div class="note" style="margin-top:18px">
+    <b>The recommendation is B.</b> A is the better product decision and the worse demo decision: the
+    judges are evaluating StockSense, and burying it in the footer to win realism trades the wrong
+    thing. C is honest but cramped, and co-branding implies a partnership that does not exist. B keeps
+    StockSense named, makes the SME concrete, and the switchable-looking chip does useful extra work:
+    it implies the product has other customers, which is the claim a hackathon pitch wants to make
+    anyway.
   </div>
 
   <h2>Notes</h2>
