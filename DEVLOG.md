@@ -260,3 +260,51 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, backend/src/engines/{alerts,index}.js, frontend/src/pages/{Inventory,Alerts}.jsx, frontend/src/components/{StockPositionBar,FormField}.jsx
 - **New files:** none
 - **Notes:** Full interactive audit of all three pages (TASK-30), 10 fixes. Biggest: the stock bar drew the SUGGESTED reorder point while the status badge and alerts used the POLICY one, so a SKU could show a red "28 MT below reorder point" bar beside a green "Healthy" badge, and the tick jumped when switching modal tabs. All bars now use policy, suggested named separately in the hover. Also: "Purchase 0 MT" on alerts that mean stop buying, a clipped chart Y-axis, "1 active alerts", premature validation scolding on modal open, the modal re-centring and sliding its tabs on every switch, Save offered on a read-only tab, misaligned Min order qty, full-weight zero tiles, unlabelled filter selects, and one carrying-cost figure formatted two different ways in two places.
+
+---
+
+## Session: 2026-09-13 02:20
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, README.md, backend/src/db/seed.js, backend/src/routes/inventory.js, frontend/src/App.jsx, frontend/src/api/inventory.js, frontend/src/components/Sidebar.jsx
+- **New files:** backend/src/db/audit.js, frontend/src/pages/Activity.jsx
+- **Notes:** TASK-31 and TASK-32, chosen after auditing what actually stands between the repo and a submission. Two gaps mapped straight onto scored criteria. First: audit_log had been in the schema from day one with a comment naming the events it should hold, and nothing ever wrote to it, while Observability is an explicit judging criterion. Now six real write points, a field-level before/after diff on policy edits, the system proposal stored next to the manager's action on decisions, GET /api/audit, and a new Activity page rendering it as plain-English sentences with the raw payload one click away. ALERT_TRIGGERED deliberately fires inside the dedupe_key branch so it means "condition first became true", not "page was loaded", and seed.js now wipes audit_log with alerts_log or the trail would stay empty forever after a reseed. Second: the README still described the pre-rebuild app (categories, out of stock, top-selling products, in-memory store), which is what a judge reads first. Rewritten around the reasoning loop with a diagram, the domain-rules table, the real API, and an honest statement that TASK-11 is blocked on a key rather than on design. Three defects caught in browser verification, including ColHint rendering only its icon so the page shipped with no visible h1.
+
+---
+
+## Session: 2026-09-13 02:45
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, SUBMISSION.md, backend/src/db/init.js, backend/src/index.js
+- **New files:** SUBMISSION.md
+- **Notes:** TASK-33. Audited the submission rather than the code and found the real risk is not polish: three of the four required artifacts (deployment URL, demo video, PDF) do not exist, and only the deployment has an external dependency that cannot be rescued late. Did every part of it that does not need a host. DATA_DIR and CORS_ORIGIN are now env driven, the backend serves the built frontend with a SPA fallback under NODE_ENV=production, and an empty database seeds itself once on boot. Verified by booting a production server against an empty temp directory: created the dir, seeded, served the app, survived a hard refresh on a deep link, and still returned JSON for a bad API path, with local dev untouched. Also wrote SUBMISSION.md tracking all four deliverables, with the Render settings, a beat-by-beat demo video script built around the reasoning loop rather than a feature tour, and a PDF outline that assembles from existing prose instead of rewriting it.
+
+---
+
+## Session: 2026-09-13 04:30
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, SUBMISSION.md, frontend/src/components/StatCard.jsx, frontend/src/components/StockPositionBar.jsx, frontend/src/pages/Dashboard.jsx
+- **New files:** render.yaml, Dockerfile, .dockerignore, WRITEUP.md
+- **Notes:** Overnight run, TASK-34 through TASK-36. Deployment blueprint written (render.yaml plus a Dockerfile fallback); the image could NOT be build-tested because no container runtime is installed on this machine, so what was verified instead is the layout and runtime contract it depends on, by assembling the image's directory structure in a temp dir and booting it with an empty DATA_DIR. Four deferred defects fixed, three verified on screen. The Japonica bar was worse than reported: idle fill, track and avoid-shading were all near-identical grey so the bar read as a disabled control, and because idle short-circuited the over-maximum branch the bar also stayed silent about 18 MT of overage that the Dashboard was simultaneously tagging as OVERSTOCK. Hatched fill plus a status line carrying both facts. The Needs Attention re-ranking could not be shown on screen because the seed produces no REORDER row; verified by inspection only, and that gap is recorded rather than glossed. PDF write-up drafted by assembling existing prose. Nothing committed, per instruction.
+
+---
+
+## Session: 2026-09-13 06:10
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, backend/src/engines/alerts.js, frontend/src/pages/Alerts.jsx, frontend/src/pages/Dashboard.jsx
+- **New files:** frontend/src/lib/explain.js
+- **Notes:** TASK-37. Set out to improve the Ask AI modal and found a data bug on the way. The suggested order quantity was being computed two different ways: engines/index.js used the spec-correct projected-at-lead-time formula while alerts.js and the Dashboard both still used the snapshot proxy that design.md records as retired on 2026-09-12. They disagreed by 257 MT on TJ-25KG, about $347K, with the Inventory page showing one figure and the Alerts approval modal pre-filling the other. Three sites now read the engine's own number. Then the original target: Ask AI concatenated the alert message with the recommended action, both already printed on the card behind it, so the app's single AI touchpoint returned the card to the reader. Replaced with lib/explain.js, a four-step reasoning trace per alert type built from the enriched SKU (measured, derived, consequence, trade-off), rendered as a numbered rail. The trace doubles as the prompt context for TASK-11 whenever a key arrives. Also aligned three money formatters that disagreed on the same figures, and fixed a decision footer that said "No order required for this alert" beside three decision buttons.
+
+---
+
+## Session: 2026-09-13 06:50
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/lib/explain.js
+- **New files:** none
+- **Notes:** TASK-38. Exercised all six explanation branches against all ten SKUs (240 sections) instead of clicking modals, which is both cheaper and far better coverage. The interesting find was a bug class rather than a bug: Number(null) is 0 and finite, so the Number.isFinite guards were rendering missing values as a confident "0 MT" rather than failing visibly, which a grep for "null" can never detect. Hardened the helpers, which then exposed two sentences that divide by demand and break on zero-demand SKUs. Reading the prose of the branches never seen on screen also caught a correctness bug no automated check would find: the OVERSTOCK explanation called a Normal mover with real daily sales "unlikely to clear on demand alone", which would push a manager toward an unnecessary discount. Narrow-viewport layout on the Activity page remains unverified: the browser resize tool reports success but leaves the viewport unchanged, and that is recorded rather than assumed away.
+
+---
+
+## Session: 2026-09-13 10:35
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, SUBMISSION.md, WRITEUP.md
+- **New files:** docs/images/{alerts-human-in-the-loop,reasoning-trace,activity-audit-record}.jpg
+- **Notes:** TASK-39. Captured the write-up's screenshots from the running app rather than leaving placeholder markers, so the PDF now needs only the deployment URL. Added a third image the outline did not ask for: section 3 spends four paragraphs arguing the deterministic-first case and had no evidence on the page, and the reasoning trace is both that evidence and the best-looking screen in the build. Captions are written to carry the argument rather than to describe the picture.

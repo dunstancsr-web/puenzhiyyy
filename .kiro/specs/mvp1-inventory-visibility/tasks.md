@@ -926,6 +926,233 @@ implementation. Ten findings, all fixed.
 
 Verified by interaction across all three pages in both themes; `npx vite build` clean; no console errors.
 
+## TASK-31 - Wire the audit log, and make it visible (2026-09-13)
+
+`audit_log` has been in the schema since db/init.js was first written, carrying a comment naming the
+events it was meant to hold (LLM_CALL, ALERT_TRIGGERED, RESTOCK). Nothing ever wrote a row to it. With
+Observability an explicitly scored submission criterion, a created-but-empty table is the worst of both
+worlds: it documents the intention and demonstrates none of it.
+
+- [x] `backend/src/db/audit.js`: `logEvent` / `readEvents` / `eventCounts` / `diffFields`. Logging is
+      best-effort and swallows its own failures. An audit insert must never be able to 500 the restock
+      it is recording.
+- [x] Six real write points: SKU_CREATED, SKU_UPDATED, RESTOCK, ALERT_TRIGGERED, ALERT_ACKNOWLEDGED,
+      DECISION_RECORDED. LLM_CALL is defined and handled end to end but unemitted until TASK-11.
+- [x] ALERT_TRIGGERED fires inside `materializeAlerts`, in the branch guarded by dedupe_key, so it means
+      "this condition first became true" and not "someone loaded the Alerts page".
+- [x] SKU_UPDATED stores a field-level before/after diff, which required selecting the full prior row
+      rather than the existing `SELECT 1` existence check. A no-op Save logs nothing.
+- [x] DECISION_RECORDED stores the system's proposal alongside the manager's action and the quantity
+      delta, so override rate is a query rather than a research project.
+- [x] `GET /api/audit` with event_type / sku_id / limit filters. `counts` is nested inside `data`
+      because the frontend client unwraps to body.data and would otherwise drop it.
+- [x] `seed.js` now wipes audit_log alongside alerts_log. Without that, a reseed leaves the trail empty
+      forever: every alert is already materialized, so ALERT_TRIGGERED can never fire again.
+- [x] New Activity page plus route and nav entry. Events render as plain-English sentences, with the
+      stored input/output payload behind a per-row disclosure. Raw JSON is not observability.
+
+Three defects found and fixed during browser verification: ColHint renders only the icon (its `label`
+is the aria-label), so wrapping it alone in the h1 produced a page with no heading; engine copy already
+ends in a full stop, so composing it into a sentence produced "targeted promotion.."; and a stray extra
+period in the decision sentence.
+
+Verified in both themes against real seeded data: 7 ALERT_TRIGGERED rows from a live alert evaluation
+plus a real DECISION_RECORDED round trip. `npx vite build` clean.
+
+## TASK-32 - README rewritten against the app that exists (2026-09-13)
+
+The README still described the pre-rebuild demo: categories, out-of-stock, top-selling products, an
+in-memory store, and a `/api/products` surface that is now the superseded legacy route. It is the first
+thing a judge reads and it undersold the work badly, describing none of the engines, the two-axis
+classification, the deterministic-versus-LLM split, or the decision trail.
+
+- [x] Rewritten around the reasoning loop, with the loop drawn as a diagram, since that is a named
+      judging criterion and was nowhere in the document.
+- [x] Added the domain-rules table (On Hand vs Available, POs never added to stock, the two reorder
+      points, Days of Cover at zero demand, movement class vs ABC). These are the distinctions that
+      separate a dashboard that looks right from one that is right.
+- [x] Documented the real API surface, the Observability section, and the deliberate omissions,
+      including that TASK-11 is blocked on a key rather than on design.
+- [x] Verified every command documented actually exists in the root package.json scripts.
+
+## TASK-33 - Production deployment prep (2026-09-13)
+
+Three of the four required submission artifacts do not exist, and the deployment URL is the only one
+with an external dependency, so it is the one that cannot be recovered if it is left to the last week.
+Everything that can be done without a host was done and verified locally. See `SUBMISSION.md`.
+
+- [x] `db/init.js` reads `DATA_DIR` from the environment, defaulting to the repo-local `data/`. A
+      mounted volume lives outside the source tree, and better-sqlite3 throws SQLITE_CANTOPEN rather
+      than creating a missing parent, so the directory is created with `mkdirSync` first.
+- [x] `index.js` serves `frontend/dist` and a SPA fallback when NODE_ENV=production. The Vite proxy
+      that connects the two halves in dev does not exist in a production build. Registered after every
+      /api route and before the 404 handler; the fallback excludes /api so a mistyped endpoint still
+      returns JSON rather than a page of HTML.
+- [x] CORS origin read from `CORS_ORIGIN`, defaulting to the previous hardcoded localhost value.
+- [x] Seed on first boot, guarded on the SKU count, so an empty volume produces a working demo but a
+      redeploy does not wipe one someone is mid-way through. Failure is logged, never fatal.
+- [x] Verified: production server booted against an empty temp DATA_DIR, created the directory, seeded
+      10 SKUs, served the built app, returned index.html for a hard refresh on /activity, returned JSON
+      for /api/nope, and left local dev behaviour unchanged with no env vars set.
+
+Remaining: create the service on the host, and decide between a persistent disk and treating the
+database as disposable. The fallback is viable precisely because the seed is deterministic.
+
+## TASK-34 - Deployment blueprint (2026-09-13)
+
+TASK-33 made the app production-ready and verified it locally. This adds the declarative config so the
+deploy is a click rather than a form-filling exercise.
+
+- [x] `render.yaml`. Single web service, build and start commands, health check on /api/health, and the
+      four env vars. Pins NODE_VERSION because better-sqlite3 is a native module compiled at install
+      time, so the Node major is not an incidental detail.
+- [x] Documented the persistence decision in the file itself rather than elsewhere: Render's free
+      instance type does not support disks, so the blueprint runs without one and relies on
+      seed-on-first-boot. That is sound because the seed is deterministic, and the paid-disk path is one
+      commented block away with DATA_DIR already pointing at the mount.
+- [x] `Dockerfile` as the Fly.io fallback, multi-stage, plus `.dockerignore`. Two failure modes are
+      called out in comments because both are easy to hit: better-sqlite3 is native so builder and
+      runtime must share a base image (Debian, not Alpine, which has no prebuilt binary for it), and
+      backend/ and frontend/dist must remain SIBLINGS because index.js resolves the frontend as
+      ../../frontend/dist.
+
+**Verification, stated precisely.** No container runtime is installed on this machine (no docker,
+podman, colima, nerdctl or finch), so `docker build` was NOT run and the image is unproven. What was
+verified is the layout and runtime contract the Dockerfile depends on: a directory mirroring the image
+layout exactly was assembled in a temp dir and `node backend/src/index.js` run from its root with
+NODE_ENV=production, PORT and an empty DATA_DIR. It created the data directory, seeded 10 SKUs, served
+/ and a hard refresh on /activity as HTML, served a hashed asset as JS, and still returned JSON for
+/api/nope. The remaining unknown is the image build itself: apt-get, npm ci, and the native compile on
+linux.
+
+## TASK-35 - Four deferred defects (2026-09-13)
+
+- [x] `fmt$` rounded to whole thousands, turning $26,217 into "$26K". It now keeps one decimal below
+      $100K and drops it above, where the decimal stops earning its place. A trailing ".0" is trimmed so
+      an exact $1,000 still reads "$1K". Verified on screen: $26.2K, $14.2K, $87.4K, $51.7K, $273K.
+- [x] Needs Attention ranked both working-capital exceptions above REORDER, so a SKU about to run out
+      could be pushed off the list by stock that had been sitting still for months and would still be
+      sitting still tomorrow. Re-ranked by deadline first, exposure second: STOCKOUT RISK, REORDER, IDLE
+      STOCK, OVERSTOCK, SLOW MOVING, AGEING. Working capital is the more expensive problem; it is never
+      the more urgent one.
+- [x] The KPI strip sat on two baselines because exactly one card (Coverage in Target Band) carried a
+      `target` prop that rendered as a third line. The target now renders inline beside the value, so
+      every card is exactly three rows: label, value, sub. Verified: both groups align across all seven.
+- [x] Japonica's stock bar. Worse on inspection than reported: the idle fill was flat muted grey at 0.65
+      opacity, near-identical to both the track and the greyscale avoid-shading, so fill, track and both
+      shaded ranges merged into one uniform slab that read as a disabled control. It also hid a second
+      fact, because `idle` short-circuited the over-maximum branch: Japonica holds 78 MT against a 60 MT
+      maximum and said nothing about the overage, while the Dashboard tagged the same SKU
+      "IDLE STOCK · OVERSTOCK · AGEING". The fill is now hatched (idle is not a severity, so it must not
+      borrow red or amber, but it must read as present and inert rather than absent), the quantity is
+      full-strength text, and the status line reads "78 MT idle - no recent demand · 18 MT over
+      maximum". Verified in both themes.
+
+**One verification gap, stated rather than glossed.** The re-ranking could not be demonstrated on
+screen: the seeded portfolio currently produces no REORDER row, because no SKU satisfies that filter.
+The change is verified by inspection of the priority constants and the sort comparator only. Forcing a
+REORDER row would have meant mutating seeded stock levels to satisfy four simultaneous conditions, which
+is a larger disturbance to the demo data than the check is worth.
+
+## TASK-36 - PDF write-up draft (2026-09-13)
+
+- [x] `WRITEUP.md`, assembled per the outline in SUBMISSION.md from README.md and design.md. Existing
+      prose reused rather than re-authored. Nine sections plus a local-setup appendix, two marked
+      screenshot slots, and a placeholder for the deployment URL.
+- [x] Expanded three things the README states but does not argue: why deterministic-first has three
+      separate justifications (cost, trust, correctness) rather than one, why the two reorder points are
+      not redundancy, and why the decisions table is Phase 2 training data.
+
+## TASK-37 - Two order quantities, and an Ask AI that said nothing (2026-09-13)
+
+Found while reading real SKU data to build a better explanation, which is the only reason it surfaced:
+nothing on screen looked wrong.
+
+**The suggested order quantity was computed twice, two different ways.** `engines/index.js` computes
+`suggested_order_qty = target_stock - projected_available_at_lead_time`, which design.md documents as
+correct and records as an upgrade made on 2026-09-12, away from a snapshot-based proxy. `engines/
+alerts.js` was still computing that retired proxy, `target_stock - available_qty`, and so was the
+Dashboard's Needs Attention row. On TJ-25KG the two disagreed by 257 MT, roughly $347K of purchase
+order, because the proxy ignores everything consumed while the order is in transit. The Inventory page
+showed 597 and the Alerts page pre-filled 340 into the approval modal.
+
+- [x] `alerts.js` gains one `orderQty(s)` helper reading the engine's own figure, used by both ordering
+      alert types for the message text and the quantity. min_order_qty still floors it, since a supplier
+      minimum is a constraint rather than a calculation.
+- [x] Dashboard's Needs Attention reads `suggested_order_qty` too. Three sites, one answer.
+
+**Ask AI returned the card back to the reader.** `buildFallbackExplanation` concatenated `alert.message`
+with `alert.recommended_action`, which are the two lines already printed on the card the button sits on,
+then repeated the quantity a third time. Clicking it added nothing. This is the app's one AI touchpoint
+and Architecture & Reasoning Loop is a named judging criterion.
+
+- [x] New `frontend/src/lib/explain.js`. Four-step trace per alert type: what was measured (inputs and
+      the windows they came from), how it was derived (the arithmetic, checkable by hand), if nothing
+      changes (the consequence, priced), why this action (the trade-off). All six alert types.
+- [x] The modal renders these as a numbered rail. Numbering is justified here because the four steps
+      genuinely are a sequence; numbering something unordered would be decoration.
+- [x] Alerts now loads SKUs alongside alerts, since the alert carries the conclusion and the SKU carries
+      the inputs. When a SKU cannot be matched the modal falls back to the old restatement and says so.
+- [x] Disclaimer rewritten from "rule-based summary" to state that every figure can be checked against
+      the Inventory page, which is the property that makes it trustworthy regardless of who wrote the
+      prose. The honest "not yet a live model" wording is kept.
+
+This is also not throwaway work pending TASK-11: the assembled trace is exactly the prompt context a
+real model needs, and assembling it has to be deterministic either way.
+
+**Smaller fixes in the same pass.**
+- [x] Three money formatters disagreed. `fmt$` (Dashboard), `sgd` (explain.js) and `fmt$` (backend
+      alerts.js) now share thresholds, so a carrying cost is not "$26K" in an alert and "$26.2K" on the
+      dashboard.
+- [x] The decision footer read "AI Recommendation: No order required for this alert" on four of the six
+      alert types, directly beside Approve / Modify / Reject: it told the reader there was nothing to
+      decide, then asked them to decide it. It now names the actual action ("Disposition review",
+      "Suspend purchasing"). Relabelled "Decision:" rather than "Recommended:" after a first attempt
+      created two "Recommended:" labels on one card.
+- [x] "a 270 days limit" now reads "a 270-day limit".
+
+Verified in the browser on the stockout and idle branches, plus `npm run analytics` and a clean build.
+
+## TASK-38 - Hardening the explanation builder (2026-09-13)
+
+Four of the six branches in lib/explain.js shipped in TASK-37 without ever being seen rendered, because
+only two alert types were open on screen. Rather than click through modals, a throwaway script ran every
+branch against every SKU (240 sections) and grepped the output for leaked placeholders.
+
+- [x] First pass found one visible `null`. Investigating it exposed the real problem: `Number(null)` and
+      `Number("")` are both 0, and both are finite, so the `Number.isFinite` guards in `mt`, `day` and
+      `dayAdj` were rendering MISSING values as a confident "0 MT" and "0 days". A grep for "null" can
+      never catch that, and an explanation a manager is about to act on is the worst place for a
+      plausible wrong zero. Added an `isNum` guard that rejects null, undefined and empty string.
+- [x] Hardening the helpers turned the silent zeros into visible nulls, which surfaced a second case:
+      STOCKOUT_RISK and SLOW_MOVING both divide by demand, and a zero-demand SKU has no days of cover.
+      Both sentences are now guarded and say so in words instead.
+- [x] Re-ran: 240 sections, 0 problems.
+- [x] Reading the prose of the two branches never seen on screen caught a correctness bug that no null
+      check would have found. The OVERSTOCK explanation told the reader that anything not Fast Moving is
+      "unlikely to clear on demand alone". Vietnam Fragrant is a Normal mover selling 3.23 MT a day with
+      185 days of cover: demand will absolutely drain it, the ceiling is what is wrong. As written it
+      pointed a manager at a discount they do not need. Now splits on Fast/Normal versus Slow/Idle.
+
+**Not verified: narrow-viewport layout.** The Activity page has never been checked below desktop width,
+and the browser resize tool reports success while leaving the viewport unchanged (tried 414px and
+500px), so this could not be confirmed either way in this session. By construction the payload panels
+are `flex: 1 1 260px` inside a `flexWrap: wrap` row and should stack, and the page inherits the shared
+sidebar breakpoint from index.css, but that is reasoning about the code rather than a check.
+
+## TASK-39 - Write-up screenshots (2026-09-13)
+
+- [x] Three captures from the running app on live seeded data, saved to `docs/images/`: the Alerts page
+      (human in the loop), the explanation modal (reasoning loop), and an expanded Activity record
+      (observability). Each is referenced from WRITEUP.md with a caption and real alt text.
+- [x] Added a third image beyond the two the outline called for. Section 3 argues the
+      deterministic-first case at length and showed nothing; the reasoning trace is the evidence for it,
+      and it is also the strongest single screen in the build.
+- [x] SUBMISSION.md updated: the write-up now needs only the deployment URL.
+
+Note for export: the image paths are repo-relative, so the markdown-to-PDF step has to run from the
+repository root.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy
