@@ -5,6 +5,7 @@ import EventCredit from "../components/EventCredit";
 import AppMark from "../components/AppMark";
 import ColHint from "../components/ColHint";
 import TowerIcon from "../components/TowerIcon";
+import useDeviceClass from "../hooks/useDeviceClass";
 import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 // which read as chrome and nested a button inside a link.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HERE = {
+const OFFICE = [{
   to: "/dashboard",
   icon: TowerIcon,
   tint: "var(--purple)",
@@ -47,7 +48,7 @@ const HERE = {
   sub: "Analysis and decisions",
   who: "office, desktop",
   help: "See what needs a decision today, why it was flagged, and approve or reject what the system recommends.",
-};
+}];
 
 const FLOOR = [
   {
@@ -168,7 +169,26 @@ function Floor({ m }) {
   );
 }
 
+/**
+ * A row of workspaces. The two-column grid applies only when there are two to
+ * put in it: on a handheld the office group holds one card, and leaving it in
+ * the grid stranded it at half width with empty space beside it.
+ */
+function Group({ items, style }) {
+  if (items.length === 0) return null;
+  return items.length === 1
+    ? <div style={style}><Floor m={items[0]} /></div>
+    : <div className="home-pair" style={style}>{items.map((m) => <Floor key={m.label} m={m} />)}</div>;
+}
+
 export default function Home() {
+  const device = useDeviceClass();
+  const handheld = device === "handheld";
+
+  const primary = handheld ? FLOOR : OFFICE;
+  const secondary = handheld ? OFFICE : FLOOR;
+  const secondaryLabel = handheld ? "In the office" : "On the warehouse floor";
+
   return (
     <div style={{
       minHeight: "100vh", background: "var(--bg)",
@@ -212,13 +232,24 @@ export default function Home() {
           Pick a workspace to begin.
         </p>
 
-        <div className="home-rule">For this device</div>
-        <Hero m={HERE} />
+        {/* Which group leads is DETECTED, not assumed. "For this device" used
+            to sit over a hardcoded Control Tower, so on a phone the page told
+            the reader that the desktop workspace was the one for their phone.
+            See hooks/useDeviceClass: it asks whether the primary input is a
+            finger, which is the real question, rather than measuring width,
+            which only says how much room there is.
 
-        <div className="home-rule">On the warehouse floor</div>
-        <div className="home-pair">
-          {FLOOR.map((m) => <Floor key={m.label} m={m} />)}
-        </div>
+            Detection changes the ORDER AND THE LABELS, never what is
+            available. Both groups render either way, so a wrong guess costs a
+            little scrolling rather than access to a workspace. */}
+        <div className="home-rule">For this device</div>
+        <Hero m={primary[0]} />
+        {primary.length > 1 && (
+          <Group items={primary.slice(1)} style={{ marginTop: "var(--space-3)" }} />
+        )}
+
+        <div className="home-rule">{secondaryLabel}</div>
+        <Group items={secondary} />
 
         <div style={{
           marginTop: "var(--space-6)", paddingTop: "var(--space-4)",
@@ -233,7 +264,7 @@ export default function Home() {
               Running on <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>StockSense</span>
             </span>
           </div>
-          <EventCredit align="center" />
+          <EventCredit align="center" inline />
         </div>
       </div>
     </div>
