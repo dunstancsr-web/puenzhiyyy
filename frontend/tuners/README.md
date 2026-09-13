@@ -48,3 +48,22 @@ the tooltip a bit less see through" is three round trips and a guess.
   16px in another.
 - Republish after editing by passing the file path to the Artifact tool along with the
   URL above, so the existing link keeps working instead of sprouting a second copy.
+
+## brand.html
+
+Not a tuner: the naming research and logo sheet for **四海米行 / Four Seas Rice Trading**, the
+fictional SME this tool is pitched at. Published at
+https://claude.ai/code/artifact/55f682c6-a10b-4219-a8cc-8def83a31fd6
+
+`brand.html` is GENERATED. Edit `src/logo-template.html` and run `python3 src/build-logo.py`
+from `src/`, which does two things the hand-written file cannot:
+
+- inlines `mz-sub.woff2` as a data URI, so the brush face ships with the page
+- escapes every non-ASCII character as an HTML numeric entity
+
+The second is not optional here. These pages carry no charset meta of their own, and served
+locally every Chinese character rendered as mojibake. Entities are charset-independent, so the
+built file is correct both from disk and published.
+
+The font is Ma Shan Zheng (SIL OFL), subset to nine glyphs: 5.86 MB down to 3.7 KB. Regenerate
+with `pyftsubset mz.ttf --text="四海米行友合业粮" --flavor=woff2 --output-file=mz-sub.woff2`.

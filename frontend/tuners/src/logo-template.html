@@ -1,0 +1,325 @@
+<title>Four Seas Rice Trading</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant:wght@500;600&display=swap">
+<style>
+/* Ma Shan Zheng (SIL OFL), subset to the nine glyphs this page uses and
+   inlined. 5.86 MB of CJK font reduced to 3.7 KB, which is what makes a
+   calligraphic mark shippable at all: the alternative is a CDN request that
+   can fail, and a logo that silently renders in Helvetica when it does. */
+@font-face {
+  font-family: "Brush";
+  src: url(data:font/woff2;base64,__FONT_B64__) format("woff2");
+  font-display: block;
+}
+
+:root {
+  --paper:   #f7f3ea;   /* rice paper, warm but not yellow */
+  --ink:     #17130f;
+  --ink-2:   #4b433c;
+  --ink-3:   #857c72;
+  --seal:    #b3271e;   /* 印泥 cinnabar, the red of seal paste */
+  --seal-dk: #8e1d16;
+  --line:    #e4ddd0;
+  --panel:   #ffffff;
+  --blue:    #3b82f6;   /* StockSense, for the in-context swatch */
+  --slate:   #1e293b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #14110d; --ink: #f2ece2; --ink-2: #c3b9ac; --ink-3: #8d8478;
+    --line: #2e2821; --panel: #1c1813; --seal: #d6453a; --seal-dk: #b3271e;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #14110d; --ink: #f2ece2; --ink-2: #c3b9ac; --ink-3: #8d8478;
+  --line: #2e2821; --panel: #1c1813; --seal: #d6453a; --seal-dk: #b3271e;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 34px 24px 72px; }
+
+.mast { border-bottom: 1px solid var(--line); padding-bottom: 22px; margin-bottom: 28px; }
+.mast h1 {
+  font-family: Cormorant, Georgia, serif; font-weight: 600;
+  font-size: 40px; line-height: 1.05; margin: 0 0 8px; letter-spacing: -.005em;
+}
+.mast .cn { font-family: Brush, serif; font-size: 44px; color: var(--seal); margin-right: 12px; vertical-align: -4px; }
+.mast p { margin: 0; color: var(--ink-2); max-width: 68ch; }
+
+h2 {
+  font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-3); margin: 40px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+
+/* ── Naming table ─────────────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ink-3); font-weight: 700; padding: 0 12px 8px;
+}
+td { padding: 12px; border-top: 1px solid var(--line); vertical-align: top; }
+td.han { font-family: Brush, serif; font-size: 30px; line-height: 1.1; white-space: nowrap; color: var(--ink); }
+td.py { font-family: Cormorant, Georgia, serif; font-size: 18px; font-style: italic; color: var(--ink-2); white-space: nowrap; }
+tr.pick td { background: color-mix(in srgb, var(--seal) 6%, transparent); }
+tr.pick td.han { color: var(--seal); }
+.tag {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 3px;
+  background: var(--seal); color: #fff; margin-left: 8px; vertical-align: 3px;
+}
+
+/* ── Logo lockups ─────────────────────────────────────────────────────── */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 18px; }
+.spec { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.spec__hd {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+}
+.spec__hd b { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+.spec__hd span { font-size: 11px; color: var(--ink-3); }
+.spec__stage { padding: 30px 22px; display: flex; align-items: center; justify-content: center; min-height: 172px; }
+.on-paper { background: var(--paper); }
+.on-white { background: #ffffff; }
+.on-ink   { background: #14110d; }
+.on-slate { background: var(--slate); }
+.spec__note { padding: 11px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+
+/* ── The seal ─────────────────────────────────────────────────────────── */
+.seal {
+  display: grid; place-items: center;
+  background: var(--seal); color: #fff;
+  font-family: Brush, serif; line-height: 1;
+  border-radius: 4px; flex-shrink: 0;
+}
+.seal--1 { width: 62px; height: 62px; font-size: 42px; }
+/* 2x2, read top-to-bottom then right-to-left, which is why the grid is
+   column-first and reversed: 四 top-right, 海 bottom-right, 米 top-left,
+   行 bottom-left. Setting them left-to-right would read as 四米海行. */
+.seal--4 {
+  width: 88px; height: 88px; padding: 7px;
+  /* Rows must be declared too. With only columns declared and auto-flow
+     column, the grid makes ONE row of four and the seal reads 行米海四. */
+  grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  grid-auto-flow: column;
+  direction: rtl; gap: 2px; font-size: 30px;
+}
+.seal--4 > span { display: grid; place-items: center; }
+
+.lockup { display: flex; align-items: center; gap: 16px; }
+.lockup__cn { font-family: Brush, serif; font-size: 40px; line-height: 1.05; color: var(--ink); letter-spacing: .04em; }
+.lockup__en {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--ink-3); margin-top: 7px;
+}
+.on-ink .lockup__cn, .on-slate .lockup__cn { color: #f6f1e7; }
+.on-ink .lockup__en, .on-slate .lockup__en { color: rgba(255,255,255,.55); }
+
+/* Ink treatment: characters in ink with the seal reduced to an accent, which
+   is how a scroll is actually signed. */
+.inkmark { display: flex; align-items: flex-start; gap: 10px; }
+.inkmark__cn { font-family: Brush, serif; font-size: 52px; line-height: 1; color: var(--ink); letter-spacing: .03em; }
+.on-ink .inkmark__cn { color: #f6f1e7; }
+.inkmark__seal {
+  width: 26px; height: 26px; border-radius: 3px; background: var(--seal); color: #fff;
+  font-family: Brush, serif; font-size: 18px; display: grid; place-items: center; margin-top: 4px;
+}
+
+/* ── In-app previews ──────────────────────────────────────────────────── */
+.app { width: 100%; max-width: 260px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+.app__row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.app__name { font-family: ui-sans-serif, system-ui, sans-serif; }
+.app__name b { display: block; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -.01em; }
+.app__name span { display: block; font-size: 12px; color: rgba(255,255,255,.6); }
+.app__div { height: 1px; background: rgba(255,255,255,.10); }
+.app__tenant { display: flex; align-items: center; gap: 9px; padding: 11px 14px; }
+.app__tenant .seal--sm { width: 30px; height: 30px; font-size: 20px; border-radius: 4px; }
+.app__tenant .t { font-size: 12.5px; }
+.app__tenant .t b { display: block; font-family: Brush, serif; font-size: 17px; color: #fff; letter-spacing: .04em; }
+.app__tenant .t span { display: block; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.5); }
+
+.sizes { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+.sizes figure { margin: 0; text-align: center; }
+.sizes figcaption { font-size: 10.5px; color: var(--ink-3); margin-top: 7px; }
+.s16 { width: 16px; height: 16px; font-size: 11px; border-radius: 2px; }
+.s24 { width: 24px; height: 24px; font-size: 16px; border-radius: 3px; }
+.s34 { width: 34px; height: 34px; font-size: 23px; border-radius: 4px; }
+.s64 { width: 64px; height: 64px; font-size: 43px; border-radius: 5px; }
+
+.note {
+  border-left: 2px solid var(--seal); background: color-mix(in srgb, var(--seal) 6%, transparent);
+  padding: 13px 16px; border-radius: 0 8px 8px 0; margin-top: 18px; color: var(--ink-2);
+}
+.note b { color: var(--ink); }
+.note + .note { margin-top: 10px; }
+
+:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <h1><span class="cn">四海米行</span>Four Seas Rice Trading</h1>
+    <p>A name for the fictional SME this tool is built for, derived from <i>Puenzhi</i>, and a
+      calligraphic mark to go with it. Everything here is one self-contained page: the brush face is
+      embedded, so nothing depends on a font server staying up.</p>
+  </header>
+
+  <h2>Where the name comes from</h2>
+  <p style="max-width:70ch;margin:0 0 18px;color:var(--ink-2)">
+    <b>Puenzhi</b> breaks into two Dzongkha parts: <b>pün</b> (སྤུན), sibling or kin, and
+    <b>zhi</b> (བཞི), four. So it is closer to <i>the four siblings</i> than to <i>four friends</i>,
+    and that distinction drove the Chinese choice. 朋友 (<i>péngyǒu</i>) is the ordinary word for
+    friend and is too weak: the register wanted is kinship, the bond you do not choose.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th style="width:130px">Candidate</th><th style="width:120px">Reading</th><th>What it carries</th></tr>
+    </thead>
+    <tbody>
+      <tr class="pick">
+        <td class="han">四海</td>
+        <td class="py">sì hǎi<br><span style="font-style:normal;font-size:12px;color:var(--ink-3)">four seas</span></td>
+        <td>
+          <b>Recommended<span class="tag">the pick</span></b><br>
+          From the <i>Analects</i> (顏淵): 四海之内皆兄弟也 — <i>within the four seas, all men are
+          brothers</i>. Two characters that carry <b>both</b> halves of Puenzhi at once: the number
+          four, and kinship rather than acquaintance. It is also exactly the register an
+          overseas-Chinese trading house uses, and it quietly says <i>importer</i>, which this
+          business is: the SKUs come from Thailand, Vietnam, India and Japan.
+        </td>
+      </tr>
+      <tr>
+        <td class="han">四友</td>
+        <td class="py">sì yǒu<br><span style="font-style:normal;font-size:12px;color:var(--ink-3)">four friends</span></td>
+        <td>The literal translation, with a literary echo in 文房四友, the four friends of the
+          scholar's desk. Handsome, but it reads boutique rather than commercial, and <i>friends</i>
+          is the weaker reading of Puenzhi.</td>
+      </tr>
+      <tr>
+        <td class="han">四合</td>
+        <td class="py">sì hé<br><span style="font-style:normal;font-size:12px;color:var(--ink-3)">four joined</span></td>
+        <td>Joined or in harmony, echoing 四合院, the courtyard house built around a family. Warm and
+          domestic, but rare as a firm name, so it would read as invented.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>The suffix matters as much as the name.</b> 米行 (<i>mǐháng</i>) is the traditional term for a
+    rice dealer, where 行 means a trading house, as in 銀行. It is what a family rice business in
+    Singapore or Malaysia actually calls itself. 米業 is the modern corporate alternative and sounds
+    like a larger group; 貿易 is generic. For an SME, 米行 is the credible one.
+  </div>
+
+  <h2>The mark</h2>
+  <div class="grid">
+
+    <div class="spec">
+      <div class="spec__hd"><b>Primary lockup</b><span>seal + wordmark</span></div>
+      <div class="spec__stage on-paper">
+        <div class="lockup">
+          <div class="seal seal--1">米</div>
+          <div>
+            <div class="lockup__cn">四海米行</div>
+            <div class="lockup__en">Four Seas Rice Trading</div>
+          </div>
+        </div>
+      </div>
+      <div class="spec__note">The seal carries 米, rice, alone. One character survives being shrunk;
+        four do not.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>Full seal</b><span>四海米行, 2&times;2</span></div>
+      <div class="spec__stage on-paper">
+        <div class="seal seal--4">
+          <span>四</span><span>海</span><span>米</span><span>行</span>
+        </div>
+      </div>
+      <div class="spec__note">Read top to bottom, then right to left, which is why 四 sits top-right
+        and 米 top-left. Left-to-right would read 四米海行, which is nothing.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>Ink</b><span>for documents and print</span></div>
+      <div class="spec__stage on-paper">
+        <div class="inkmark">
+          <div class="inkmark__cn">四海米行</div>
+          <div class="inkmark__seal">米</div>
+        </div>
+      </div>
+      <div class="spec__note">Characters in ink, the seal reduced to an accent at the end. This is how
+        a scroll is actually signed, and it is the version that survives a fax or a black-and-white
+        delivery note.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>On the sidebar</b><span>tenant, not replacement</span></div>
+      <div class="spec__stage on-slate">
+        <div class="app" style="background:var(--slate)">
+          <div class="app__row">
+            <div style="width:34px;height:34px;border-radius:8px;background:var(--blue);display:grid;place-items:center;flex-shrink:0">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="app__name"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="app__div"></div>
+          <div class="app__tenant">
+            <div class="seal seal--sm">米</div>
+            <div class="t"><b>四海米行</b><span>Four Seas Rice</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="spec__note">StockSense stays the product; the rice company is the account using it.
+        Swapping the StockSense mark for this one would claim the tool belongs to the customer.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>Reversed</b><span>on ink</span></div>
+      <div class="spec__stage on-ink">
+        <div class="lockup">
+          <div class="seal seal--1">米</div>
+          <div>
+            <div class="lockup__cn">四海米行</div>
+            <div class="lockup__en">Four Seas Rice Trading</div>
+          </div>
+        </div>
+      </div>
+      <div class="spec__note">The cinnabar holds against near-black without adjustment, which a paler
+        red would not.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>Scale</b><span>16 to 64px</span></div>
+      <div class="spec__stage on-white">
+        <div class="sizes">
+          <figure><div class="seal s16">米</div><figcaption>16</figcaption></figure>
+          <figure><div class="seal s24">米</div><figcaption>24</figcaption></figure>
+          <figure><div class="seal s34">米</div><figcaption>34</figcaption></figure>
+          <figure><div class="seal s64">米</div><figcaption>64</figcaption></figure>
+        </div>
+      </div>
+      <div class="spec__note">16px is the favicon floor. 米 holds at that size because it is six
+        strokes with a clear centre; 四海米行 in the same square would be a red smudge.</div>
+    </div>
+
+  </div>
+
+  <h2>Notes</h2>
+  <div class="note">
+    <b>Why cinnabar and not a brand red.</b> #b3271e is the colour of 印泥, the cinnabar paste a
+    physical seal is pressed into. A brighter red would read as a generic logo; this one reads as an
+    object that exists.
+  </div>
+  <div class="note">
+    <b>The typeface is Ma Shan Zheng</b>, a brush script under the SIL Open Font License, subset here
+    to nine glyphs, 3.7 KB from 5.86 MB. Free to use commercially. A true seal-script (篆書) face
+    would be more authentic for the square mark, but nothing usable is openly licensed, and a wrong
+    licence on a demo logo is a worse problem than a slightly modern brush.
+  </div>
+</div>
