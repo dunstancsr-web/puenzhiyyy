@@ -259,18 +259,17 @@ export default function Alerts() {
       {/* ── Alert cards ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 32 }}>
         {filtered.length === 0 ? (
-          <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 15 }}>
+          <div className="card" style={{ padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 15 }}>
             {active.length === 0 ? "✓ No active alerts - all inventory levels are healthy." : "No alerts match this filter."}
           </div>
         ) : (
-          filtered.map((alert, i) => (
+          filtered.map((alert) => (
             <AlertCard
               key={alert.id}
               alert={alert}
               onAcknowledge={acknowledge}
               onAskAI={handleAskAI}
               onApprove={setApprovalModal}
-              isLast={i === filtered.length - 1}
             />
           ))
         )}
@@ -355,7 +354,7 @@ function ActionButton({ onClick, children, variant = "quiet", title }) {
   );
 }
 
-function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
+function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
   const meta = TYPE_META[alert.alert_type] || TYPE_META.REORDER;
   const Icon = meta.icon;
 
@@ -369,10 +368,20 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
     ? `Order ${alert.ai_recommendation_qty} MT`
     : (ACTION_SUMMARY[alert.alert_type] || "Review this SKU");
 
+  // Each alert is its own white surface. The list previously sat directly on the
+  // page's grey background with only hairline dividers, so body text was reading
+  // against grey, and the rows already had a 14px gap from the parent AND a
+  // bottom border, which is two separators doing one job. A discrete card per
+  // alert is also the right unit here: each one is a single decision, and
+  // dismissing it removes exactly one surface.
+  //
+  // `overflow: hidden` matters. The severity stripe is a 3px left border, and
+  // without it the stripe squares off the card's rounded top and bottom corners.
   return (
-    <div style={{
+    <div className="card" style={{
+      padding: 0,
+      overflow: "hidden",
       borderLeft: `3px solid ${SEVERITY_STRIPE[alert.severity] || "var(--border)"}`,
-      borderBottom: isLast ? "none" : "1px solid var(--border)",
     }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 20px" }}>
         <div style={{

@@ -1190,6 +1190,24 @@ Pruned the orphaned useCollapsed state, DECISION_LOG_HINT and ChevronDown import
 Verified in both themes. Four cards now fit where two did, without cramming. Alerts screenshot in
 WRITEUP.md re-captured, since the old one showed the previous card design.
 
+## TASK-41 - White cards on Alerts (2026-09-13)
+
+Stan: body text on the Alerts list was reading against the page's grey background and was hard to read.
+Correct, and it made Alerts the only page in the app whose content did not sit on a card. Dashboard
+widgets, the Inventory table, the Activity timeline and even the Alerts tile row above are all on
+`.card`; the alert list alone sat on bare `--bg` with hairline dividers.
+
+- [x] Each alert is its own `.card` rather than the whole list being one surface. An alert is a single
+      decision and dismissing it removes exactly one card, so the discrete unit matches the mental
+      model. It also matches the tile row directly above, which is already six separate cards.
+- [x] Dropped the per-row `borderBottom` and the `isLast` prop that drove it. The parent already spaces
+      rows with `gap: 14`, so a divider on top of a gap was two separators doing one job.
+- [x] `overflow: hidden` on the card, because the severity stripe is a 3px left border and without it
+      the stripe squares off the rounded top and bottom corners.
+- [x] The empty state now reuses `.card` instead of restating its four tokens inline.
+
+Verified in both themes plus the filtered-to-empty state. WRITEUP.md screenshot re-captured again.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy
