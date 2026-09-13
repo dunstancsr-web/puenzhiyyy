@@ -170,6 +170,10 @@
 .dash-row { display: grid; gap: var(--space-5); align-items: start; }
 .dash-row--even       { grid-template-columns: 1fr 1fr; }
 .dash-row--wide-right { grid-template-columns: 1fr 1.3fr; }
+/* A single card across the full width. Needs Attention uses it because it is
+   the only widget on the page carrying actions rather than analysis, and at
+   half width its Action column wrapped to three lines on a 1546px display. */
+.dash-row--full       { grid-template-columns: 1fr; }
 
 @media (max-width: 768px) {
   .app-sidebar-panel { display: none; }

@@ -291,11 +291,20 @@ function buildNeedsAttention(skus) {
   return rows.sort((a, b) => a.priority - b.priority || b.value - a.value);
 }
 
-// Display cap for the Needs Attention table - applied AFTER filtering, so a
-// filter always searches the full exception list, not just what fit on
-// screen. Any rows beyond this are surfaced via a "+N more" note rather than
-// disappearing without a trace.
-const NEEDS_ATTENTION_CAP = 8;
+// How many exception rows show before the reveal - applied AFTER filtering, so
+// a filter always searches the full exception list, not just what fit on
+// screen.
+//
+// PARTIAL REVEAL, not collapse-by-default (TASK-57). Collapsing this section
+// behind a count was considered and rejected: "7 SKUs need attention" is
+// strictly less information than five rows naming which SKUs and what to do
+// about them, and operators of dense tools resent a dashboard that hides the
+// answer behind a click. Five rows keep the page short while the urgent work
+// stays readable without interaction, and the rest is one button away.
+// Collapse-by-default is right for a section that is long, situational or
+// usually irrelevant, which is why the compliance position is folded. This is
+// none of those.
+const NEEDS_ATTENTION_PREVIEW = 5;
 
 // ── Coverage vs (lead time + safety) - one row per SKU, worst gap first ──────
 function buildCoverageData(skus) {
@@ -347,6 +356,11 @@ export default function Dashboard() {
   // chart on this page to filter Needs Attention to just those SKUs; click
   // the same one again to clear it. Only one filter active at a time.
   const [filter, setFilter] = useState(null);
+  // Deliberately NOT persisted, unlike the collapse state. Collapsing a whole
+  // widget is a standing preference; expanding a list to see two more rows is
+  // a momentary thing, and restoring it on the next visit would quietly undo
+  // the short page it exists to protect.
+  const [showAllAttention, setShowAllAttention] = useState(false);
 
   const load = useCallback(() => {
     setError(null);
@@ -380,8 +394,12 @@ export default function Dashboard() {
   // Filter first, cap for display second - a filter must search every real
   // exception, not just the top slice that happened to fit on screen.
   const filteredAttention = attention.filter((a) => matchesFilter(a, filter, skuIndex));
-  const shownAttention = filteredAttention.slice(0, NEEDS_ATTENTION_CAP);
+  const shownAttention = showAllAttention ? filteredAttention : filteredAttention.slice(0, NEEDS_ATTENTION_PREVIEW);
   const hiddenAttentionCount = filteredAttention.length - shownAttention.length;
+  // The badge takes its colour from the worst row present, and the list is
+  // already sorted worst first, so that is simply the first one. A count alone
+  // would say "7 things"; the colour says how bad the worst of them is.
+  const attentionTone = filteredAttention.length > 0 ? filteredAttention[0].tagColor : null;
   // "Baseline"/"Now" rather than "Last month"/"This month": the comparison
   // point is a fixed hand-set constant, not a real previous month.
   const monthTrendData = [
@@ -396,10 +414,16 @@ export default function Dashboard() {
         subtitle={`${new Date().toLocaleDateString("en-SG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} · ${s.totalSkus} active SKUs · data as of ${new Date(s.asOf).toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}`}
       />
 
-      {/* ── Summary card: hero value, month comparison, and the core KPI strip.
-          One card, because these are one thought ("state of the portfolio
-          right now"), separated internally by a hairline rather than being
-          five floating islands on the page background. ── */}
+      {/* ── KEY METRICS ────────────────────────────────────────────────────
+          Stan's name for this block, and the one to use when talking about it:
+          hero value, baseline comparison, and the two labelled KPI groups.
+          Everything in it answers "how are we doing right now" in numbers, and
+          nothing in it is a list or a chart, which is what makes it one thing.
+
+          One card, because these are one thought, separated internally by a
+          hairline rather than being five floating islands on the page
+          background. It carries no visible heading: it is the first thing on
+          the page and a label would be chrome explaining the obvious. ── */}
       <div className="card" style={{ marginBottom: "var(--space-5)" }}>
         {/* No justifyContent: space-between here. It pinned the chart to the
             far edge of a ~1300px card, leaving ~700px of gap between a number
@@ -518,14 +542,9 @@ export default function Dashboard() {
           analysis (health mix, ABC x XYZ) sits below it. It used to be the
           other way round, which pushed the single most actionable widget on
           the page off-screen behind a segmentation matrix. ── */}
-      <div className="dash-row dash-row--wide-right" style={{ marginBottom: "var(--space-5)" }}>
-        <Section title="Cover vs Lead + Safety" subtitle="Worst gap first - click a row to filter" hint={HINTS.coverage}
-          collapsible storageKey="coverage" defaultOpen>
-          <CoverageBullets data={coverageData} selected={filter?.type === "sku" ? filter.value : null}
-            onSelect={(skuId) => toggleFilter(setFilter, "sku", skuId)} />
-        </Section>
-
+      <div className="dash-row dash-row--full" style={{ marginBottom: "var(--space-5)" }}>
         <Section title="Needs Attention" subtitle="Every open exception, ranked by urgency then financial exposure" hint={HINTS.needsAttention}
+          badge={filteredAttention.length} badgeTone={attentionTone}
           collapsible storageKey="needs-attention" defaultOpen>
           {filter && (
             <div style={{
@@ -579,9 +598,22 @@ export default function Dashboard() {
                   ))}
                 </tbody>
               </table>
-              {hiddenAttentionCount > 0 && (
-                <div style={{ padding: "var(--space-3) 8px 0", fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-                  +{hiddenAttentionCount} more - showing the {NEEDS_ATTENTION_CAP} highest-priority exceptions{filter ? " matching this filter" : ""}.
+              {/* The reveal names what is behind it rather than saying "Show
+                  more", so the choice to press it is informed. */}
+              {(hiddenAttentionCount > 0 || showAllAttention) && (
+                <div style={{ paddingTop: "var(--space-3)" }}>
+                  <button type="button" onClick={() => setShowAllAttention((v) => !v)}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      background: "none", border: "none", cursor: "pointer", padding: "4px 8px",
+                      marginLeft: 2, borderRadius: "var(--radius)",
+                      color: "var(--blue)", fontSize: "var(--text-sm)", fontWeight: 600,
+                    }}>
+                    <ChevronDown size={15} style={{ transform: showAllAttention ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+                    {showAllAttention
+                      ? `Show fewer`
+                      : `Show ${hiddenAttentionCount} more`}
+                  </button>
                 </div>
               )}
             </div>
@@ -589,13 +621,25 @@ export default function Dashboard() {
         </Section>
       </div>
 
+      {/* Diagnosis, below the worklist. Both of these are filter sources for
+          Needs Attention above, which is the one cost of putting the table
+          first: clicking a colour here scrolls its own effect out of view. The
+          filter chip at the top of the table is what makes that recoverable. */}
       <div className="dash-row dash-row--even" style={{ marginBottom: "var(--space-5)" }}>
+        <Section title="Cover vs Lead + Safety" subtitle="Worst gap first - click a row to filter" hint={HINTS.coverage}
+          collapsible storageKey="coverage" defaultOpen>
+          <CoverageBullets data={coverageData} selected={filter?.type === "sku" ? filter.value : null}
+            onSelect={(skuId) => toggleFilter(setFilter, "sku", skuId)} />
+        </Section>
+
         <Section title="Inventory Health" subtitle="Share of working capital by status - click a colour to filter" hint={HINTS.health}
           collapsible storageKey="health" defaultOpen>
           <HealthStack data={s.healthByValue} selected={filter?.type === "health" ? filter.value : null}
             onSelect={(status) => toggleFilter(setFilter, "health", status)} />
         </Section>
+      </div>
 
+      <div className="dash-row dash-row--full" style={{ marginBottom: "var(--space-5)" }}>
         <Section title="Value × Movement" subtitle="Economic value tier × how fast it sells - click a cell to filter" hint={HINTS.abcMovement}
           collapsible storageKey="abcxyz" defaultOpen>
           <AbcMovementMatrix matrix={s.abcMovementMatrix} selected={filter?.type === "segment" ? filter.value : null}
@@ -834,7 +878,12 @@ function PageHeader({ title, subtitle }) {
 // `collapsible` sections persist their open/closed state per-browser
 // (localStorage) - the "optional decluttering" a user can set once and
 // forget, rather than a per-visit toggle. Defaults to open.
-function Section({ title, subtitle, children, hint, collapsible = false, storageKey, defaultOpen = true }) {
+// `badge` is a count shown beside the title, and `badgeTone` a CSS colour
+// variable to tint it with. It stays visible when the section is COLLAPSED,
+// which is the whole point: a folded section that gives no sign there are
+// seven open exceptions inside it is worse than no section at all.
+function Section({ title, subtitle, children, hint, badge = null, badgeTone = null,
+                  collapsible = false, storageKey, defaultOpen = true }) {
   const [storedOpen, setStoredOpen] = useCollapsed(storageKey || title, defaultOpen);
   const open = collapsible ? storedOpen : true;
   return (
@@ -846,6 +895,16 @@ function Section({ title, subtitle, children, hint, collapsible = false, storage
               size already carries the emphasis. */}
           <div style={{ fontWeight: 600, fontSize: "var(--text-lg)", display: "flex", alignItems: "center", gap: 5 }}>
             {title}
+            {badge > 0 && (
+              <span style={{
+                fontSize: "var(--text-xs)", fontWeight: 700, lineHeight: 1,
+                padding: "4px 9px", borderRadius: 99, flexShrink: 0,
+                color: badgeTone || "var(--text-secondary)",
+                background: badgeTone ? badgeTone.replace(")", "-light)") : "var(--surface-2)",
+              }}>
+                {badge}
+              </span>
+            )}
             {hint && <ColHint label={title} what={hint.what} how={hint.how} />}
           </div>
           {subtitle && open && <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginTop: 2 }}>{subtitle}</div>}

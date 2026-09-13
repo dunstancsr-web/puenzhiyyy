@@ -120,6 +120,12 @@ feedback, not suggestions to re-litigate.
   Alerts, Activity. It is the only part that wears the sidebar.
 - **Goods In** and **Goods Out** are the handheld warehouse floor flows. Industry
   terms: inbound / goods receipt, and outbound / goods issue.
+- **Key Metrics** is the top card on the Dashboard: hero value, baseline
+  comparison, and the Service & Availability and Working Capital groups. It has
+  no visible heading, so the name exists for talking about it. The Dashboard's
+  sections in order are then **Needs Attention** (full width, the only one
+  carrying actions rather than analysis), **Cover vs Lead + Safety** beside
+  **Inventory Health**, and **Value × Movement** full width.
 
 ### Where things live
 
