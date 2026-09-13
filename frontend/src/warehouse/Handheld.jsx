@@ -38,9 +38,9 @@ export function HandheldHeader({ title, operator, onBack, onSignOut, steps, step
           </Link>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{title}</div>
+          <div style={{ fontSize: "var(--text-base)", fontWeight: 700, lineHeight: 1.2 }}>{title}</div>
           {operator && (
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 1 }}>
               Signed in as {operator.name}
             </div>
           )}
@@ -61,7 +61,7 @@ export function HandheldHeader({ title, operator, onBack, onSignOut, steps, step
           <div className="hh-steps" aria-hidden>
             {Array.from({ length: steps }, (_, i) => <span key={i} data-on={i < step} />)}
           </div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 7 }}>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 7 }}>
             Step {step} of {steps}
           </div>
         </>
@@ -74,9 +74,9 @@ export function HandheldHeader({ title, operator, onBack, onSignOut, steps, step
 export function Instruction({ children, detail }) {
   return (
     <div>
-      <h2 style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.3 }}>{children}</h2>
+      <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, lineHeight: 1.3 }}>{children}</h2>
       {detail && (
-        <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6, lineHeight: 1.5 }}>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 6, lineHeight: 1.5 }}>
           {detail}
         </p>
       )}
@@ -112,11 +112,11 @@ export function Keypad({ value, onChange, suffix = "MT", max }) {
         padding: "18px 16px", textAlign: "center", marginBottom: 14,
       }}>
         <div style={{
-          fontSize: 40, fontWeight: 700, lineHeight: 1.1, fontVariantNumeric: "tabular-nums",
+          fontSize: "var(--text-2xl)", fontWeight: 700, lineHeight: 1.1, fontVariantNumeric: "tabular-nums",
           color: value ? "var(--text-primary)" : "var(--text-muted)",
         }}>
           {value || "0"}
-          <span style={{ fontSize: 18, fontWeight: 600, color: "var(--text-muted)", marginLeft: 6 }}>{suffix}</span>
+          <span style={{ fontSize: "var(--text-base)", fontWeight: 600, color: "var(--text-muted)", marginLeft: 6 }}>{suffix}</span>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
@@ -136,7 +136,7 @@ export function Keypad({ value, onChange, suffix = "MT", max }) {
 export function Fact({ label, value, strong, tone }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, padding: "7px 0" }}>
-      <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>{label}</span>
+      <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{label}</span>
       <span style={{
         fontSize: strong ? 17 : 15,
         fontWeight: strong ? 700 : 600,
@@ -167,7 +167,7 @@ export function HowThisWorks({ title, steps }) {
         style={{
           display: "flex", alignItems: "center", gap: 7, width: "100%",
           background: "none", border: "none", padding: "10px 0", cursor: "pointer",
-          color: "var(--text-muted)", fontSize: 14, fontWeight: 600,
+          color: "var(--text-muted)", fontSize: "var(--text-sm)", fontWeight: 600,
         }}>
         {open ? <X size={15} /> : <HelpCircle size={15} />}
         {open ? "Hide the steps" : "How this works"}
@@ -178,15 +178,15 @@ export function HowThisWorks({ title, steps }) {
           border: "1px solid var(--border)", borderRadius: 14,
           background: "var(--surface-2)", padding: "14px 16px",
         }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>{title}</div>
+          <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, marginBottom: 10 }}>{title}</div>
           <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 11 }}>
             {steps.map((s, i) => (
-              <li key={s} style={{ display: "flex", gap: 10, fontSize: 13, lineHeight: 1.5, color: "var(--text-secondary)" }}>
+              <li key={s} style={{ display: "flex", gap: 10, fontSize: "var(--text-xs)", lineHeight: 1.5, color: "var(--text-secondary)" }}>
                 <span style={{
                   flexShrink: 0, width: 20, height: 20, borderRadius: "50%",
                   background: "var(--card-bg)", border: "1px solid var(--border)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 700, color: "var(--text-muted)",
+                  fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-muted)",
                 }}>
                   {i + 1}
                 </span>
@@ -206,7 +206,7 @@ export function FloorError({ message }) {
   return (
     <div style={{
       background: "var(--red-light)", border: "1px solid var(--border)",
-      borderRadius: 12, padding: "12px 14px", fontSize: 14, lineHeight: 1.5,
+      borderRadius: 12, padding: "12px 14px", fontSize: "var(--text-sm)", lineHeight: 1.5,
       color: "var(--text-primary)",
     }}>
       {message}

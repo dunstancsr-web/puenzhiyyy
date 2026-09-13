@@ -18,7 +18,7 @@ export default function LoadingState({ label = "Loading…" }) {
           animation: "loading-pulse 1s ease-in-out infinite",
         }}
       />
-      <span style={{ fontSize: 13 }}>{label}</span>
+      <span style={{ fontSize: "var(--text-xs)" }}>{label}</span>
       <style>{`
         @keyframes loading-pulse {
           0%, 100% { opacity: 0.3; transform: scale(0.85); }

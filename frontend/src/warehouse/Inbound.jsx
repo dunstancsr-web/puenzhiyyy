@@ -120,8 +120,8 @@ export default function Inbound() {
             }}>
               <CheckCircle2 size={31} color="var(--green)" />
             </div>
-            <h2 style={{ fontSize: 21, fontWeight: 700 }}>Stock received</h2>
-            <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 5 }}>
+            <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700 }}>Stock received</h2>
+            <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 5 }}>
               It is live in the system now.
             </p>
           </div>
@@ -138,10 +138,10 @@ export default function Inbound() {
               borderBottom: "1px solid var(--border)",
               display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
-              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
+              <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
                 GOODS RECEIVED NOTE
               </span>
-              <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "monospace" }}>
+              <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, fontFamily: "monospace" }}>
                 {receipt.movement_no}
               </span>
             </div>
@@ -167,7 +167,7 @@ export default function Inbound() {
           {(short || over) && (
             <div style={{
               background: "var(--yellow-light)", border: "1px solid var(--border)",
-              borderRadius: 12, padding: "12px 14px", fontSize: 13.5, lineHeight: 1.55,
+              borderRadius: 12, padding: "12px 14px", fontSize: "var(--text-sm)", lineHeight: 1.55,
               display: "flex", gap: 10,
             }}>
               <AlertTriangle size={16} color="var(--yellow)" style={{ flexShrink: 0, marginTop: 2 }} />
@@ -205,16 +205,16 @@ export default function Inbound() {
           <FloorError message={loadError} />
 
           {deliveries === null && !loadError && (
-            <div style={{ color: "var(--text-muted)", fontSize: 14, padding: "20px 0" }}>Loading…</div>
+            <div style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)", padding: "20px 0" }}>Loading…</div>
           )}
 
           {deliveries && deliveries.length === 0 && (
             <div style={{ textAlign: "center", padding: "34px 10px", color: "var(--text-secondary)" }}>
               <Truck size={26} color="var(--text-muted)" />
-              <div style={{ fontSize: 15, fontWeight: 600, marginTop: 10, color: "var(--text-primary)" }}>
+              <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginTop: 10, color: "var(--text-primary)" }}>
                 Nothing is expected
               </div>
-              <div style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
+              <div style={{ fontSize: "var(--text-sm)", marginTop: 6, lineHeight: 1.5 }}>
                 Every open purchase order has been received. If a delivery turns up anyway, purchasing
                 needs to raise a PO before it can be booked in.
               </div>
@@ -228,15 +228,15 @@ export default function Inbound() {
                 style={{ padding: "13px 15px", textAlign: "left", display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    <span style={{ fontFamily: "monospace", fontSize: 13, color: "var(--text-muted)" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
                       {d.po_number}
                     </span>
                   </div>
-                  <div style={{ fontSize: 15.5, fontWeight: 700, marginTop: 2 }}>{d.product_name}</div>
-                  <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3, fontWeight: 400 }}>
+                  <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginTop: 2 }}>{d.product_name}</div>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 3, fontWeight: 400 }}>
                     {fmt(d.ordered_qty)} MT expected · due {d.eta}
                   </div>
-                  <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2, fontWeight: 400 }}>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2, fontWeight: 400 }}>
                     {d.supplier}
                   </div>
                 </div>
@@ -270,11 +270,11 @@ export default function Inbound() {
             border: "1px solid var(--border)", borderRadius: 14, padding: "13px 15px",
             background: "var(--surface-2)",
           }}>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 3 }}>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 3 }}>
               {po.po_number} should be
             </div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{po.product_name}</div>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3 }}>
+            <div style={{ fontSize: "var(--text-base)", fontWeight: 700 }}>{po.product_name}</div>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 3 }}>
               {po.rice_variety} · {po.packaging_size} · {po.country_of_origin}
             </div>
           </div>
@@ -297,7 +297,7 @@ export default function Inbound() {
                 spellCheck={false}
                 style={{
                   flex: 1, border: "none", outline: "none", background: "transparent",
-                  padding: "17px 0", fontSize: 17, fontWeight: 600, letterSpacing: "0.02em",
+                  padding: "17px 0", fontSize: "var(--text-base)", fontWeight: 600, letterSpacing: "0.02em",
                   color: "var(--text-primary)", minWidth: 0,
                   // Deliberately NOT textTransform: uppercase. That styles the
                   // placeholder as well, so the hint shouted "SCAN OR TYPE THE
@@ -309,7 +309,7 @@ export default function Inbound() {
             </div>
 
             {wrong && (
-              <div style={{ fontSize: 13.5, color: "var(--red)", marginTop: 9, lineHeight: 1.5 }}>
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginTop: 9, lineHeight: 1.5 }}>
                 That code is not {po.sku_id}. If the pallet really is a different product, go back and
                 pick the delivery that matches it.
               </div>
@@ -320,7 +320,7 @@ export default function Inbound() {
               here, so tapping the expected code stands in for pulling the
               trigger. Labelled honestly rather than dressed up as a scan. */}
           <button className="hh-tap" onClick={() => setScan(po.sku_id)}
-            style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)" }}>
+            style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-secondary)" }}>
             No scanner? Tap to enter {po.sku_id}
           </button>
 
@@ -356,7 +356,7 @@ export default function Inbound() {
               person counting it. */}
           {entered && variance !== 0 && (
             <div style={{
-              fontSize: 13.5, lineHeight: 1.5, padding: "11px 13px", borderRadius: 12,
+              fontSize: "var(--text-sm)", lineHeight: 1.5, padding: "11px 13px", borderRadius: 12,
               background: "var(--yellow-light)", border: "1px solid var(--border)",
             }}>
               That is <strong>{fmt(Math.abs(variance))} MT {variance < 0 ? "short of" : "more than"}</strong>{" "}
@@ -365,7 +365,7 @@ export default function Inbound() {
           )}
           {entered && variance === 0 && (
             <div style={{
-              fontSize: 13.5, padding: "11px 13px", borderRadius: 12,
+              fontSize: "var(--text-sm)", padding: "11px 13px", borderRadius: 12,
               background: "var(--green-light)", border: "1px solid var(--border)",
             }}>
               Matches the expected quantity exactly.
@@ -418,14 +418,14 @@ export default function Inbound() {
 
         {needsReason && (
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 9 }}>
+            <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: 9 }}>
               Why is it {variance < 0 ? "short" : "over"}?
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {(variance < 0 ? SHORT_REASONS : OVER_REASONS).map((r) => (
                 <button key={r} className="hh-tap" onClick={() => setReason(r)}
                   style={{
-                    minHeight: 48, fontSize: 14, textAlign: "left", padding: "0 14px",
+                    minHeight: 48, fontSize: "var(--text-sm)", textAlign: "left", padding: "0 14px",
                     borderColor: reason === r ? "var(--blue)" : "var(--border)",
                     background: reason === r ? "var(--blue-light)" : "var(--card-bg)",
                     color: reason === r ? "var(--blue)" : "var(--text-primary)",
@@ -434,7 +434,7 @@ export default function Inbound() {
                 </button>
               ))}
             </div>
-            <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 9, lineHeight: 1.5 }}>
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 9, lineHeight: 1.5 }}>
               This goes on the record against the delivery, so purchasing can settle it with the supplier.
             </p>
           </div>
@@ -451,7 +451,7 @@ export default function Inbound() {
             )}
           </button>
           {needsReason && !reason && (
-            <div style={{ fontSize: 12.5, color: "var(--text-muted)", textAlign: "center" }}>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", textAlign: "center" }}>
               Pick a reason to continue
             </div>
           )}

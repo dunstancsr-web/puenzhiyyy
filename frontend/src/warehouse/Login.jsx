@@ -65,8 +65,8 @@ export default function Login({ onSignedIn, purpose }) {
 
       <div className="hh-body" style={{ justifyContent: "center", gap: 22 }}>
         <div style={{ textAlign: "center" }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.25 }}>Who is {purpose}?</h1>
-          <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6 }}>
+          <h1 style={{ fontSize: "var(--text-lg)", fontWeight: 700, lineHeight: 1.25 }}>Who is {purpose}?</h1>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 6 }}>
             Enter your four digit PIN
           </p>
         </div>
@@ -92,7 +92,7 @@ export default function Login({ onSignedIn, purpose }) {
             k === "" ? <span key={i} /> : (
               <button key={i} className="hh-key" onClick={() => press(k)} disabled={busy}
                 aria-label={k === "back" ? "Delete last digit" : k}
-                style={{ height: 66, fontSize: 24 }}>
+                style={{ height: 66, fontSize: "var(--text-lg)" }}>
                 {k === "back" ? <Delete size={20} style={{ verticalAlign: "middle" }} /> : k}
               </button>
             )
@@ -106,7 +106,7 @@ export default function Login({ onSignedIn, purpose }) {
             padding: "12px 14px", background: "var(--surface-2)",
           }}>
             <div style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+              fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
               color: "var(--text-muted)", marginBottom: 8,
             }}>
               Demo PINs
@@ -116,7 +116,7 @@ export default function Login({ onSignedIn, purpose }) {
                 style={{
                   display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center",
                   background: "none", border: "none", padding: "5px 0", cursor: "pointer",
-                  fontSize: 13, color: "var(--text-secondary)",
+                  fontSize: "var(--text-xs)", color: "var(--text-secondary)",
                 }}>
                 <span>{o.name}<span style={{ color: "var(--text-muted)" }}> · {o.role}</span></span>
                 <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--text-primary)" }}>{o.pin}</span>

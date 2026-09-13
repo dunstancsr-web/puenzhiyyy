@@ -201,8 +201,8 @@ export default function Alerts() {
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700 }}>Alerts</h1>
-          <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>
+          <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>Alerts</h1>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4 }}>
             {filter === "ALL"
               ? `${active.length} active alert${active.length === 1 ? "" : "s"}`
               : `${filtered.length} of ${active.length} alert${active.length === 1 ? "" : "s"}`} · sorted by severity
@@ -210,7 +210,7 @@ export default function Alerts() {
         </div>
         <button
           onClick={loadAlerts}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--card-bg)", fontSize: 14, color: "var(--text-secondary)", cursor: "pointer" }}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--card-bg)", fontSize: "var(--text-sm)", color: "var(--text-secondary)", cursor: "pointer" }}
         >
           <RefreshCw size={13} /> Refresh
         </button>
@@ -243,10 +243,10 @@ export default function Alerts() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
                 <Icon size={14} color={count > 0 ? meta.color : "var(--text-muted)"} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: count > 0 ? meta.color : "var(--text-muted)" }}>{meta.label}</span>
+                <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: count > 0 ? meta.color : "var(--text-muted)" }}>{meta.label}</span>
                 <ColHint label={meta.label} what={TYPE_HINTS[type].what} how={TYPE_HINTS[type].how} />
               </div>
-              <div style={{ fontSize: 26, fontWeight: 700, color: count > 0 ? meta.color : "var(--text-muted)" }}>
+              <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: count > 0 ? meta.color : "var(--text-muted)" }}>
                 {count}
               </div>
             </button>
@@ -256,7 +256,7 @@ export default function Alerts() {
 
       {filter !== "ALL" && (
         <div style={{
-          display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600,
+          display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600,
           background: "var(--blue-light)", color: "var(--blue)", padding: "4px 10px 4px 12px",
           borderRadius: 99, marginBottom: 18,
         }}>
@@ -271,7 +271,7 @@ export default function Alerts() {
       {/* ── Alert cards ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 32 }}>
         {filtered.length === 0 ? (
-          <div className="card" style={{ padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: 15 }}>
+          <div className="card" style={{ padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
             {active.length === 0 ? "✓ No active alerts - all inventory levels are healthy." : "No alerts match this filter."}
           </div>
         ) : (
@@ -299,7 +299,7 @@ export default function Alerts() {
         <div style={{ marginTop: 4, marginBottom: 24 }}>
           <Link to="/activity" style={{
             display: "inline-flex", alignItems: "center", gap: 7,
-            fontSize: 13, fontWeight: 600, color: "var(--text-secondary)",
+            fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)",
             textDecoration: "none", padding: "8px 14px",
             border: "1px solid var(--border)", borderRadius: "var(--radius)",
             background: "var(--card-bg)",
@@ -358,7 +358,7 @@ function ActionButton({ onClick, children, variant = "quiet", title }) {
       style={{
         display: "inline-flex", alignItems: "center", gap: 6,
         padding: "6px 13px", borderRadius: "var(--radius)",
-        fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+        fontSize: "var(--text-xs)", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
         ...styles,
       }}>
       {children}
@@ -405,12 +405,12 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontWeight: 700, fontSize: 15 }}>{alert.sku_name}</span>
-            <span style={{ fontSize: 12, fontFamily: "monospace", color: "var(--text-muted)" }}>{alert.sku_id}</span>
+            <span style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}>{alert.sku_name}</span>
+            <span style={{ fontSize: "var(--text-xs)", fontFamily: "monospace", color: "var(--text-muted)" }}>{alert.sku_id}</span>
             <Badge type={alert.alert_type} label={meta.label} />
           </div>
 
-          <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55, margin: "6px 0 0" }}>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.55, margin: "6px 0 0" }}>
             {alert.message}
           </p>
 
@@ -418,7 +418,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
               left bar, sitting inside a card that already has a border and a
               coloured left stripe: a box inside a box inside a box. The label
               alone separates it perfectly well. */}
-          <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.55, margin: "6px 0 0" }}>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-primary)", lineHeight: 1.55, margin: "6px 0 0" }}>
             <span style={{ fontWeight: 600 }}>Recommended: </span>
             {alert.recommended_action}
           </p>
@@ -456,10 +456,10 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
             competed with the product name for first read; the name is what a
             manager scans for. */}
         <div style={{ textAlign: "right", flexShrink: 0, minWidth: 74 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
+          <div style={{ fontSize: "var(--text-lg)", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
             {alert.triggered_value}
           </div>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
             {VALUE_UNIT[alert.alert_type] || "days"}
           </div>
         </div>
@@ -483,8 +483,8 @@ function AiModal({ aiModal, onClose }) {
               <Cpu size={15} color="var(--purple)" />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>Why this was flagged</div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{alert.sku_name} · {alert.alert_type.replace(/_/g, " ")}</div>
+              <div style={{ fontWeight: 700, fontSize: "var(--text-base)" }}>Why this was flagged</div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{alert.sku_name} · {alert.alert_type.replace(/_/g, " ")}</div>
             </div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
@@ -495,7 +495,7 @@ function AiModal({ aiModal, onClose }) {
             fields, not a live model call (TASK-11 needs an API key that
             isn't available yet). Corrected to say so plainly rather than
             claim a capability that doesn't exist yet. */}
-        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--yellow)", marginBottom: 18 }}>
+        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--yellow)", marginBottom: 18 }}>
           {degraded
             ? "\u26A0\uFE0F This SKU's current figures could not be loaded, so only the alert's own text is shown. Reopen after a refresh for the full reasoning."
             : narrative?.available
@@ -508,7 +508,7 @@ function AiModal({ aiModal, onClose }) {
             reachable, the deterministic steps below are the whole explanation
             and nothing announces an absence the reader did not ask about. */}
         {narrative?.loading && (
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 16 }}>
             Asking the model for a plain English summary...
           </div>
         )}
@@ -519,7 +519,7 @@ function AiModal({ aiModal, onClose }) {
           }}>
             <div style={{
               display: "flex", alignItems: "center", gap: 6, marginBottom: 7,
-              fontSize: 11, fontWeight: 700, letterSpacing: "0.05em",
+              fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em",
               textTransform: "uppercase", color: "var(--purple)",
             }}>
               <Cpu size={12} /> Summary
@@ -533,7 +533,7 @@ function AiModal({ aiModal, onClose }) {
                 {narrative.cached ? " · reused" : ""}
               </span>
             </div>
-            <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text-primary)", whiteSpace: "pre-line" }}>
+            <div style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "var(--text-primary)", whiteSpace: "pre-line" }}>
               {narrative.explanation}
             </div>
           </div>
@@ -551,7 +551,7 @@ function AiModal({ aiModal, onClose }) {
                 style={{
                   flexShrink: 0, width: 22, height: 22, borderRadius: "50%",
                   background: "var(--surface-2)", border: "1px solid var(--border)",
-                  color: "var(--text-muted)", fontSize: 11, fontWeight: 700,
+                  color: "var(--text-muted)", fontSize: "var(--text-xs)", fontWeight: 700,
                   display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1,
                 }}
               >
@@ -559,12 +559,12 @@ function AiModal({ aiModal, onClose }) {
               </span>
               <div style={{ minWidth: 0 }}>
                 <div style={{
-                  fontSize: 11, fontWeight: 700, letterSpacing: "0.05em",
+                  fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em",
                   textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 3,
                 }}>
                   {s.heading}
                 </div>
-                <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.65 }}>
+                <div style={{ fontSize: "var(--text-sm)", color: "var(--text-primary)", lineHeight: 1.65 }}>
                   {s.body}
                 </div>
               </div>
@@ -574,7 +574,7 @@ function AiModal({ aiModal, onClose }) {
 
         <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}>
           <button onClick={onClose}
-            style={{ padding: "8px 20px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff", fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}>
+            style={{ padding: "8px 20px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff", fontWeight: 600, fontSize: "var(--text-sm)", border: "none", cursor: "pointer" }}>
             Understood
           </button>
         </div>
@@ -628,12 +628,12 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
       <div style={{ background: "var(--modal-bg)", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: 480, boxShadow: "var(--shadow-md)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>Manager Decision</div>
+          <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>Manager Decision</div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
         </div>
 
         {/* Context */}
-        <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", marginBottom: 20, fontSize: 14 }}>
+        <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", marginBottom: 20, fontSize: "var(--text-sm)" }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>{alert.sku_name}</div>
           <div style={{ color: "var(--text-secondary)" }}>{alert.recommended_action}</div>
           {alert.ai_recommendation_qty > 0 && (
@@ -646,7 +646,7 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
         <form onSubmit={handleSubmit}>
           {/* Action selector */}
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>Decision</label>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>Decision</label>
             <div style={{ display: "flex", gap: 8 }}>
               {[
                 { value: "approved", label: "✓ Approve", activeColor: "var(--green)", activeBg: "var(--green-light)" },
@@ -655,7 +655,7 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
               ].map((opt) => (
                 <button key={opt.value} type="button" onClick={() => setAction(opt.value)}
                   style={{
-                    flex: 1, padding: "8px", borderRadius: "var(--radius)", fontSize: 14, fontWeight: 600, cursor: "pointer",
+                    flex: 1, padding: "8px", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", fontWeight: 600, cursor: "pointer",
                     border: `1px solid ${action === opt.value ? opt.activeColor : "var(--border)"}`,
                     background: action === opt.value ? opt.activeBg : "var(--surface)",
                     color: action === opt.value ? opt.activeColor : "var(--text-secondary)",
@@ -669,17 +669,17 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
           {/* Quantity (shown for approve/modify) */}
           {action !== "rejected" && alert.ai_recommendation_qty != null && (
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
+              <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
                 Quantity to {action === "approved" ? "approve" : "adjust"} (MT)
               </label>
               <input type="number" min={0} step={1} value={qty} onChange={(e) => setQty(e.target.value)}
-                style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 14 }} />
+                style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-sm)" }} />
             </div>
           )}
 
           {/* Reason */}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
+            <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
               Reason / Notes {action !== "approved" && <span style={{ color: "var(--red)" }}>*</span>}
             </label>
             <textarea
@@ -688,31 +688,31 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
               placeholder="e.g. Customer contract confirmed, adjusted quantity accordingly…"
               rows={3}
               style={{
-                width: "100%", padding: "9px 12px", borderRadius: "var(--radius)", fontSize: 14,
+                width: "100%", padding: "9px 12px", borderRadius: "var(--radius)", fontSize: "var(--text-sm)",
                 resize: "vertical", fontFamily: "inherit",
                 border: `1px solid ${showReasonError ? "var(--red)" : "var(--border)"}`,
               }}
             />
             {showReasonError && (
-              <div style={{ fontSize: 12, color: "var(--red)", marginTop: 4 }}>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--red)", marginTop: 4 }}>
                 A reason is required to {action === "rejected" ? "reject" : "modify"} this recommendation.
               </div>
             )}
           </div>
 
           {submitError && (
-            <div style={{ fontSize: 13, color: "var(--red)", marginBottom: 12 }}>⚠ {submitError}</div>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--red)", marginBottom: 12 }}>⚠ {submitError}</div>
           )}
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button type="button" onClick={onClose} disabled={saving}
-              style={{ padding: "8px 18px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--surface)", fontSize: 14, cursor: saving ? "not-allowed" : "pointer" }}>
+              style={{ padding: "8px 18px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--surface)", fontSize: "var(--text-sm)", cursor: saving ? "not-allowed" : "pointer" }}>
               Cancel
             </button>
             <button type="submit" disabled={!valid || saving}
               style={{
                 padding: "8px 22px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff",
-                fontWeight: 600, fontSize: 14, border: "none", cursor: !valid || saving ? "not-allowed" : "pointer",
+                fontWeight: 600, fontSize: "var(--text-sm)", border: "none", cursor: !valid || saving ? "not-allowed" : "pointer",
                 opacity: !valid || saving ? 0.6 : 1,
               }}>
               {saving ? "Recording…" : "Record Decision"}

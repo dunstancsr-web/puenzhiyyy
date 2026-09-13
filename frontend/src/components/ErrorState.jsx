@@ -14,12 +14,12 @@ export default function ErrorState({ message = "Failed to load.", onRetry }) {
       }}
     >
       <AlertTriangle size={22} color="var(--red)" />
-      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{message}</div>
+      <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)" }}>{message}</div>
       {onRetry && (
         <button
           onClick={onRetry}
           style={{
-            padding: "7px 16px", borderRadius: "var(--radius)", fontSize: 13, fontWeight: 600,
+            padding: "7px 16px", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", fontWeight: 600,
             border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)",
             cursor: "pointer",
           }}

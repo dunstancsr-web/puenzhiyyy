@@ -629,7 +629,7 @@ function MonthTrendChart({ data }) {
               if (!active || !payload?.length) return null;
               const d = payload[0].payload;
               return (
-                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: 12, boxShadow: "var(--shadow)" }}>
+                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: "var(--text-xs)", boxShadow: "var(--shadow)" }}>
                   <strong>{d.name}</strong>: SGD {fmt$(d.value)}
                 </div>
               );
@@ -667,7 +667,7 @@ function HealthStack({ data, selected, onSelect }) {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 opacity: selected && selected !== d.status ? 0.55 : 1,
               }}>
-              {d.pct > 12 && <span style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>{d.pct}%</span>}
+              {d.pct > 12 && <span style={{ color: "#fff", fontSize: "var(--text-xs)", fontWeight: 700 }}>{d.pct}%</span>}
             </button>
           </HoverHint>
         ))}
@@ -704,13 +704,13 @@ function AbcMovementMatrix({ matrix, selected, onSelect }) {
         <div />
         {cols.map((c) => (
           <div key={c} style={{ textAlign: "center", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)" }}>
-            {c}<div style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)" }}>{MOVE_NOTE[c]}</div>
+            {c}<div style={{ fontWeight: 400, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{MOVE_NOTE[c]}</div>
           </div>
         ))}
         {rows.map((r) => (
           <React.Fragment key={r}>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", paddingRight: 6 }}>
-              {r}<span style={{ fontWeight: 400, fontSize: 11, color: "var(--text-muted)" }}>{ABC_NOTE[r]}</span>
+              {r}<span style={{ fontWeight: 400, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{ABC_NOTE[r]}</span>
             </div>
             {cols.map((c) => {
               const key = `${r}:${c}`;
@@ -730,10 +730,10 @@ function AbcMovementMatrix({ matrix, selected, onSelect }) {
                       cursor: clickable ? "pointer" : "default",
                       opacity: selected && !isSel ? 0.55 : 1,
                     }}>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: cell.count ? "var(--text-primary)" : "var(--text-muted)" }}>
+                    <div style={{ fontSize: "var(--text-base)", fontWeight: 800, color: cell.count ? "var(--text-primary)" : "var(--text-muted)" }}>
                       {cell.count}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{cell.value > 0 ? fmt$(cell.value) : "-"}</div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{cell.value > 0 ? fmt$(cell.value) : "-"}</div>
                   </button>
                 </HoverHint>
               );

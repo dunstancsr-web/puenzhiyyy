@@ -126,7 +126,7 @@ export default function SettingsMenu({ align = "up", compact = false }) {
           border: "1px solid var(--sidebar-border)",
           background: open ? "var(--surface-2)" : "transparent",
           color: "var(--text-secondary)", cursor: "pointer",
-          fontSize: 13, fontWeight: 600, textAlign: "left",
+          fontSize: "var(--text-xs)", fontWeight: 600, textAlign: "left",
         }}
       >
         <Settings size={compact ? 19 : 15} style={{ flexShrink: 0 }} />
@@ -207,12 +207,12 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                     background: awaiting ? "var(--yellow-light)" : active ? "var(--blue-light)" : "transparent",
                     color: !m.available ? "var(--text-muted)" : awaiting ? "var(--yellow)" : active ? "var(--blue)" : "var(--text-secondary)",
                     opacity: m.available ? 1 : 0.55,
-                    fontSize: 13.5, fontWeight: active || awaiting ? 600 : 400,
+                    fontSize: "var(--text-sm)", fontWeight: active || awaiting ? 600 : 400,
                   }}>
                   <Icon size={14} style={{ flexShrink: 0 }} />
                   <span style={{ flex: 1 }}>{awaiting ? "Spend credit?" : m.label}</span>
                   {m.cost === "metered" && m.available && !awaiting && !active && (
-                    <span style={{ fontSize: 10, fontWeight: 700, color: "var(--yellow)" }}>$</span>
+                    <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--yellow)" }}>$</span>
                   )}
                   {awaiting && <AlertTriangle size={12} />}
                   {active && <Check size={13} />}
@@ -222,12 +222,12 @@ export default function SettingsMenu({ align = "up", compact = false }) {
           </div>
 
           {pending && (
-            <p style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.45, margin: "-8px 0 12px" }}>
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.45, margin: "-8px 0 12px" }}>
               Click again to confirm. This tier bills the team's shared AWS credit on every new explanation.
             </p>
           )}
           {error && (
-            <p style={{ fontSize: 11.5, color: "var(--red)", lineHeight: 1.45, margin: "-8px 0 12px" }}>{error}</p>
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--red)", lineHeight: 1.45, margin: "-8px 0 12px" }}>{error}</p>
           )}
 
           <Section title="Theme" />
@@ -244,7 +244,7 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                     border: `1px solid ${on ? "var(--blue)" : "var(--border)"}`,
                     background: on ? "var(--blue-light)" : "transparent",
                     color: on ? "var(--blue)" : "var(--text-secondary)",
-                    fontSize: 12.5, fontWeight: on ? 600 : 400,
+                    fontSize: "var(--text-xs)", fontWeight: on ? 600 : 400,
                   }}>
                   <ThemeIcon size={14} style={{ flexShrink: 0 }} />
                   {t.label}
@@ -272,13 +272,13 @@ function Section({ title, note }) {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{
-        fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+        fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
         color: "var(--text-muted)",
       }}>
         {title}
       </div>
       {note && (
-        <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.4 }}>{note}</div>
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 3, lineHeight: 1.4 }}>{note}</div>
       )}
     </div>
   );

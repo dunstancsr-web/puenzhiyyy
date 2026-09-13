@@ -77,14 +77,14 @@ function Detail({ body }) {
         style={{
           display: "inline-flex", alignItems: "center", gap: 5, padding: 0,
           background: "none", border: "none", cursor: "pointer",
-          fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)",
+          fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
         }}
       >
         <ChevronDown size={13} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }} />
         {open ? "Less" : "What is this?"}
       </button>
       {open && (
-        <p style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.55, marginTop: 8 }}>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.55, marginTop: 8 }}>
           {body}
         </p>
       )}
@@ -112,11 +112,11 @@ export default function Home() {
               </svg>
             </div>
             <div>
-              <h1 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.1 }}>StockSense</h1>
-              <div style={{ fontSize: 14, color: "var(--text-muted)" }}>Rice inventory, from the dock to the decision</div>
+              <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, lineHeight: 1.1 }}>StockSense</h1>
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Rice inventory, from the dock to the decision</div>
             </div>
           </div>
-          <p style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.55, maxWidth: 620 }}>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.55, maxWidth: 620 }}>
             Stock arrives, stock leaves, and somebody has to decide what to do about what is left.
             Pick where you are.
           </p>
@@ -146,10 +146,10 @@ export default function Home() {
 
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.2 }}>{m.label}</span>
+                    <span style={{ fontSize: "var(--text-lg)", fontWeight: 700, lineHeight: 1.2 }}>{m.label}</span>
                     {m.soon && (
                       <span style={{
-                        fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase",
+                        fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase",
                         color: "var(--text-muted)", border: "1px solid var(--border)",
                         borderRadius: 99, padding: "2px 8px",
                       }}>
@@ -157,13 +157,13 @@ export default function Home() {
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 13, color: m.tint, fontWeight: 600, marginTop: 2 }}>{m.sub}</div>
+                  <div style={{ fontSize: "var(--text-xs)", color: m.tint, fontWeight: 600, marginTop: 2 }}>{m.sub}</div>
                 </div>
 
                 {/* Naming the device and the place is the fastest way to tell
                     someone a screen is not meant for them, and it is two words
                     rather than three lines. */}
-                <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{m.who}</div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{m.who}</div>
 
                 <Detail body={m.body} />
               </Card>
@@ -171,7 +171,7 @@ export default function Home() {
           })}
         </div>
 
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 26, textAlign: "center" }}>
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 26, textAlign: "center" }}>
           AWS NUS-ISS SMYA 2026
         </div>
       </div>

@@ -19,7 +19,7 @@ const wrapStyle = (half) => ({ gridColumn: half ? "span 1" : "span 2", minWidth:
 
 const labelStyle = {
   display: "block",
-  fontSize: 13,
+  fontSize: "var(--text-xs)",
   fontWeight: 500,
   marginBottom: 4,
   color: "var(--text-secondary)",
@@ -30,12 +30,12 @@ const inputStyle = (error) => ({
   padding: "8px 11px",
   border: `1px solid ${error ? "var(--red)" : "var(--border)"}`,
   borderRadius: "var(--radius)",
-  fontSize: 14,
+  fontSize: "var(--text-sm)",
   background: "var(--surface)",
   color: "var(--text-primary)",
 });
 
-const errorStyle = { fontSize: 12, color: "var(--red)", marginTop: 3 };
+const errorStyle = { fontSize: "var(--text-xs)", color: "var(--red)", marginTop: 3 };
 
 export function TextField({ label, value, onChange, placeholder, required, half, error }) {
   return (
@@ -77,9 +77,9 @@ export function NumberField({
               value={value ?? ""}
               onChange={(e) => onChange(e.target.value)}
               step={step} min={min} max={max}
-              style={{ ...inputStyle(error), width: 64, padding: "4px 7px", fontSize: 13, textAlign: "right" }}
+              style={{ ...inputStyle(error), width: 64, padding: "4px 7px", fontSize: "var(--text-xs)", textAlign: "right" }}
             />
-            {suffix && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{suffix}</span>}
+            {suffix && <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{suffix}</span>}
           </span>
         </div>
         {/* reserves the vertical space a sibling slider's track occupies */}
@@ -106,7 +106,7 @@ export function NumberField({
           <span
             style={{
               position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-              fontSize: 13, color: "var(--text-muted)", pointerEvents: "none",
+              fontSize: "var(--text-xs)", color: "var(--text-muted)", pointerEvents: "none",
             }}
           >
             {suffix}
@@ -150,9 +150,9 @@ export function SliderField({
             min={min}
             max={max}
             disabled={disabled}
-            style={{ ...inputStyle(error), width: 64, padding: "4px 7px", fontSize: 13, textAlign: "right" }}
+            style={{ ...inputStyle(error), width: 64, padding: "4px 7px", fontSize: "var(--text-xs)", textAlign: "right" }}
           />
-          {suffix && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{suffix}</span>}
+          {suffix && <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{suffix}</span>}
         </span>
       </div>
       <input

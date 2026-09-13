@@ -114,7 +114,7 @@ export default function StockPositionBar({
 
   if (!finalAxisMax || finalAxisMax <= 0) {
     return (
-      <div style={{ fontSize: 12, color: "var(--text-muted)", minWidth: 220 }}>
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", minWidth: 220 }}>
         No stock policy set
       </div>
     );
@@ -199,9 +199,9 @@ export default function StockPositionBar({
     <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 240 }}>
       {/* value */}
       <HoverHint panelWidth={260} content={AVAIL_COPY}>
-        <span style={{ fontSize: 14 }}>
+        <span style={{ fontSize: "var(--text-sm)" }}>
           <span style={{ fontWeight: 800, color: valueColor }}>{fmt(avail)} MT</span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}> available</span>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 400 }}> available</span>
         </span>
       </HoverHint>
 
@@ -266,7 +266,7 @@ export default function StockPositionBar({
       </HoverHint>
 
       {/* axis labels - sit under their ticks */}
-      <div style={{ position: "relative", height: 14, fontSize: 11, marginTop: 1 }}>
+      <div style={{ position: "relative", height: 14, fontSize: "var(--text-xs)", marginTop: 1 }}>
         <span style={{ position: "absolute", left: 0, color: "var(--text-muted)" }}>0</span>
         {showReorder && (
           <HoverHint panelWidth={280} content={reorderCopy(true, sug)}>
@@ -290,7 +290,7 @@ export default function StockPositionBar({
       {/* status line */}
       {gapText && (
         <HoverHint panelWidth={260} content={gapCopy(idle)}>
-          <div style={{ fontSize: 13, fontWeight: gapWeight, color: gapColor }}>{gapText}</div>
+          <div style={{ fontSize: "var(--text-xs)", fontWeight: gapWeight, color: gapColor }}>{gapText}</div>
         </HoverHint>
       )}
     </div>

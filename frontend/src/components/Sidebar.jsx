@@ -76,8 +76,8 @@ export default function Sidebar() {
             <TrendingUp size={18} color="#fff" />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-primary)" }}>StockSense</div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Control Tower</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--text-primary)" }}>StockSense</div>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Control Tower</div>
           </div>
         </div>
 
@@ -87,11 +87,11 @@ export default function Sidebar() {
           padding: "9px 10px", marginBottom: 18, borderRadius: "var(--radius)",
           border: "1px solid var(--sidebar-border)",
           color: "var(--text-secondary)", textDecoration: "none",
-          fontSize: 13.5, fontWeight: 600,
+          fontSize: "var(--text-sm)", fontWeight: 600,
         }}>
           <HomeIcon size={17} />
           Home
-          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>Switch</span>
+          <span style={{ marginLeft: "auto", fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 500 }}>Switch</span>
         </Link>
 
         <nav style={{ flex: 1 }}>
@@ -100,7 +100,7 @@ export default function Sidebar() {
               style={({ isActive }) => ({
                 display: "flex", alignItems: "center", gap: 11,
                 padding: "10px 12px", marginBottom: 3, borderRadius: "var(--radius)",
-                textDecoration: "none", fontSize: 15,
+                textDecoration: "none", fontSize: "var(--text-sm)",
                 fontWeight: isActive ? 600 : 400,
                 background: isActive ? "var(--blue)" : "transparent",
                 color: isActive ? "#fff" : "var(--text-secondary)",
@@ -113,8 +113,8 @@ export default function Sidebar() {
                   {badge > 0 && (
                     <span style={{
                       background: isActive ? "rgba(255,255,255,0.25)" : "var(--red)",
-                      color: "#fff", fontSize: 11, fontWeight: 700,
-                      minWidth: 19, height: 19, borderRadius: 99,
+                      color: "#fff", fontSize: "var(--text-xs)", fontWeight: 700,
+                      minWidth: 21, height: 21, borderRadius: 99,
                       display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px",
                     }}>
                       {badge}
@@ -130,7 +130,7 @@ export default function Sidebar() {
 
         <div style={{
           padding: "12px 8px 0", marginTop: 12, borderTop: "1px solid var(--sidebar-border)",
-          fontSize: 12, color: "var(--text-muted)",
+          fontSize: "var(--text-xs)", color: "var(--text-muted)",
         }}>
           AWS NUS-ISS SMYA 2026
         </div>
@@ -143,7 +143,7 @@ export default function Sidebar() {
         <div className="app-topbar-glass__island glass-surface">
           <Link to="/" aria-label="Home" style={{
             display: "flex", alignItems: "center", gap: 7, textDecoration: "none",
-            color: "var(--text-primary)", fontSize: 14, fontWeight: 600, padding: "0 4px",
+            color: "var(--text-primary)", fontSize: "var(--text-sm)", fontWeight: 600, padding: "0 4px",
           }}>
             <HomeIcon size={19} />
             Home
@@ -169,7 +169,7 @@ export default function Sidebar() {
                       <span style={{
                         position: "absolute", top: -4, right: -6,
                         background: "var(--red)", color: "#fff",
-                        fontSize: 9, fontWeight: 700, minWidth: 14, height: 14,
+                        fontSize: "var(--text-xs)", fontWeight: 700, minWidth: 18, height: 18,
                         borderRadius: 99, display: "flex", alignItems: "center",
                         justifyContent: "center", padding: "0 3px",
                       }}>
@@ -180,7 +180,7 @@ export default function Sidebar() {
                   {/* className, not an inline display, so the 560px rule can
                       hide it. See the note in index.css. */}
                   <span className="tab-label" style={{
-                    fontSize: 13, fontWeight: isActive ? 700 : 500,
+                    fontSize: "var(--text-xs)", fontWeight: isActive ? 700 : 500,
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
                     {label}
@@ -188,7 +188,7 @@ export default function Sidebar() {
                   {badge > 0 && isActive && (
                     <span className="tab-badge" style={{
                       background: "rgba(255,255,255,0.28)", color: "#fff",
-                      fontSize: 10, fontWeight: 700, minWidth: 16, height: 16,
+                      fontSize: "var(--text-xs)", fontWeight: 700, minWidth: 20, height: 20,
                       borderRadius: 99, alignItems: "center",
                       justifyContent: "center", padding: "0 4px", flexShrink: 0,
                     }}>

@@ -203,7 +203,7 @@ function Payload({ label, value }) {
   return (
     <div style={{ minWidth: 0, flex: "1 1 260px" }}>
       <div style={{
-        fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase",
+        fontSize: "var(--text-xs)", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase",
         color: "var(--text-muted)", marginBottom: 6,
       }}>
         {label}
@@ -211,7 +211,7 @@ function Payload({ label, value }) {
       <pre style={{
         margin: 0, padding: "10px 12px", borderRadius: "var(--radius)",
         background: "var(--surface-2)", border: "1px solid var(--border)",
-        fontSize: 12, lineHeight: 1.55, color: "var(--text-secondary)",
+        fontSize: "var(--text-xs)", lineHeight: 1.55, color: "var(--text-secondary)",
         // A payload can be wider than the card. Scroll it inside its own box
         // rather than letting it widen the page.
         overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word",
@@ -247,23 +247,23 @@ function EventRow({ event, isLast }) {
           display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap",
           justifyContent: "space-between",
         }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: meta.color, letterSpacing: "0.01em" }}>
+          <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: meta.color, letterSpacing: "0.01em" }}>
             {meta.label}
           </span>
           <span
-            style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}
+            style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", flexShrink: 0 }}
             title={exactTime(event.created_at)}
           >
             {relativeTime(event.created_at)}
           </span>
         </div>
 
-        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginTop: 2 }}>
+        <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)", marginTop: 2 }}>
           {headline}
         </div>
 
         {detail && (
-          <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3, lineHeight: 1.55 }}>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 3, lineHeight: 1.55 }}>
             {detail}
           </div>
         )}
@@ -275,7 +275,7 @@ function EventRow({ event, isLast }) {
           style={{
             display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, padding: 0,
             border: "none", background: "none", cursor: "pointer",
-            fontSize: 12, fontWeight: 600, color: "var(--text-muted)",
+            fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
           }}
         >
           <ChevronRight
@@ -338,11 +338,11 @@ export default function Activity() {
           {/* ColHint renders the ⓘ trigger ONLY - its `label` prop is the aria
               label, not visible text. Wrapping it alone in the h1 produced a
               page with no heading at all. */}
-          <h1 style={{ fontSize: 24, fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}>
+          <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}>
             Activity
             <ColHint label="Activity" what={PAGE_HINT.what} how={PAGE_HINT.how} />
           </h1>
-          <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4 }}>
             {total === 0
               ? "No activity recorded yet"
               : filter === "ALL"
@@ -355,7 +355,7 @@ export default function Activity() {
           style={{
             display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", flexShrink: 0,
             border: "1px solid var(--border)", borderRadius: "var(--radius)",
-            background: "var(--card-bg)", fontSize: 14, color: "var(--text-secondary)", cursor: "pointer",
+            background: "var(--card-bg)", fontSize: "var(--text-sm)", color: "var(--text-secondary)", cursor: "pointer",
           }}
         >
           <RefreshCw size={13} /> Refresh
@@ -378,7 +378,7 @@ export default function Activity() {
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 6,
                   padding: "6px 13px", borderRadius: 99, cursor: "pointer",
-                  fontSize: 13, fontWeight: 600,
+                  fontSize: "var(--text-xs)", fontWeight: 600,
                   border: `1px solid ${isActive ? "var(--text-primary)" : "var(--border)"}`,
                   background: isActive ? "var(--text-primary)" : "var(--card-bg)",
                   color: isActive ? "var(--card-bg)" : "var(--text-secondary)",
@@ -403,10 +403,10 @@ export default function Activity() {
         {!loading && !error && events.length === 0 && (
           <div style={{ textAlign: "center", padding: "56px 20px" }}>
             <FileSearch size={26} color="var(--text-muted)" />
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginTop: 12 }}>
+            <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)", marginTop: 12 }}>
               Nothing recorded yet
             </div>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 6, maxWidth: 420, marginInline: "auto", lineHeight: 1.6 }}>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 6, maxWidth: 420, marginInline: "auto", lineHeight: 1.6 }}>
               This log fills itself as the system runs. Load the Alerts page to have the engines
               evaluate current stock, or change a policy on any SKU, and the record appears here.
             </div>

@@ -292,8 +292,8 @@ export default function Inventory() {
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700 }}>Inventory</h1>
-          <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>
+          <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>Inventory</h1>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4 }}>
             {filtered.length} of {skus.length} SKUs
             {needsAttention > 0
               ? ` · ${needsAttention} need${needsAttention === 1 ? "s" : ""} attention`
@@ -306,7 +306,7 @@ export default function Inventory() {
             display: "flex", alignItems: "center", gap: 7,
             background: "var(--blue)", color: "#fff",
             padding: "9px 18px", borderRadius: "var(--radius)",
-            fontWeight: 600, fontSize: 14, border: "none",
+            fontWeight: 600, fontSize: "var(--text-sm)", border: "none",
           }}
         >
           <Plus size={15} /> Add SKU
@@ -320,7 +320,7 @@ export default function Inventory() {
           <input
             value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search SKU, variety, supplier…"
-            style={{ width: "100%", padding: "8px 12px 8px 32px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 14, background: "var(--surface)", color: "var(--text-primary)" }}
+            style={{ width: "100%", padding: "8px 12px 8px 32px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", background: "var(--surface)", color: "var(--text-primary)" }}
           />
         </div>
         <Select value={healthFilter}   onChange={setHealthFilter}   options={HEALTH_STATUSES}  placeholder="Health Status" />
@@ -345,7 +345,7 @@ export default function Inventory() {
                   <th key={label}
                     onClick={() => handleSort(key)}
                     style={{
-                      padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600,
+                      padding: "12px 16px", textAlign: "left", fontSize: "var(--text-xs)", fontWeight: 600,
                       color: "var(--text-secondary)", cursor: key ? "pointer" : "default",
                       userSelect: "none", lineHeight: 1.3,
                       textTransform: "uppercase", letterSpacing: "0.03em",
@@ -385,11 +385,11 @@ export default function Inventory() {
                       onClick={() => setSelectedSku(sku)}
                       style={{ padding: "13px 16px", cursor: "pointer" }}
                     >
-                      <div style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.35 }}>{sku.product_name}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: "var(--text-sm)", lineHeight: 1.35 }}>{sku.product_name}</div>
+                      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 1 }}>
                         {sku.sku_id} · {sku.rice_variety}
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: 11, color: "var(--text-muted)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
                         {sku.abc_class && sku.xyz_class && (
                           <span style={{
                             fontWeight: 700, letterSpacing: "0.04em",
@@ -423,19 +423,19 @@ export default function Inventory() {
                     {/* Coverage vs lead time */}
                     <td style={{ padding: "13px 16px" }}>
                       {sku.days_of_cover === null ? (
-                        <span style={{ fontSize: 13, color: "var(--red)", fontWeight: 700 }}>No demand</span>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--red)", fontWeight: 700 }}>No demand</span>
                       ) : (
                         <div>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                             <span style={{
-                              fontSize: 15, fontWeight: 800,
+                              fontSize: "var(--text-sm)", fontWeight: 800,
                               color: sku.days_of_cover < sku.lead_time_days ? "var(--red)"
                                 : sku.days_of_cover < sku.lead_time_days * 1.5 ? "var(--yellow)"
                                 : "var(--green)",
                             }}>
                               {sku.days_of_cover}d
                             </span>
-                            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>/ {sku.lead_time_days}d LT</span>
+                            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>/ {sku.lead_time_days}d LT</span>
                           </div>
                           <div style={{ marginTop: 4, width: 84, height: 5, background: "var(--border)", borderRadius: 99, position: "relative" }}>
                             <div style={{
@@ -457,7 +457,7 @@ export default function Inventory() {
                     {/* Movement */}
                     <td style={{ padding: "13px 16px" }}>
                       <Badge type={sku.movement_class} />
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 4 }}>
                         {sku.avg_daily_usage_30d} MT/day
                       </div>
                     </td>
@@ -485,18 +485,18 @@ export default function Inventory() {
           <InfoRow label="Target stock"            value={`${restockTarget.target_stock} MT`} />
           <InfoRow label="Max stock"               value={`${restockTarget.max_stock} MT`} />
           <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
-          <label style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
+          <label style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 500, marginBottom: 6 }}>
             Quantity to add (MT)
           </label>
           <input
             type="number" min={0.1} step={0.1} value={restockQty}
             onChange={(e) => { setRestockQty(e.target.value); setRestockError(null); }}
             placeholder="e.g. 200"
-            style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 14, marginBottom: restockError ? 8 : 18, background: "var(--surface)", color: "var(--text-primary)" }}
+            style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", marginBottom: restockError ? 8 : 18, background: "var(--surface)", color: "var(--text-primary)" }}
             autoFocus
           />
           {restockError && (
-            <div style={{ fontSize: 13, color: "var(--red)", marginBottom: 12 }}>⚠ {restockError}</div>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--red)", marginBottom: 12 }}>⚠ {restockError}</div>
           )}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <ModalBtn label="Cancel" onClick={() => setRestockTarget(null)} disabled={restockSaving} />
@@ -533,7 +533,7 @@ function Select({ value, onChange, options, placeholder }) {
           announced three unlabelled comboboxes. */}
       <select value={value} onChange={(e) => onChange(e.target.value)}
         aria-label={`Filter by ${placeholder || "value"}`}
-        style={{ padding: "8px 12px 8px 26px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", fontSize: 14, color: "var(--text-primary)", cursor: "pointer", appearance: "none" }}>
+        style={{ padding: "8px 12px 8px 26px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", fontSize: "var(--text-sm)", color: "var(--text-primary)", cursor: "pointer", appearance: "none" }}>
         {options.map((o) => <option key={o} value={o}>{o === "All" ? placeholder || "All" : o}</option>)}
       </select>
     </div>
@@ -543,7 +543,7 @@ function Select({ value, onChange, options, placeholder }) {
 function ActionBtn({ label, onClick, variant }) {
   return (
     <button onClick={onClick} style={{
-      padding: "5px 11px", borderRadius: 6, fontSize: 13, fontWeight: 500,
+      padding: "5px 11px", borderRadius: 6, fontSize: "var(--text-xs)", fontWeight: 500,
       border: "1px solid var(--border)",
       background: variant === "ghost" ? "transparent" : "var(--surface)",
       color: "var(--text-primary)", cursor: "pointer",
@@ -581,7 +581,7 @@ function Modal({ title, onClose, children, wide }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>{title}</div>
+          <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{title}</div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}>
             <X size={18} />
           </button>
@@ -596,7 +596,7 @@ function Modal({ title, onClose, children, wide }) {
 function ModalBtn({ label, onClick, primary, type = "button", disabled }) {
   return (
     <button type={type} onClick={onClick} disabled={disabled} style={{
-      padding: "8px 20px", borderRadius: "var(--radius)", fontSize: 14, fontWeight: 600,
+      padding: "8px 20px", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", fontWeight: 600,
       border: "1px solid var(--border)",
       background: primary ? "var(--blue)" : "var(--surface)",
       color: primary ? "#fff" : "var(--text-primary)",
@@ -610,7 +610,7 @@ function ModalBtn({ label, onClick, primary, type = "button", disabled }) {
 
 function InfoRow({ label, value }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", marginBottom: 8 }}>
       <span style={{ color: "var(--text-secondary)" }}>{label}</span>
       <span style={{ fontWeight: 600 }}>{value}</span>
     </div>
@@ -620,7 +620,7 @@ function InfoRow({ label, value }) {
 function FormSection({ title, children }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 10 }}>
+      <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 10 }}>
         {title}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 16px" }}>
@@ -647,17 +647,17 @@ function ProjectionChart({ skuId }) {
   }, [skuId]);
 
   if (error) {
-    return <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Projection unavailable - {error}</div>;
+    return <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Projection unavailable - {error}</div>;
   }
   if (!projection) {
-    return <div style={{ fontSize: 13, color: "var(--text-muted)", padding: "16px 0" }}>Loading projection…</div>;
+    return <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", padding: "16px 0" }}>Loading projection…</div>;
   }
 
   const { curve, first_stockout_date, first_safety_breach_date, lowest_position, lowest_date, reference } = projection;
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13, marginBottom: 10 }}>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "var(--text-xs)", marginBottom: 10 }}>
         {first_stockout_date ? (
           <span style={{ color: "var(--red)", fontWeight: 700 }}>
             {/* "Projected" reads oddly for a date of today - that's not a forecast,
@@ -688,7 +688,7 @@ function ProjectionChart({ skuId }) {
               label this axis can produce rather than a guess. */}
           <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={78} unit=" MT" />
           <Tooltip
-            contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13 }}
+            contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: "var(--text-xs)" }}
             labelStyle={{ color: "var(--text-primary)", fontWeight: 700 }}
             formatter={(v) => [`${Math.round(v)} MT`, "Projected available"]}
           />
@@ -1040,7 +1040,7 @@ function AddSkuForm({ onSave, onCancel }) {
       </FormSection>
 
       {saveError && (
-        <div style={{ padding: "8px 12px", background: "var(--red-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--red)", marginBottom: 16 }}>
+        <div style={{ padding: "8px 12px", background: "var(--red-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--red)", marginBottom: 16 }}>
           ⚠ {saveError}
         </div>
       )}
