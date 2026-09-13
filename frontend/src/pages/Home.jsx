@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, ChevronDown } from "lucide-react";
+import EventCredit from "../components/EventCredit";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME (TASK-47, renamed TASK-48, renamed again TASK-50)
@@ -171,8 +172,8 @@ export default function Home() {
           })}
         </div>
 
-        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 26, textAlign: "center" }}>
-          AWS NUS-ISS SMYA 2026
+        <div style={{ marginTop: 26 }}>
+          <EventCredit align="center" />
         </div>
       </div>
     </div>

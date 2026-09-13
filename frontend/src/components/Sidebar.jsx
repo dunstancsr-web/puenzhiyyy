@@ -3,6 +3,7 @@ import { NavLink, Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, Home as HomeIcon } from "lucide-react";
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
+import EventCredit from "./EventCredit";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTROL TOWER NAVIGATION (TASK-49)
@@ -130,9 +131,8 @@ export default function Sidebar() {
 
         <div style={{
           padding: "12px 8px 0", marginTop: 12, borderTop: "1px solid var(--sidebar-border)",
-          fontSize: "var(--text-xs)", color: "var(--text-muted)",
         }}>
-          AWS NUS-ISS SMYA 2026
+          <EventCredit />
         </div>
       </aside>
 
