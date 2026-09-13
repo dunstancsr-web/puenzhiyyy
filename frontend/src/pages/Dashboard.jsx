@@ -51,10 +51,17 @@ const MOVE_NOTE = { Fast: "high velocity", Normal: "steady", Slow: "low velocity
 const ABC_NOTE = { A: "top 80% of value", B: "next 15%", C: "the rest" };
 
 // ── Money formatting - consistent M / K, never mixed ─────────────────────────
+// Thousands keep one decimal below $100K. Rounding to whole thousands turned
+// $26,217 of carrying cost into "$26K" on a Needs Attention row, which reads as
+// a suspiciously round estimate rather than a measured figure, and threw away
+// real money at exactly the magnitudes these rows deal in. Above $100K the
+// decimal stops earning its place, so it is dropped. A trailing ".0" is trimmed
+// so an exact $1,000 still reads "$1K" rather than "$1.0K".
 const fmt$ = (v) => {
   const n = Math.abs(v);
   if (n >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
-  if (n >= 1e3) return `$${Math.round(v / 1e3)}K`;
+  if (n >= 1e5) return `$${Math.round(v / 1e3)}K`;
+  if (n >= 1e3) return `$${(v / 1e3).toFixed(1).replace(/\.0$/, "")}K`;
   return `$${Math.round(v)}`;
 };
 
@@ -128,13 +135,30 @@ const HINTS = {
 // folds onto an existing row's tag/reason for the same SKU (Japonica reads
 // as one row tagged "IDLE STOCK · AGEING", not two rows), or gets its own
 // row when no other exception applies.
+//
+// Priority scale, ordered by DEADLINE first and exposure second:
+//   1 STOCKOUT RISK  service failure already in progress
+//   2 REORDER        has a clock on it, set by supplier lead time
+//   3 IDLE STOCK     capital trapped, large, but no deadline
+//   4 OVERSTOCK      carrying cost, no deadline
+//   5 SLOW MOVING    inefficiency, no deadline
+//   6 AGEING         usually folds onto a row above rather than standing alone
+// The two working-capital items used to outrank REORDER, which meant a SKU
+// about to run out could be pushed off the list by stock that had been sitting
+// still for months and would still be sitting still tomorrow. Working capital
+// is the more expensive problem; it is never the more urgent one.
 function buildNeedsAttention(skus) {
   const actions = [];
 
   skus
     .filter((s) => s.stockout_gap_days > 0)
     .forEach((s) => {
-      const qty = Math.max(s.min_order_qty, Math.round(s.target_stock - s.available_qty));
+      // Reads the engine's suggested_order_qty rather than recomputing
+      // target_stock - available_qty here. That proxy ignores everything
+      // consumed while the order is in transit, and this row used to print a
+      // different quantity from the Alerts page for the same SKU.
+      // See the orderQty note in backend/src/engines/alerts.js.
+      const qty = Math.max(s.min_order_qty, Math.round(s.suggested_order_qty));
       actions.push({
         priority: 1,
         sku_id: s.sku_id,
@@ -156,7 +180,7 @@ function buildNeedsAttention(skus) {
     .filter((s) => s.movement_class === "Idle" && s.available_qty > 0)
     .forEach((s) => {
       actions.push({
-        priority: 2,
+        priority: 3,
         sku_id: s.sku_id,
         name: s.product_name,
         action: "Initiate disposition review",
@@ -172,7 +196,7 @@ function buildNeedsAttention(skus) {
     .filter((s) => s.overstock_qty > 0)
     .forEach((s) => {
       actions.push({
-        priority: 3,
+        priority: 4,
         sku_id: s.sku_id,
         name: s.product_name,
         action: "Suspend purchasing",
@@ -188,7 +212,7 @@ function buildNeedsAttention(skus) {
     .filter((s) => s.coverage_band === "below" && s.stockout_gap_days === 0 && s.available_qty <= s.reorder_point_policy && s.movement_class !== "Idle")
     .forEach((s) => {
       actions.push({
-        priority: 4,
+        priority: 2,
         sku_id: s.sku_id,
         name: s.product_name,
         action: "Procurement review",

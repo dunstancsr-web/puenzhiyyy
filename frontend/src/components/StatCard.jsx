@@ -47,14 +47,19 @@ export default function StatCard({ label, value, icon: Icon, sub, target, trend,
               {trend.dir === "up" ? "▲" : trend.dir === "down" ? "▼" : "▬"} {trend.text}
             </span>
           )}
+          {/* Beside the value, not on its own line. Only one card in the strip
+              carries a target, and as a third line it made that card taller
+              than its neighbours, so a row of otherwise identical KPIs sat on
+              two different baselines. Every card is now exactly three rows
+              high: label, value, sub. */}
+          {target && (
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+              target&nbsp;{target}
+            </span>
+          )}
         </div>
         {sub && (
           <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginTop: 3 }}>{sub}</div>
-        )}
-        {target && (
-          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
-            Target&nbsp;{target}
-          </div>
         )}
       </div>
     </div>

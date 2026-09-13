@@ -76,6 +76,21 @@ export default function StockPositionBar({
   const { theme } = useTheme();
   const rangeShade = theme === "light" ? "rgba(15,23,42,0.13)" : "rgba(255,255,255,0.15)";
 
+  // An idle SKU used to draw as flat muted grey at 0.65 opacity, which is very
+  // close to both the track colour and the greyscale "avoid" shading. On
+  // Japonica (78 MT available against a 60 MT maximum) the fill, the track and
+  // both shaded ranges merged into one uniform slab: the bar read as an empty
+  // or broken control rather than as "78 MT sitting here that nobody is
+  // buying", which is the single most expensive fact on that row.
+  //
+  // Hatching solves this without reaching for a health colour. Idle is not a
+  // severity, so it should not borrow red or amber, but it does need to read as
+  // PRESENT and INERT rather than as absent. Diagonal stripes are the
+  // conventional encoding for exactly that, and they stay distinguishable from
+  // the flat shading at any width.
+  const idleStripe = theme === "light" ? "rgba(51,65,85,0.60)" : "rgba(203,213,225,0.60)";
+  const idleBase   = theme === "light" ? "rgba(51,65,85,0.16)" : "rgba(203,213,225,0.18)";
+
   const avail = Number(available) || 0;
   const rop = Number(reorder) || 0;
   const sug = Number(suggested) || 0;
@@ -116,13 +131,34 @@ export default function StockPositionBar({
     : avail < rop ? "red"
     : avail < rop * 1.15 ? "amber"
     : "green";
-  const fillColor = zoneKey === "idle" ? "var(--text-muted)" : FILL[zoneKey];
-  const valueColor = zoneKey === "idle" ? "var(--text-secondary)" : FILL[zoneKey];
+  const fillColor = zoneKey === "idle" ? idleBase : FILL[zoneKey];
+  // The quantity itself is a hard fact and stays fully legible even when the
+  // state is not an emergency. Muting it to secondary made 78 MT of trapped
+  // capital look like a disabled field.
+  const valueColor = zoneKey === "idle" ? "var(--text-primary)" : FILL[zoneKey];
+
+  // Applied to the measure bar. Idle gets hatching, everything else a solid.
+  const measureFill = zoneKey === "idle"
+    ? {
+        backgroundColor: idleBase,
+        backgroundImage: `repeating-linear-gradient(135deg, ${idleStripe} 0 4px, transparent 4px 9px)`,
+      }
+    : { background: fillColor };
 
   // Status line under the bar
   let gapText, gapColor, gapWeight = 600;
   if (idle) {
-    gapText = "Idle - no recent demand";
+    // Name the quantity, not just the state. "Idle - no recent demand" says
+    // nothing about how much capital is involved, and the number beside it was
+    // the only place that fact appeared.
+    //
+    // Idle also used to short-circuit the over-maximum branch below, so a SKU
+    // that was BOTH idle and overstocked reported only the idle half. Japonica
+    // holds 78 MT against a 60 MT maximum and said nothing about the overage,
+    // while the Dashboard's own Needs Attention row tagged it
+    // "IDLE STOCK · OVERSTOCK · AGEING". Both facts now surface here.
+    gapText = `${fmt(avail)} MT idle - no recent demand`;
+    if (showMax && avail > max) gapText += ` · ${fmt(avail - max)} MT over maximum`;
     gapColor = "var(--text-secondary)";
   } else if (showMax && avail > max) {
     gapText = `${fmt(avail - max)} MT over maximum`;
@@ -193,7 +229,7 @@ export default function StockPositionBar({
           <div style={{
             position: "absolute", left: 0, top: 0, height: "100%",
             width: `${fillPct}%`, borderRadius: 99,
-            background: fillColor, opacity: idle ? 0.65 : 1,
+            ...measureFill,
             transition: animateFill ? "width 0.4s ease" : "none",
           }} />
 
