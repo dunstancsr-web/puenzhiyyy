@@ -195,11 +195,11 @@ function seed() {
     // leave duplicate ALERT_TRIGGERED rows for conditions that were re-detected
     // on the fresh data, and clearing neither leaves the trail empty after a
     // reseed, because every alert is already materialized.
-    for (const t of ["sales_transactions", "purchase_orders", "inventory_positions", "alerts_log", "audit_log", "decisions", "skus"]) {
+    for (const t of ["sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "skus"]) {
       db.exec(`DELETE FROM ${t}`);
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN
-      ('sales_transactions','purchase_orders','inventory_positions','alerts_log','audit_log','decisions','skus')`);
+      ('sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','skus')`);
   });
   wipe();
 
@@ -258,7 +258,45 @@ function seed() {
   });
   run();
 
-  console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${poSeq - 1} open POs`);
+  // ── Operators ──────────────────────────────────────────────────────────────
+  // Demo PINs, printed on the login screen. Not secrets. See db/init.js.
+  const insertOp = db.prepare(`INSERT INTO operators (name, pin, role) VALUES (?, ?, ?)`);
+  const OPERATORS = [
+    ["Rahman B.", "1234", "receiving"],
+    ["Siti K.", "2345", "both"],
+    ["Wei Ming L.", "3456", "dispatch"],
+  ];
+  for (const o of OPERATORS) insertOp.run(...o);
+
+  // ── Sales orders ───────────────────────────────────────────────────────────
+  // Derived FROM reserved_qty rather than invented alongside it, so the open
+  // order quantities for a SKU always sum to exactly what the dashboard says is
+  // reserved. Inventing them independently would let the warehouse and the
+  // Control Tower disagree about the same tonnes.
+  const CUSTOMERS = [
+    "Tiong Bahru Provisions", "Golden Prata House", "NTUC FairPrice (Central)",
+    "Sakura Japanese Kitchen", "Al-Azhar Restaurant", "Seng Kee Wholesale",
+  ];
+  const insertSo = db.prepare(`
+    INSERT INTO sales_orders (so_number, sku_id, customer, ordered_qty, required_date, status)
+    VALUES (?, ?, ?, ?, ?, 'open')`);
+
+  let soSeq = 3301;
+  let soCount = 0;
+  for (const sku of SKUS) {
+    const reserved = sku.reserved_qty || 0;
+    if (reserved <= 0) continue;
+    // Split larger reservations across two customers so the pick list is not
+    // one order per SKU, which is not what a real dispatch day looks like.
+    const parts = reserved >= 40 ? [Math.round(reserved * 0.6), reserved - Math.round(reserved * 0.6)] : [reserved];
+    parts.forEach((qty, i) => {
+      const due = new Date(Date.now() + (1 + i * 2) * 86400000).toISOString().slice(0, 10);
+      insertSo.run(`SO-${soSeq++}`, sku.sku_id, CUSTOMERS[soCount % CUSTOMERS.length], qty, due);
+      soCount++;
+    });
+  }
+
+  console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${poSeq - 1} open POs, ${soCount} open sales orders, ${OPERATORS.length} operators`);
 }
 
 if (require.main === module) seed();

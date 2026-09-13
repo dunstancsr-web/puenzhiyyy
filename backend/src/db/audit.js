@@ -31,6 +31,11 @@ const EVENTS = Object.freeze({
   // Switching into or out of the metered model tier is a spending decision, so
   // it is recorded like any other decision rather than living only in memory.
   LLM_MODE_CHANGED: "LLM_MODE_CHANGED",
+  // Physical movements from the warehouse floor. These are the most
+  // consequential writes in the system, since they change what is actually in
+  // the building, so they carry the operator and any variance reason.
+  GOODS_RECEIVED: "GOODS_RECEIVED",
+  GOODS_ISSUED: "GOODS_ISSUED",
   // Reserved for TASK-11. The explanation layer is still rule-based, so nothing
   // emits this yet. The reader and the UI already handle it, so wiring the real
   // model call is a one-line addition at that call site.

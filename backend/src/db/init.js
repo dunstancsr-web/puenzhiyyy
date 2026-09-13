@@ -165,6 +165,73 @@ function initDb() {
     );
 
     -- ================================================================
+    -- OPERATORS  (warehouse floor staff, for handheld attribution)
+    -- A shared rugged device with a short PIN per person is the normal
+    -- pattern on a warehouse floor: gloves make passwords impractical, and
+    -- attribution still has to be per person for the audit trail.
+    --
+    -- PINs are stored in clear text ON PURPOSE and ONLY because this is a
+    -- prototype whose demo PINs are printed on the login screen. They are not
+    -- secrets. A real deployment needs hashed credentials and a device
+    -- enrolment step; see requirements.md "Explicitly Deferred".
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS operators (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL,
+      pin         TEXT NOT NULL,
+      role        TEXT NOT NULL DEFAULT 'both',   -- receiving | dispatch | both
+      active      INTEGER DEFAULT 1
+    );
+
+    -- ================================================================
+    -- SALES ORDERS  (what outbound picks against)
+    -- Seeded to reconcile EXACTLY with inventory_positions.reserved_qty per
+    -- SKU. Reserved stock is, by definition, stock already promised to an
+    -- order, so open order quantities that did not sum to it would mean the
+    -- warehouse and the dashboard disagreed about the same MT.
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS sales_orders (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      so_number     TEXT UNIQUE,
+      sku_id        TEXT NOT NULL,
+      customer      TEXT,
+      ordered_qty   REAL NOT NULL,
+      required_date TEXT,
+      status        TEXT DEFAULT 'open',        -- open | picked | cancelled
+      picked_qty    REAL,
+      picked_by     TEXT,
+      picked_at     TEXT,
+      FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_so_status ON sales_orders(status);
+
+    -- ================================================================
+    -- GOODS MOVEMENTS  (the GRN / DN record for every physical move)
+    -- One row per confirmed receipt or issue, carrying who did it, what was
+    -- expected, what actually moved, and any variance.
+    --
+    -- NOT the immutable movement ledger deferred in requirements.md: balances
+    -- are still a mutable snapshot on inventory_positions and are not rebuilt
+    -- from these rows. This records the TRANSACTION, not the balance.
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS goods_movements (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      movement_no     TEXT UNIQUE,              -- GRN-0001 / DN-0001
+      movement_type   TEXT NOT NULL,            -- RECEIPT | ISSUE
+      reference       TEXT,                     -- po_number or so_number
+      sku_id          TEXT NOT NULL,
+      expected_qty    REAL,
+      actual_qty      REAL NOT NULL,
+      variance_qty    REAL DEFAULT 0,
+      variance_reason TEXT,
+      operator_id     INTEGER,
+      operator_name   TEXT,
+      created_at      TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mv_type ON goods_movements(movement_type, created_at);
+
+    -- ================================================================
     -- AUDIT LOG  (Observability — every LLM_CALL, ALERT_TRIGGERED, RESTOCK)
     -- ================================================================
     CREATE TABLE IF NOT EXISTS audit_log (
