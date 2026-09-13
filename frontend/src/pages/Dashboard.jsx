@@ -651,28 +651,17 @@ export default function Dashboard() {
                   ))}
                 </tbody>
               </table>
+              {/* Sits ON the faded row, so the reveal costs the card no height
+                  of its own. The label names what is behind it rather than
+                  saying "Show more", so pressing it is an informed choice. */}
+              {teasing && (
+                <RevealButton floating showAll={false} count={hiddenAttentionCount}
+                  onToggle={() => setShowAllAttention(true)} />
+              )}
               </div>
-              {/* The reveal names what is behind it rather than saying "Show
-                  more", so the choice to press it is informed. Centred and
-                  full-width-ish because it sits directly under the fade and is
-                  the obvious next move; a small link tucked left would read as
-                  a footnote to the table rather than its continuation. */}
-              {(hiddenAttentionCount > 0 || showAllAttention) && (
+              {showAllAttention && (
                 <div style={{ display: "flex", justifyContent: "center", paddingTop: "var(--space-3)" }}>
-                  <button type="button" onClick={() => setShowAllAttention((v) => !v)}
-                    style={{
-                      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
-                      minWidth: 240, padding: "13px 26px",
-                      background: "var(--surface-2)", border: "1px solid var(--border)",
-                      borderRadius: 99, cursor: "pointer",
-                      color: "var(--blue)", fontSize: "var(--text-base)", fontWeight: 600,
-                      transition: "background 0.15s, border-color 0.15s",
-                    }}>
-                    <ChevronDown size={18} style={{ transform: showAllAttention ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
-                    {showAllAttention
-                      ? `Show fewer`
-                      : `Show ${hiddenAttentionCount} more`}
-                  </button>
+                  <RevealButton showAll count={0} onToggle={() => setShowAllAttention(false)} />
                 </div>
               )}
             </div>
@@ -937,6 +926,38 @@ function PageHeader({ title, subtitle }) {
 // `collapsible` sections persist their open/closed state per-browser
 // (localStorage) - the "optional decluttering" a user can set once and
 // forget, rather than a per-visit toggle. Defaults to open.
+// The Needs Attention reveal. Two placements, one component, because the
+// label and behaviour are identical and only the position differs.
+//
+// `floating` lays it over the faded fourth row rather than below the table.
+// That is what keeps the section compact: an in-flow button added its own
+// height plus a gap to a card whose whole point is to stay short, and the
+// faded row is dead space already. Expanded, it goes back into the flow,
+// because there is no fade to sit on and nothing left to overlap.
+function RevealButton({ showAll, count, onToggle, floating = false }) {
+  return (
+    <button type="button" onClick={onToggle}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+        minWidth: 216, padding: floating ? "10px 24px" : "12px 26px",
+        background: "var(--card-bg)",
+        border: "1px solid var(--border)",
+        borderRadius: 99, cursor: "pointer",
+        color: "var(--blue)", fontSize: "var(--text-sm)", fontWeight: 600,
+        // Floating needs the shadow to read as ABOVE the row it covers rather
+        // than as another faded table element.
+        boxShadow: floating ? "var(--shadow-md)" : "none",
+        ...(floating ? {
+          position: "absolute", left: "50%", bottom: 7,
+          transform: "translateX(-50%)", zIndex: 2,
+        } : {}),
+      }}>
+      <ChevronDown size={17} style={{ transform: showAll ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+      {showAll ? "Show fewer" : `Show ${count} more`}
+    </button>
+  );
+}
+
 // `badge` is a count shown beside the title, and `badgeTone` a CSS colour
 // variable to tint it with. It stays visible when the section is COLLAPSED,
 // which is the whole point: a folded section that gives no sign there are
