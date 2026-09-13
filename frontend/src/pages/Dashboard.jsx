@@ -488,12 +488,21 @@ export default function Dashboard() {
         <div style={{ fontWeight: 600, fontSize: "var(--text-lg)", marginBottom: "var(--space-4)" }}>
           Key Metrics
         </div>
-        {/* No justifyContent: space-between here. It pinned the chart to the
-            far edge of a ~1300px card, leaving ~700px of gap between a number
-            and the chart that exists to explain that number - which reads as
-            two unrelated elements (Gestalt proximity). The standard KPI +
-            sparkline treatment keeps the chart tight against the value it
-            describes and simply lets the leftover width be leftover. */}
+        {/* The chart FILLS the remaining width rather than sitting at a fixed
+            200px with the rest of the card left blank.
+ 
+            An earlier note here rejected justify-content: space-between, and
+            it was right at the time: a 200px chart pinned to the right edge of
+            a 1300px card left a 700px gap between a number and the chart that
+            exists to explain it, reading as two unrelated things. Letting the
+            chart grow removes the gap instead of the alignment, so the two stay
+            adjacent AND the card stops being 46% empty (measured: content ended
+            at 1135px inside a 1605px card).
+
+            This costs no vertical space, which matters: the alternative of
+            stacking the chart under the value would push Needs Attention down
+            by roughly a chart's height, and that table was deliberately
+            promoted to sit as high as possible. */}
         <div className="divider" style={{ paddingBottom: "var(--space-5)", marginBottom: "var(--space-5)", display: "flex", alignItems: "flex-end", flexWrap: "wrap", gap: "var(--space-6)" }}>
           <div>
             <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, marginBottom: 2, display: "flex", alignItems: "center", gap: 5 }}>
@@ -757,7 +766,25 @@ function HeroChart({ baselineData }) {
   const months = history?.months || [];
 
   return (
-    <div style={{ flexShrink: 0 }}>
+    // The frame follows the mode, and that is not a compromise, it is the
+    // point: the two views want different widths.
+    //
+    // Baseline is a comparison of TWO numbers. Stretched across 800px its bars
+    // sit at opposite ends of the card, far from the value they explain, which
+    // is the disconnection the original note here warned about. It stays
+    // compact and tight against the number.
+    //
+    // Six months is a real series, and at 400px in a 1605px card it left the
+    // card 46% empty while squeezing six labelled bars into a sparkline slot.
+    // It takes the width instead.
+    //
+    // HEIGHT is fixed across both. Height is what reflows the page below, so
+    // holding it constant is what keeps the toggle from feeling like the page
+    // rearranging itself; a width change inside a deliberate mode switch reads
+    // as the chart changing, which is what it is.
+    <div style={mode === "months"
+      ? { flex: "1 1 380px", minWidth: 300, maxWidth: 860 }
+      : { flexShrink: 0, width: 248 }}>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 4 }}>
         {[["baseline", "Baseline"], ["months", "6 months"]].map(([id, label]) => (
           <button key={id} type="button" onClick={() => setMode(id)} aria-pressed={mode === id}
@@ -776,16 +803,18 @@ function HeroChart({ baselineData }) {
       {mode === "baseline" ? (
         <BaselineChart data={baselineData} />
       ) : failed ? (
-        <div style={{ width: 400, height: 92, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+        <div style={{ height: CHART_H, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
           Could not load history.
         </div>
       ) : !history ? (
-        <div style={{ width: 400, height: 92 }} />
+        // Reserves the frame while loading. Without it the row collapses and
+        // then springs back, which is worse than a beat of blank space.
+        <div style={{ height: CHART_H }} />
       ) : (
         <ConsumptionChart data={months} average={history.average} />
       )}
 
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 3, textAlign: "right", maxWidth: 400 }}>
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 3, textAlign: "right" }}>
         {mode === "baseline"
           ? "Inventory value vs a fixed reference"
           : `Consumed per month, at cost${history?.average ? ` · dashed = ${history.fullMonths}-month average` : ""}`}
@@ -794,9 +823,14 @@ function HeroChart({ baselineData }) {
   );
 }
 
+// One height for both views, so switching changes the bars and nothing else.
+// The old layout jumped from 200x92 to 400x116 on toggle, which read as the
+// page rearranging itself rather than as a chart changing.
+const CHART_H = 122;
+
 function BaselineChart({ data }) {
   return (
-    <div style={{ width: 200, height: 92, flexShrink: 0 }}>
+    <div style={{ height: CHART_H }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 18, right: 6, bottom: 0, left: 6 }}>
           <Tooltip
@@ -813,7 +847,9 @@ function BaselineChart({ data }) {
           />
           <XAxis dataKey="name" axisLine={false} tickLine={false}
             tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
-          <Bar dataKey="value" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+          {/* Capped, or two bars in an 800px frame become slabs. The baseline
+              view is a comparison of two numbers, not a use of the space. */}
+          <Bar dataKey="value" radius={[3, 3, 0, 0]} isAnimationActive={false} maxBarSize={86}>
             <LabelList dataKey="value" position="top" formatter={(v) => fmt$(v)}
               style={{ fontSize: 11, fontWeight: 700, fill: "var(--text-secondary)" }} />
             {data.map((d, i) => <Cell key={i} fill={i === data.length - 1 ? "var(--blue)" : "var(--border)"} />)}
@@ -829,11 +865,8 @@ const MONTH_LABEL = (m) =>
 
 function ConsumptionChart({ data, average }) {
   const rows = data.map((d) => ({ ...d, name: MONTH_LABEL(d.month) }));
-  // Taller than the baseline chart. Six bars over a 0-to-1M domain in 74px of
-  // plot area flattened the differences between months into near-identical
-  // blocks, which is the opposite of what a six month view is for.
   return (
-    <div style={{ width: 400, height: 116, flexShrink: 0 }}>
+    <div style={{ height: CHART_H }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={rows} margin={{ top: 18, right: 6, bottom: 0, left: 6 }}>
           <defs>
@@ -865,7 +898,7 @@ function ConsumptionChart({ data, average }) {
           {average && (
             <ReferenceLine y={average} stroke="var(--text-muted)" strokeDasharray="4 3" strokeWidth={1} />
           )}
-          <Bar dataKey="value_sgd" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+          <Bar dataKey="value_sgd" radius={[3, 3, 0, 0]} isAnimationActive={false} maxBarSize={96}>
             <LabelList dataKey="value_sgd" position="top" formatter={(v) => fmt$(v)}
               style={{ fontSize: 10, fontWeight: 700, fill: "var(--text-secondary)" }} />
             {rows.map((d, i) => (
