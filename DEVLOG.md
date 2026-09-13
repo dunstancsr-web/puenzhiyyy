@@ -308,3 +308,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, SUBMISSION.md, WRITEUP.md
 - **New files:** docs/images/{alerts-human-in-the-loop,reasoning-trace,activity-audit-record}.jpg
 - **Notes:** TASK-39. Captured the write-up's screenshots from the running app rather than leaving placeholder markers, so the PDF now needs only the deployment URL. Added a third image the outline did not ask for: section 3 spends four paragraphs arguing the deterministic-first case and had no evidence on the page, and the reasoning trace is both that evidence and the best-looking screen in the build. Captions are written to carry the argument rather than to describe the picture.
+
+---
+
+## Session: 2026-09-13 11:20
+- **Branch:** observability-and-submission-prep
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, WRITEUP.md, docs/images/alerts-human-in-the-loop.jpg, frontend/src/pages/Alerts.jsx
+- **New files:** none
+- **Notes:** TASK-40. Stan asked to declutter Alerts and whether Activity should fold into it; the answers connect. The clutter was structural: four encodings of two facts (stripe, icon, type chip, severity chip, over a tile row already grouping by type), a recommended-action panel boxed inside an already-bordered card, actions split between a floating Dismiss and a footer that only some cards had, and four differently-coloured buttons with no hierarchy. Severity moved to the stripe, the panel unboxed, one action row on every card, one primary button that names what it records. Also made every alert decidable: needsApproval had been hiding the decision controls on four of seven live alerts whose recommended actions are perfectly decidable, while the write-up claimed the opposite. On the second question: Activity stays standalone, because Alerts is a queue that shrinks as you work and Activity is a record that only grows, and Activity covers restocks and policy edits that are not alerts at all. The genuine duplication was the Decision Log table at the bottom of Alerts, a worse rendering of the audit trail's own DECISION_RECORDED rows, so it became a one-line pointer to /activity.

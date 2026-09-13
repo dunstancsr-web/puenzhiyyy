@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import {
   AlertTriangle, XCircle, TrendingUp, TrendingDown,
-  RefreshCw, X, CheckCircle, Clock, Cpu, ChevronDown,
+  RefreshCw, X, CheckCircle, Clock, Cpu, History,
 } from "lucide-react";
 import Badge from "../components/Badge";
 import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
-import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
 import { buildExplanation } from "../lib/explain";
 
@@ -91,11 +91,6 @@ const TYPE_HINTS = {
     how: "The number shown is days held. Rice doesn't spoil overnight, but quality and sellability drop the longer it sits past that limit.",
   },
 };
-const DECISION_LOG_HINT = {
-  what: "A permanent record of every Approve, Modify, or Reject decision a manager has made on an AI/rule-based recommendation.",
-  how: "Nothing here can be edited or deleted - it's the audit trail for \"who decided what, and why,\" not a working list. Compare Manager Decision against AI Recommended to see how often recommendations get overridden.",
-};
-
 // Ask AI is a placeholder until TASK-11 wires a real LLM call (blocked on an
 // Anthropic API key). This used to look up a MOCK_AI_EXPLANATIONS dict keyed
 // by numeric alert.id, hand-written against the old mock alert set - but
@@ -122,7 +117,6 @@ export default function Alerts() {
   // Needed by the explanation builder: alerts carry the conclusion, the SKU
   // carries the inputs the conclusion was derived from.
   const [skus, setSkus] = useState([]);
-  const [logOpen, setLogOpen] = useCollapsed("alerts-decision-log", true);
 
   const loadAlerts = useCallback(() => {
     setLoadError(null);
@@ -282,69 +276,27 @@ export default function Alerts() {
         )}
       </div>
 
-      {/* ── Decision log - collapsible: it only grows, and isn't something
-          you need open on every visit (matches the Dashboard's per-widget
-          collapse pattern, persisted the same way). ── */}
+      {/* The Decision Log table lived here and has moved to /activity.
+          It was a strict subset of what the audit trail already records
+          (DECISION_RECORDED events), rendered as a second, worse view: seven
+          columns of the same rows, growing forever, at the bottom of a page
+          whose job is the opposite one. Alerts is a work queue, things leave it
+          when handled. Activity is the permanent record, nothing ever leaves.
+          Keeping both meant the page that should shrink as you work also grew
+          as you worked. */}
       {decisions.length > 0 && (
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: logOpen ? 14 : 0 }}>
-            <button type="button" onClick={() => setLogOpen((v) => !v)} aria-expanded={logOpen}
-              aria-label={logOpen ? "Collapse Decision Log" : "Expand Decision Log"}
-              style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", padding: 0, color: "inherit" }}>
-              <ChevronDown size={15} color="var(--text-muted)" style={{ transform: logOpen ? "none" : "rotate(-90deg)", transition: "transform 0.15s" }} />
-              <h2 style={{ fontSize: 18, fontWeight: 700 }}>Decision Log</h2>
-            </button>
-            <ColHint label="Decision Log" what={DECISION_LOG_HINT.what} how={DECISION_LOG_HINT.how} />
-          </div>
-          {logOpen && (
-          <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
-                  {["Time", "SKU", "Alert Type", "AI Recommended", "Manager Decision", "Qty Approved", "Reason"].map((h) => (
-                    <th key={h} style={{ padding: "9px 14px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {decisions.map((d, i) => (
-                  <tr key={d.id} style={{ borderBottom: i < decisions.length - 1 ? "1px solid var(--border)" : "none" }}>
-                    <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                      {new Date(d.decided_at).toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}
-                    </td>
-                    <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600 }}>{d.sku_name}</td>
-                    <td style={{ padding: "10px 14px" }}>
-                      {d.trigger_type && <Badge type={d.trigger_type} label={d.trigger_type.replace(/_/g, " ")} />}
-                    </td>
-                    <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--text-secondary)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                      title={d.ai_quantity == null ? d.ai_recommendation : undefined}>
-                      {/* Quantity-based alerts (stockout, reorder) recommend an
-                          MT figure; qualitative ones (idle, ageing, slow-moving)
-                          don't - this used to fall back to a bare, meaningless
-                          "Review" literal instead of the actual recommendation
-                          text that's already stored right alongside it. */}
-                      {d.ai_quantity != null ? `${d.ai_quantity} MT` : (d.ai_recommendation || "-")}
-                    </td>
-                    <td style={{ padding: "10px 14px" }}>
-                      <span style={{
-                        fontWeight: 700, fontSize: 13,
-                        color: d.manager_action === "approved" ? "var(--green)" : d.manager_action === "rejected" ? "var(--red)" : "var(--yellow)",
-                      }}>
-                        {d.manager_action.toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={{ padding: "10px 14px", fontSize: 14 }}>
-                      {d.manager_quantity != null ? `${d.manager_quantity} MT` : "-"}
-                    </td>
-                    <td style={{ padding: "10px 14px", fontSize: 13, color: "var(--text-secondary)" }}>
-                      {d.manager_reason || "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          )}
+        <div style={{ marginTop: 4, marginBottom: 24 }}>
+          <Link to="/activity" style={{
+            display: "inline-flex", alignItems: "center", gap: 7,
+            fontSize: 13, fontWeight: 600, color: "var(--text-secondary)",
+            textDecoration: "none", padding: "8px 14px",
+            border: "1px solid var(--border)", borderRadius: "var(--radius)",
+            background: "var(--card-bg)",
+          }}>
+            <History size={13} />
+            {decisions.length} decision{decisions.length === 1 ? "" : "s"} recorded
+            <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>View in Activity</span>
+          </Link>
         </div>
       )}
 
@@ -367,105 +319,130 @@ export default function Alerts() {
 }
 
 // ── Alert card ─────────────────────────────────────────────────────────────────
+// Severity colours the stripe. Type colours the icon and the chip. The card used
+// to carry FOUR encodings of roughly the same two facts: a type-coloured stripe,
+// a type-coloured icon, a type chip AND a severity chip, on top of a tile row
+// above that already groups by type. Severity moved to the stripe so one chip
+// could go.
+const SEVERITY_STRIPE = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--blue)" };
+
+// Unit for each alert type's triggered_value - see backend/src/engines/alerts.js
+const VALUE_UNIT = {
+  STOCKOUT_RISK: "days cover", SLOW_MOVING: "days cover",
+  REORDER: "MT", OVERSTOCK: "MT",
+  IDLE: "days idle", AGEING: "days held",
+};
+
+function ActionButton({ onClick, children, variant = "quiet", title }) {
+  // One primary, everything else quiet. The row used to be four buttons in four
+  // different colours (purple, green, amber, red), which is a rainbow rather
+  // than a hierarchy: nothing led, so the eye had to read all four every time.
+  const styles = {
+    primary: { background: "var(--blue)", color: "#fff", border: "1px solid var(--blue)" },
+    quiet:   { background: "var(--card-bg)", color: "var(--text-secondary)", border: "1px solid var(--border)" },
+    danger:  { background: "var(--card-bg)", color: "var(--red)", border: "1px solid var(--border)" },
+  }[variant];
+  return (
+    <button onClick={onClick} title={title}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 6,
+        padding: "6px 13px", borderRadius: "var(--radius)",
+        fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+        ...styles,
+      }}>
+      {children}
+    </button>
+  );
+}
+
 function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
   const meta = TYPE_META[alert.alert_type] || TYPE_META.REORDER;
   const Icon = meta.icon;
-  const needsApproval = alert.severity === "critical" || (alert.ai_recommendation_qty != null);
 
-  // Hairline divider, not a bordered-and-shadowed box - matches the rest of
-  // the app's post-overhaul style; the colored left stripe still carries
-  // severity at a glance without needing a full card outline (visual-
-  // consistency pass, 2026-09 - this was the last page still boxing rows).
+  // Every alert is now decidable. `needsApproval` previously gated the action
+  // row on critical severity or a non-null quantity, so four of the seven live
+  // alerts offered no decision at all, only Dismiss. Those four still carry a
+  // real recommended action ("Reduce or pause the next order", "Escalate to QA")
+  // that a manager should be able to approve or reject, and the write-up claims
+  // every recommendation terminates at a human decision. It did not.
+  const decision = alert.ai_recommendation_qty > 0
+    ? `Order ${alert.ai_recommendation_qty} MT`
+    : (ACTION_SUMMARY[alert.alert_type] || "Review this SKU");
+
   return (
     <div style={{
-      borderLeft: `3px solid ${meta.color}`,
+      borderLeft: `3px solid ${SEVERITY_STRIPE[alert.severity] || "var(--border)"}`,
       borderBottom: isLast ? "none" : "1px solid var(--border)",
-      paddingBottom: 14,
     }}>
-      {/* Main row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 20px" }}>
-        {/* Icon */}
-        <div style={{ width: 38, height: 38, borderRadius: 10, background: meta.bg, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <Icon size={17} color={meta.color} />
+        <div style={{
+          width: 34, height: 34, borderRadius: 9, background: meta.bg,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1,
+        }}>
+          <Icon size={16} color={meta.color} />
         </div>
 
-        {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontWeight: 700, fontSize: 15 }}>{alert.sku_name}</span>
-            <span style={{ fontSize: 12, fontFamily: "monospace", color: "var(--text-muted)", background: "var(--surface-2)", padding: "1px 7px", borderRadius: 4 }}>{alert.sku_id}</span>
+            <span style={{ fontSize: 12, fontFamily: "monospace", color: "var(--text-muted)" }}>{alert.sku_id}</span>
             <Badge type={alert.alert_type} label={meta.label} />
-            <Badge type={alert.severity} />
           </div>
-          <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 8 }}>
+
+          <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55, margin: "6px 0 0" }}>
             {alert.message}
           </p>
-          <div style={{ padding: "8px 12px", background: "var(--surface-2)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--text-primary)", borderLeft: "3px solid var(--blue)" }}>
-            <span style={{ fontWeight: 600, color: "var(--blue)" }}>Recommended: </span>
+
+          {/* Unboxed. This was a bordered, tinted panel with its own coloured
+              left bar, sitting inside a card that already has a border and a
+              coloured left stripe: a box inside a box inside a box. The label
+              alone separates it perfectly well. */}
+          <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.55, margin: "6px 0 0" }}>
+            <span style={{ fontWeight: 600 }}>Recommended: </span>
             {alert.recommended_action}
+          </p>
+
+          {/* One action row, always present, Dismiss included. Dismiss used to
+              float in the middle of the card beside the metric while the other
+              four sat in a footer bar that only some cards had, so actions were
+              split across two places and the set changed card to card. */}
+          {/* The primary button states what approving will record, so the
+              separate "Approving records: ..." line underneath could go. A
+              button that says "Approve 597 MT" needs no caption.
+
+              Dismiss stays in the same cluster rather than being pushed to the
+              far edge by a flex spacer, which on a wide screen stranded it
+              about a thousand pixels from its siblings. A plain separator
+              carries "different kind of action" without the distance. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <ActionButton variant="primary" onClick={() => onApprove(alert)}
+              title={`Record approval: ${decision}`}>
+              {alert.ai_recommendation_qty > 0 ? `Approve ${alert.ai_recommendation_qty} MT` : "Approve"}
+            </ActionButton>
+            <ActionButton onClick={() => onApprove({ alert, preAction: "modified" })}>Modify</ActionButton>
+            <ActionButton variant="danger" onClick={() => onApprove({ alert, preAction: "rejected" })}>Reject</ActionButton>
+            <ActionButton onClick={() => onAskAI(alert)} title="Show the reasoning behind this alert">
+              <Cpu size={12} /> Why?
+            </ActionButton>
+            <span aria-hidden style={{ width: 1, height: 18, background: "var(--border)", margin: "0 3px" }} />
+            <ActionButton onClick={() => onAcknowledge(alert.id)} title="Dismiss without recording a decision">
+              <CheckCircle size={12} /> Dismiss
+            </ActionButton>
           </div>
         </div>
 
-        {/* Right: value + acknowledge */}
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: 24, fontWeight: 700, color: meta.color }}>{alert.triggered_value}</div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
-            {/* Matches each alert type's actual triggered_value unit - see backend/src/engines/alerts.js */}
-            {alert.alert_type === "STOCKOUT_RISK" || alert.alert_type === "SLOW_MOVING" ? "days" :
-             alert.alert_type === "REORDER" || alert.alert_type === "OVERSTOCK" ? "MT" :
-             alert.alert_type === "IDLE" ? "days idle" : "days held"}
+        {/* The metric, quieter than before. At 24px bold in the type colour it
+            competed with the product name for first read; the name is what a
+            manager scans for. */}
+        <div style={{ textAlign: "right", flexShrink: 0, minWidth: 74 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
+            {alert.triggered_value}
           </div>
-          <button onClick={() => onAcknowledge(alert.id)}
-            style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 11px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--card-bg)", fontSize: 13, cursor: "pointer", color: "var(--text-secondary)" }}>
-            <CheckCircle size={12} /> Dismiss
-          </button>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+            {VALUE_UNIT[alert.alert_type] || "days"}
+          </div>
         </div>
       </div>
-
-      {/* Action bar - only for alerts needing manager decision */}
-      {needsApproval && (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "10px 20px", background: "var(--surface-2)",
-          borderTop: "1px solid var(--border)",
-        }}>
-          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            <span style={{ fontWeight: 600 }}>Decision: </span>
-            {alert.ai_recommendation_qty > 0
-              ? `Order ${alert.ai_recommendation_qty} MT`
-              : (ACTION_SUMMARY[alert.alert_type] || "Review this SKU")}
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {/* Ask AI button */}
-            <button onClick={() => onAskAI(alert)}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 14px", borderRadius: "var(--radius)",
-                border: "1px solid var(--border)",
-                background: "var(--purple-light)", color: "var(--purple)",
-                fontSize: 13, fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              <Cpu size={12} /> Ask AI
-            </button>
-            {/* Approval buttons - fixed: these referenced the out-of-scope
-                `setApprovalModal` directly and threw ReferenceError on click;
-                now correctly call the `onApprove` prop passed down from Alerts(). */}
-            <button onClick={() => onApprove(alert)}
-              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--green-light)", color: "var(--green)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              ✓ Approve
-            </button>
-            <button onClick={() => onApprove({ alert, preAction: "modified" })}
-              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--yellow-light)", color: "var(--yellow)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              ✏ Modify
-            </button>
-            <button onClick={() => onApprove({ alert, preAction: "rejected" })}
-              style={{ padding: "6px 14px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--red-light)", color: "var(--red)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              ✕ Reject
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

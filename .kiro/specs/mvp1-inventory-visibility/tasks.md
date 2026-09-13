@@ -1153,6 +1153,43 @@ sidebar breakpoint from index.css, but that is reasoning about the code rather t
 Note for export: the image paths are repo-relative, so the markdown-to-PDF step has to run from the
 repository root.
 
+## TASK-40 - Declutter Alerts, and settle the Alerts versus Activity question (2026-09-13)
+
+Stan reported the Alerts page as cluttered and asked whether Activity should fold into it. The two turn
+out to be the same question, because the clutter had a structural cause rather than a styling one.
+
+**Four encodings of two facts.** Each card carried a type-coloured left stripe, a type-coloured icon, a
+type chip AND a severity chip, sitting under a tile row that already groups by type. Severity moved to
+the stripe so one chip could go: icon and chip now carry type, the stripe carries severity.
+
+**A box inside a box inside a box.** The recommended action sat in a bordered, tinted panel with its own
+coloured left bar, inside a card that already has a border and a stripe. Unboxed, the label alone
+separates it.
+
+**Actions split across two places, and a different set per card.** Dismiss floated mid-card beside the
+metric while the other four sat in a footer bar shown only when `needsApproval` passed, so four of the
+seven live alerts offered no decision at all. Those four carry real recommended actions ("Reduce or
+pause the next order", "Escalate to QA") and the write-up claims every recommendation terminates at a
+human decision, which was simply not true. Every alert is now decidable, with one action row.
+
+**A rainbow instead of a hierarchy.** Purple, green, amber and red buttons meant nothing led and the eye
+read all four. One primary, the rest quiet. The primary also states what it will record ("Approve 597
+MT"), which let the "Approving records:" caption go.
+
+The metric dropped from 24px bold in the type colour to 20px in the text colour; it was competing with
+the product name, which is what a manager actually scans for.
+
+**Activity stays standalone, and the Decision Log left Alerts.** Alerts is a work queue: items leave it
+when handled. Activity is the permanent record: nothing ever leaves. Folding one into the other fights
+that, and Activity also covers RESTOCK, SKU_UPDATED and SKU_CREATED, which have nothing to do with
+alerts. The real duplication was the Decision Log table at the bottom of Alerts, a strict subset of the
+audit trail's DECISION_RECORDED events rendered as a second, worse view, which meant the page that
+should shrink as you work also grew as you worked. Replaced with a one-line pointer to /activity.
+Pruned the orphaned useCollapsed state, DECISION_LOG_HINT and ChevronDown import.
+
+Verified in both themes. Four cards now fit where two did, without cramming. Alerts screenshot in
+WRITEUP.md re-captured, since the old one showed the previous card design.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

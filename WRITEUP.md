@@ -210,8 +210,9 @@ practice the right answer is frequently "yes, but not that much."
 
 ![The Alerts page. Each alert states the measured value and the threshold it breached, names the decision the buttons act on, and terminates at approve, modify or reject.](docs/images/alerts-human-in-the-loop.jpg)
 
-*Every recommendation terminates at a human decision. The "Decision:" line names what the three buttons
-will record, so approving is never approving nothing.*
+*Every recommendation terminates at a human decision, and the primary button states what approving will
+record. Severity is carried by the left stripe, type by the icon and chip, so the card encodes each fact
+once.*
 
 ---
 
