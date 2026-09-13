@@ -208,6 +208,42 @@ tr.pick td.han { color: var(--seal); }
 .cobrand { display: flex; align-items: center; gap: 11px; padding: 13px 14px; }
 .cobrand__bar { width: 1px; height: 26px; background: rgba(255,255,255,.16); }
 
+/* &#x2500;&#x2500; Pairing study &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500; */
+.pair__stage { background: #ffffff; padding: 18px; display: flex; justify-content: center; }
+.mini { width: 214px; }
+.mini__hd { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.mini__nm b { display: block; font-size: 15px; font-weight: 700; color: #1a202c; line-height: 1.2; }
+.mini__nm span { display: block; font-size: 12px; color: #64748b; }
+.chip2 {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 10px;
+  background: #f8f9fb; border: 1px solid #e2e6ea;
+}
+.chip2__cn { font-family: Brush, serif; font-size: 17px; line-height: 1.15; color: #1a202c; letter-spacing: .05em; }
+.chip2__en {
+  font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: #64748b; margin-top: 1px;
+}
+/* Seal at the size it is actually used, 30px. Anything judged larger than
+   this is being judged at the wrong size. */
+.s30-1 {
+  width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0;
+  background: var(--seal); color: #fff; font-family: Brush, serif;
+  display: grid; place-items: center; font-size: 20px; line-height: 1;
+}
+.s30-4 {
+  width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0; padding: 3px;
+  background: var(--seal); color: #fff; font-family: Brush, serif;
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  grid-auto-flow: column; direction: rtl; gap: 1px; font-size: 11px; line-height: 1;
+}
+.s30-4 > span { display: grid; place-items: center; }
+
+.tileS { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
+.verdict { font-size: 12px; padding: 10px 14px; border-top: 1px solid var(--line); line-height: 1.5; }
+.verdict.bad { color: var(--seal); }
+.verdict.ok  { color: var(--ink-2); }
+
 :focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
 </style>
 
@@ -518,6 +554,203 @@ tr.pick td.han { color: var(--seal); }
     StockSense named, makes the SME concrete, and the switchable-looking chip does useful extra work:
     it implies the product has other customers, which is the claim a hackathon pitch wants to make
     anyway.
+  </div>
+
+  <h2>Seal and wordmark: four combinations</h2>
+  <p style="max-width:70ch;margin:0 0 16px;color:var(--ink-2)">
+    All four shown at the size the sidebar actually uses, 30px for the seal in a 214px column. A mark
+    judged larger than it ships is judged wrong, and this is the decision where that matters most:
+    four characters in a 30px square gives each glyph about 13px.
+  </p>
+
+  <div class="grid">
+    <div class="spec">
+      <div class="spec__hd"><b>1 &middot; Shipping now</b><span>&#x7C73; + &#x56DB;&#x6D77;&#x7C73;&#x884C;</span></div>
+      <div class="spec__stage pair__stage"><div class="mini">
+          <div class="mini__hd"><div class="tileS" style="background:#3b82f6">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="mini__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip2"><div class="s30-1">&#x7C73;</div>
+            <div><div class="chip2__cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="chip2__en">Four Seas Rice</div></div>
+          </div>
+        </div></div>
+      <div class="verdict ok">The seal is legible, the wordmark is the full registered name.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>2 &middot; Your proposal</b><span>full seal + &#x56DB;&#x6D77;&#x7C73;</span></div>
+      <div class="spec__stage pair__stage"><div class="mini">
+          <div class="mini__hd"><div class="tileS" style="background:#3b82f6">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="mini__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip2"><div class="s30-4"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+            <div><div class="chip2__cn">&#x56DB;&#x6D77;&#x7C73;</div><div class="chip2__en">Four Seas Rice</div></div>
+          </div>
+        </div></div>
+      <div class="verdict bad">The seal turns to texture at this size, and the wordmark now says less
+        than the seal it sits beside.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>3 &middot; Full seal, full name</b><span>full seal + &#x56DB;&#x6D77;&#x7C73;&#x884C;</span></div>
+      <div class="spec__stage pair__stage"><div class="mini">
+          <div class="mini__hd"><div class="tileS" style="background:#3b82f6">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="mini__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip2"><div class="s30-4"><span>&#x56DB;</span><span>&#x6D77;</span><span>&#x7C73;</span><span>&#x884C;</span></div>
+            <div><div class="chip2__cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="chip2__en">Four Seas Rice</div></div>
+          </div>
+        </div></div>
+      <div class="verdict bad">Now the same four characters appear twice, 40mm apart, one of them
+        unreadable. The seal earns nothing.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>4 &middot; &#x7C73; seal, short name</b><span>&#x7C73; + &#x56DB;&#x6D77;&#x7C73;</span></div>
+      <div class="spec__stage pair__stage"><div class="mini">
+          <div class="mini__hd"><div class="tileS" style="background:#3b82f6">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="mini__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip2"><div class="s30-1">&#x7C73;</div>
+            <div><div class="chip2__cn">&#x56DB;&#x6D77;&#x7C73;</div><div class="chip2__en">Four Seas Rice</div></div>
+          </div>
+        </div></div>
+      <div class="verdict ok">Legible, and &#x56DB;&#x6D77;&#x7C73; is a real short form: the chop carries the registered
+        name, the signage drops &#x884C;. The cost is that &#x7C73; then appears in both, which reads as a stutter
+        rather than as a pairing.</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>The full seal is right, at the wrong size.</b> It is the better mark on a letterhead, an
+    invoice or a slide, where 88px gives each character room and the 2&times;2 reading order is
+    visible as a deliberate thing. At 30px in a sidebar it is four grey-red marks that read as
+    texture, and a logo whose job is instant recognition cannot be texture. Keep both: the full seal
+    for print and the deck, &#x7C73; for the interface. That is normal practice, not a compromise;
+    every bank has a crest it never puts in its app.
+  </div>
+  <div class="note">
+    <b>On &#x56DB;&#x6D77;&#x7C73; as the wordmark.</b> It is legitimate Chinese, and the logic is sound: the chop
+    carries the formal name and everyday use drops the &#x884C; suffix. The problem is only positional.
+    Beside the full seal it says <i>less</i> than the mark next to it, which inverts the usual
+    relationship; beside the &#x7C73; seal, &#x7C73; appears twice in 40 pixels. &#x56DB;&#x6D77;&#x7C73;&#x884C; avoids both, and the
+    suffix is doing real work: it is the character that says this is a trading house rather than a
+    brand of rice.
+  </div>
+
+  <h2>Making the two marks agree</h2>
+  <p style="max-width:70ch;margin:0 0 16px;color:var(--ink-2)">
+    The seal and the StockSense tile currently disagree on three things at once, and the mismatch is
+    easier to see now that they sit ten pixels apart. The seal is a <b>solid stamp</b>: filled glyph,
+    deep pigment, no interior detail. The tile is a <b>hairline drawing</b>: 2.2px strokes in a bright
+    SaaS blue. Put them side by side and one looks pressed into the page while the other looks
+    sketched on it.
+  </p>
+
+  <div class="grid">
+    <div class="spec">
+      <div class="spec__hd"><b>Now</b><span>#3b82f6, 2.2px strokes</span></div>
+      <div class="spec__stage pair__stage"><div class="mini">
+          <div class="mini__hd"><div class="tileS" style="background:#3b82f6">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="mini__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip2"><div class="s30-1">&#x7C73;</div>
+            <div><div class="chip2__cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="chip2__en">Four Seas Rice</div></div>
+          </div>
+        </div></div>
+      <div class="verdict bad">The blue is brighter than the cinnabar is deep, so the junior mark
+        pulls the eye first.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>A &middot; Deeper ink</b><span>same drawing</span></div>
+      <div class="spec__stage pair__stage"><div class="mini">
+          <div class="mini__hd"><div class="tileS" style="background:#1d4ed8;border-radius:8px">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+            <div class="mini__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip2"><div class="s30-1">&#x7C73;</div>
+            <div><div class="chip2__cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="chip2__en">Four Seas Rice</div></div>
+          </div>
+        </div></div>
+      <div class="verdict ok">One change: #3b82f6 to #1d4ed8, with a slightly heavier stroke. The
+        cheapest option and it fixes the loudness, but the stamp-versus-sketch difference remains.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>B &middot; Solid bars</b><span>filled, not drawn</span></div>
+      <div class="spec__stage pair__stage"><div class="mini">
+          <div class="mini__hd"><div class="tileS" style="background:#1d4ed8;border-radius:8px">
+              <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="14" width="4.6" height="7" rx="1.3" fill="#fff"/><rect x="9.7" y="9" width="4.6" height="12" rx="1.3" fill="#fff"/><rect x="16.4" y="4" width="4.6" height="17" rx="1.3" fill="#fff"/></svg>
+            </div>
+            <div class="mini__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip2"><div class="s30-1">&#x7C73;</div>
+            <div><div class="chip2__cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="chip2__en">Four Seas Rice</div></div>
+          </div>
+        </div></div>
+      <div class="verdict ok">Filled shapes answer the seal's solidity, so both tiles read as marks
+        rather than one mark and one icon. Bars also say <i>inventory</i> more plainly than an
+        abstract upward line does.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>C &middot; Bars and trend</b><span>recommended</span></div>
+      <div class="spec__stage pair__stage"><div class="mini">
+          <div class="mini__hd"><div class="tileS" style="background:#1d4ed8;border-radius:8px">
+              <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="15" width="4.4" height="6" rx="1.2" fill="#ffffff" opacity=".55"/><rect x="9.8" y="11" width="4.4" height="10" rx="1.2" fill="#ffffff" opacity=".55"/><rect x="16.6" y="6" width="4.4" height="15" rx="1.2" fill="#fff"/><path d="M4 12.5 L11 8.5 L18.8 3.4" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="mini__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip2"><div class="s30-1">&#x7C73;</div>
+            <div><div class="chip2__cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="chip2__en">Four Seas Rice</div></div>
+          </div>
+        </div></div>
+      <div class="verdict ok">Keeps the rising line the product is already known by, but sets it over
+        solid bars so the tile has mass. The muted rear bars give it depth without adding a colour.</div>
+    </div>
+
+    <div class="spec">
+      <div class="spec__hd"><b>D &middot; The grain</b><span>considered, not recommended</span></div>
+      <div class="spec__stage pair__stage"><div class="mini">
+          <div class="mini__hd"><div class="tileS" style="background:#1d4ed8;border-radius:8px">
+              <svg width="20" height="20" viewBox="0 0 24 24"><path d="M12 3.2c3.1 2.6 4.6 5.6 4.6 8.9 0 3.6-1.7 6.6-4.6 8.7-2.9-2.1-4.6-5.1-4.6-8.7 0-3.3 1.5-6.3 4.6-8.9z" fill="#fff"/><path d="M12 5.6v13.2" stroke="#1d4ed8" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="mini__nm"><b>StockSense</b><span>Control Tower</span></div>
+          </div>
+          <div class="chip2"><div class="s30-1">&#x7C73;</div>
+            <div><div class="chip2__cn">&#x56DB;&#x6D77;&#x7C73;&#x884C;</div><div class="chip2__en">Four Seas Rice</div></div>
+          </div>
+        </div></div>
+      <div class="verdict bad">A rice grain matches the seal's language exactly, and that is the
+        problem: StockSense is not a rice company. Borrowing the client's subject for the product mark
+        is the one thing the tenant arrangement exists to avoid.</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>The recommendation is C, and the colour change matters more than the drawing.</b> #3b82f6 is
+    brighter than #b3271e is deep, so today the junior mark wins the first glance, which is backwards.
+    #1d4ed8 sits at a similar weight to the cinnabar: neither shouts, and the pair reads as two marks
+    of the same family rather than a logo next to a UI accent.
+  </div>
+  <div class="note">
+    <b>What NOT to change.</b> The blue stays blue. It is the app's functional accent, used on the
+    active nav item, the primary buttons and every chart series, so the header tile has to belong to
+    that system. And the tiles stay different sizes, 34px and 30px: the product is the header and the
+    client is the account inside it, and equal sizes would flatten that into a co-brand, which is the
+    arrangement that was already rejected.
   </div>
 
   <h2>Notes</h2>
