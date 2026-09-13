@@ -381,7 +381,6 @@ export default function Dashboard() {
   const [skus, setSkus] = useState(null);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
-  const [showMore, setShowMore] = useState(false);
   // Single active cross-filter, PowerBI-style: click a bar/cell/row in any
   // chart on this page to filter Needs Attention to just those SKUs; click
   // the same one again to clear it. Only one filter active at a time.
@@ -545,6 +544,22 @@ export default function Dashboard() {
         <StatCard label="Coverage in Target Band" value={`${s.coverageInBandPct}%`} icon={Clock} hint={HINTS.coverageBand}
           status={s.coverageInBandPct < 50 ? "bad" : s.coverageInBandPct < 80 ? "warn" : "ok"} trend={ppTrend(t.coverageInBandPct)}
           sub={`${s.coverage.above.pct}% overstocked · ${s.coverage.below.pct}% at risk`} target="≥ 80%" />
+        {/* Fourth column of the service row since 2026-09-14, rather than a
+            disclosure of its own below the card. It belongs here on the
+            merits: the question it answers is "are we holding enough to meet
+            the mandate", which is an availability question, and the row had
+            an empty fourth cell that made it look like something was missing.
+            Standing alone under a toggle it read as an afterthought.
+
+            compliancePosition is a QUANTITY in metric tonnes (eligible on-hand
+            minus required buffer, see financials.js), not money. It used to
+            render through fmt$ and displayed "+$1K" for what is actually
+            +1,058 MT of rice - wrong unit and, via the K-rounding, wrong
+            magnitude too. */}
+        <StatCard label="Compliance Position"
+          value={`${s.compliancePosition >= 0 ? "+" : ""}${fmtMt(s.compliancePosition)} MT`}
+          icon={ShieldCheck} status={s.compliancePosition < 0 ? "bad" : "ok"}
+          sub={`${fmtMt(s.complianceEligibleQty)} MT eligible vs ${fmtMt(s.complianceRequiredQty)} MT required · illustrative`} />
       </div>
 
       <div className="divider" style={{ margin: "var(--space-5) 0" }} />
@@ -571,30 +586,6 @@ export default function Dashboard() {
           - Coverage in Target Band moved above since it's a real daily-glance
           figure, not a duplicate of Health-by-Value (different taxonomy:
           below/in/above/idle days-of-cover vs RED/ORANGE/YELLOW/GREEN rules). ── */}
-      <button
-        onClick={() => setShowMore((v) => !v)}
-        style={{
-          display: "flex", alignItems: "center", gap: 6, background: "none", border: "none",
-          color: "var(--text-muted)", fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer",
-          padding: "var(--space-2) 0", marginBottom: showMore ? "var(--space-3)" : "var(--space-5)",
-        }}
-      >
-        <ChevronDown size={13} style={{ transform: showMore ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
-        {showMore ? "Hide" : "Show"} compliance position
-      </button>
-      {showMore && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-5)" }}>
-          {/* compliancePosition is a QUANTITY in metric tonnes (eligible on-hand
-              minus required buffer, see financials.js), not money. It used to
-              render through fmt$ and displayed "+$1K" for what is actually
-              +1,058 MT of rice - wrong unit and, via the K-rounding, wrong
-              magnitude too. */}
-          <StatCard label="Compliance Position"
-            value={`${s.compliancePosition >= 0 ? "+" : ""}${fmtMt(s.compliancePosition)} MT`}
-            icon={ShieldCheck} status={s.compliancePosition < 0 ? "bad" : "ok"}
-            sub={`${fmtMt(s.complianceEligibleQty)} MT eligible vs ${fmtMt(s.complianceRequiredQty)} MT required · illustrative, pending governance approval`} />
-        </div>
-      )}
       </div>
 
       {/* ── Command Deck: four purpose-built widgets, each independently

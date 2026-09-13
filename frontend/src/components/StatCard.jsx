@@ -16,7 +16,15 @@ export default function StatCard({ label, value, icon: Icon, sub, target, trend,
   // left the strip with no focal point at all - the reader cannot tell which
   // two numbers are the emergency. The dot keeps the signal without the shout.
   const statusColor = status === "bad" ? "var(--red)" : "var(--text-primary)";
-  const dotColor = { ok: null, warn: "var(--yellow)", bad: "var(--red)" }[status];
+  // EVERY status gets a dot, healthy included (2026-09-14). Previously "ok"
+  // rendered nothing, which made absence ambiguous: a reader could not tell
+  // whether a metric with no dot was healthy or simply not assessed. A green
+  // dot says "checked, fine", and that is a different statement from silence.
+  // It does not cost the focal point the dots were introduced to protect,
+  // because the colours still separate: green reads as background, red does
+  // not.
+  const dotColor = { ok: "var(--green)", warn: "var(--yellow)", bad: "var(--red)" }[status];
+  const dotLabel = { ok: "Healthy", warn: "Needs watching", bad: "Critical" }[status];
 
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)" }}>
@@ -27,8 +35,8 @@ export default function StatCard({ label, value, icon: Icon, sub, target, trend,
         <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}>
           {dotColor && (
             <span
-              aria-label={status === "bad" ? "Critical" : "Needs watching"}
-              title={status === "bad" ? "Critical" : "Needs watching"}
+              aria-label={dotLabel}
+              title={dotLabel}
               style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }}
             />
           )}
