@@ -420,3 +420,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, CLAUDE.md, DEVLOG.md, frontend/src/components/Sidebar.jsx, frontend/src/components/SettingsMenu.jsx, frontend/src/index.css
 - **New files:** none
 - **Notes:** TASK-51. Gave the top bar and the settings popover the liquid glass treatment Stan tuned for the hint panel, factored into a shared .glass-surface rather than approximated twice. Two departures from his tokens, both about legibility over a scrolling backdrop rather than a momentary one: heavier blur on the bar, and a lighter drop shadow since 60px on a persistent strip reads as heavy. Home finally got a house icon, which is the other half of the grid-icon confusion he spotted earlier. Verified by temporarily widening the breakpoint so the narrow bar rendered at desktop width, then diffing the file back to byte-identical; that verifies the glass but not the narrow fit. Also caught myself putting a // comment inside a JSX opening tag for the third time this session and added it to the CLAUDE.md quirks list.
+
+---
+
+## Session: 2026-09-13 21:55
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, CLAUDE.md, DEVLOG.md, frontend/src/components/SettingsMenu.jsx
+- **New files:** none
+- **Notes:** TASK-52. Stan reported the settings popover as far too transparent. It was not a blur value problem: backdrop-filter makes an element a backdrop root, the popover was nested inside the bar's own .glass-surface, and so its backdrop-filter sampled an empty root and silently did nothing. Only the gradient was rendering. HoverHint portals to document.body, which is the only reason the hint panel he was comparing against frosts correctly. Portaled the popover the same way, positioned fixed against the trigger rect with scroll and resize listeners, extended the outside-click test to cover the portaled panel, and set blur to --hint-blur so it matches the values he tuned rather than approximating them. Added to the CLAUDE.md quirks list because it presents as a styling bug and is a DOM one.

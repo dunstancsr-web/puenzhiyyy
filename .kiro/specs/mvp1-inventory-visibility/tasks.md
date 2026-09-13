@@ -1551,6 +1551,31 @@ a backup afterwards and is byte identical.
 **Third repeat of a known mistake, now recorded in CLAUDE.md.** A `//` comment inside a JSX opening tag.
 esbuild tolerates it and the build passes, so it never announces itself, but it is not valid JSX.
 
+## TASK-52 - The settings popover was not blurring at all (2026-09-13)
+
+Stan: the popover is so transparent you can read the page through it, and it should look like the hint
+panel. Both halves of that were right, and the cause was not the blur value.
+
+`backdrop-filter` makes an element a **backdrop root**. The popover sat inside
+`.app-topbar-glass__island--settings`, which carries `.glass-surface` and therefore its own
+`backdrop-filter`, so the popover's backdrop-filter could only sample within that root, found nothing,
+and silently rendered with ZERO blur. What was on screen was the gradient alone, which is exactly why
+"Add SKU" stayed perfectly crisp behind it.
+
+The hint panel frosts correctly for one reason: `HoverHint` portals it to `document.body`, escaping
+every backdrop root. Same CSS, different DOM position, opposite result.
+
+- [x] The compact popover is portaled to `document.body`, positioned `fixed` against the trigger's
+      measured rect, with the measurement following scroll and resize.
+- [x] The outside-click test now checks the panel as well as the trigger. A portaled panel counts as
+      "outside" its own wrapper, so without this every click inside the menu closed it.
+- [x] Blur and saturation set to `--hint-blur`, matching what Stan tuned rather than approximating it. A
+      panel dismissed in seconds can afford to be glassier than a strip read all day, which is why the
+      bar keeps its heavier blur.
+- [x] Recorded in CLAUDE.md, because it presents as a styling problem and is a DOM problem.
+
+Verified by temporarily widening the breakpoint, then diffing index.css back to byte identical.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

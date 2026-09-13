@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Settings, Cpu, Calculator, Cloud, AlertTriangle, Sun, Moon, Check } from "lucide-react";
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { api } from "../api/inventory";
@@ -33,17 +34,50 @@ export default function SettingsMenu({ align = "up", compact = false }) {
   const [pending, setPending] = useState(null);  // metered tier awaiting confirm
   const [error, setError] = useState(null);
   const wrapRef = useRef(null);
+  const panelRef = useRef(null);
+  const [rect, setRect] = useState(null);
 
   const load = useCallback(() => {
     api.getLlmMode().then(setState).catch(() => setState(null));
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // The compact panel is PORTALED to document.body, and that is not cosmetic.
+  // Its ancestor .glass-surface sets backdrop-filter, which makes that ancestor
+  // a backdrop root: a descendant's own backdrop-filter can then only sample
+  // inside that root, which is empty, so it silently does nothing. The panel was
+  // rendering with its gradient and no blur at all, which is why the page behind
+  // it stayed perfectly readable. HoverHint portals for the same reason, which
+  // is why the hint panel blurs correctly and this one did not.
+  //
+  // Portaling means position: fixed against the trigger's measured rect, so the
+  // measurement has to follow scroll and resize.
+  const place = useCallback(() => {
+    if (wrapRef.current) setRect(wrapRef.current.getBoundingClientRect());
+  }, []);
+
+  useEffect(() => {
+    if (!open || !compact) return;
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open, compact, place]);
+
   // Close on outside click and on Escape. A popover that can only be dismissed
   // by pressing its own trigger again is a trap on a touch screen.
   useEffect(() => {
     if (!open) return;
-    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) { setOpen(false); setPending(null); } };
+    const onDown = (e) => {
+      const inTrigger = wrapRef.current && wrapRef.current.contains(e.target);
+      // Without this the portaled panel counts as "outside" and clicking any
+      // control in it would close the menu before the click registered.
+      const inPanel = panelRef.current && panelRef.current.contains(e.target);
+      if (!inTrigger && !inPanel) { setOpen(false); setPending(null); }
+    };
     const onKey = (e) => { if (e.key === "Escape") { setOpen(false); setPending(null); } };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
@@ -99,19 +133,39 @@ export default function SettingsMenu({ align = "up", compact = false }) {
         )}
       </button>
 
-      {open && (
-        /* Compact uses the same glass as the hint panel, with its full drop
-           shadow, because it genuinely floats above the page. */
-        <div role="dialog" aria-label="Settings"
-          className={compact ? "glass-surface glass-surface--floating" : undefined}
-          style={{
-            position: "absolute", zIndex: 60,
-            [align === "up" ? "bottom" : "top"]: "calc(100% + 8px)",
-            // Anchored to the right when compact: the trigger sits at the right
-            // edge of the strip, so a left-anchored panel would open off screen.
-            ...(compact ? { right: 0 } : { left: 0, right: 0 }),
-            width: compact ? 256 : undefined,
-            minWidth: 248,
+      {open && renderPanel()}
+    </div>
+  );
+
+  function renderPanel() {
+    /* Compact uses the same glass as the hint panel, including its blur and
+       saturation, because Stan tuned those values and this should match what he
+       tuned rather than approximate it. */
+    const panel = (
+      <div role="dialog" aria-label="Settings" ref={panelRef}
+        className={compact ? "glass-surface glass-surface--floating" : undefined}
+        style={{
+          zIndex: 9999,
+          ...(compact
+            ? {
+                position: "fixed",
+                top: rect ? rect.bottom + 8 : -9999,
+                // Right aligned to the trigger, which sits at the right edge of
+                // the strip, so a left-aligned panel would open off screen.
+                right: rect ? Math.max(8, window.innerWidth - rect.right) : 8,
+                width: 256,
+                // The hint panel's own blur, not the bar's heavier one. A
+                // floating panel that is dismissed in a few seconds can afford
+                // to be glassier than a strip you read all day.
+                "--glass-surface-blur": "var(--hint-blur)",
+                color: "var(--hint-text)",
+              }
+            : {
+                position: "absolute",
+                [align === "up" ? "bottom" : "top"]: "calc(100% + 8px)",
+                left: 0, right: 0,
+              }),
+          minWidth: 248,
             // The desktop sidebar popover stays a solid card: it opens against
             // the sidebar's own flat panel, where glass has nothing interesting
             // to refract and just looks murky.
@@ -119,9 +173,9 @@ export default function SettingsMenu({ align = "up", compact = false }) {
               background: "var(--card-bg)", border: "1px solid var(--border)",
               boxShadow: "var(--shadow-md)",
             }),
-            borderRadius: "var(--radius-lg)",
-            padding: 14,
-          }}>
+          borderRadius: "var(--radius-lg)",
+          padding: 14,
+        }}>
 
           <Section title="Explanations" note="Which engine answers Why? on an alert" />
           <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 }}>
@@ -178,11 +232,13 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                 {t.label}
               </button>
             ))}
-          </div>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+
+    // document.body is outside every backdrop root, which is the whole point.
+    return compact ? createPortal(panel, document.body) : panel;
+  }
 }
 
 function Section({ title, note }) {

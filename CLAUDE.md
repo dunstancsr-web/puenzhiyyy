@@ -60,6 +60,12 @@ feedback, not suggestions to re-litigate.
   quantity was calculated two ways and differed by 257 MT; months of cover was
   computed two ways and differed by 0.2. Read the engine's own field rather than
   re-deriving it. `engines/duration.js` and `suggested_order_qty` exist for this.
+- **`backdrop-filter` does not work inside another `backdrop-filter`.** An
+  element with it becomes a *backdrop root*, so a descendant's own
+  backdrop-filter can only sample within that root, finds nothing, and silently
+  renders with zero blur. It looks like a wrong blur value; it is a wrong DOM
+  position. Portal the floating element to `document.body`, which is what
+  `HoverHint` does and why the hint panel frosts correctly.
 - **Never put a `//` comment inside a JSX opening tag.** esbuild tolerates it and
   the build passes, so it does not announce itself, but it is not valid JSX and
   other toolchains reject it. Put the comment above the element as `{/* ... */}`
