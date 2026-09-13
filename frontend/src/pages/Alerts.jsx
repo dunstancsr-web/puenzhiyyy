@@ -9,6 +9,7 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
+import { buildExplanation } from "../lib/explain";
 
 // Escape-to-close + body-scroll-lock while a modal is open. Inventory.jsx's
 // Modal component already does this; AiModal/ApprovalModal below didn't -
@@ -40,6 +41,27 @@ const TYPE_META = {
 };
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
+
+// Short verb phrase for the decision footer, one per alert type.
+//
+// The footer used to read "AI Recommendation: No order required for this alert"
+// on every alert whose answer is not a purchase order, which is four of the six
+// types. Sitting directly beside Approve / Modify / Reject, it told the reader
+// there was nothing to decide and then asked them to decide it. Naming the
+// actual action makes the buttons mean something: you are approving a
+// disposition review, not approving nothing.
+//
+// The label is "Decision:", not "Recommended:". The card already carries a
+// "Recommended:" block holding the full recommended_action sentence, and a
+// second "Recommended" a few pixels below it reads as a competing
+// recommendation rather than as the same one. This line names what the three
+// buttons beside it will act on.
+const ACTION_SUMMARY = {
+  OVERSTOCK:   "Suspend purchasing",
+  IDLE:        "Disposition review",
+  SLOW_MOVING: "Reduce next order",
+  AGEING:      "Escalate to QA and commercial",
+};
 
 // ELI18: plain language, no assumed prior inventory-ops vocabulary - matches
 // the Dashboard's ColHint copy style (visual-consistency pass, 2026-09).
@@ -82,15 +104,12 @@ const DECISION_LOG_HINT = {
 // click showed a different SKU's canned explanation as if it were this
 // alert's. Synthesizing from the alert's own (already-correct) fields
 // guarantees the text always matches what was actually clicked.
-function buildFallbackExplanation(alert) {
-  // > 0, not != null. A quantity of 0 means "no order applies" (overstock,
-  // slow-moving, idle, ageing all report 0), and rendering it produced
-  // "Suggested quantity: 0 MT" on alerts whose whole point is to stop buying.
-  const qtyLine = alert.ai_recommendation_qty > 0
-    ? `\n\nSuggested order quantity: ${alert.ai_recommendation_qty} MT.`
-    : "";
-  return `${alert.message}\n\nRecommended action: ${alert.recommended_action}${qtyLine}`;
-}
+// Superseded by lib/explain.js (TASK-37). The old body here concatenated
+// alert.message with alert.recommended_action, which are the two lines already
+// printed on the card the button sits on, so clicking Ask AI returned the card
+// back to the reader. buildExplanation now assembles a four-step reasoning
+// trace from the enriched SKU, and falls back to this restatement only when the
+// SKU cannot be matched, saying so when it does.
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Alerts() {
@@ -100,13 +119,18 @@ export default function Alerts() {
   const [aiModal, setAiModal] = useState(null);       // { alert, explanation }
   const [approvalModal, setApprovalModal] = useState(null); // alert
   const [decisions, setDecisions] = useState([]);
+  // Needed by the explanation builder: alerts carry the conclusion, the SKU
+  // carries the inputs the conclusion was derived from.
+  const [skus, setSkus] = useState([]);
   const [logOpen, setLogOpen] = useCollapsed("alerts-decision-log", true);
 
   const loadAlerts = useCallback(() => {
     setLoadError(null);
     setAlerts(null);
-    Promise.all([api.getAlerts(), api.getDecisions()])
-      .then(([alertsData, decisionsData]) => { setAlerts(alertsData); setDecisions(decisionsData); })
+    Promise.all([api.getAlerts(), api.getDecisions(), api.getSkus()])
+      .then(([alertsData, decisionsData, skuData]) => {
+        setAlerts(alertsData); setDecisions(decisionsData); setSkus(skuData || []);
+      })
       .catch((err) => setLoadError(err.message || "Failed to load alerts"));
   }, []);
 
@@ -143,7 +167,8 @@ export default function Alerts() {
   };
 
   const handleAskAI = (alert) => {
-    setAiModal({ alert, explanation: buildFallbackExplanation(alert) });
+    const sku = skus.find((s) => s.sku_id === alert.sku_id);
+    setAiModal({ alert, ...buildExplanation(alert, sku) });
   };
 
   // Deliberately doesn't catch: ApprovalModal awaits this and needs the
@@ -405,10 +430,10 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
           borderTop: "1px solid var(--border)",
         }}>
           <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            <span style={{ fontWeight: 600 }}>AI Recommendation: </span>
+            <span style={{ fontWeight: 600 }}>Decision: </span>
             {alert.ai_recommendation_qty > 0
               ? `Order ${alert.ai_recommendation_qty} MT`
-              : "No order required for this alert"}
+              : (ACTION_SUMMARY[alert.alert_type] || "Review this SKU")}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             {/* Ask AI button */}
@@ -447,7 +472,7 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove, isLast }) {
 
 // ── AI explanation modal ───────────────────────────────────────────────────────
 function AiModal({ aiModal, onClose }) {
-  const { alert, explanation } = aiModal;
+  const { alert, sections, degraded } = aiModal;
   useModalEscape(onClose);
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -460,7 +485,7 @@ function AiModal({ aiModal, onClose }) {
               <Cpu size={15} color="var(--purple)" />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>Explanation</div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>Why this was flagged</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{alert.sku_name} · {alert.alert_type.replace(/_/g, " ")}</div>
             </div>
           </div>
@@ -472,14 +497,44 @@ function AiModal({ aiModal, onClose }) {
             fields, not a live model call (TASK-11 needs an API key that
             isn't available yet). Corrected to say so plainly rather than
             claim a capability that doesn't exist yet. */}
-        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--yellow)", marginBottom: 16 }}>
-          ⚠️ Rule-based summary of the numbers already computed for this SKU - not yet a live AI call. All recommendations require manager review and approval before action is taken.
+        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: 13, color: "var(--yellow)", marginBottom: 18 }}>
+          {degraded
+            ? "\u26A0\uFE0F This SKU's current figures could not be loaded, so only the alert's own text is shown. Reopen after a refresh for the full reasoning."
+            : "\u26A0\uFE0F Traced from this SKU's computed figures by the rules in design.md, not yet written by a live model. Every number below can be checked against the Inventory page. All recommendations require manager approval before action is taken."}
         </div>
 
-        {/* Explanation */}
-        <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.8, whiteSpace: "pre-line" }}>
-          {explanation}
-        </div>
+        {/* The four steps, each labelled. A numbered rail is used here because
+            these genuinely ARE a sequence: measurement, derivation,
+            consequence, response. Numbering something that is not ordered is
+            decoration, but this is the reasoning chain in order. */}
+        <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          {sections.map((s, i) => (
+            <li key={s.heading} style={{ display: "flex", gap: 12 }}>
+              <span
+                aria-hidden
+                style={{
+                  flexShrink: 0, width: 22, height: 22, borderRadius: "50%",
+                  background: "var(--surface-2)", border: "1px solid var(--border)",
+                  color: "var(--text-muted)", fontSize: 11, fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1,
+                }}
+              >
+                {i + 1}
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, letterSpacing: "0.05em",
+                  textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 3,
+                }}>
+                  {s.heading}
+                </div>
+                <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.65 }}>
+                  {s.body}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
 
         <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}>
           <button onClick={onClose}

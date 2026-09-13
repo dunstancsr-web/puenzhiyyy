@@ -12,10 +12,36 @@ const TYPE_PRIORITY = {
 const fmtMt = (n) => `${Math.round(n)} MT`;
 const fmt$ = (n) => {
   const a = Math.abs(n);
+  // Thresholds match fmt$ in frontend/src/pages/Dashboard.jsx and sgd() in
+  // frontend/src/lib/explain.js. All three render the same figures, and a
+  // carrying cost that reads "$26K" in an alert and "$26.2K" on the dashboard
+  // looks like two different numbers.
   if (a >= 1e6) return `SGD $${(n / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `SGD $${Math.round(n / 1e3)}K`;
+  if (a >= 1e5) return `SGD $${Math.round(n / 1e3)}K`;
+  if (a >= 1e3) return `SGD $${(n / 1e3).toFixed(1).replace(/\.0$/, "")}K`;
   return `SGD $${Math.round(n)}`;
 };
+
+// How much to order, for the two alert types that recommend ordering.
+//
+// This used to be recomputed here as `target_stock - available_qty`, a
+// snapshot-based proxy that ignores everything consumed WHILE the order is in
+// transit. engines/index.js already computes the real figure as
+// `target_stock - projected_available_at_lead_time` (design.md "Reorder Point
+// and Suggested Order Quantity", upgraded away from exactly this proxy on
+// 2026-09-12) and attaches it to every SKU before generateAlerts is called.
+// The alert engine simply never picked up the upgrade.
+//
+// The two disagreed badly. On TJ-25KG the proxy said 340 MT while the SKU's own
+// suggested_order_qty said 597 MT: a 257 MT gap, about $347K of purchase order,
+// with the Inventory page showing one number and the Alerts page pre-filling
+// the other into the approval modal. Same disease as the reorder-point policy
+// versus suggested bug: one question, two answers, no way for a manager to tell
+// which one the system means.
+//
+// min_order_qty still floors it, because a supplier minimum is a hard
+// constraint rather than a calculation.
+const orderQty = (s) => Math.round(Math.max(s.min_order_qty, s.suggested_order_qty));
 
 function alertsForSku(s) {
   const out = [];
@@ -29,12 +55,12 @@ function alertsForSku(s) {
       triggered_value: s.days_of_cover,
       threshold_value: s.lead_time_days,
       message: `${s.product_name} has ${s.days_of_cover} days of cover against a ${s.lead_time_days}-day supplier lead time. A stockout is projected ${s.stockout_gap_days} days before replenishment can arrive.`,
-      recommended_action: `Place a replenishment order now (min ${fmtMt(s.min_order_qty)}). Suggested quantity ${fmtMt(Math.max(s.min_order_qty, s.target_stock - s.available_qty))}. ${s.expected_incoming_qty > 0 ? `${fmtMt(s.expected_incoming_qty)} already inbound (ETA ${s.incoming_eta_days}d) - expedite if possible.` : "Consider expedited freight."}`,
-      ai_recommendation_qty: Math.round(Math.max(s.min_order_qty, s.target_stock - s.available_qty)),
+      recommended_action: `Place a replenishment order now (min ${fmtMt(s.min_order_qty)}). Suggested quantity ${fmtMt(orderQty(s))}. ${s.expected_incoming_qty > 0 ? `${fmtMt(s.expected_incoming_qty)} already inbound (ETA ${s.incoming_eta_days}d) - expedite if possible.` : "Consider expedited freight."}`,
+      ai_recommendation_qty: orderQty(s),
     });
   }
 
-  // REORDER — inventory position (on-hand + expected incoming), not just on-hand
+  // REORDER - inventory position (on-hand + expected incoming), not just on-hand
   else if (s.inventory_position <= s.reorder_point_suggested && s.movement_class !== "Idle") {
     push({
       alert_type: "REORDER",
@@ -42,8 +68,8 @@ function alertsForSku(s) {
       triggered_value: Math.round(s.inventory_position),
       threshold_value: Math.round(s.reorder_point_suggested),
       message: `${s.product_name} inventory position (${fmtMt(s.inventory_position)} on-hand + expected incoming) is at or below the reorder point (${fmtMt(s.reorder_point_suggested)}).`,
-      recommended_action: `Initiate a standard replenishment order of ~${fmtMt(s.target_stock - s.available_qty)} within the lead-time window.`,
-      ai_recommendation_qty: Math.round(Math.max(s.min_order_qty, s.target_stock - s.available_qty)),
+      recommended_action: `Initiate a standard replenishment order of ~${fmtMt(orderQty(s))} within the lead-time window.`,
+      ai_recommendation_qty: orderQty(s),
     });
   }
 
