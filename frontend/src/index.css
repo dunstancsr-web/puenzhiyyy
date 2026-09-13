@@ -376,6 +376,46 @@ input, select, textarea {
   .home-card:hover, .home-card:focus-visible { transform: none; }
 }
 
+/* ── Sidebar restraint (TASK-82) ─────────────────────────────────────────────
+   The Control Tower panel had three colours competing before a single figure
+   was read: a purple section icon, a blue product mark and a red badge. Only
+   the badge was carrying information. Colour is reserved for state and meaning
+   in this app, so the other two step back and earn their colour on hover. */
+
+/* The StockSense credit. Muted until pointed at, which is the right weight for
+   a footer credit: it is an attribution, not a control, and it does not need
+   to compete with the alert count for the first glance. */
+.credit-mark { --app-mark-bg: var(--text-muted); }
+.credit-mark:hover, .credit-mark:focus-within { --app-mark-bg: #1d4ed8; }
+
+/* The way out.
+   Every colour here lives in the CLASS, not in an inline style prop: an inline
+   background or color beats a stylesheet rule lacking !important, so a :hover
+   rule could never reach it. That mistake has shipped in this repo before. */
+.sidebar-exit {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 12px; border-radius: var(--radius);
+  border: 1px solid var(--sidebar-border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: var(--text-sm); font-weight: 700;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.sidebar-exit:hover, .sidebar-exit:focus-visible {
+  background: var(--blue-light);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+/* The icon steps toward the edge it leads to. One gesture, three properties
+   moving together, rather than a decorative flourish: the control lights up
+   and the mark takes a step out. */
+.sidebar-exit svg { transition: transform 0.16s ease; }
+.sidebar-exit:hover svg, .sidebar-exit:focus-visible svg { transform: translateX(-3px); }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-exit:hover svg, .sidebar-exit:focus-visible svg { transform: none; }
+}
+
 /* ── Modal entry animations ─────────────────────────────────────────────── */
 @keyframes inv-overlay-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes inv-modal-in {

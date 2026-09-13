@@ -38,7 +38,11 @@ export default function AppMark({ size = 34 }) {
       style={{
         width: size, height: size, flexShrink: 0,
         display: "grid", placeItems: "center",
-        background: MARK_BLUE,
+        // Read from a custom property so an ancestor can mute it without the
+        // inline style winning. The sidebar credit dims the mark until it is
+        // hovered; everywhere else the fallback keeps the brand blue.
+        background: "var(--app-mark-bg, " + MARK_BLUE + ")",
+        transition: "background 0.16s ease",
         // Same corner ratio as the seal, so the two tiles read as a pair
         // rather than as two unrelated squares that happen to be adjacent.
         borderRadius: Math.round(size * 0.24),

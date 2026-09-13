@@ -4,7 +4,7 @@ import { LayoutDashboard, PackageSearch, Bell, History, Home as HomeIcon } from 
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 import EventCredit from "./EventCredit";
-import { FullSeal, CLIENT_HAN } from "./Tenant";
+import { Seal, CLIENT_HAN } from "./Tenant";
 import TowerIcon from "./TowerIcon";
 import AppMark from "./AppMark";
 
@@ -89,7 +89,11 @@ export default function Sidebar() {
             company name sitting under a product name. At the top it needs no
             explaining: it is the masthead, exactly as on Home. */}
         <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "0 6px", marginBottom: 16 }}>
-          <FullSeal size={40} />
+          {/* The single 米, not the full chop. Four characters in a 40px
+              square gives each glyph about 17px and the seal reads as texture;
+              one character holds. The full seal keeps Home, where 56px gives
+              it the room it needs. */}
+          <Seal size={40} />
           <div style={{ minWidth: 0 }}>
             <div className="brush" style={{
               fontSize: "var(--text-base)", lineHeight: 1.15, color: "var(--text-primary)",
@@ -115,7 +119,12 @@ export default function Sidebar() {
           borderTop: "1px solid var(--sidebar-border)",
           borderBottom: "1px solid var(--sidebar-border)",
         }}>
-          <TowerIcon size={19} color="var(--purple)" />
+          {/* 24px, and --text-primary rather than purple. The tint is
+              wayfinding on Home, where three workspaces have to be told apart;
+              here there is only one workspace, so the colour distinguishes
+              nothing and just competes with the alert badge. Matching the
+              title's colour makes icon and label read as a single lockup. */}
+          <TowerIcon size={24} color="var(--text-primary)" />
           <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)" }}>
             Control Tower
           </span>
@@ -159,13 +168,7 @@ export default function Sidebar() {
             who opened the Control Tower by mistake needs to find this without
             hunting, so it is full width, taller than a nav row, and says where
             it goes rather than just "Home". */}
-        <Link to="/" style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: "13px 12px", marginBottom: 10, borderRadius: "var(--radius)",
-          border: "1px solid var(--sidebar-border)", background: "var(--surface-2)",
-          color: "var(--text-primary)", textDecoration: "none",
-          fontSize: "var(--text-sm)", fontWeight: 700,
-        }}>
+        <Link to="/" className="sidebar-exit" style={{ marginBottom: 10 }}>
           <HomeIcon size={19} style={{ flexShrink: 0 }} />
           All workspaces
         </Link>
@@ -176,7 +179,7 @@ export default function Sidebar() {
         <div style={{
           padding: "12px 6px 0", marginTop: 12, borderTop: "1px solid var(--sidebar-border)",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+          <div className="credit-mark" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9, width: "fit-content" }}>
             <AppMark size={22} />
             <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", fontWeight: 600 }}>
               Running on <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>StockSense</span>
