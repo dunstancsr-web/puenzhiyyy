@@ -1,0 +1,30 @@
+# Keep the build context small and, more importantly, keep host-built artifacts
+# out of it. Copying a macOS node_modules into a Linux image would overwrite the
+# correctly compiled better-sqlite3 binary with one that cannot load.
+node_modules
+**/node_modules
+
+# Built in the image, never copied from the host.
+frontend/dist
+frontend/build
+
+# Local database and its write-ahead log. The container seeds its own.
+backend/data
+
+.git
+.gitignore
+*.log
+npm-debug.log*
+.DS_Store
+.vscode
+.idea
+.env
+.env.*
+
+# Documentation and specs: not needed at runtime.
+.kiro
+DEVLOG.md
+SUBMISSION.md
+README.md
+CLAUDE.md
+frontend/mockups

@@ -1,12 +1,21 @@
 const Database = require("better-sqlite3");
+const fs = require("fs");
 const path = require("path");
 
-const DB_PATH = path.join(__dirname, "../../data/stocksense.db");
+// DATA_DIR is configurable so a deployed instance can point the database at a
+// mounted persistent disk, which is never inside the checked-out source tree.
+// Defaults to the repo-local data/ directory, so local development and
+// `npm run seed` behave exactly as before with no env var set.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "../../data");
+const DB_PATH = path.join(DATA_DIR, "stocksense.db");
 
 let db;
 
 function getDb() {
   if (!db) {
+    // A mounted volume can be empty on first boot, and better-sqlite3 will not
+    // create a missing parent directory for you: it throws SQLITE_CANTOPEN.
+    fs.mkdirSync(DATA_DIR, { recursive: true });
     db = new Database(DB_PATH);
     db.pragma("journal_mode = WAL"); // better concurrent read performance
     db.pragma("foreign_keys = ON");
