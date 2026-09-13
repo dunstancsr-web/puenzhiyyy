@@ -73,8 +73,13 @@ export default function StockPositionBar({
   available, minStock, reorder, suggested, maxStock, reservedQty, physicalStock, idle,
   target, axisMax, animateFill = true,
 }) {
-  const { theme } = useTheme();
-  const rangeShade = theme === "light" ? "rgba(15,23,42,0.13)" : "rgba(255,255,255,0.15)";
+  // `resolved`, never `theme`. The preference can be "auto", which is neither
+  // "light" nor "dark", so a `theme === "light"` test silently takes the dark
+  // branch and paints pale shading on a white page. Anything choosing a COLOUR
+  // wants the resolved appearance; only the settings UI wants the preference.
+  const { resolved } = useTheme();
+  const light = resolved === "light";
+  const rangeShade = light ? "rgba(15,23,42,0.13)" : "rgba(255,255,255,0.15)";
 
   // An idle SKU used to draw as flat muted grey at 0.65 opacity, which is very
   // close to both the track colour and the greyscale "avoid" shading. On
@@ -88,8 +93,8 @@ export default function StockPositionBar({
   // PRESENT and INERT rather than as absent. Diagonal stripes are the
   // conventional encoding for exactly that, and they stay distinguishable from
   // the flat shading at any width.
-  const idleStripe = theme === "light" ? "rgba(51,65,85,0.60)" : "rgba(203,213,225,0.60)";
-  const idleBase   = theme === "light" ? "rgba(51,65,85,0.16)" : "rgba(203,213,225,0.18)";
+  const idleStripe = light ? "rgba(51,65,85,0.60)" : "rgba(203,213,225,0.60)";
+  const idleBase   = light ? "rgba(51,65,85,0.16)" : "rgba(203,213,225,0.18)";
 
   const avail = Number(available) || 0;
   const rop = Number(reorder) || 0;

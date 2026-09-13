@@ -25,9 +25,11 @@ feedback, not suggestions to re-litigate.
 
 ### Design preferences
 
-- **Light theme is the default and the priority.** Dark mode must work, but light
-  is what Stan looks at, demos and judges. When a choice trades one against the
-  other, light wins. Do not reach for a dark, high contrast treatment just
+- **Light is the priority. The default is Auto.** Since TASK-53 a fresh browser
+  gets `auto`, which follows the device's own appearance setting, and falls back
+  to light when the device cannot say. That is a default, not a change of
+  priority: light is still what Stan looks at, demos and judges, and when a
+  choice trades one against the other, light wins. Do not reach for a dark, high contrast treatment just
   because a screen is "industrial" or "device-like": make it light first.
 - **Apple aesthetics** is the standing direction. Restraint, hierarchy from type
   and spacing rather than boxes, colour reserved for state and meaning.
@@ -66,6 +68,12 @@ feedback, not suggestions to re-litigate.
   renders with zero blur. It looks like a wrong blur value; it is a wrong DOM
   position. Portal the floating element to `document.body`, which is what
   `HoverHint` does and why the hint panel frosts correctly.
+- **`theme` is a preference, `resolved` is an appearance.** `useTheme()` returns
+  both. `theme` can be `"auto"`, which is neither `"light"` nor `"dark"`, so a
+  test like `theme === "light" ? a : b` silently takes the dark branch while the
+  page is painted light. Anything picking a COLOUR reads `resolved`; only the
+  settings UI reads `theme`. `StockPositionBar` had exactly this bug the moment
+  Auto was added.
 - **Never put a `//` comment inside a JSX opening tag.** esbuild tolerates it and
   the build passes, so it does not announce itself, but it is not valid JSX and
   other toolchains reject it. Put the comment above the element as `{/* ... */}`

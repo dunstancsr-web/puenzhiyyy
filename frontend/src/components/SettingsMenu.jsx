@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Settings, Cpu, Calculator, Cloud, AlertTriangle, Sun, Moon, Check } from "lucide-react";
+import { Settings, Cpu, Calculator, Cloud, AlertTriangle, Sun, Moon, Monitor, Check } from "lucide-react";
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { api } from "../api/inventory";
 
@@ -26,9 +26,10 @@ import { api } from "../api/inventory";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MODE_ICON = { rules: Calculator, local: Cpu, cloud: Cloud };
+const THEME_ICON = { auto: Monitor, light: Sun, dark: Moon };
 
 export default function SettingsMenu({ align = "up", compact = false }) {
-  const { theme, setTheme } = useTheme();
+  const { theme, resolved, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(null);      // { mode, modes }
   const [pending, setPending] = useState(null);  // metered tier awaiting confirm
@@ -93,7 +94,11 @@ export default function SettingsMenu({ align = "up", compact = false }) {
   };
 
   const activeMode = state?.modes?.find((m) => m.id === state.mode);
+  // The visible label stays short, because it shares a truncating line with the
+  // mode. Auto's resolved appearance goes in the tooltip, where there is room
+  // to say "Auto (dark)" without pushing the mode out of view.
   const themeLabel = THEMES.find((t) => t.id === theme)?.label || theme;
+  const themeTitle = theme === "auto" ? `Auto (${resolved})` : themeLabel;
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
@@ -108,8 +113,8 @@ export default function SettingsMenu({ align = "up", compact = false }) {
         onClick={() => { setOpen((v) => !v); setPending(null); }}
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label={compact ? `Settings. ${activeMode ? activeMode.label : ""}, ${themeLabel}` : undefined}
-        title={compact && activeMode ? `${activeMode.label} · ${themeLabel}` : undefined}
+        aria-label={compact ? `Settings. ${activeMode ? activeMode.label : ""}, ${themeTitle}` : undefined}
+        title={compact && activeMode ? `${activeMode.label} · ${themeTitle}` : undefined}
         style={compact ? {
           display: "flex", alignItems: "center", justifyContent: "center",
           width: 38, height: 38, borderRadius: 999, flexShrink: 0,
@@ -177,7 +182,16 @@ export default function SettingsMenu({ align = "up", compact = false }) {
           padding: 14,
         }}>
 
-          <Section title="Explanations" note="Which engine answers Why? on an alert" />
+          {/* Deliberately not called "Engines". This repo already uses that word
+              for backend/src/engines, the deterministic maths that produces
+              every figure, so labelling the AI tiers "engines" would tell a
+              reader the opposite of the truth: that switching one changes the
+              numbers. The second sentence exists to rule that out explicitly,
+              since it is the single most likely misreading of this control. */}
+          <Section title="Explanations" note={
+            <>Who writes the <Em>Why?</Em> explanations in the <Em>Alerts</Em> tab.
+            The figures are the same in all 3 options, only the wording changes.</>
+          } />
           <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 }}>
             {(state?.modes || []).map((m) => {
               const Icon = MODE_ICON[m.id] || Cpu;
@@ -218,20 +232,25 @@ export default function SettingsMenu({ align = "up", compact = false }) {
 
           <Section title="Theme" />
           <div style={{ display: "flex", gap: 6 }}>
-            {THEMES.map((t) => (
-              <button key={t.id} onClick={() => setTheme(t.id)} aria-pressed={theme === t.id}
-                style={{
-                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  padding: "8px 6px", borderRadius: "var(--radius)", cursor: "pointer",
-                  border: `1px solid ${theme === t.id ? "var(--blue)" : "var(--border)"}`,
-                  background: theme === t.id ? "var(--blue-light)" : "transparent",
-                  color: theme === t.id ? "var(--blue)" : "var(--text-secondary)",
-                  fontSize: 13, fontWeight: theme === t.id ? 600 : 400,
-                }}>
-                {t.id === "light" ? <Sun size={14} /> : <Moon size={14} />}
-                {t.label}
-              </button>
-            ))}
+            {THEMES.map((t) => {
+              const ThemeIcon = THEME_ICON[t.id] || Sun;
+              const on = theme === t.id;
+              return (
+                <button key={t.id} onClick={() => setTheme(t.id)} aria-pressed={on}
+                  title={t.id === "auto" ? "Follow this device's appearance setting" : undefined}
+                  style={{
+                    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    padding: "8px 4px", borderRadius: "var(--radius)", cursor: "pointer",
+                    border: `1px solid ${on ? "var(--blue)" : "var(--border)"}`,
+                    background: on ? "var(--blue-light)" : "transparent",
+                    color: on ? "var(--blue)" : "var(--text-secondary)",
+                    fontSize: 12.5, fontWeight: on ? 600 : 400,
+                  }}>
+                  <ThemeIcon size={14} style={{ flexShrink: 0 }} />
+                  {t.label}
+                </button>
+              );
+            })}
         </div>
       </div>
     );
@@ -239,6 +258,14 @@ export default function SettingsMenu({ align = "up", compact = false }) {
     // document.body is outside every backdrop root, which is the whole point.
     return compact ? createPortal(panel, document.body) : panel;
   }
+}
+
+// Names of things on screen, marked as names. Stan's draft used square
+// brackets for this; weight and colour say the same thing without adding
+// punctuation the reader has to parse. currentColor rather than a token, so it
+// works in both the solid sidebar popover and the glass one.
+function Em({ children }) {
+  return <span style={{ fontWeight: 700, color: "currentColor", opacity: 0.85 }}>{children}</span>;
 }
 
 function Section({ title, note }) {
