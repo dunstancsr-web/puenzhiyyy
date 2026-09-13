@@ -396,3 +396,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/components/Sidebar.jsx, frontend/src/index.css
 - **New files:** frontend/src/components/SettingsMenu.jsx (AiModeSwitch.jsx deleted)
 - **Notes:** TASK-49. Stan asked to declutter the sidebar with reference to well-designed products, and to stop the narrow-screen bar lumping unrelated buttons into one island. The sidebar had twelve interactive elements of which eight were settings; Linear, Notion, Stripe and Vercel all collapse settings behind a single entry and keep the sidebar for navigation, so that is what this does. The trigger still shows the state ("Local model · Light") because seeing which engine is answering was the original reason the tier lived in the sidebar. On narrow screens the one pill became two islands plus a bottom tab bar with labels; the pill had put the Launchpad grid icon immediately beside the Dashboard grid icon, which was my own doing last session. The narrow layout is still unverified: the resize tool has reported success while leaving the viewport unchanged all session.
+
+---
+
+## Session: 2026-09-13 20:45
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, frontend/src/components/Sidebar.jsx, frontend/src/index.css
+- **New files:** none
+- **Notes:** Moved the narrow-screen navigation from a bottom tab bar back to the top, on Stan's correction. My reasoning had been thumb reach, which is sound for a native app someone installs and wrong for a desktop web app someone opens: users of a web page look up for navigation. The valuable half of the bottom bar idea was giving navigation a row of its own, since that is what actually bought the room for labels, so the top strip is now two rows: Launchpad and settings at opposite edges on the first, navigation alone on the second. Same separation of the three unrelated jobs, same labels, conventional placement.

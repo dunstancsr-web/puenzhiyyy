@@ -15,17 +15,18 @@ import SettingsMenu from "./SettingsMenu";
 // Linear, Notion, Stripe and Vercel all put them. A sidebar is a map, and a map
 // that also holds the car's controls is harder to read as either.
 //
-// NARROW, a top bar plus a bottom tab bar, deliberately split rather than one
-// pill holding everything. Leaving the Control Tower, moving inside it, and
-// changing a setting are three unrelated jobs, and a single island implied they
-// were one group. It also placed the Launchpad grid icon immediately beside the
-// Dashboard grid icon: two near-identical glyphs one tap apart.
+// NARROW, a two row strip at the top. Everything stays at the top because this
+// is a desktop web app that can be viewed narrow, not a native mobile app, and
+// the web convention is navigation at the top. An earlier version put the tabs
+// along the bottom on thumb-reach grounds, which is the right answer for an app
+// you install and the wrong one for a page you open.
 //
-// Navigation sits at the BOTTOM on narrow screens because that is where a thumb
-// reaches, which is why iOS, Android and every mobile app worth copying put
-// their tab bars there. Moving it down also buys the room for labels: four
-// named destinations fit across a phone, where they never fit in a pill already
-// holding a logo and two settings controls.
+// Two rows rather than one pill, because leaving the Control Tower, moving
+// inside it, and changing a setting are three unrelated jobs. The old single
+// island also placed the Launchpad grid icon immediately beside the Dashboard
+// grid icon: two near-identical glyphs one tap apart. The top row now holds the
+// two things that are not navigation, pushed to opposite edges; the second row
+// is navigation alone, and having it to itself is what buys room for labels.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
@@ -135,61 +136,75 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* ── Narrow: top bar, two islands ─────────────────────────────────────
-          Leaving and configuring are separate jobs, so they sit in separate
-          containers with space between them rather than in one pill that
-          implied they belonged together. */}
+      {/* ── Narrow: two row strip, all at the top ────────────────────────── */}
       <div className="app-topbar-glass">
-        <div className="app-topbar-glass__island">
-          <Link to="/" aria-label="Launchpad" style={{
-            display: "flex", alignItems: "center", gap: 7, textDecoration: "none",
-            color: "var(--text-primary)", fontSize: 13.5, fontWeight: 600, padding: "0 4px",
-          }}>
-            <LayoutGrid size={16} />
-            Launchpad
-          </Link>
+        {/* Row one: the two jobs that are not navigation, at opposite edges. */}
+        <div className="app-topbar-glass__row">
+          <div className="app-topbar-glass__island">
+            <Link to="/" aria-label="Launchpad" style={{
+              display: "flex", alignItems: "center", gap: 7, textDecoration: "none",
+              color: "var(--text-primary)", fontSize: 13.5, fontWeight: 600, padding: "0 4px",
+            }}>
+              <LayoutGrid size={16} />
+              Launchpad
+            </Link>
+          </div>
+
+          <div className="app-topbar-glass__island app-topbar-glass__island--settings">
+            <SettingsMenu align="down" />
+          </div>
         </div>
 
-        <div className="app-topbar-glass__island app-topbar-glass__island--settings">
-          <SettingsMenu align="down" />
-        </div>
-      </div>
-
-      {/* ── Narrow: bottom tab bar ───────────────────────────────────────────
-          At the bottom because that is where a thumb reaches, and with labels
-          because four named destinations fit across a phone once they are not
-          sharing a pill with a logo and two settings controls. */}
-      <nav className="app-tabbar" aria-label="Primary">
-        {navItems.map(({ to, label, icon: Icon, badge }) => (
-          <NavLink key={to} to={to}
-            style={({ isActive }) => ({
-              flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-              justifyContent: "center", gap: 3, padding: "7px 2px",
-              textDecoration: "none",
-              color: isActive ? "var(--blue)" : "var(--text-muted)",
-            })}>
-            {({ isActive }) => (
-              <>
-                <span style={{ position: "relative", display: "flex" }}>
-                  <Icon size={20} strokeWidth={isActive ? 2.4 : 2} />
-                  {badge > 0 && (
+        {/* Row two: navigation, with the whole width to itself. */}
+        <nav className="app-topbar-glass__nav" aria-label="Primary">
+          {navItems.map(({ to, label, icon: Icon, badge }) => (
+            <NavLink key={to} to={to}
+              style={({ isActive }) => ({
+                flex: 1, minWidth: 0,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "8px 4px", borderRadius: 999, textDecoration: "none",
+                background: isActive ? "var(--blue)" : "transparent",
+                color: isActive ? "#fff" : "var(--text-secondary)",
+                transition: "background 0.15s, color 0.15s",
+              })}>
+              {({ isActive }) => (
+                <>
+                  <span style={{ position: "relative", display: "flex", flexShrink: 0 }}>
+                    <Icon size={16} strokeWidth={isActive ? 2.4 : 2} />
+                    {badge > 0 && !isActive && (
+                      <span style={{
+                        position: "absolute", top: -4, right: -6,
+                        background: "var(--red)", color: "#fff",
+                        fontSize: 9, fontWeight: 700, minWidth: 14, height: 14,
+                        borderRadius: 99, display: "flex", alignItems: "center",
+                        justifyContent: "center", padding: "0 3px",
+                      }}>
+                        {badge}
+                      </span>
+                    )}
+                  </span>
+                  <span style={{
+                    fontSize: 12, fontWeight: isActive ? 700 : 500,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {label}
+                  </span>
+                  {badge > 0 && isActive && (
                     <span style={{
-                      position: "absolute", top: -5, right: -8,
-                      background: "var(--red)", color: "#fff",
+                      background: "rgba(255,255,255,0.28)", color: "#fff",
                       fontSize: 10, fontWeight: 700, minWidth: 16, height: 16,
                       borderRadius: 99, display: "flex", alignItems: "center",
-                      justifyContent: "center", padding: "0 4px",
+                      justifyContent: "center", padding: "0 4px", flexShrink: 0,
                     }}>
                       {badge}
                     </span>
                   )}
-                </span>
-                <span style={{ fontSize: 11, fontWeight: isActive ? 700 : 500 }}>{label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
-      </nav>
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
     </>
   );
 }

@@ -120,7 +120,6 @@
    both navs rendered stacked on top of each other on a phone). */
 .app-sidebar-panel { display: flex; flex-direction: column; }
 .app-topbar-glass { display: none; }
-.app-tabbar { display: none; }
 .app-main { padding: 28px 32px; }
 
 /* Card: the default container for a dashboard widget. Restored 2026-09-13 at
@@ -164,14 +163,20 @@
   .dash-row--even,
   .dash-row--wide-right { grid-template-columns: 1fr; gap: var(--space-5); }
 
-  /* Two islands, not one. Leaving the Control Tower and changing a setting are
-     unrelated jobs, and one pill holding both implied they were a group. The
-     gap between them is the message. */
+  /* Everything at the top, in two rows.
+     This is a desktop web app that can be viewed narrow, not a native mobile
+     app, and the web convention is navigation at the top. An earlier version
+     put the tabs along the bottom on thumb-reach grounds, which is the right
+     answer for an app you install and the wrong one for a page you open.
+
+     Two rows rather than one because leaving the Control Tower, moving inside
+     it, and changing a setting are three unrelated jobs. The top row holds the
+     two that are not navigation, pushed to opposite edges; the second row is
+     navigation alone, and having it to itself is what buys room for labels. */
   .app-topbar-glass {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    gap: 8px;
     position: fixed;
     top: 0;
     left: 0;
@@ -180,44 +185,47 @@
     padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 0;
     pointer-events: none;   /* the strip is a layout container, not a target */
   }
-  .app-topbar-glass__island {
-    pointer-events: auto;
+  .app-topbar-glass__row {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    min-height: 44px;
-    padding: 0 10px;
-    border-radius: 999px;
+    gap: 10px;
+  }
+
+  /* Shared surface for every floating group in the strip. */
+  .app-topbar-glass__island,
+  .app-topbar-glass__nav {
+    pointer-events: auto;
     background: var(--glass-bar-bg);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-md);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-radius: 999px;
   }
-  /* The settings popover needs room to open downward without the island
-     clipping it, and it anchors to this box rather than to the strip. */
+
+  .app-topbar-glass__island {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 10px;
+  }
+  /* The settings popover opens downward from here and anchors to this box
+     rather than to the strip. */
   .app-topbar-glass__island--settings { position: relative; padding: 0 8px; }
   .app-topbar-glass__island--settings > div { min-width: 150px; }
 
-  /* Bottom tab bar: where the thumb is. Labels fit here because this bar holds
-     only navigation, unlike the pill it replaced. */
-  .app-tabbar {
+  /* Navigation gets the full width and nothing else in it, which is the only
+     reason four icons with names fit across a phone. */
+  .app-topbar-glass__nav {
     display: flex;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 40;
-    background: var(--glass-bar-bg);
-    border-top: 1px solid var(--border);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding: 4px;
+    gap: 2px;
   }
 
-  /* Clear both fixed bars. The bottom padding is the tab bar plus the home
-     indicator on a notched phone. */
+  /* Clears the two-row strip above. */
   .app-main {
-    padding: 76px 16px calc(78px + env(safe-area-inset-bottom, 0px));
+    padding: 128px 16px 24px;
   }
 }
 

@@ -1481,19 +1481,19 @@ sidebar is for NAVIGATION, and settings collapse into a single entry at its edge
 - [x] Sidebar is now logo, Launchpad, four links, settings, footer. Twelve interactive elements down to
       six.
 
-**Narrow screens: two islands and a bottom tab bar.** The single pill held the logo, a Launchpad grid
+**Narrow screens: a two row strip, all at the top.** (Revised same day, see below.) The single pill held the logo, a Launchpad grid
 icon, a Dashboard grid icon, alerts, activity and a theme toggle. Two near-identical grid glyphs sat one
 tap apart, and leaving the Control Tower, moving inside it, and changing a setting were presented as one
 group when they are three unrelated jobs.
 
 - [x] Top strip is now two islands with space between them: Launchpad on the left, settings on the
       right. The strip itself is `pointer-events: none` so only the islands are targets.
-- [x] Navigation moved to a bottom tab bar with icon AND label. At the bottom because that is where a
-      thumb reaches, which is why iOS and Android put tab bars there. Moving it down also bought the
-      room for labels: four named destinations fit across a phone once they are not sharing a pill with
-      a logo and two settings controls.
-- [x] `.app-main` bottom padding clears the tab bar plus `env(safe-area-inset-bottom)` for a notched
-      phone.
+- [x] Navigation is a second row inside the same top strip, with icon AND label. It briefly lived in a
+      bottom tab bar on thumb-reach grounds, which Stan corrected: thumb reach is the right argument for
+      an app you INSTALL and the wrong one for a page you OPEN. StockSense is a desktop web app that can
+      be viewed narrow, and the web convention is navigation at the top.
+- [x] Giving navigation a row to itself is what buys the room for labels, so the two row layout is doing
+      the same work the bottom bar was, without moving anything away from where a web user looks.
 
 **Not verified: the narrow layout itself.** The browser resize tool reports success while leaving the
 viewport unchanged, as it has all session, so the two islands and the tab bar have only been reasoned
