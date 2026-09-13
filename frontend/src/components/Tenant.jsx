@@ -51,16 +51,31 @@ export function Seal({ size = 30 }) {
 export default function Tenant({ compact = false }) {
   if (compact) return <Seal size={26} />;
 
+  // NO fill, NO border, NO radius. Those three together are the universal
+  // "press me" signal, and the first version had all three, so a row that does
+  // nothing looked like the most clickable thing in the sidebar. The chevron
+  // had already been dropped for that reason; the container was still making
+  // the promise on its own.
+  //
+  // What replaces the box is a LABEL. "Account" over a value is the shape of a
+  // read-only field, and a hairline above groups it with the header it belongs
+  // to without drawing a container around it. Information, not a control.
   return (
     <div
       title={`${CLIENT_HAN} · ${CLIENT_EN}`}
       style={{
-        display: "flex", alignItems: "center", gap: 10,
-        padding: "9px 10px", borderRadius: "var(--radius)",
-        background: "var(--surface-2)",
-        border: "1px solid var(--sidebar-border)",
+        paddingTop: 12, marginTop: 2,
+        borderTop: "1px solid var(--sidebar-border)",
       }}
     >
+      <div style={{
+        fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.09em",
+        textTransform: "uppercase", color: "var(--text-muted)",
+        marginBottom: 7, paddingLeft: 2,
+      }}>
+        Account
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 2 }}>
       <Seal size={30} />
       <div style={{ minWidth: 0 }}>
         <div className="brush" style={{
@@ -81,6 +96,7 @@ export default function Tenant({ compact = false }) {
         }}>
           Four Seas Rice
         </div>
+      </div>
       </div>
     </div>
   );

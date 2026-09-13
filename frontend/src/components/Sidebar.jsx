@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, Home as HomeIcon } from "lucide-react";
+import { LayoutDashboard, PackageSearch, Bell, History, Home as HomeIcon } from "lucide-react";
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 import EventCredit from "./EventCredit";
 import Tenant from "./Tenant";
+import AppMark from "./AppMark";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTROL TOWER NAVIGATION (TASK-49)
@@ -70,13 +71,8 @@ export default function Sidebar() {
           height: "100vh",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px", marginBottom: 22 }}>
-          <div style={{
-            width: 34, height: 34, background: "var(--blue)", borderRadius: 8,
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>
-            <TrendingUp size={18} color="#fff" />
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px", marginBottom: 16 }}>
+          <AppMark size={45} />
           <div>
             <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--text-primary)" }}>StockSense</div>
             <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Control Tower</div>
@@ -86,7 +82,7 @@ export default function Sidebar() {
         {/* The account being worked in, directly under the product header. See
             components/Tenant.jsx for why it sits here rather than replacing
             the header above it. */}
-        <div style={{ marginBottom: 18 }}>
+        <div style={{ marginBottom: 18, padding: "0 8px" }}>
           <Tenant />
         </div>
 

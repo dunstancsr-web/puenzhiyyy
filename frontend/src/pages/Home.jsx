@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDownToLine, ArrowUpFromLine, LayoutDashboard, ChevronDown } from "lucide-react";
 import EventCredit from "../components/EventCredit";
+import AppMark from "../components/AppMark";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME (TASK-47, renamed TASK-48, renamed again TASK-50)
@@ -102,16 +103,7 @@ export default function Home() {
       <div style={{ width: "100%", maxWidth: 940 }}>
         <div style={{ marginBottom: 30 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 12 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 11, background: "var(--blue)",
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>
-              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4"
-                strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-                <polyline points="16 7 22 7 22 13" />
-              </svg>
-            </div>
+            <AppMark size={56} />
             <div>
               <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, lineHeight: 1.1 }}>StockSense</h1>
               <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Rice inventory, from the dock to the decision</div>
