@@ -4,7 +4,8 @@ import { LayoutDashboard, PackageSearch, Bell, History, Home as HomeIcon } from 
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 import EventCredit from "./EventCredit";
-import Tenant from "./Tenant";
+import { FullSeal, CLIENT_HAN } from "./Tenant";
+import TowerIcon from "./TowerIcon";
 import AppMark from "./AppMark";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,37 +70,58 @@ export default function Sidebar() {
           position: "sticky",
           top: 0,
           height: "100vh",
+          // The panel gained a masthead, a section header and a larger exit
+          // control, so it is taller than it was. It fits a 929px viewport
+          // with room to spare, but a 13 inch laptop in landscape is nearer
+          // 700px, and a credit line disappearing off the bottom edge is a
+          // silent failure. Scrolling is the cheap insurance.
+          overflowY: "auto",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px", marginBottom: 16 }}>
-          <AppMark size={45} />
-          <div>
-            <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--text-primary)" }}>StockSense</div>
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Control Tower</div>
+        {/* CLIENT-LED, matching Home (TASK-81). This header used to read
+            StockSense over "Control Tower", with the company below it labelled
+            ACCOUNT, which meant the identity INVERTED as you walked from Home
+            into this screen: Home says "Four Seas Rice's system, running on
+            StockSense" and this said "StockSense, one of whose accounts is
+            Four Seas Rice". Both are defensible; having both is not.
+
+            The ACCOUNT label is gone with it. That label existed to explain a
+            company name sitting under a product name. At the top it needs no
+            explaining: it is the masthead, exactly as on Home. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 11, padding: "0 6px", marginBottom: 16 }}>
+          <FullSeal size={40} />
+          <div style={{ minWidth: 0 }}>
+            <div className="brush" style={{
+              fontSize: "var(--text-base)", lineHeight: 1.15, color: "var(--text-primary)",
+            }}>
+              {CLIENT_HAN}
+            </div>
+            <div style={{
+              fontSize: "var(--text-xs)", fontWeight: 600, letterSpacing: "0.08em",
+              textTransform: "uppercase", color: "var(--text-muted)", marginTop: 1,
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>
+              Four Seas Rice
+            </div>
           </div>
         </div>
 
-        {/* The account being worked in, directly under the product header. See
-            components/Tenant.jsx for why it sits here rather than replacing
-            the header above it. */}
-        <div style={{ marginBottom: 18, padding: "0 8px" }}>
-          <Tenant />
+        {/* Names the screen you are on, with the icon that marks it on Home.
+            The repetition is the point: an icon is learnable when the same
+            mark names the door and the room behind it. */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 9,
+          padding: "12px 6px", margin: "0 0 6px",
+          borderTop: "1px solid var(--sidebar-border)",
+          borderBottom: "1px solid var(--sidebar-border)",
+        }}>
+          <TowerIcon size={19} color="var(--purple)" />
+          <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-primary)" }}>
+            Control Tower
+          </span>
         </div>
 
-        {/* The way out, styled as leaving rather than as a fifth page. */}
-        <Link to="/" style={{
-          display: "flex", alignItems: "center", gap: 9,
-          padding: "9px 10px", marginBottom: 18, borderRadius: "var(--radius)",
-          border: "1px solid var(--sidebar-border)",
-          color: "var(--text-secondary)", textDecoration: "none",
-          fontSize: "var(--text-sm)", fontWeight: 600,
-        }}>
-          <HomeIcon size={17} />
-          Home
-          <span style={{ marginLeft: "auto", fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 500 }}>Switch</span>
-        </Link>
-
-        <nav style={{ flex: 1 }}>
+        <nav style={{ flex: 1, paddingTop: 6 }}>
           {navItems.map(({ to, label, icon: Icon, badge }) => (
             <NavLink key={to} to={to}
               style={({ isActive }) => ({
@@ -113,7 +135,9 @@ export default function Sidebar() {
               })}>
               {({ isActive }) => (
                 <>
-                  <Icon size={17} />
+                  {/* 20px, up from 17. Home's glyphs grew and the two screens
+                      should scale alike. */}
+                  <Icon size={20} />
                   <span style={{ flex: 1 }}>{label}</span>
                   {badge > 0 && (
                     <span style={{
@@ -131,11 +155,33 @@ export default function Sidebar() {
           ))}
         </nav>
 
+        {/* The way out, and deliberately the largest control down here. Someone
+            who opened the Control Tower by mistake needs to find this without
+            hunting, so it is full width, taller than a nav row, and says where
+            it goes rather than just "Home". */}
+        <Link to="/" style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "13px 12px", marginBottom: 10, borderRadius: "var(--radius)",
+          border: "1px solid var(--sidebar-border)", background: "var(--surface-2)",
+          color: "var(--text-primary)", textDecoration: "none",
+          fontSize: "var(--text-sm)", fontWeight: 700,
+        }}>
+          <HomeIcon size={19} style={{ flexShrink: 0 }} />
+          All workspaces
+        </Link>
+
         <SettingsMenu align="up" />
 
+        {/* StockSense signs the foot, as it does on Home. */}
         <div style={{
-          padding: "12px 8px 0", marginTop: 12, borderTop: "1px solid var(--sidebar-border)",
+          padding: "12px 6px 0", marginTop: 12, borderTop: "1px solid var(--sidebar-border)",
         }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+            <AppMark size={22} />
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", fontWeight: 600 }}>
+              Running on <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>StockSense</span>
+            </span>
+          </div>
           <EventCredit />
         </div>
       </aside>
