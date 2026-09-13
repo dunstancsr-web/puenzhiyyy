@@ -5,6 +5,10 @@
 // (sku_id, alert_type) via dedupe_key.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// One formatter for every duration in the app, in its own module so that
+// importing it here does not create a cycle with index.js.
+const { humanDuration } = require("./duration");
+
 const TYPE_PRIORITY = {
   STOCKOUT_RISK: 0, IDLE: 1, REORDER: 2, OVERSTOCK: 3, AGEING: 4, SLOW_MOVING: 5,
 };
@@ -93,7 +97,7 @@ function alertsForSku(s) {
       severity: "critical",
       triggered_value: s.days_since_last_sale ?? 90,
       threshold_value: 90,
-      message: `${s.product_name} has had no sales for ${s.days_since_last_sale ?? "90+"} days. ${fmtMt(s.available_qty)} on hand, ${fmt$(s.eo_value)} tied up.`,
+      message: `${s.product_name} has had no sales for ${s.days_since_last_sale_text || "90+ days"}. ${fmtMt(s.available_qty)} on hand, ${fmt$(s.eo_value)} tied up.`,
       recommended_action: `Stop replenishment. Initiate disposition review - discount, alternative channel, or CSR donation. Write-down risk ≈ ${fmt$(s.eo_value_risk_adjusted)}.`,
       ai_recommendation_qty: null,
     });
@@ -106,7 +110,7 @@ function alertsForSku(s) {
       severity: "warning",
       triggered_value: s.days_of_cover,
       threshold_value: 120,
-      message: `${s.product_name} has ${s.days_of_cover} days of cover on hand (${s.months_of_cover} months). Demand is ${s.velocity_trend}.`,
+      message: `${s.product_name} has ${s.days_of_cover_text} of cover on hand. Demand is ${s.velocity_trend}.`,
       recommended_action: `Reduce or pause the next order. Review the customer base; consider a targeted promotion.`,
       ai_recommendation_qty: null,
     });
@@ -119,8 +123,8 @@ function alertsForSku(s) {
       severity: s.ageing_status === "At Risk" ? "critical" : "warning",
       triggered_value: s.inventory_age_days,
       threshold_value: s.max_holding_days,
-      message: `${s.product_name} has been held ${s.inventory_age_days} days against a ${s.max_holding_days}-day limit (status: ${s.ageing_status}).`,
-      recommended_action: `Escalate to QA and commercial. Move stock before it reaches the holding limit - ${s.max_holding_days - s.inventory_age_days} days remain.`,
+      message: `${s.product_name} has been held ${s.inventory_age_text}, against a limit of ${humanDuration(s.max_holding_days)} (status: ${s.ageing_status}).`,
+      recommended_action: `Escalate to QA and commercial. Move stock before it reaches the holding limit, ${humanDuration(s.max_holding_days - s.inventory_age_days)} remain.`,
       ai_recommendation_qty: null,
     });
   }

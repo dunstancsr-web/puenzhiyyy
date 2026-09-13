@@ -1321,6 +1321,41 @@ Drift clusters by alert rather than scattering. qwen3 renamed money as "sales" o
 4 runs; llama3.1 converted 97 days into months on the same alert in 4 of 4. Both are prompt or facts
 problems on one alert, not general model quality.
 
+## TASK-44 - Readable durations, computed once (2026-09-13)
+
+Stan: "9.3 months" and "9.1 months" are both worse than "9 months and 8 days". Correct, and the two
+decimals existing at once was itself the bug.
+
+- [x] `engines/duration.js`. One `humanDuration`, its own module. It started inside `engines/index.js`,
+      but `alerts.js` needs it and `index.js` already requires `alerts.js`, so importing it back made a
+      cycle: node resolved it to `undefined` and WARNED rather than threw, which would have surfaced as
+      a crash on the first slow-moving alert instead of at startup.
+- [x] Computed once in the engine and attached to the SKU as `days_of_cover_text`,
+      `days_since_last_sale_text` and `inventory_age_text`. Four places render a duration (alert
+      message, LLM facts, the frontend trace, the dashboard) and formatting in each is exactly how
+      "9.1 months" ended up beside "9.3 months". Third time this project has learned that derived
+      values computed twice eventually disagree.
+- [x] `Number(null)` is 0 and finite, so the first version rendered a null `days_of_cover` as a
+      confident "0 days" on the idle SKU, which reads as an emergency rather than as the Not Applicable
+      the glossary requires. Third appearance of this same trap today.
+- [x] "against a 9 months limit" restructured to "against a limit of 9 months" rather than inventing a
+      second adjectival formatter.
+
+**Measured effect, and it is not all good.** Year conversions ROSE: llama3 2 to 4, llama3.1 1 to 3.
+"9 months and 8 days" makes "nearly a year" more tempting than "278 days" did. The earlier fix worked
+because months were missing; this one backfired because months are inviting. "Supply the information
+rather than forbid the behaviour" is not universal: it helps when the model is filling a gap, not when
+it is rounding toward a familiar unit.
+
+The format stays, because readability was the point and the safety net holds: a duration conversion is
+classified dangerous, so it is retried and then rejected, and the reader falls back to the audited
+trace. Roughly 1 click in 7 on llama3 now shows the trace without prose. Nobody ever sees a wrong
+number. If that fallback rate is too high, moving "converted a duration" out of DANGEROUS in
+`llm/explain.js` is a one line change, at the cost of showing "nearly a year" for 9 months and 8 days.
+
+Tuning stops here. Five benchmark runs in, the remaining failures are rare, mostly cosmetic, and
+handled correctly by the retry and fallback path.
+
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
 movement ledger, lot/batch genealogy, mobile receiving, import clearance, full stock-status taxonomy

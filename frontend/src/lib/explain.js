@@ -193,7 +193,7 @@ function overstock(s) {
       heading: "If nothing changes",
       body: para(
         `The carrying cost accrues whether or not the stock moves.`,
-        s.days_of_cover != null ? `At the current rate this is ${day(s.days_of_cover)} of cover, roughly ${s.months_of_cover} months.` : null,
+        s.days_of_cover_text ? `At the current rate this is ${s.days_of_cover_text} of cover.` : null,
         // Split on whether demand will actually drain this, not on Fast alone.
         // A Normal mover with months of cover still clears; it is the policy
         // ceiling that is wrong, not the demand. Telling a manager that stock
@@ -224,8 +224,8 @@ function slowMoving(s) {
     {
       heading: "What was measured",
       body: para(
-        s.days_of_cover != null
-          ? `${day(s.days_of_cover)} of cover on hand, roughly ${s.months_of_cover} months, against a 120-day threshold.`
+        s.days_of_cover_text
+          ? `${s.days_of_cover_text} of cover on hand, against a 120 day threshold.`
           : `${mt(s.available_qty)} on hand with no measurable demand, so cover cannot be expressed in days.`,
         `Demand is ${s.velocity_trend}.`
       ),

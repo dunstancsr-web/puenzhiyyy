@@ -233,7 +233,7 @@ function buildNeedsAttention(skus) {
         sku_id: s.sku_id,
         name: s.product_name,
         action: "Reduce next order",
-        reason: `${s.days_of_cover} days of cover (${s.months_of_cover} months) · demand ${s.velocity_trend}`,
+        reason: `${s.days_of_cover_text} of cover · demand ${s.velocity_trend}`,
         value: s.inventory_value,
         valueLabel: "inventory value",
         tag: "SLOW MOVING",

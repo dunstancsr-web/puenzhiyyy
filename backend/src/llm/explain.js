@@ -57,6 +57,7 @@ function buildFacts(sku, alert) {
     if (value === null || value === undefined || value === "") return;
     L.push(`${label}: ${value}${unit}`);
   };
+  const addIf = (cond, label, value, unit = "") => { if (cond) add(label, value, unit); };
 
   add("Product", sku.product_name);
   add("SKU", sku.sku_id);
@@ -71,6 +72,17 @@ function buildFacts(sku, alert) {
   add("Already on order and inbound", sku.expected_incoming_qty, " MT");
   add("Demand rate (blended)", sku.blended_daily_usage, " MT per day");
   add("Days of cover remaining", sku.days_of_cover, " days");
+  // Same treatment as days since last sale, for the field that fix missed. The
+  // slow movers carry 200 to 300 days of cover, and models reached for "nearly
+  // a year" or "several weeks" because months only appeared buried inside the
+  // alert sentence rather than as a figure of its own. A labelled figure anchors
+  // where prose does not.
+  // The engine's own formatted string, never a recomputation. A first version
+  // divided by 30.44 and produced "9.1 months" beside an alert sentence already
+  // saying "9.3 months": the same one-question-two-answers defect as the
+  // suggested order quantity, and it would have handed the model two conflicting
+  // figures and then penalised it for picking either.
+  add("Days of cover remaining, written out", sku.days_of_cover_text);
   add("Supplier lead time", sku.lead_time_days, " days");
   add("Safety stock held", sku.safety_stock_days, " days");
   add("Maximum stock level", sku.max_stock, " MT");
@@ -81,9 +93,28 @@ function buildFacts(sku, alert) {
   add("Movement class", sku.movement_class);
   add("Demand trend", sku.velocity_trend);
   add("Days since last sale", sku.days_since_last_sale, " days");
-  add("Gross margin at risk if it stocks out", sku.lost_margin_risk, " SGD");
-  add("Write down risk if it stays unsold", sku.eo_value_risk_adjusted, " SGD");
-  add("Overstock carrying cost per year", sku.overstock_carrying_cost, " SGD");
+
+  // Long day counts also get their month equivalent. Models reach for "about
+  // three months" because that is how a person says 97 days, and forbidding the
+  // conversion did not stop it: llama3.1 converted this exact figure in 4 runs
+  // out of 4. Supplying the conversion removes the reason to perform one, which
+  // works better than a rule telling it not to.
+  add("Days since last sale, written out", sku.days_since_last_sale_text);
+
+  // Money figures, only when non zero. "Gross margin at risk: 0 SGD" on an idle
+  // SKU is noise the model then has to decide what to do with.
+  addIf(sku.lost_margin_risk > 0, "Gross margin at risk if it stocks out", sku.lost_margin_risk, " SGD");
+  addIf(sku.eo_value_risk_adjusted > 0, "Write down risk if it stays unsold", sku.eo_value_risk_adjusted, " SGD");
+  addIf(sku.overstock_carrying_cost > 0, "Overstock carrying cost per year", sku.overstock_carrying_cost, " SGD");
+
+  // The alert message quotes a figure like "SGD 250K tied up" with no labelled
+  // fact anywhere saying what it is, so the model had to guess and guessed
+  // "sales". qwen3 renamed it on 3 of 4 runs. Naming it, and naming what it is
+  // NOT, is the fix: the label does the work the rule could not.
+  addIf(sku.eo_value > 0,
+    "Capital tied up in this stock, valued at cost (this is NOT sales, NOT revenue)",
+    sku.eo_value, " SGD");
+
   add("Supplier", sku.supplier);
 
   return L.join("\n");
@@ -169,27 +200,44 @@ function verifyExplanation(text, facts) {
 
 const MAX_ATTEMPTS = 2;
 
-// TODO(human): implement onDriftDetected({ attempt, issues, text })
+// Not every rule break is equally harmful, and the benchmark showed the split
+// clearly. Across 28 runs llama3 broke a rule 5 times and every single one was
+// a hedge word: "almost 78 MT" where the figure itself was correct. llama3.1
+// and qwen3, by contrast, invented a figure and renamed money as sales or
+// revenue, which puts a wrong number in front of someone about to commit cash.
 //
-// verifyExplanation has just caught the model breaking a hard rule: it invented
-// a figure, rounded one, hedged it, converted a unit, or renamed what a figure
-// measures. Decide what should happen next by returning one of three strings.
+// So the policy splits on harm rather than on count:
 //
-//   "retry"   ask the model again, telling it what it got wrong. Costs another
-//             call. On the final attempt an unresolved drift is rejected.
-//   "accept"  show the answer anyway, drift and all.
-//   "reject"  discard it. The caller falls back to the deterministic trace, so
-//             the user still gets a correct explanation, just not a written one.
+//   dangerous  a wrong number, or a right number under the wrong name. Retry,
+//              and if the second attempt is still wrong the loop rejects it and
+//              the reader falls back to the audited trace. Never shown.
+//   cosmetic   hedging. The figure is right, the wording is loose. Worth one
+//              cheap correction, not worth failing over, and definitely not
+//              worth a third paid call to delete the word "almost".
 //
-// Things worth weighing. On the paid tier every retry spends shared AWS credit,
-// and `attempt` tells you which try you are on. Some issues are cosmetic and
-// some are dangerous: hedging with "about" is untidy, whereas inventing a
-// figure or renaming margin as revenue puts a wrong number in front of someone
-// who is about to commit money. `issues` is an array of short strings, so you
-// can treat different kinds differently rather than applying one rule to all.
-// Remember the fallback is good: rejecting is not failing, it just means the
-// reader sees the audited four step trace on its own.
-function onDriftDetected({ attempt, issues, text }) {
+// Rejecting is not failing. The deterministic four step trace is a complete,
+// correct explanation on its own, so the cost of refusing a bad summary is that
+// the reader sees slightly drier prose.
+const DANGEROUS = [
+  "figures not in the source data",  // invented or rounded a number
+  "described a money figure as",     // margin called revenue, capital called sales
+  "converted a duration",            // 97 days restated as three months
+];
+
+// Shared so the retry policy and scripts/bench-models.js cannot disagree about
+// what counts as serious.
+function isDangerous(issues) {
+  return issues.some((i) => DANGEROUS.some((d) => i.startsWith(d)));
+}
+
+function onDriftDetected({ attempt, issues }) {
+  // Hedging alone is accepted immediately, with no retry at all. Measured
+  // reason: after the facts fix, hedging rose from 12 occurrences to 21 while
+  // every dangerous category fell to zero, and in each of those cases the FIGURE
+  // was correct and only the wording was loose. Retrying to delete the word
+  // "nearly" would have spent a paid call on every one of those 21, to change
+  // nothing a manager would act on differently.
+  if (!isDangerous(issues)) return "accept";
   return "retry";
 }
 
@@ -344,4 +392,4 @@ async function explainAlert(sku, alert) {
   return { ...value, cached: false };
 }
 
-module.exports = { explainAlert, providerInfo, LlmUnavailable, buildFacts, cacheKey, verifyExplanation, SYSTEM };
+module.exports = { explainAlert, providerInfo, LlmUnavailable, buildFacts, cacheKey, verifyExplanation, isDangerous, SYSTEM };

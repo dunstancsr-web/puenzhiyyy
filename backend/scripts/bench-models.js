@@ -13,7 +13,7 @@
 // ollama directly, so every model answers the identical prompt from cold.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { buildFacts, verifyExplanation, SYSTEM } = require("../src/llm/explain");
+const { buildFacts, verifyExplanation, isDangerous, SYSTEM } = require("../src/llm/explain");
 
 const API = "http://localhost:4000/api";
 const OLLAMA = process.env.OLLAMA_URL || "http://localhost:11434";
@@ -67,7 +67,11 @@ const stripThinking = (s) => s.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
   const summary = [];
   for (const model of MODELS) {
-    let clean = 0, totalMs = 0, failed = 0;
+    // Counted separately on purpose. A single "clean" percentage rates
+    // inventing a figure and writing the word "nearly" as the same event, which
+    // hid a real improvement behind a worse looking score and nearly caused a
+    // good change to be reverted.
+    let clean = 0, cosmetic = 0, dangerous = 0, totalMs = 0, failed = 0;
     const allIssues = [];
     console.log(`── ${model} ${"─".repeat(Math.max(0, 58 - model.length))}`);
 
@@ -90,7 +94,11 @@ const stripThinking = (s) => s.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
           ? { ok: false, issues: [`empty or truncated response (${text.length} chars, ${out.reason})`] }
           : verifyExplanation(text, facts);
         totalMs += out.ms;
-        if (check.ok) clean++; else allIssues.push(...check.issues);
+        if (check.ok) clean++;
+        else {
+          allIssues.push(...check.issues);
+          if (isDangerous(check.issues)) dangerous++; else cosmetic++;
+        }
         if (!check.ok || REPEATS === 1) {
           console.log(
             `  ${check.ok ? "clean" : "DRIFT"}  ${String(out.ms).padStart(6)}ms  ${alert.sku_id.padEnd(9)} ${alert.alert_type.padEnd(14)} ${check.issues.join("; ")}`
@@ -103,15 +111,19 @@ const stripThinking = (s) => s.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
     }
 
     const scored = runs.length - failed;
-    summary.push({ model, clean, scored, avgMs: scored ? Math.round(totalMs / scored) : 0, issues: allIssues });
+    summary.push({ model, clean, cosmetic, dangerous, scored, avgMs: scored ? Math.round(totalMs / scored) : 0, issues: allIssues });
     console.log("");
   }
 
   console.log("── summary ".padEnd(64, "─"));
-  console.log("  model              clean       avg latency");
+  console.log("  model              exact      +tidy-issue   DANGEROUS   latency");
   for (const s of summary) {
-    const pct = s.scored ? Math.round((s.clean / s.scored) * 100) : 0;
-    console.log(`  ${s.model.padEnd(18)} ${String(s.clean + "/" + s.scored).padEnd(11)} ${String(s.avgMs + "ms").padEnd(10)} ${pct}%`);
+    // "usable" is exact plus cosmetic: answers a manager can act on safely,
+    // because every figure in them is correct. That is the number that matters.
+    const usable = s.scored ? Math.round(((s.clean + s.cosmetic) / s.scored) * 100) : 0;
+    console.log(
+      `  ${s.model.padEnd(18)} ${String(s.clean + "/" + s.scored).padEnd(10)} ${String(s.cosmetic).padEnd(13)} ${String(s.dangerous).padEnd(11)} ${String(s.avgMs + "ms").padEnd(8)} ${usable}% usable`
+    );
   }
 
   console.log("\n── most common drift ".padEnd(64, "─"));

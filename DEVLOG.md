@@ -356,3 +356,11 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** DEVLOG.md, backend/scripts/bench-models.js
 - **New files:** none
 - **Notes:** Removed qwen3:8b after the benchmark (slowest, and the only model that repeatedly renamed a money figure as "sales"). Kept llama3.1:8b at Stan's call, which is the better instinct: its weaker score came mostly from one alert it failed 4 of 4 times, a systematic and fixable trigger rather than general unreliability, so it is worth re-testing after the JP-5KG facts fix. llama2 stays, Stan uses it for another project. Also updated the benchmark's default model list, which still named qwen3:8b and would have made a no-args run fail for the next person.
+
+---
+
+## Session: 2026-09-13 16:50
+- **Branch:** main
+- **Files changed:** .kiro/specs/mvp1-inventory-visibility/tasks.md, DEVLOG.md, backend/scripts/bench-models.js, backend/src/engines/alerts.js, backend/src/engines/index.js, backend/src/llm/explain.js, frontend/src/lib/explain.js, frontend/src/pages/Dashboard.jsx
+- **New files:** backend/src/engines/duration.js
+- **Notes:** TASK-43 continued plus TASK-44. Implemented the retry policy (dangerous drift is retried then rejected, hedging is accepted immediately: 21 hedges in one run all had correct figures, so retrying them would spend a paid call to delete the word "nearly"). Split the benchmark's score into exact, cosmetic and DANGEROUS, which immediately revealed that the facts fix HAD worked: llama3.1's dangerous drift fell 6 to 2 and stayed there, hidden until then behind a single blended percentage that rated inventing a figure and writing "nearly" as the same event. Then Stan asked for "9 months and 8 days" instead of decimals, which was also a latent bug since my new line said 9.1 while the alert said 9.3. Fixed by computing the string once in the engine. Three bugs found on the way: Number(null) rendering a null cover as "0 days", a circular require that warned instead of throwing, and a grammar leak. Honest result: the readable format made year conversions worse, because "9 months and 8 days" invites "nearly a year" in a way "278 days" did not, so the rule of supplying information instead of forbidding behaviour does not generalise. Kept it anyway, readability was the point and the reject-and-fall-back path means no wrong number reaches the screen.

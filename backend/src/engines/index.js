@@ -17,6 +17,7 @@ const { computeHealth } = require("./health");
 const { skuFinancials, portfolioStats } = require("./financials");
 const { generateAlerts, fmt$ } = require("./alerts");
 const { projectInventory } = require("./projection");
+const { humanDuration } = require("./duration");
 
 function ageingStatus(ageDays, maxHoldingDays) {
   if (ageDays == null) return "Fresh";
@@ -88,10 +89,13 @@ function buildAnalytics(db, asOf = Date.now()) {
       service_z: ss.z,
       days_of_cover,
       months_of_cover,
+      days_of_cover_text: humanDuration(days_of_cover),
       target_days_of_cover,
       covered_by_po,
       suggested_order_qty,
       lost_30d,
+      days_since_last_sale_text: humanDuration(v.days_since_last_sale),
+      inventory_age_text: humanDuration(p.inventory_age_days),
       ageing_status: ageingStatus(p.inventory_age_days, m.max_holding_days),
       annual_cogs: Math.round(blended * 365 * m.unit_cost_sgd),
     };
