@@ -8,8 +8,8 @@ inclusion: always
 - Event: AWS NUS-ISS SMYA 2026 Hackathon
 - Submission deadline: 28 September 2026
 - Submission requires: GitHub repo, YouTube demo video, PDF write-up, deployment URL
-- Team: Stan (you) + Tawmo (second developer) + 2 others
-- Stan works independently from Tawmo to avoid file conflicts
+- Team: Stan (you) + Taw (second developer) + 2 others
+- Stan works independently from Taw to avoid file conflicts
 
 ## Business Problem
 Rice importer/distributor needs to move from reactive spreadsheet-based inventory management to a proactive, AI-assisted system.
@@ -119,7 +119,7 @@ puenzhiyyy/
 - In-memory store (products.js) to be replaced with SQLite in MVP 1 rebuild
 - No Tailwind: plain CSS variables for portability and simplicity
 - LLM delayed until explicit user trigger to minimise token costs
-- Stan develops independently from Tawmo until results are proven
+- Stan develops independently from Taw until results are proven
 
 ## Writing Style (added 2026-09-12, user feedback)
 Do not use an em dash or an en dash anywhere in this project: not in UI copy, not in code comments, not

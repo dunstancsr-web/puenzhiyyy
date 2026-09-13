@@ -4,7 +4,7 @@ This is the master reference for the domain-alignment pass done on 2026-09-12 ag
 in this folder ([technical spec](./rice-inventory-technical-spec.md),
 [terms glossary](./rice-inventory-terms-glossary.md)). It records **every field that changed name**,
 **every formula that changed**, and **why** — so nobody "corrects" a name back to the old one without
-knowing it was deliberate, and so Kiro/Tawmo can pick this work up mid-stream with full context.
+knowing it was deliberate, and so Kiro/Taw can pick this work up mid-stream with full context.
 
 Status column: ✅ done · 🔜 planned, not yet applied to code.
 
