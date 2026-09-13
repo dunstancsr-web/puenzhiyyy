@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Bell, TrendingUp, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, PackageSearch, Bell, History, TrendingUp, Sun, Moon } from "lucide-react";
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { api } from "../api/inventory";
 
@@ -21,6 +21,9 @@ export default function Sidebar() {
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
     { to: "/inventory", label: "Inventory",  icon: PackageSearch,  badge: null },
     { to: "/alerts",    label: "Alerts",     icon: Bell,           badge: alertCount },
+    // Last in the list on purpose: Activity is a record to consult, not a
+    // queue to work, so it sits after the three pages that drive daily action.
+    { to: "/activity",  label: "Activity",   icon: History,        badge: null },
   ];
 
   return (

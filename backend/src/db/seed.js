@@ -189,11 +189,17 @@ function seed() {
     // "skus" — this table was added after this wipe list was first written,
     // and reseeding after recording even one decision failed with
     // SQLITE_CONSTRAINT_FOREIGNKEY until it was added here.
-    for (const t of ["sales_transactions", "purchase_orders", "inventory_positions", "alerts_log", "decisions", "skus"]) {
+    // "audit_log" (TASK-31) is wiped alongside "alerts_log" for a reason: alerts
+    // are only written to audit_log the first time each dedupe_key is
+    // materialized. Clearing alerts without clearing the audit trail would
+    // leave duplicate ALERT_TRIGGERED rows for conditions that were re-detected
+    // on the fresh data, and clearing neither leaves the trail empty after a
+    // reseed, because every alert is already materialized.
+    for (const t of ["sales_transactions", "purchase_orders", "inventory_positions", "alerts_log", "audit_log", "decisions", "skus"]) {
       db.exec(`DELETE FROM ${t}`);
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN
-      ('sales_transactions','purchase_orders','inventory_positions','alerts_log','decisions','skus')`);
+      ('sales_transactions','purchase_orders','inventory_positions','alerts_log','audit_log','decisions','skus')`);
   });
   wipe();
 

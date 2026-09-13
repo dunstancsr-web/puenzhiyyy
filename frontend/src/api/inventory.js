@@ -72,4 +72,17 @@ export const api = {
   // Decisions (TASK-12) - Approve/Modify/Reject audit trail
   getDecisions: () => request("/decisions"),
   createDecision: (body) => request("/decisions", { method: "POST", body }),
+
+  // Audit log (TASK-31) - every state change the API made, newest first.
+  // Resolves to { events, counts }, not a bare array: `counts` is the whole
+  // table's totals per event type, which the filter chips need even when the
+  // current filter returns a handful of rows.
+  getAuditLog: ({ eventType, skuId, limit } = {}) => {
+    const qs = new URLSearchParams();
+    if (eventType) qs.set("event_type", eventType);
+    if (skuId) qs.set("sku_id", skuId);
+    if (limit) qs.set("limit", limit);
+    const q = qs.toString();
+    return request(`/audit${q ? `?${q}` : ""}`);
+  },
 };

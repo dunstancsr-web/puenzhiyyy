@@ -11,6 +11,7 @@
 const express = require("express");
 const router = express.Router();
 const { getDb } = require("../db/init");
+const { EVENTS, logEvent, readEvents, eventCounts, diffFields } = require("../db/audit");
 const { buildAnalytics } = require("../engines/index");
 const { projectInventory } = require("../engines/projection");
 
@@ -153,7 +154,25 @@ router.post("/skus", (req, res) => {
     run();
 
     const { skus } = getAnalytics();
-    res.status(201).json({ success: true, data: skus.find((s) => s.sku_id === b.sku_id) });
+    const created = skus.find((s) => s.sku_id === b.sku_id);
+
+    // The output side records what the engines DERIVED from the new SKU, not
+    // just the fields that were posted. That is the interesting half: it shows
+    // the classification and reorder maths running on arrival.
+    logEvent(EVENTS.SKU_CREATED, {
+      skuId: b.sku_id,
+      input: { product_name: b.product_name, supplier: b.supplier || null, lead_time_days: Number(b.lead_time_days) || 45 },
+      output: created
+        ? {
+            abc_class: created.abc_class,
+            reorder_point_suggested: created.reorder_point_suggested,
+            safety_stock_mt: created.safety_stock_mt,
+            health_status: created.health_status,
+          }
+        : null,
+    });
+
+    res.status(201).json({ success: true, data: created });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to create SKU" });
@@ -175,7 +194,14 @@ router.put("/skus/:id", (req, res) => {
   if (numericError) return res.status(400).json({ success: false, message: numericError });
   try {
     const db = getDb();
-    const existing = db.prepare(`SELECT 1 FROM skus WHERE sku_id = ?`).get(req.params.id);
+    // Select the full row, not just `1`: the audit trail needs the before-state
+    // to diff against, and it has to be read inside the same request, before
+    // the UPDATE runs.
+    const existing = db.prepare(`
+      SELECT s.*, p.reserved_qty, p.quality_hold_qty
+        FROM skus s
+        LEFT JOIN inventory_positions p ON p.sku_id = s.sku_id
+       WHERE s.sku_id = ?`).get(req.params.id);
     if (!existing) return res.status(404).json({ success: false, message: "SKU not found" });
 
     const skuUpdates = SKU_TABLE_FIELDS.filter((k) => b[k] !== undefined);
@@ -194,7 +220,23 @@ router.put("/skus/:id", (req, res) => {
     run();
 
     const { skus } = getAnalytics();
-    res.json({ success: true, data: skus.find((s) => s.sku_id === req.params.id) });
+    const updated = skus.find((s) => s.sku_id === req.params.id);
+
+    // Only log when something actually moved. A Save that changed nothing is
+    // noise, and a trail full of no-op rows is the fastest way to make an audit
+    // log unreadable.
+    const changes = diffFields(existing, b, [...SKU_TABLE_FIELDS, ...POSITION_TABLE_FIELDS]);
+    if (Object.keys(changes).length) {
+      logEvent(EVENTS.SKU_UPDATED, {
+        skuId: req.params.id,
+        input: { changed_fields: Object.keys(changes), changes },
+        output: updated
+          ? { health_status: updated.health_status, reorder_point_suggested: updated.reorder_point_suggested, available_qty: updated.available_qty }
+          : null,
+      });
+    }
+
+    res.json({ success: true, data: updated });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to update SKU" });
@@ -212,7 +254,7 @@ router.post("/inventory/restock", (req, res) => {
 
   try {
     const db = getDb();
-    const existing = db.prepare(`SELECT 1 FROM inventory_positions WHERE sku_id = ?`).get(sku_id);
+    const existing = db.prepare(`SELECT on_hand_qty FROM inventory_positions WHERE sku_id = ?`).get(sku_id);
     if (!existing) return res.status(404).json({ success: false, message: "SKU not found" });
 
     db.prepare(`
@@ -222,7 +264,17 @@ router.post("/inventory/restock", (req, res) => {
     ).run(qty, today(), sku_id);
 
     const { skus } = getAnalytics();
-    res.json({ success: true, data: skus.find((s) => s.sku_id === sku_id) });
+    const after = skus.find((s) => s.sku_id === sku_id);
+
+    logEvent(EVENTS.RESTOCK, {
+      skuId: sku_id,
+      input: { quantity_mt: qty, on_hand_before: existing.on_hand_qty, received_date: today() },
+      output: after
+        ? { on_hand_after: existing.on_hand_qty + qty, available_qty: after.available_qty, health_status: after.health_status }
+        : null,
+    });
+
+    res.json({ success: true, data: after });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to restock SKU" });
@@ -267,6 +319,20 @@ function materializeAlerts(db, alerts) {
         triggered_value: a.triggered_value ?? null, threshold_value: a.threshold_value ?? null,
       });
       id = info.lastInsertRowid;
+
+      // Logged here, on first materialization, not on every GET /api/alerts.
+      // The dedupe_key guard above means this branch runs exactly once per
+      // alert, which is what makes ALERT_TRIGGERED mean "this condition first
+      // became true" rather than "someone loaded the page".
+      logEvent(EVENTS.ALERT_TRIGGERED, {
+        skuId: a.sku_id,
+        input: {
+          alert_type: a.alert_type,
+          triggered_value: a.triggered_value ?? null,
+          threshold_value: a.threshold_value ?? null,
+        },
+        output: { alert_id: id, severity: a.severity, message: a.message, recommended_action: a.recommended_action },
+      });
     }
     out.push({ ...a, id });
   }
@@ -290,9 +356,17 @@ router.get("/alerts", (req, res) => {
 router.post("/alerts/:id/acknowledge", (req, res) => {
   try {
     const db = getDb();
+    const before = db.prepare(`SELECT sku_id, alert_type, severity FROM alerts_log WHERE id = ?`).get(req.params.id);
     const info = db.prepare(`UPDATE alerts_log SET status = 'acknowledged', resolved_at = datetime('now') WHERE id = ?`)
       .run(req.params.id);
     if (info.changes === 0) return res.status(404).json({ success: false, message: "Alert not found" });
+
+    logEvent(EVENTS.ALERT_ACKNOWLEDGED, {
+      skuId: before ? before.sku_id : null,
+      input: { alert_id: Number(req.params.id), alert_type: before ? before.alert_type : null, severity: before ? before.severity : null },
+      output: { status: "acknowledged", dismissed_by: "manager" },
+    });
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -352,10 +426,56 @@ router.post("/decisions", (req, res) => {
         LEFT JOIN skus s ON s.sku_id = d.sku_id
        WHERE d.id = ?
     `).get(info.lastInsertRowid);
+
+    // The human-in-the-loop event. Input is what the system proposed, output is
+    // what the manager did with it, so approve / modify / reject and the delta
+    // between the two quantities are both readable straight off the trail.
+    logEvent(EVENTS.DECISION_RECORDED, {
+      skuId: b.sku_id,
+      input: {
+        trigger_type: created.trigger_type,
+        ai_recommendation: created.ai_recommendation,
+        ai_quantity: created.ai_quantity,
+      },
+      output: {
+        decision_id: created.id,
+        manager_action: created.manager_action,
+        manager_quantity: created.manager_quantity,
+        manager_reason: created.manager_reason,
+        delta_qty:
+          created.ai_quantity != null && created.manager_quantity != null
+            ? +(created.manager_quantity - created.ai_quantity).toFixed(2)
+            : null,
+      },
+    });
+
     res.status(201).json({ success: true, data: created });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to record decision" });
+  }
+});
+
+// ── Audit log (TASK-31) ──────────────────────────────────────────────────────
+// Read side of db/audit.js. Every state change in this API writes a row here,
+// so this one endpoint answers "what has the system done, and what did a human
+// do about it" without reading the database by hand.
+
+// GET /api/audit?event_type=RESTOCK&sku_id=...&limit=200
+router.get("/audit", (req, res) => {
+  try {
+    const events = readEvents({
+      eventType: req.query.event_type,
+      skuId: req.query.sku_id,
+      limit: req.query.limit,
+    });
+    // `counts` is nested inside `data` deliberately: the frontend client unwraps
+    // responses to body.data, so anything at the top level next to it would be
+    // dropped before a caller could see it.
+    res.json({ success: true, count: events.length, data: { events, counts: eventCounts() } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load audit log" });
   }
 });
 
