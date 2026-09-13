@@ -78,6 +78,7 @@ export const api = {
 
   // Dashboard
   getDashboardStats: () => request("/dashboard/stats"),
+  getDashboardHistory: (months = 6) => request(`/dashboard/history?months=${months}`),
 
   // Alerts
   getAlerts: () => request("/alerts"),

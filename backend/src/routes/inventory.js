@@ -280,6 +280,72 @@ router.put("/skus/:id", (req, res) => {
   }
 });
 
+// GET /api/dashboard/history — monthly consumption at cost (TASK-65)
+//
+// What this is NOT: a history of Total Inventory Value. Nothing in this schema
+// records what stock was worth on a past date, and reconstructing it backwards
+// from sales would have to assume no goods were ever received, which would draw
+// a smooth line sloping up into the past: entirely plausible, entirely wrong.
+// So this charts what IS recorded, the value consumed each month, which is the
+// thing that draws inventory down and therefore earns its place beside the
+// hero figure.
+//
+// `partial` is the load-bearing field. The data starts mid-March and the
+// current month is still running, so those two months hold roughly half a
+// month of sales each. Drawn as ordinary bars beside a full month they read as
+// a collapse in demand, which is a false story told with true numbers. The
+// server decides this rather than the chart, because the server is the only
+// side that knows the real coverage window.
+router.get("/dashboard/history", (req, res) => {
+  const months = Math.min(24, Math.max(1, Number(req.query.months) || 6));
+  try {
+    const db = getDb();
+    const span = db.prepare(`
+      SELECT MIN(sale_date) first, MAX(sale_date) last FROM sales_transactions`).get();
+    if (!span?.first) return res.json({ success: true, data: { months: [], coverage: null } });
+
+    const rows = db.prepare(`
+      SELECT substr(t.sale_date, 1, 7) AS month,
+             ROUND(SUM(t.quantity_mt), 1) AS qty_mt,
+             ROUND(SUM(t.quantity_mt * s.unit_cost_sgd)) AS value_sgd,
+             COUNT(*) AS txns
+        FROM sales_transactions t
+        JOIN skus s ON s.sku_id = t.sku_id
+       WHERE t.status = 'fulfilled'
+       GROUP BY month
+       ORDER BY month`).all();
+
+    const firstMonth = span.first.slice(0, 7);
+    const lastMonth = span.last.slice(0, 7);
+    // A month is partial when the data window opens after the 1st or closes
+    // before the month is over. Only the two edge months can ever qualify.
+    const partialOf = (m) =>
+      (m === firstMonth && span.first.slice(8) !== "01") || m === lastMonth;
+
+    const series = rows.slice(-months).map((r) => ({ ...r, partial: partialOf(r.month) }));
+    const full = series.filter((r) => !r.partial);
+    // The reference line is the mean of the COMPLETE months only. Including a
+    // half month would drag it down and make every full month look like an
+    // overshoot.
+    const average = full.length
+      ? Math.round(full.reduce((a, r) => a + r.value_sgd, 0) / full.length)
+      : null;
+
+    res.json({
+      success: true,
+      data: {
+        months: series,
+        average,
+        fullMonths: full.length,
+        coverage: { from: span.first, to: span.last },
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to build history" });
+  }
+});
+
 // ── Bulk edit: CSV out, CSV back in (TASK-60) ────────────────────────────────
 //
 // The workflow this exists for is "export everything, fix fifty rows in a

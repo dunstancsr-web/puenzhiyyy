@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
+  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList, ReferenceLine,
 } from "recharts";
 import {
   AlertTriangle, TrendingUp, Clock, PackageX, Repeat, Target,
@@ -514,7 +514,7 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-          <MonthTrendChart data={monthTrendData} />
+          <HeroChart baselineData={monthTrendData} />
         </div>
 
       {/* ── Secondary strip: core numbers, demoted but never hidden. Every
@@ -724,7 +724,77 @@ export default function Dashboard() {
 // zero baseline stays (truncating it to exaggerate a 4% move is the classic
 // misleading-bar-chart trick); the labels are what make it readable, and the
 // near-equal heights are themselves the honest message.
-function MonthTrendChart({ data }) {
+// ── Hero chart, two views ───────────────────────────────────────────────────
+//
+// "Baseline" is the two-bar comparison this card has always had: today's
+// inventory value against a fixed hand-set reference.
+//
+// "6 months" charts MONTHLY CONSUMPTION AT COST, and the label says so, because
+// it is emphatically not a history of inventory value. Nothing records what
+// stock was worth on a past date, and reconstructing it backwards from sales
+// would have to assume no goods were ever received. That draws a smooth line
+// rising into the past: completely plausible, completely wrong. Consumption is
+// recorded, 241 transactions deep, and it is what draws inventory down, which
+// is why it belongs beside this number rather than somewhere else.
+//
+// Partial months are hatched, not hidden. The data opens mid-March and the
+// current month is still running, so each holds roughly half a month of sales;
+// plain bars beside a full month would read as demand collapsing, which is a
+// false story told with true numbers. Hatching is the same encoding
+// StockPositionBar uses for idle stock: present, but not what it looks like.
+function HeroChart({ baselineData }) {
+  const [mode, setMode] = useState("baseline");
+  const [history, setHistory] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  // Fetched on first switch, not on mount. Most visits never open this view,
+  // and the dashboard already makes two calls before anything renders.
+  useEffect(() => {
+    if (mode !== "months" || history || failed) return;
+    api.getDashboardHistory(6).then(setHistory).catch(() => setFailed(true));
+  }, [mode, history, failed]);
+
+  const months = history?.months || [];
+
+  return (
+    <div style={{ flexShrink: 0 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginBottom: 4 }}>
+        {[["baseline", "Baseline"], ["months", "6 months"]].map(([id, label]) => (
+          <button key={id} type="button" onClick={() => setMode(id)} aria-pressed={mode === id}
+            style={{
+              padding: "3px 9px", borderRadius: 99, cursor: "pointer",
+              border: `1px solid ${mode === id ? "var(--blue)" : "var(--border)"}`,
+              background: mode === id ? "var(--blue-light)" : "transparent",
+              color: mode === id ? "var(--blue)" : "var(--text-muted)",
+              fontSize: "var(--text-xs)", fontWeight: mode === id ? 700 : 500,
+            }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "baseline" ? (
+        <BaselineChart data={baselineData} />
+      ) : failed ? (
+        <div style={{ width: 400, height: 92, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+          Could not load history.
+        </div>
+      ) : !history ? (
+        <div style={{ width: 400, height: 92 }} />
+      ) : (
+        <ConsumptionChart data={months} average={history.average} />
+      )}
+
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 3, textAlign: "right", maxWidth: 400 }}>
+        {mode === "baseline"
+          ? "Inventory value vs a fixed reference"
+          : `Consumed per month, at cost${history?.average ? ` · dashed = ${history.fullMonths}-month average` : ""}`}
+      </div>
+    </div>
+  );
+}
+
+function BaselineChart({ data }) {
   return (
     <div style={{ width: 200, height: 92, flexShrink: 0 }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -747,6 +817,60 @@ function MonthTrendChart({ data }) {
             <LabelList dataKey="value" position="top" formatter={(v) => fmt$(v)}
               style={{ fontSize: 11, fontWeight: 700, fill: "var(--text-secondary)" }} />
             {data.map((d, i) => <Cell key={i} fill={i === data.length - 1 ? "var(--blue)" : "var(--border)"} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+const MONTH_LABEL = (m) =>
+  new Date(`${m}-01T00:00:00`).toLocaleDateString("en-SG", { month: "short" });
+
+function ConsumptionChart({ data, average }) {
+  const rows = data.map((d) => ({ ...d, name: MONTH_LABEL(d.month) }));
+  // Taller than the baseline chart. Six bars over a 0-to-1M domain in 74px of
+  // plot area flattened the differences between months into near-identical
+  // blocks, which is the opposite of what a six month view is for.
+  return (
+    <div style={{ width: 400, height: 116, flexShrink: 0 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={rows} margin={{ top: 18, right: 6, bottom: 0, left: 6 }}>
+          <defs>
+            {/* Diagonal hatch for an incomplete month. Declared once and
+                referenced by the Cells that need it. */}
+            <pattern id="na-partial" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+              <rect width="6" height="6" fill="var(--surface-2)" />
+              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--text-muted)" strokeWidth="2.5" opacity="0.55" />
+            </pattern>
+          </defs>
+          <Tooltip
+            cursor={{ fill: "var(--surface-2)" }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const d = payload[0].payload;
+              return (
+                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", fontSize: "var(--text-xs)", boxShadow: "var(--shadow)", lineHeight: 1.5 }}>
+                  <strong>{d.name}</strong>: SGD {fmt$(d.value_sgd)}
+                  <div style={{ color: "var(--text-muted)" }}>
+                    {d.qty_mt} MT over {d.txns} sales
+                    {d.partial && " · month still in progress"}
+                  </div>
+                </div>
+              );
+            }}
+          />
+          <XAxis dataKey="name" axisLine={false} tickLine={false}
+            tick={{ fontSize: 11, fill: "var(--text-muted)" }} />
+          {average && (
+            <ReferenceLine y={average} stroke="var(--text-muted)" strokeDasharray="4 3" strokeWidth={1} />
+          )}
+          <Bar dataKey="value_sgd" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+            <LabelList dataKey="value_sgd" position="top" formatter={(v) => fmt$(v)}
+              style={{ fontSize: 10, fontWeight: 700, fill: "var(--text-secondary)" }} />
+            {rows.map((d, i) => (
+              <Cell key={i} fill={d.partial ? "url(#na-partial)" : "var(--blue)"} />
+            ))}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
