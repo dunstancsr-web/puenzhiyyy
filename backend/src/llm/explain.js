@@ -484,6 +484,16 @@ async function runExplanation({ sku, alert, callModel }) {
     // anyway ("This alert was flagged because stock is low.") would repeat it,
     // so a leading "was flagged / triggered" sentence of its own is dropped:
     // the opening already says it, with the figures.
+    // The approved action is the one thing a manager must not miss, so it is
+    // guaranteed rather than requested (TASK-98): the prompt asks the model to
+    // end with {recommended_action}, and the 15 Sep rehearsal showed stockout
+    // and ageing answers that simply stopped without it. If the model's text
+    // does not already contain the action, the system appends it, the same
+    // move as the system-written opening. No retry, no paid call.
+    if (alert.recommended_action && !rendered.includes(alert.recommended_action)) {
+      rendered = `${rendered.trim()}\n\n${alert.recommended_action}`;
+    }
+
     if (opening) {
       rendered = rendered.replace(/^\s*(?:this alert|this sku|this product|it|[A-Z][\w ]{0,40}?)\s+(?:was|has been|is)\s+(?:flagged|triggered)\b[^.]*\.\s*/i, "");
       rendered = `${opening} ${rendered}`.trim();

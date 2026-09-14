@@ -65,7 +65,9 @@ const TRIGGERS = {
     // min_order: the recommended action already carries "(min 20 MT)", and on
     // its own llama3 turned it into "order at least that amount" against a
     // suggested 597 MT.
-    withhold: ["days_of_cover", "lead_time", "stockout_gap", "on_hand_stock", "reserved_stock", "max_stock", "reorder_point", "min_order"],
+    // safety_stock too: "The 10 days is insufficient to cover the time it
+    // takes for a new shipment to arrive" presented the buffer as cover.
+    withhold: ["days_of_cover", "lead_time", "stockout_gap", "on_hand_stock", "reserved_stock", "max_stock", "reorder_point", "min_order", "safety_stock"],
   },
   REORDER: {
     clause: (s, a, f) => `its inventory position of ${f.mt(s.inventory_position)} (stock available now plus stock already on order) is at or below the approved reorder point of ${f.mt(s.reorder_point_policy)}`,
