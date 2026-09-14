@@ -40,6 +40,10 @@ function delta(cur, prev, { higherIsBetter = true, unit = "", pp = false } = {})
 
 const HEALTH_COLORS = { GREEN: "#22c55e", YELLOW: "#f59e0b", ORANGE: "#f97316", RED: "#ef4444" };
 const HEALTH_LABEL = { RED: "Critical", ORANGE: "Action", YELLOW: "Watch", GREEN: "Healthy" };
+// The same four colours as tokens. HEALTH_COLORS feeds Recharts, which needs a
+// resolved value; this feeds the tag pills in Needs Attention, which derive
+// their background by appending "-light" and therefore need the token form.
+const HEALTH_TOKEN = { RED: "var(--red)", ORANGE: "var(--orange)", YELLOW: "var(--yellow)", GREEN: "var(--green)" };
 
 // Movement axis of the ABC x movement matrix. Must mirror MOVEMENT_COLS in
 // backend/src/engines/segmentation.js - the cell keys are built from these.
@@ -135,7 +139,7 @@ const HINTS = {
   },
   needsAttention: {
     what: "Every SKU with an open problem right now - running low, sitting idle, overstocked, or ageing past its shelf-life target - combined into one list instead of three separate ones.",
-    how: "Ranked with the most urgent, highest-value problems at the top. Click a bar or cell in the charts on this page to filter this table down to just the SKUs in that category - click it again to clear the filter.",
+    how: "Ranked with the most urgent, highest-value problems at the top. Click a bar or cell in the charts on this page to filter this table down to just the SKUs in that category - click it again to clear the filter.\n\nSwitch to All SKUs to include the ones with nothing wrong. They sort to the bottom, so the urgent work stays at the top either way. That is the view to use after clicking the green band in Inventory Health, since healthy SKUs have no exception to list.",
   },
   health: {
     what: "Every SKU sorted into one of four health buckets by real rules - about to run out, needs action soon, worth watching, or genuinely fine - shown by dollar value, not just a headcount.",
@@ -313,6 +317,54 @@ function buildNeedsAttention(skus) {
   return rows.sort((a, b) => a.priority - b.priority || b.value - a.value);
 }
 
+// ── The other SKUs: everything with nothing wrong with it ────────────────────
+//
+// Why this exists. Every chart on this page is a filter source for the table
+// above, and Inventory Health is the one whose categories do not all map onto
+// an exception. Clicking the GREEN band asked "show me the healthy stock" and
+// got back "No open exceptions match this filter", which is technically true
+// and completely useless: the four SKUs are healthy, that is the whole point
+// of the band, and the table had no way to say so.
+//
+// So the table gains a second scope rather than a special case for green. The
+// rows are deliberately shaped like exception rows (same columns, same stripe,
+// same value cell) because they are the same objects seen at a different
+// threshold, and a healthy SKU whose stripe is green beside an urgent one
+// whose stripe is red is exactly the comparison the toggle exists to allow.
+//
+// Priority 9 keeps them last under the shared sort, so switching scope APPENDS
+// to the worklist rather than reshuffling it. The urgent row stays row one.
+function buildNoActionRows(skus, attention) {
+  const flagged = new Set(attention.map((a) => a.sku_id));
+  return skus
+    .filter((s) => s.active !== 0 && !flagged.has(s.sku_id))
+    .map((s) => ({
+      priority: 9,
+      sku_id: s.sku_id,
+      name: s.product_name,
+      action: "No action required",
+      // Real figures, not a reassuring phrase. "Healthy" is a conclusion, and
+      // a row that only states the conclusion gives the reader nothing to
+      // disagree with. These are the three numbers the health rules actually
+      // read, so a sceptical operator can check the verdict rather than
+      // trust it.
+      reason: `${s.days_of_cover != null ? `${s.days_of_cover}d cover` : "no cover figure"} · ${s.movement_class} · ${fmtMt(s.available_qty)} MT available`,
+      // Stock value, not risk. Every other row in this table values a PROBLEM,
+      // so the column header "Value" changes meaning here and the label under
+      // the figure has to say so.
+      value: s.inventory_value,
+      valueLabel: "stock value",
+      // The tag reads the SKU's OWN health verdict rather than always saying
+      // "healthy". Having no open exception and being GREEN are not the same
+      // test: a SKU can sit on WATCH for a reason the exception rules do not
+      // raise a row for, and painting it green here would have this table
+      // contradict the health chart that filtered into it.
+      tag: HEALTH_LABEL[s.health_status]?.toUpperCase() || "NO EXCEPTION",
+      tagColor: HEALTH_TOKEN[s.health_status] || "var(--green)",
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
 // How many exception rows show before the reveal - applied AFTER filtering, so
 // a filter always searches the full exception list, not just what fit on
 // screen.
@@ -413,6 +465,12 @@ export default function Dashboard() {
   // the short page it exists to protect.
   const [history, setHistory] = useState(null);
   const [showAllAttention, setShowAllAttention] = useState(false);
+  // "exceptions" (the worklist) or "all" (every SKU, healthy ones included).
+  // Defaults to exceptions and is not persisted: this table's job is to be the
+  // day's worklist, and a reader who opened it up yesterday to inspect a
+  // healthy SKU should not find tomorrow's urgent row buried under nine quiet
+  // ones. Same reasoning as showAllAttention above.
+  const [attentionScope, setAttentionScope] = useState("exceptions");
 
   // Needs Attention now sits ABOVE the charts that filter it, so clicking a
   // health colour or a matrix cell changes something off screen. Scrolling the
@@ -466,20 +524,34 @@ export default function Dashboard() {
   // Filter first, cap for display second - a filter must search every real
   // exception, not just the top slice that happened to fit on screen.
   const filteredAttention = attention.filter((a) => matchesFilter(a, filter, skuIndex));
+  // The full list under the current scope. "all" appends the no-action rows
+  // rather than building a different table, so the two scopes share one sort,
+  // one filter and one set of columns.
+  const allRows = attentionScope === "all"
+    ? [...attention, ...buildNoActionRows(skus, attention)]
+    : attention;
+  const filteredRows = allRows.filter((a) => matchesFilter(a, filter, skuIndex));
   const shownAttention = showAllAttention
-    ? filteredAttention
-    : filteredAttention.slice(0, NEEDS_ATTENTION_PREVIEW + NEEDS_ATTENTION_TEASE);
+    ? filteredRows
+    : filteredRows.slice(0, NEEDS_ATTENTION_PREVIEW + NEEDS_ATTENTION_TEASE);
   // Counted against the rows READ IN FULL, not against the rows rendered. The
   // teased fourth row is half legible behind the fade, so counting it as seen
   // would make the button under-report what is left.
   const hiddenAttentionCount = showAllAttention
     ? 0
-    : Math.max(0, filteredAttention.length - NEEDS_ATTENTION_PREVIEW);
-  const teasing = !showAllAttention && filteredAttention.length > NEEDS_ATTENTION_PREVIEW;
-  // The badge takes its colour from the worst row present, and the list is
-  // already sorted worst first, so that is simply the first one. A count alone
-  // would say "7 things"; the colour says how bad the worst of them is.
+    : Math.max(0, filteredRows.length - NEEDS_ATTENTION_PREVIEW);
+  const teasing = !showAllAttention && filteredRows.length > NEEDS_ATTENTION_PREVIEW;
+  // The badge counts EXCEPTIONS in both scopes, never the rows on screen. It
+  // is the alarm number, and switching to All SKUs must not make the alarm go
+  // up: "4" turning into "10" because four healthy rows were revealed would
+  // report a portfolio getting worse when nothing changed.
   const attentionTone = filteredAttention.length > 0 ? filteredAttention[0].tagColor : null;
+  // How many SKUs the current filter selects, regardless of whether any of
+  // them has an exception. This is what makes the empty state able to say
+  // "these 4 are healthy" instead of "nothing here".
+  const filterSkuCount = filter
+    ? skus.filter((sk) => matchesFilter({ sku_id: sk.sku_id }, filter, skuIndex)).length
+    : skus.length;
 
 
   return (
@@ -658,9 +730,17 @@ export default function Dashboard() {
           other way round, which pushed the single most actionable widget on
           the page off-screen behind a segmentation matrix. ── */}
       <div ref={attentionRef} className="dash-row dash-row--full" style={{ marginBottom: "var(--space-5)", scrollMarginTop: "var(--space-5)" }}>
-        <Section title="Needs Attention" subtitle="Every open exception, ranked by urgency then financial exposure" hint={HINTS.needsAttention}
+        <Section title="Needs Attention"
+          subtitle={attentionScope === "all"
+            ? "Every SKU, exceptions first by urgency and exposure, then the ones with nothing wrong"
+            : "Every open exception, ranked by urgency then financial exposure"}
+          hint={HINTS.needsAttention}
           badge={filteredAttention.length} badgeTone={attentionTone} pad={NA_DENSITY.cardPad}
-          collapsible storageKey="needs-attention" defaultOpen>
+          collapsible storageKey="needs-attention" defaultOpen
+          actions={
+            <ScopeToggle value={attentionScope} onChange={(v) => { setAttentionScope(v); setShowAllAttention(false); }}
+              counts={{ exceptions: attention.length, all: skus.filter((sk) => sk.active !== 0).length }} />
+          }>
           {filter && (
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600,
@@ -674,9 +754,35 @@ export default function Dashboard() {
               </button>
             </div>
           )}
-          {filteredAttention.length === 0 ? (
+          {filteredRows.length === 0 ? (
+            // A dead end used to live here. Clicking the GREEN health band set
+            // a filter that matched real SKUs, none of which had an exception,
+            // and the table said "No open exceptions match this filter" as if
+            // the click had been a mistake. It was not: healthy is a real
+            // answer, and the reader had asked a reasonable question.
+            //
+            // So the empty state now names what the filter actually selected
+            // and offers the one control that shows it. The button is the same
+            // action as the toggle in the header, placed where the reader is
+            // looking when they need it.
             <div style={{ padding: "var(--space-4) 0", textAlign: "center", color: attention.length === 0 ? "var(--green)" : "var(--text-muted)", fontWeight: 600, fontSize: "var(--text-base)" }}>
-              {attention.length === 0 ? "✓ No open exceptions - portfolio is healthy." : "No open exceptions match this filter."}
+              {attention.length === 0
+                ? "✓ No open exceptions - portfolio is healthy."
+                : filter && filterSkuCount > 0
+                  ? `${filterSkuCount} ${filterSkuCount === 1 ? "SKU matches" : "SKUs match"} this filter, and none of them has an open exception.`
+                  : "No open exceptions match this filter."}
+              {filter && filterSkuCount > 0 && attentionScope === "exceptions" && (
+                <div style={{ marginTop: "var(--space-3)" }}>
+                  <button type="button" onClick={() => setAttentionScope("all")}
+                    style={{
+                      padding: "7px 16px", borderRadius: 99, cursor: "pointer",
+                      border: "1px solid var(--blue)", background: "var(--blue-light)",
+                      color: "var(--blue)", fontSize: "var(--text-sm)", fontWeight: 600,
+                    }}>
+                    Show {filterSkuCount === 1 ? "it" : "them"} anyway
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -842,8 +948,9 @@ const CHART_H = 122;
 // strokeWidth, strokeDasharray - anything SVG takes.
 function partialCellProps(partial) {
   if (!partial) return {};
-  // TODO(human)
-  return {};
+  // Dimmed, not outlined. Opacity keeps both hues and the split readable, and
+  // needs no legend entry of its own; the tooltip carries the actual caveat.
+  return { fillOpacity: 0.55 };
 }
 
 function HeroChart({ history }) {
@@ -1186,8 +1293,50 @@ function RevealButton({ showAll, count, onToggle, floating = false }) {
 // variable to tint it with. It stays visible when the section is COLLAPSED,
 // which is the whole point: a folded section that gives no sign there are
 // seven open exceptions inside it is worse than no section at all.
+// ── Needs Attention scope toggle ─────────────────────────────────────────────
+//
+// A segmented control, not a checkbox reading "include healthy SKUs". Two
+// named states with their counts on them say what each one will show BEFORE it
+// is pressed, where a checkbox only says what it does to the current view.
+//
+// It borrows the hero chart's window-button styling on purpose. Both are the
+// same kind of control, "which slice of the data am I looking at", and giving
+// the page one visual language for that is worth more than a bespoke look for
+// each. Counts are muted rather than bold: they are the size of each option,
+// not an alarm, and the alarm is already the badge beside the title.
+function ScopeToggle({ value, onChange, counts }) {
+  const OPTS = [
+    { key: "exceptions", label: "Needs action", count: counts.exceptions },
+    { key: "all", label: "All SKUs", count: counts.all },
+  ];
+  return (
+    <div role="group" aria-label="Which rows to show" style={{ display: "flex", gap: 4 }}>
+      {OPTS.map((o) => {
+        const on = o.key === value;
+        return (
+          <button key={o.key} type="button" onClick={() => onChange(o.key)} aria-pressed={on}
+            style={{
+              padding: "3px 10px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap",
+              border: `1px solid ${on ? "var(--blue)" : "var(--border)"}`,
+              background: on ? "var(--blue-light)" : "transparent",
+              color: on ? "var(--blue)" : "var(--text-muted)",
+              fontSize: "var(--text-xs)", fontWeight: on ? 700 : 500,
+            }}>
+            {o.label}
+            <span style={{ opacity: 0.65, marginLeft: 5, fontWeight: 500 }}>{o.count}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// `actions` is an optional control that belongs to the section itself rather
+// than to its content - a scope toggle, a unit switch. It sits in the header
+// beside the collapse chevron, and only while the section is open, because a
+// control for content nobody can see is a control that cannot be understood.
 function Section({ title, subtitle, children, hint, badge = null, badgeTone = null,
-                  pad = null, collapsible = false, storageKey, defaultOpen = true }) {
+                  pad = null, collapsible = false, storageKey, defaultOpen = true, actions = null }) {
   const [storedOpen, setStoredOpen] = useCollapsed(storageKey || title, defaultOpen);
   const open = collapsible ? storedOpen : true;
   return (
@@ -1216,6 +1365,8 @@ function Section({ title, subtitle, children, hint, badge = null, badgeTone = nu
           </div>
           {subtitle && open && <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginTop: 2 }}>{subtitle}</div>}
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        {actions && open && actions}
         {collapsible && (
           <button type="button" onClick={() => setStoredOpen((v) => !v)} aria-expanded={open}
             aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
@@ -1223,6 +1374,7 @@ function Section({ title, subtitle, children, hint, badge = null, badgeTone = nu
             <ChevronDown size={15} style={{ transform: open ? "none" : "rotate(-90deg)", transition: "transform 0.15s" }} />
           </button>
         )}
+        </div>
       </div>
       {open && children}
     </div>
