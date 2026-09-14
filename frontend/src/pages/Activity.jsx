@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   PackagePlus, SlidersHorizontal, Truck, BellRing, BellOff,
-  UserCheck, Cpu, RefreshCw, ChevronRight, FileSearch,
+  UserCheck, Cpu, RefreshCw, ChevronRight, FileSearch, KeyRound, ShieldAlert,
 } from "lucide-react";
 import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
@@ -30,6 +30,10 @@ const TYPE_META = {
   SKU_CREATED:        { icon: PackagePlus,       color: "var(--purple)", label: "SKU added" },
   ALERT_ACKNOWLEDGED: { icon: BellOff,           color: "var(--text-muted)", label: "Alert dismissed" },
   LLM_CALL:           { icon: Cpu,               color: "var(--purple)", label: "AI explanation" },
+  // TASK-90. Unlocking is a spending decision and reads like one; a lockout is
+  // the only security event in this log, so it takes the alarm colour.
+  LLM_UNLOCKED:          { icon: KeyRound,    color: "var(--yellow)", label: "Paid AI unlocked" },
+  LLM_UNLOCK_LOCKED_OUT: { icon: ShieldAlert, color: "var(--red)",    label: "PIN lockout" },
 };
 
 // Column order for the filter chips. Deliberately not alphabetical and not
@@ -39,6 +43,7 @@ const TYPE_META = {
 const TYPE_ORDER = [
   "ALERT_TRIGGERED", "DECISION_RECORDED", "LLM_CALL",
   "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
+  "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT",
 ];
 
 const PAGE_HINT = {
@@ -190,6 +195,20 @@ function describe(event) {
       return {
         headline: `AI explanation generated for ${sku}`,
         detail: o.model ? `Model: ${o.model}` : null,
+      };
+
+    case "LLM_UNLOCKED":
+      return {
+        headline: "A visitor unlocked paid AI explanations with the demo PIN",
+        detail: o.expires_at
+          ? `Their pass expires ${new Date(o.expires_at).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" })}.`
+          : null,
+      };
+
+    case "LLM_UNLOCK_LOCKED_OUT":
+      return {
+        headline: "Too many wrong demo PINs, unlocking was blocked",
+        detail: o.reason || null,
       };
 
     default:

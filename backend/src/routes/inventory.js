@@ -14,7 +14,8 @@ const { getDb } = require("../db/init");
 const { EVENTS, logEvent, readEvents, eventCounts, diffFields } = require("../db/audit");
 const { buildAnalytics } = require("../engines/index");
 const { explainAlert, providerInfo, LlmUnavailable } = require("../llm/explain");
-const { listModes, getMode, setMode } = require("../llm/provider");
+const { listModes, getDefaultMode, resolveTier } = require("../llm/provider");
+const demoAccess = require("../llm/demoAccess");
 const { projectInventory } = require("../engines/projection");
 const { toCsv, parseCsv } = require("../db/csv");
 
@@ -1047,11 +1048,34 @@ router.get("/audit", (req, res) => {
 // rate-limited gateway and a daily cap all return 200 with available:false and
 // a reason, because the frontend has a complete deterministic explanation of
 // its own to fall back on. The model is an enhancement, not a dependency.
+//
+// Body: { sku_id, alert_type, tier? }. The tier is the VISITOR's choice
+// (TASK-90) and falls back to the server default when absent. The cloud tier
+// additionally needs a valid pass from POST /llm/unlock in the X-Demo-Unlock
+// header wherever a PIN is required.
 router.post("/alerts/explain", async (req, res) => {
   const { sku_id, alert_type } = req.body || {};
   if (!sku_id || !alert_type) {
     return res.status(400).json({ success: false, message: "sku_id and alert_type are required" });
   }
+  const tier = resolveTier(req.body?.tier || getDefaultMode());
+
+  // Refused before any analytics work, and with `locked` set so the page can
+  // tell "your pass expired, enter the PIN again" apart from "the model is
+  // down". Still a 200 with available:false, for the reason given above.
+  if (tier === "cloud" && !demoAccess.passValid(req.get("X-Demo-Unlock"))) {
+    const gate = demoAccess.gateStatus();
+    return res.json({
+      success: true,
+      data: {
+        available: false,
+        locked: gate.ok,
+        reason: gate.ok ? "Paid explanations are locked. Enter the demo PIN in Settings to unlock them." : gate.reason,
+        ...providerInfo(tier),
+      },
+    });
+  }
+
   try {
     const { skus, alerts } = getAnalytics();
     const sku = skus.find((s) => s.sku_id === sku_id);
@@ -1061,7 +1085,7 @@ router.post("/alerts/explain", async (req, res) => {
     }
 
     try {
-      const out = await explainAlert(sku, alert);
+      const out = await explainAlert(sku, alert, { tier });
       res.json({
         success: true,
         data: {
@@ -1075,7 +1099,7 @@ router.post("/alerts/explain", async (req, res) => {
       });
     } catch (err) {
       if (err instanceof LlmUnavailable) {
-        return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo() } });
+        return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo(tier) } });
       }
       throw err;
     }
@@ -1089,31 +1113,37 @@ router.post("/alerts/explain", async (req, res) => {
 // Three tiers in increasing order of cost: rules (free, no model), local (free,
 // on this machine), cloud (metered, spends shared AWS credit).
 
-// GET /api/llm/mode - current tier plus what is available to switch to
+//
+// Since TASK-90 there is no server-wide tier to switch. Each visitor's choice
+// lives in their own browser and travels with each request, because on a
+// public URL a global switch let one visitor turn on paid calls for everyone.
+// POST /api/llm/mode was removed rather than kept as a no-op, so an old client
+// fails loudly instead of believing it changed something.
+
+// GET /api/llm/mode - the server default plus every tier and whether this
+// server can offer it. `mode` is only the DEFAULT for visitors with no choice.
 router.get("/llm/mode", (req, res) => {
-  res.json({ success: true, data: { mode: getMode(), modes: listModes() } });
+  const gate = { ...demoAccess.gateStatus(), pinRequired: demoAccess.pinRequired() };
+  res.json({ success: true, data: { mode: getDefaultMode(), modes: listModes(gate) } });
 });
 
-// POST /api/llm/mode  { mode }
-// The only way into the metered tier. Refuses when credentials are absent
-// rather than switching into a state that then fails on first use.
-router.post("/llm/mode", (req, res) => {
-  try {
-    const previous = getMode();
-    const mode = setMode(req.body?.mode);
-
-    // Entering or leaving the paid tier is a spending decision, so it belongs
-    // in the same trail as every other decision the app records.
-    if (mode !== previous) {
-      logEvent(EVENTS.LLM_MODE_CHANGED, {
-        input: { from: previous, to: mode },
-        output: { metered: mode === "cloud", ...providerInfo() },
-      });
-    }
-    res.json({ success: true, data: { mode, modes: listModes() } });
-  } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+// POST /api/llm/unlock  { pin }
+// Exchanges the demo PIN for a two hour pass this browser sends with paid
+// requests. Rate limited inside demoAccess, per client and in total.
+//
+// Audited on success and on lockout, NOT on every wrong guess: a flood of
+// guesses must not become a flood of rows, and the lockout is the event a
+// person needs to see. The PIN itself is never logged, right or wrong.
+router.post("/llm/unlock", (req, res) => {
+  const result = demoAccess.tryUnlock(req.ip, req.body?.pin);
+  if (result.ok) {
+    logEvent(EVENTS.LLM_UNLOCKED, { output: { expires_at: new Date(result.expiresAt).toISOString() } });
+    return res.json({ success: true, data: { pass: result.pass, expiresAt: result.expiresAt } });
   }
+  if (result.lockedOut) {
+    logEvent(EVENTS.LLM_UNLOCK_LOCKED_OUT, { output: { reason: result.reason } });
+  }
+  res.status(result.status).json({ success: false, message: result.reason });
 });
 
 module.exports = router;

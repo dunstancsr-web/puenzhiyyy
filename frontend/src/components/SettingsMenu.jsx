@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Settings, Cpu, Calculator, Cloud, AlertTriangle, Sun, Moon, Monitor, Check } from "lucide-react";
+import { Settings, Cpu, Calculator, Cloud, AlertTriangle, Sun, Moon, Monitor, Check, KeyRound } from "lucide-react";
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { api } from "../api/inventory";
+import { useLlmTier, effectiveTier, setTierChoice, setPass, clearPass } from "../lib/llmTier";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SETTINGS MENU (TASK-49)
@@ -31,9 +32,15 @@ const THEME_ICON = { auto: Monitor, light: Sun, dark: Moon };
 export default function SettingsMenu({ align = "up", compact = false }) {
   const { theme, resolved, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState(null);      // { mode, modes }
-  const [pending, setPending] = useState(null);  // metered tier awaiting confirm
+  const [state, setState] = useState(null);      // { mode, modes } from the server
+  // null | "confirm" (dev: click again to spend) | "pin" (enter the demo PIN)
+  const [pending, setPending] = useState(null);
   const [error, setError] = useState(null);
+  const [pin, setPin] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
+  // The tier is this visitor's own since TASK-90, read from the browser rather
+  // than from the server. The server only says what it CAN offer.
+  const { choice, pass } = useLlmTier();
   const wrapRef = useRef(null);
   const panelRef = useRef(null);
   const [rect, setRect] = useState(null);
@@ -42,6 +49,9 @@ export default function SettingsMenu({ align = "up", compact = false }) {
     api.getLlmMode().then(setState).catch(() => setState(null));
   }, []);
   useEffect(() => { load(); }, [load]);
+  // Refetched on open too, so the paid-call count it shows is current rather
+  // than whatever it was when the page first loaded.
+  useEffect(() => { if (open) load(); }, [open, load]);
 
   // The compact panel is PORTALED to document.body, and that is not cosmetic.
   // Its ancestor .glass-surface sets backdrop-filter, which makes that ancestor
@@ -85,15 +95,46 @@ export default function SettingsMenu({ align = "up", compact = false }) {
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
   }, [open]);
 
-  const choose = async (m) => {
-    if (!m.available || m.id === state?.mode) return;
-    if (m.cost === "metered" && pending !== m.id) { setPending(m.id); setError(null); return; }
-    setPending(null); setError(null);
-    try { setState(await api.setLlmMode(m.id)); }
-    catch (err) { setError(err.message); }
+  const current = effectiveTier(state, choice, pass);
+
+  const choose = (m) => {
+    if (!m.available) return;
+    const locked = m.id === "cloud" && m.requiresPin && !pass;
+    if (m.id === current && !locked) return;
+    setError(null);
+    if (m.cost === "metered") {
+      // Where a PIN is required, typing it IS the confirmation, so there is
+      // no second "are you sure" click on top. Without one (development) the
+      // original click-again-to-spend step still applies.
+      if (locked) { setPending("pin"); return; }
+      if (!m.requiresPin && pending !== "confirm") { setPending("confirm"); return; }
+    }
+    setPending(null);
+    setTierChoice(m.id);
   };
 
-  const activeMode = state?.modes?.find((m) => m.id === state.mode);
+  const unlock = async (e) => {
+    e.preventDefault();
+    if (!pin.trim() || unlocking) return;
+    setUnlocking(true); setError(null);
+    try {
+      setPass(await api.unlockLlm(pin.trim()));
+      setTierChoice("cloud");
+      setPending(null);
+      load();
+    } catch (err) {
+      // The server's message is written to be shown: "2 tries left",
+      // "try again in 15 min". Rephrasing it here would only lose the count.
+      setError(err.message);
+    } finally {
+      // Cleared on failure too. Leaving a wrong PIN in the box invites
+      // resubmitting it, and each resubmission spends one of five tries.
+      setPin("");
+      setUnlocking(false);
+    }
+  };
+
+  const activeMode = state?.modes?.find((m) => m.id === current);
   // The visible label stays short, because it shares a truncating line with the
   // mode. Auto's resolved appearance goes in the tooltip, where there is room
   // to say "Auto (dark)" without pushing the mode out of view.
@@ -168,7 +209,12 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                 [align === "up" ? "bottom" : "top"]: "calc(100% + 8px)",
                 left: 0, right: 0,
               }),
-          minWidth: 248,
+          // No minWidth. There was a 248px one, which only ever applied to the
+          // sidebar variant (compact sets its own width), and the sidebar is
+          // 230px with overflow: auto, so the panel's right 34px were clipped:
+          // the check mark on the active tier, half of "Dark" and, once the
+          // demo PIN form arrived, half of the Unlock button. left/right: 0
+          // now sizes it to the sidebar exactly.
             // The desktop sidebar popover stays a solid card: it opens against
             // the sidebar's own flat panel, where glass has nothing interesting
             // to refract and just looks murky.
@@ -193,8 +239,9 @@ export default function SettingsMenu({ align = "up", compact = false }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 }}>
             {(state?.modes || []).map((m) => {
               const Icon = MODE_ICON[m.id] || Cpu;
-              const active = state.mode === m.id;
-              const awaiting = pending === m.id;
+              const active = current === m.id;
+              const awaiting = m.cost === "metered" && (pending === "confirm" || pending === "pin");
+              const locked = m.id === "cloud" && m.requiresPin && !pass;
               return (
                 <button key={m.id} onClick={() => choose(m)} disabled={!m.available}
                   title={m.detail} aria-pressed={active}
@@ -208,9 +255,15 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                     fontSize: "var(--text-sm)", fontWeight: active || awaiting ? 600 : 400,
                   }}>
                   <Icon size={14} style={{ flexShrink: 0 }} />
-                  <span style={{ flex: 1 }}>{awaiting ? "Spend credit?" : m.label}</span>
+                  <span style={{ flex: 1 }}>
+                    {pending === "confirm" && awaiting ? "Spend credit?" : pending === "pin" && awaiting ? "Enter PIN" : m.label}
+                  </span>
+                  {/* A key, not a dollar sign, while locked: the first thing
+                      to know about this option is that it needs a PIN. */}
                   {m.cost === "metered" && m.available && !awaiting && !active && (
-                    <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--yellow)" }}>$</span>
+                    locked
+                      ? <KeyRound size={12} style={{ color: "var(--text-muted)" }} aria-label="Needs the demo PIN" />
+                      : <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--yellow)" }}>$</span>
                   )}
                   {awaiting && <AlertTriangle size={12} />}
                   {active && <Check size={13} />}
@@ -219,17 +272,72 @@ export default function SettingsMenu({ align = "up", compact = false }) {
             })}
           </div>
 
-          {pending && (
+          {pending === "confirm" && (
             <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.45, margin: "-8px 0 12px" }}>
               Click again to confirm. This tier bills the team's shared AWS credit on every new explanation.
             </p>
           )}
+
+          {/* The PIN goes to the server and nowhere else: it is not stored,
+              and only the two hour pass it returns is kept, in this tab. */}
+          {pending === "pin" && (
+            <form onSubmit={unlock} style={{ margin: "-8px 0 12px" }}>
+              <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.45, margin: "0 0 8px" }}>
+                Paid explanations use the team's shared AWS credit, so they need the demo PIN. It unlocks this tab for 2 hours.
+              </p>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  type="password" inputMode="numeric" autoComplete="off" autoFocus
+                  aria-label="Demo PIN" placeholder="PIN"
+                  value={pin} onChange={(e) => setPin(e.target.value)}
+                  style={{
+                    flex: 1, minWidth: 0, padding: "7px 10px", borderRadius: "var(--radius)",
+                    border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-primary)",
+                    // --text-base, not smaller: iOS zooms the whole page into
+                    // any input below 16px, which would throw the panel off.
+                    fontSize: "var(--text-base)", letterSpacing: "0.15em",
+                  }}
+                />
+                <button type="submit" disabled={!pin.trim() || unlocking}
+                  style={{
+                    padding: "7px 12px", borderRadius: "var(--radius)", border: "none",
+                    background: "var(--blue)", color: "#fff", fontSize: "var(--text-sm)", fontWeight: 600,
+                    cursor: !pin.trim() || unlocking ? "default" : "pointer", opacity: !pin.trim() || unlocking ? 0.55 : 1,
+                  }}>
+                  {unlocking ? "Checking…" : "Unlock"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {current === "cloud" && pass && !pending && (() => {
+            const cloud = state?.modes?.find((x) => x.id === "cloud");
+            const until = new Date(pass.expiresAt).toLocaleTimeString("en-SG", { hour: "numeric", minute: "2-digit" });
+            return (
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, margin: "-8px 0 12px", fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.45 }}>
+                <span>
+                  Unlocked until {until}
+                  {cloud?.usage?.dailyLimit ? ` · ${cloud.usage.usedToday} of ${cloud.usage.dailyLimit} paid calls today` : ""}
+                </span>
+                {cloud?.requiresPin && (
+                  <button type="button" onClick={clearPass}
+                    style={{ background: "none", border: "none", padding: 0, color: "var(--blue)", fontSize: "var(--text-xs)", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                    Lock now
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           {error && (
             <p style={{ fontSize: "var(--text-xs)", color: "var(--red)", lineHeight: 1.45, margin: "-8px 0 12px" }}>{error}</p>
           )}
 
           <Section title="Theme" />
-          <div style={{ display: "flex", gap: 6 }}>
+          {/* gap 4 and minWidth 0 on each button: in the 230px sidebar the three
+              buttons' text widths add up to more than the row, and a flex
+              item will not shrink below its content without minWidth 0, so
+              "Dark" used to push past the panel's border. */}
+          <div style={{ display: "flex", gap: 4 }}>
             {THEMES.map((t) => {
               const ThemeIcon = THEME_ICON[t.id] || Sun;
               const on = theme === t.id;
@@ -237,8 +345,8 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                 <button key={t.id} onClick={() => setTheme(t.id)} aria-pressed={on}
                   title={t.id === "auto" ? "Follow this device's appearance setting" : undefined}
                   style={{
-                    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    padding: "8px 4px", borderRadius: "var(--radius)", cursor: "pointer",
+                    flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                    padding: "8px 2px", borderRadius: "var(--radius)", cursor: "pointer",
                     border: `1px solid ${on ? "var(--blue)" : "var(--border)"}`,
                     background: on ? "var(--blue-light)" : "transparent",
                     color: on ? "var(--blue)" : "var(--text-secondary)",

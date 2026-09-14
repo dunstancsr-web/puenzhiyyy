@@ -50,6 +50,15 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const isProduction = process.env.NODE_ENV === "production";
 
+// A hosted instance sits behind the platform's load balancer (Lightsail's
+// container service, Render's router), so every request arrives FROM the
+// balancer. Without this, req.ip is the balancer's address for every visitor,
+// and the demo PIN's per-client lockout (llm/demoAccess.js) would lock out
+// everyone the moment one person guessed wrong five times. `1` trusts exactly
+// one hop, so a visitor cannot forge their address with their own
+// X-Forwarded-For header.
+if (isProduction) app.set("trust proxy", 1);
+
 // Middleware
 // In production the frontend is served from this same origin, so no cross
 // origin request happens at all. CORS_ORIGIN stays configurable for the case of

@@ -14,7 +14,7 @@
 // degrades to what it was, never to an error.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { chat, providerInfo, LlmUnavailable } = require("./provider");
+const { chat, providerInfo, resolveTier, LlmUnavailable } = require("./provider");
 const { buildSlots, describeSlots, validateSlotted, renderSlots } = require("./slots");
 const { EVENTS, logEvent } = require("../db/audit");
 
@@ -321,9 +321,15 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 // similar too.
 const bucket = (n, size) => (Number.isFinite(Number(n)) ? Math.round(Number(n) / size) : "na");
 
-function cacheKey(sku, alert) {
+function cacheKey(sku, alert, tier = "local") {
   if (!sku || !alert?.alert_type) return null;
   return [
+    // The tier FIRST (TASK-90). Without it, a visitor who unlocked the paid
+    // tier was handed whatever llama3 had written for the same situation up to
+    // six hours earlier, labelled with llama3's byline but presented as the
+    // answer to a paid request. Observed on the first live gateway test, and
+    // only avoided there because the backend had just restarted.
+    tier,
     sku.sku_id,
     alert.alert_type,
     alert.severity,
@@ -361,8 +367,11 @@ function fromCache(key) {
  *
  * @returns {{ text, model, provider, cached, usage }}
  */
-async function explainAlert(sku, alert) {
-  const key = cacheKey(sku, alert);
+async function explainAlert(sku, alert, { tier } = {}) {
+  // Resolved here once, so the cache key and the model call can never disagree
+  // about which tier this request is for.
+  tier = resolveTier(tier);
+  const key = cacheKey(sku, alert, tier);
   const cached = fromCache(key);
   if (cached) return { ...cached, cached: true };
 
@@ -407,7 +416,7 @@ async function explainAlert(sku, alert) {
     const system = mode === "slots" ? SLOT_SYSTEM : SYSTEM;
     const user = (mode === "slots" ? slotUser : freeUser) + correction;
 
-    result = await chat({ system, user });
+    result = await chat({ system, user, tier });
 
     if (mode === "slots") {
       // Structural check on the RAW output, before substitution. This is the

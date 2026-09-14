@@ -20,6 +20,15 @@ npm-debug.log*
 .idea
 .env
 .env.*
+# The two lines above only match at the ROOT of the build context, which is
+# not where the real one lives. Unlike .gitignore, a bare .dockerignore pattern
+# does not match inside subdirectories, so backend/.env (holding the gateway
+# key) was being sent to every build. The Dockerfile never copies it, so no
+# image contained it, but one future `COPY backend/ ./backend/` would have
+# baked the key into a layer. On a host the key belongs in the platform's
+# environment settings, never in the image.
+**/.env
+**/.env.*
 
 # Documentation and specs: not needed at runtime.
 .kiro

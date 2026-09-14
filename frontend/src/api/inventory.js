@@ -15,9 +15,14 @@ const UNREACHABLE =
 async function request(path, options = {}) {
   let res;
   try {
+    // `...options` FIRST, then headers. The other order let options.headers
+    // replace the merged object wholesale, so the first caller to pass any
+    // header (the demo unlock pass, TASK-90) silently lost Content-Type and
+    // the server received an unparsed body. Nothing passed a header before
+    // that, which is why it had never shown.
     res = await fetch(`${BASE}${path}`, {
-      headers: { "Content-Type": "application/json", ...options.headers },
       ...options,
+      headers: { "Content-Type": "application/json", ...options.headers },
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
   } catch {
@@ -106,12 +111,23 @@ export const api = {
   // problem: the backend answers { available: false, reason } when no model is
   // configured or reachable, because the caller already has a deterministic
   // explanation to show instead.
-  explainAlert: (skuId, alertType) =>
-    request("/alerts/explain", { method: "POST", body: { sku_id: skuId, alert_type: alertType } }),
+  //
+  // `tier` and `pass` come from lib/llmTier.js: the tier is this visitor's own
+  // choice, and the pass is what the demo PIN unlocked (TASK-90).
+  explainAlert: (skuId, alertType, { tier, pass } = {}) =>
+    request("/alerts/explain", {
+      method: "POST",
+      headers: pass ? { "X-Demo-Unlock": pass } : undefined,
+      body: { sku_id: skuId, alert_type: alertType, tier },
+    }),
 
-  // Model tier (TASK-42). Which engine answers "Why?", and what it costs.
+  // Model tier (TASK-42). What this server can offer. There is no setter since
+  // TASK-90: the choice is stored per browser, not on the server.
   getLlmMode: () => request("/llm/mode"),
-  setLlmMode: (mode) => request("/llm/mode", { method: "POST", body: { mode } }),
+  // Exchanges the demo PIN for a two hour pass. Rejects with the server's own
+  // message ("2 tries left", "try again in 15 min"), which is written to be
+  // shown as is.
+  unlockLlm: (pin) => request("/llm/unlock", { method: "POST", body: { pin } }),
 
   // Warehouse floor (TASK-46/47)
   getOperators: () => request("/warehouse/operators"),

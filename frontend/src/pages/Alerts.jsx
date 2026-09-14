@@ -10,6 +10,7 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { api } from "../api/inventory";
 import { buildExplanation } from "../lib/explain";
+import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier";
 
 // Escape-to-close + body-scroll-lock while a modal is open. Inventory.jsx's
 // Modal component already does this; AiModal/ApprovalModal below didn't -
@@ -130,6 +131,12 @@ export default function Alerts() {
 
   useEffect(() => { loadAlerts(); }, [loadAlerts]);
 
+  // Which tiers this server can offer, so a choice it cannot honour (an
+  // expired pass, a local model that does not exist on a host) falls back
+  // before the request rather than being refused after it.
+  const [llmServer, setLlmServer] = useState(null);
+  useEffect(() => { api.getLlmMode().then(setLlmServer).catch(() => setLlmServer(null)); }, []);
+
   if (loadError) return <ErrorState message={loadError} onRetry={loadAlerts} />;
   if (!alerts) return <LoadingState label="Loading alerts…" />;
 
@@ -168,9 +175,22 @@ export default function Alerts() {
     const sku = skus.find((s) => s.sku_id === alert.sku_id);
     setAiModal({ alert, ...buildExplanation(alert, sku), narrative: { loading: true } });
 
-    api.explainAlert(alert.sku_id, alert.alert_type)
-      .then((d) => setAiModal((prev) =>
-        prev && prev.alert.id === alert.id ? { ...prev, narrative: { loading: false, ...d } } : prev))
+    // This visitor's own tier and pass (TASK-90). Read at click time rather
+    // than held in state, so a PIN entered in Settings a second ago counts.
+    // Until the server's tier list has loaded, the raw choice is sent and the
+    // server applies its own fallback.
+    const pass = getPass();
+    const tier = llmServer ? effectiveTier(llmServer, getTierChoice(), pass) : getTierChoice() || undefined;
+
+    api.explainAlert(alert.sku_id, alert.alert_type, { tier, pass: pass?.pass })
+      .then((d) => {
+        // The server refused the pass (expired, or the server restarted and
+        // no longer recognises it). Drop it, so Settings shows the tier as
+        // locked again instead of claiming an unlock that no longer works.
+        if (d?.locked) clearPass();
+        setAiModal((prev) =>
+          prev && prev.alert.id === alert.id ? { ...prev, narrative: { loading: false, ...d } } : prev);
+      })
       .catch((err) => setAiModal((prev) =>
         prev && prev.alert.id === alert.id
           ? { ...prev, narrative: { loading: false, available: false, reason: err.message } }
@@ -510,6 +530,15 @@ function AiModal({ aiModal, onClose }) {
         {narrative?.loading && (
           <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 16 }}>
             Asking the model for a plain English summary...
+          </div>
+        )}
+        {/* The one absence that IS announced. The rule above holds for a
+            model that is simply not there, but a visitor who chose the paid
+            tier asked for a summary, and silence would read as a broken
+            button. Says what to do, not what went wrong. */}
+        {narrative && !narrative.loading && narrative.locked && (
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 16 }}>
+            Paid summaries are locked. Enter the demo PIN in Settings to unlock them; the steps below need no PIN.
           </div>
         )}
         {narrative && !narrative.loading && narrative.available && (

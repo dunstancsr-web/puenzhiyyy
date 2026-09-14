@@ -31,6 +31,12 @@ const EVENTS = Object.freeze({
   // Switching into or out of the metered model tier is a spending decision, so
   // it is recorded like any other decision rather than living only in memory.
   LLM_MODE_CHANGED: "LLM_MODE_CHANGED",
+  // Since TASK-90 the tier is per visitor, so nothing emits LLM_MODE_CHANGED
+  // any more; it stays so older rows still read. The spending decision is now
+  // a visitor unlocking the paid tier with the demo PIN, and the security
+  // event worth a person's attention is a client getting locked out.
+  LLM_UNLOCKED: "LLM_UNLOCKED",
+  LLM_UNLOCK_LOCKED_OUT: "LLM_UNLOCK_LOCKED_OUT",
   // Physical movements from the warehouse floor. These are the most
   // consequential writes in the system, since they change what is actually in
   // the building, so they carry the operator and any variance reason.

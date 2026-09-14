@@ -1,12 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // LLM PROVIDER (TASK-11)
 //
-// One `chat()` call, three backends behind it, selected by LLM_PROVIDER.
+// One `chat()` call, three backends behind it, selected by the tier the caller
+// asks for and, for the cloud tier, by which credentials are configured.
 //
 //   ollama     local, free, offline. The development default.
 //   gateway    the hackathon organizers' AWS Bedrock gateway, Ollama compatible
 //              with an X-API-Key header. Fronts Claude Sonnet 4.5.
 //   anthropic  the Anthropic API directly, against the team's own credit.
+//
+// There used to be an LLM_PROVIDER setting. It was read and never used, since
+// the cloud backend has always been chosen by which credentials exist, so it
+// was removed (TASK-90) rather than left to mislead whoever set it.
 //
 // The split exists for a budget reason rather than an architectural one. The
 // team shares a single $100 credit pool with no per developer limit, so a loop
@@ -30,21 +35,34 @@
 //   cloud  AWS Bedrock through the organizers' gateway, or the Anthropic API.
 //          METERED. Spends the team's shared credit on every uncached call.
 //
-// `cloud` is deliberately hard to reach by accident. It is never the startup
-// default, it cannot be entered unless credentials are actually configured, and
-// switching into it takes a separate explicit request. A tier that spends money
-// should not be reachable by a config typo.
+// `cloud` is deliberately hard to reach by accident. It is never the default,
+// it cannot be used unless credentials are actually configured, and wherever a
+// demo PIN is required (always, in production) each visitor must unlock it for
+// themselves. A tier that spends money should not be reachable by a config typo.
+//
+// THE TIER IS PER REQUEST, NOT GLOBAL (TASK-90). It used to be one module-level
+// variable, so one visitor choosing a tier chose it for every visitor. Each
+// request now says which tier it wants, and the server only supplies a default
+// for requests that do not say.
 const MODES = ["rules", "local", "cloud"];
 
-// The startup tier. Defaults to local, and LLM_DEFAULT_MODE deliberately cannot
-// select cloud: paid spending starts from a human action in the running app,
-// never from a file someone copied.
-const DEFAULT_MODE = (() => {
-  const m = (process.env.LLM_DEFAULT_MODE || "local").toLowerCase();
-  return m === "rules" || m === "local" ? m : "local";
-})();
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
-let activeMode = DEFAULT_MODE;
+// A hosted instance has no ollama daemon beside it, so offering "Local model"
+// there would offer something that fails on every click. Available in
+// development, or in production only if someone has deliberately pointed
+// OLLAMA_URL at a reachable daemon.
+const LOCAL_AVAILABLE = !IS_PRODUCTION || !!process.env.OLLAMA_URL;
+
+// The default tier. LLM_DEFAULT_MODE deliberately cannot select cloud: paid
+// spending starts from a human action in the running app, never from a file
+// someone copied. Without a setting, development defaults to local and
+// production to rules, since rules is the only free tier a server always has.
+const DEFAULT_MODE = (() => {
+  const m = (process.env.LLM_DEFAULT_MODE || (IS_PRODUCTION ? "rules" : "local")).toLowerCase();
+  if (m === "local" && LOCAL_AVAILABLE) return "local";
+  return "rules";
+})();
 
 // Which concrete backend `cloud` resolves to. The organizers' gateway is
 // preferred over the direct Anthropic API when both are configured, because it
@@ -55,12 +73,21 @@ function cloudProvider() {
   return null;
 }
 
-const PROVIDER = (process.env.LLM_PROVIDER || "ollama").toLowerCase();
 const MAX_TOKENS = Number(process.env.LLM_MAX_OUTPUT_TOKENS) || 280;
 
-// Rolling call counter for the paid path only. In memory on purpose: it resets
-// when the process restarts, which is the right behaviour for a dev guard. A
-// durable quota belongs on the billing side, not in this file.
+// Rolling call counter for the paid path only, applied to EVERY cloud backend.
+// It used to be checked inside callAnthropic alone, which left the gateway,
+// the backend actually used, with no ceiling at all.
+//
+// A call is counted when it is ATTEMPTED, not when it succeeds. Counting
+// successes would let a gateway that errors after billing, or a retry loop,
+// run past the cap. Over-counting a failed call is the safe direction for a
+// cost guard.
+//
+// In memory on purpose: it resets when the process restarts. A durable quota
+// belongs on the billing side, not in this file. At about USD 0.006 per call
+// and at most three model calls per explanation, 200 calls is roughly USD 1.20
+// a day in the worst case.
 const DAILY_LIMIT = Number(process.env.LLM_DAILY_CALL_LIMIT ?? 200);
 let paidCalls = [];
 
@@ -124,7 +151,7 @@ async function callOllamaCompatible({ baseUrl, model, apiKey, retries, system, u
       // Telling someone their prompt failed when the daemon is simply not up
       // sends them debugging the wrong thing.
       throw new LlmUnavailable(
-        `Cannot reach the model at ${url}. ${apiKey ? "Check LLM_GATEWAY_URL and that the gateway is up." : 'Start it with "ollama serve", or set LLM_PROVIDER=none.'} (${err.message})`
+        `Cannot reach the model at ${url}. ${apiKey ? "Check LLM_GATEWAY_URL and that the gateway is up." : 'Start it with "ollama serve", or choose Rule-based in Settings.'} (${err.message})`
       );
     }
 
@@ -173,7 +200,7 @@ function callGateway(args) {
   const apiKey = process.env.LLM_GATEWAY_API_KEY;
   if (!baseUrl || !apiKey) {
     throw new LlmUnavailable(
-      "LLM_GATEWAY_URL and LLM_GATEWAY_API_KEY must both be set. See backend/.env.example."
+      "LLM_GATEWAY_URL and LLM_GATEWAY_API_KEY must both be set, in backend/.env locally or in the host's environment settings."
     );
   }
   return callOllamaCompatible({
@@ -189,12 +216,7 @@ async function callAnthropic({ system, user, signal }) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     throw new LlmUnavailable(
-      "ANTHROPIC_API_KEY is not set. Copy backend/.env.example to backend/.env and fill it in."
-    );
-  }
-  if (!underDailyLimit()) {
-    throw new LlmUnavailable(
-      `Daily cap of ${DAILY_LIMIT} paid calls reached. Switch LLM_PROVIDER to ollama, or raise LLM_DAILY_CALL_LIMIT if this is deliberate.`
+      "ANTHROPIC_API_KEY is not set, in backend/.env locally or in the host's environment settings."
     );
   }
 
@@ -231,7 +253,6 @@ async function callAnthropic({ system, user, signal }) {
     throw new LlmUnavailable(`Anthropic API returned ${res.status}${detail ? `: ${detail}` : ""}`);
   }
 
-  paidCalls.push(Date.now());
   const body = await res.json();
   const text = body?.content?.map((c) => c.text).filter(Boolean).join("").trim();
   if (!text) throw new LlmUnavailable("Anthropic API returned no text content");
@@ -252,36 +273,67 @@ async function callAnthropic({ system, user, signal }) {
  * Throws LlmUnavailable for every "no model answered" case, so callers have a
  * single error type to fall back on.
  *
+ * Does NOT check whether the caller may use the cloud tier. That is a question
+ * about the visitor, answered at the route by llm/demoAccess.js, and this file
+ * has no request to ask it about.
+ *
  * @param {object} opts
  * @param {string} opts.system
  * @param {string} opts.user
+ * @param {"rules"|"local"|"cloud"} [opts.tier] defaults to the server default
  * @param {number} [opts.timeoutMs] default 60s, because a cold local model on a
  *   laptop can genuinely take 20s or more (measured: llama3 at about 20s).
  */
-async function chat({ system, user, timeoutMs = 60_000 }) {
-  if (activeMode === "rules") {
+async function chat({ system, user, tier = DEFAULT_MODE, timeoutMs = 60_000 }) {
+  const t = resolveTier(tier);
+  if (t === "rules") {
     throw new LlmUnavailable("Rule-based mode is active, so no model is called.");
+  }
+
+  // Checked and counted BEFORE the call, for the reason given at DAILY_LIMIT.
+  let cp = null;
+  if (t === "cloud") {
+    cp = cloudProvider();
+    if (!cp) throw new LlmUnavailable("No cloud credentials are configured on this server.");
+    if (!underDailyLimit()) {
+      throw new LlmUnavailable(
+        `Daily cap of ${DAILY_LIMIT} paid calls reached, so no more credit is spent today. Rule-based explanations still work.`
+      );
+    }
+    paidCalls.push(Date.now());
   }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const args = { system, user, signal: controller.signal };
-    if (activeMode === "local") return await callOllama(args);
-
-    const cp = cloudProvider();
-    if (cp === "gateway") return await callGateway(args);
-    if (cp === "anthropic") return await callAnthropic(args);
-    throw new LlmUnavailable("No cloud credentials are configured. See backend/.env.example.");
+    if (t === "local") return await callOllama(args);
+    return cp === "gateway" ? await callGateway(args) : await callAnthropic(args);
   } finally {
     clearTimeout(timer);
   }
 }
 
+/**
+ * Normalise a requested tier. Unknown values and tiers this server cannot
+ * serve fall back to the default rather than throwing, because every caller of
+ * the explanation layer already has a complete rule-based answer to show.
+ */
+function resolveTier(tier) {
+  const t = String(tier || "").toLowerCase();
+  if (!MODES.includes(t)) return DEFAULT_MODE;
+  if (t === "local" && !LOCAL_AVAILABLE) return DEFAULT_MODE;
+  return t;
+}
+
 // What the UI is allowed to know. Deliberately never includes a key, and never
 // whether a key LOOKS valid, only whether one is present at all.
-function listModes() {
+//
+// `gate` comes from llm/demoAccess.js via the route, so this file stays free of
+// any notion of who is asking.
+function listModes(gate = { ok: true, reason: null, pinRequired: false }) {
   const cp = cloudProvider();
+  const cloudOk = !!cp && gate.ok;
   return [
     {
       id: "rules",
@@ -293,57 +345,58 @@ function listModes() {
     {
       id: "local",
       label: "Local model",
-      detail: `${process.env.OLLAMA_MODEL || "llama3"} running on this machine. Free and unlimited, slower to answer.`,
+      detail: LOCAL_AVAILABLE
+        ? `${process.env.OLLAMA_MODEL || "llama3"} running on this machine. Free and unlimited, slower to answer.`
+        : "Not available on this server: there is no local model beside it.",
       cost: "free",
-      available: true,
+      available: LOCAL_AVAILABLE,
     },
     {
       id: "cloud",
       label: "AWS Bedrock",
-      detail: cp === "gateway"
-        ? `${process.env.LLM_GATEWAY_MODEL || "Claude Sonnet 4.5"} through the hackathon gateway. Spends shared AWS credit.`
-        : cp === "anthropic"
-          ? `${process.env.ANTHROPIC_MODEL || "Claude Haiku"} through the Anthropic API. Spends shared credit.`
-          : "Not configured. Add gateway or Anthropic credentials to backend/.env.",
+      detail: !cp
+        ? "Not configured on this server."
+        : !gate.ok
+          ? gate.reason
+          : cp === "gateway"
+            ? `${process.env.LLM_GATEWAY_MODEL || "Claude Sonnet 4.5"} through the hackathon gateway. Spends shared AWS credit.`
+            : `${process.env.ANTHROPIC_MODEL || "Claude Haiku"} through the Anthropic API. Spends shared credit.`,
       cost: "metered",
-      available: !!cp,
+      available: cloudOk,
       provider: cp,
+      requiresPin: cloudOk && !!gate.pinRequired,
+      // Shown so a demo can see the guard exists and how close it is, without
+      // exposing anything about the credential.
+      usage: cloudOk ? { usedToday: paidCallsToday(), dailyLimit: DAILY_LIMIT || null } : null,
     },
   ];
 }
 
-function getMode() {
-  return activeMode;
+function paidCallsToday() {
+  underDailyLimit(); // prunes the window as a side effect
+  return paidCalls.length;
 }
 
-/**
- * Switch tier. Returns the new mode.
- * Throws on an unknown tier, or on cloud without configured credentials, so a
- * UI can never put the app into a paid state that does not actually work.
- */
-function setMode(mode) {
-  const m = String(mode || "").toLowerCase();
-  if (!MODES.includes(m)) throw new Error(`Unknown mode "${mode}". Use rules, local or cloud.`);
-  if (m === "cloud" && !cloudProvider()) {
-    throw new Error("Cloud mode needs credentials in backend/.env. Nothing was changed.");
-  }
-  activeMode = m;
-  return activeMode;
+/** The tier used for any request that does not name one. Never "cloud". */
+function getDefaultMode() {
+  return DEFAULT_MODE;
 }
 
-// Kept for the audit trail and the modal byline.
-function providerInfo() {
+// Kept for the audit trail and the modal byline. Describes the tier a request
+// actually resolved to, which since TASK-90 is a per request fact.
+function providerInfo(tier = DEFAULT_MODE) {
+  const t = resolveTier(tier);
   const cp = cloudProvider();
   return {
-    mode: activeMode,
-    provider: activeMode === "local" ? "ollama" : activeMode === "cloud" ? cp : "rules",
+    mode: t,
+    provider: t === "local" ? "ollama" : t === "cloud" ? cp : "rules",
     model:
-      activeMode === "local" ? (process.env.OLLAMA_MODEL || "llama3")
-      : activeMode === "cloud" && cp === "gateway" ? (process.env.LLM_GATEWAY_MODEL || "claude-sonnet-4-5")
-      : activeMode === "cloud" && cp === "anthropic" ? (process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001")
+      t === "local" ? (process.env.OLLAMA_MODEL || "llama3")
+      : t === "cloud" && cp === "gateway" ? (process.env.LLM_GATEWAY_MODEL || "claude-sonnet-4-5")
+      : t === "cloud" && cp === "anthropic" ? (process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001")
       : null,
-    configured: activeMode !== "cloud" || !!cp,
+    configured: t !== "cloud" || !!cp,
   };
 }
 
-module.exports = { chat, providerInfo, listModes, getMode, setMode, LlmUnavailable };
+module.exports = { chat, providerInfo, listModes, getDefaultMode, resolveTier, LlmUnavailable };
