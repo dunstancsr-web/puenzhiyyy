@@ -10,7 +10,7 @@
 | --- | ---: |
 | AWS-sponsored credit, shared by hosting and model calls | 100.00 |
 | Hosting estimate, Lightsail Nano for a 15 day lease | about 3.50 |
-| **Model calls to date (below)** | **0.0164** |
+| **Model calls to date (below)** | **0.0212** |
 | Left, approximately | about 96.48 |
 
 ## What one call costs
@@ -35,6 +35,7 @@ organizers' figure for the team key is authoritative.
 | 1 | 14 Sep 21:43 | First gateway key test, VF-10KG overstock | Stan's Mac | 1 | 853 / 183 | 0.0053 | 0.0053 |
 | 2 | 14 Sep 22:03 | Checking the overstock placeholder fix, same alert | Stan's Mac | 1 | 862 / 203 | 0.0056 | 0.0109 |
 | 3 | 14 Sep 23:38 | Checking the REORDER fix, TW-25KG (fixed the wrong threshold; found a new pairing error) | Stan's Mac | 1 | 874 / 192 | 0.0055 | 0.0164 |
+| 4 | 15 Sep 07:24 | Sonnet check after the waterproofing work, REORDER TW-25KG only (accepted first try, figures correct) | Stan's Mac | 1 | 804 / 159 | 0.0048 | 0.0212 |
 
 ## How to update this
 

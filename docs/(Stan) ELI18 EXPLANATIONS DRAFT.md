@@ -1,9 +1,9 @@
 # (Stan) ELI18 explanations: draft for review
 
-> **For Stan to read.** A proposed rewrite of the rule-based explanation behind the **Why?** button, shorter
-> and in plain English. **Nothing in the app has changed.** The draft lives in
-> `frontend/src/lib/explain.eli18-draft.js`, which nothing imports. Every figure below is generated from the
-> real code and today's real data, not typed by hand.
+> **For Stan to read.** A rewrite of the rule-based explanation behind the **Why?** button, shorter and in
+> plain English. **Applied on 15 Sep** after Stan's review: it now lives in `frontend/src/lib/explain.js`
+> and the old wording is in git history. Every figure below was generated from the real code and real
+> data at review time, not typed by hand.
 
 ## What changed and why
 
@@ -51,7 +51,7 @@
 
 | Step | Current (185 words) | Draft (110 words) |
 | --- | --- | --- |
-| 1 | **What was measured**<br>Inventory position is 230 MT: 230 MT available plus 0 MT already on order. The approved reorder point is 250 MT, and the position has reached it. | **What we see**<br>230 MT is available, with nothing already on order. That has reached the approved reorder point of 250 MT. |
+| 1 | **What was measured**<br>Inventory position is 230 MT: 230 MT available plus 0 MT already on order. The approved reorder point is 250 MT, and the position has reached it. | **What we see**<br>230 MT is available, with nothing already on order. That is at or below the approved reorder point of 250 MT. |
 | 2 | **How it was derived**<br>The system's own calculation is lead-time demand plus safety stock: 199 MT consumed over the 45 days wait, plus 43 MT of buffer, which comes to 242 MT. That buffer is sized for a 97% service level against demand variability of 0.19 and lead-time variability of 5 days. That calculation differs from the approved 250 MT. This alert follows the approved value, which a manager sets on the Inventory page; the gap between the two is worth a policy review. | **How we worked it out**<br>The reorder point is the stock needed to cover sales during the 45-day delivery wait, plus a safety buffer. The system's own estimate is 242 MT. Alerts follow the approved 250 MT you set on the Inventory page, so the gap is worth a look. |
 | 3 | **If nothing changes**<br>Position keeps falling at 4.42 MT a day. Once cover drops below the 45 days lead time this becomes a stockout risk rather than a reorder, and at that point expediting is the only remaining lever. | **If we do nothing**<br>Stock keeps falling by 4.42 MT a day. Once it cannot last the 45-day wait, this becomes a stockout alert, and only paying for faster shipping helps. |
 | 4 | **Why this action**<br>449 MT restores the 480 MT target measured at the point the shipment lands. There is still time to order at normal freight rates, which is the entire advantage of acting on a reorder alert rather than waiting for the stockout one. | **What to do, and why**<br>Order 449 MT. There is still time to use normal shipping, which is the whole point of ordering now. |
