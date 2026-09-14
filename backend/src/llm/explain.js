@@ -15,8 +15,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { chat, providerInfo, resolveTier, LlmUnavailable } = require("./provider");
-const { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble } = require("./slots");
+const { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble, triggerSentence } = require("./slots");
 const { EVENTS, logEvent } = require("../db/audit");
+const { semanticIssues } = require("./semantic");
 
 const SYSTEM = `You are an inventory analyst at a rice importer and distributor in Singapore.
 
@@ -271,6 +272,10 @@ const DANGEROUS = [
   "figures not in the source data",  // invented or rounded a number
   "described a money figure as",     // margin called revenue, capital called sales
   "converted a duration",            // 97 days restated as three months
+  // Real figures in a false relationship (src/llm/semantic.js, TASK-96). As
+  // harmful as a wrong number: "inventory position has reached 250 MT" when
+  // it is 230 misstates the one fact the alert is about.
+  "contradicts the alert",
 ];
 
 // Shared so the retry policy and scripts/bench-models.js cannot disagree about
@@ -397,6 +402,12 @@ function fromCache(key) {
 async function runExplanation({ sku, alert, callModel }) {
   const facts = buildFacts(sku, alert);
   const slots = buildSlots(sku, alert);
+  // Written by the system, placed before the model's text (TASK-96). See
+  // triggerSentence in slots.js for why the model no longer writes it.
+  const opening = triggerSentence(sku, alert);
+  const openingNote = opening
+    ? "\n\nThe opening sentence, stating exactly why this alert fired and its figures, is already written and will appear before your text. Do not restate why it fired or repeat those figures. Begin with what this means for the business."
+    : "";
 
   // Two modes, tried in order of how strong a guarantee they give.
   //
@@ -428,8 +439,8 @@ async function runExplanation({ sku, alert, callModel }) {
   // action are offered as placeholders instead of being pasted in, because a
   // prompt that forbids digits while displaying them is a contradiction the
   // model resolves by copying.
-  const slotUser = `Here is the alert.\n\nProduct: ${sku.product_name}\nAlert type: ${alert.alert_type}\nSeverity: ${alert.severity}\n\nPlaceholders available to you:\n${describeSlots(slots)}\n\nWhat this alert means: ${ALERT_BRIEF[alert.alert_type] || "Review this SKU."}\n\nExplain why this was flagged and what the manager should do. End with one sentence that states {recommended_action} on its own.`;
-  const freeUser = `Here are the figures for this alert.\n\n${facts}\n\nExplain why this was flagged and what the manager should do.`;
+  const slotUser = `Here is the alert.\n\nProduct: ${sku.product_name}\nAlert type: ${alert.alert_type}\nSeverity: ${alert.severity}\n\nPlaceholders available to you:\n${describeSlots(slots)}\n\nWhat this alert means: ${ALERT_BRIEF[alert.alert_type] || "Review this SKU."}${openingNote}\n\nExplain ${opening ? "what this means" : "why this was flagged"} and what the manager should do. End with one sentence that states {recommended_action} on its own.`;
+  const freeUser = `Here are the figures for this alert.\n\n${facts}${openingNote}\n\nExplain ${opening ? "what this means" : "why this was flagged"} and what the manager should do.`;
 
   for (attempts = 1; attempts <= MAX_ATTEMPTS + 1; attempts++) {
     // After MAX_ATTEMPTS of placeholder mode, drop to the free text path for a
@@ -455,7 +466,7 @@ async function runExplanation({ sku, alert, callModel }) {
     if (mode === "slots") {
       // Structural check on the RAW output, before substitution. This is the
       // step that makes a wrong figure impossible rather than merely caught.
-      const structural = validateSlotted(result.text, slots);
+      const structural = validateSlotted(result.text, slots, { requireFigures: !opening });
       if (!structural.ok) {
         check = structural;
         continue;
@@ -469,17 +480,41 @@ async function runExplanation({ sku, alert, callModel }) {
       rendered = stripPreamble(result.text.replace(/\{[^{}]*\}/g, "").replace(/\s{2,}/g, " ")).trim();
     }
 
+    // Put the system's opening sentence first. A model that restates the reason
+    // anyway ("This alert was flagged because stock is low.") would repeat it,
+    // so a leading "was flagged / triggered" sentence of its own is dropped:
+    // the opening already says it, with the figures.
+    if (opening) {
+      rendered = rendered.replace(/^\s*(?:this alert|this sku|this product|it|[A-Z][\w ]{0,40}?)\s+(?:was|has been|is)\s+(?:flagged|triggered)\b[^.]*\.\s*/i, "");
+      rendered = `${opening} ${rendered}`.trim();
+    }
+
     // Slots cannot stop the model calling a margin figure "sales" or hedging
     // with "nearly": those are the words around the number, and they stay the
     // model's own. So the verifier still runs, on the rendered text.
-    check = verifyExplanation(rendered, facts);
+    // Checked against the facts AND every value the system itself inserts: the
+    // placeholder values and the opening sentence. Those are engine-computed and
+    // substituted after the model writes, so their figures are true by
+    // construction, but 15 of them ("SGD $26.2K", "1 month and 23 days",
+    // "18 MT") were absent from the facts list, and the verifier rejected
+    // correct answers as "figures not in the source data", each rejection a
+    // paid retry (15 Sep diagnosis, TASK-96).
+    const known = [facts, opening || "", ...Object.values(slots).map((v) => String(v.value))].join("\n");
+    check = verifyExplanation(rendered, known);
+    // The semantic checks run on every answer, in both modes (TASK-96). They
+    // used to exist only in the benchmark, so production showed the very
+    // contradictions the benchmark was counting.
+    const contradictions = semanticIssues(rendered, sku, alert);
+    if (contradictions.length) check = { ok: false, issues: [...check.issues, ...contradictions] };
     if (check.ok) break;
 
     const action = onDriftDetected({ attempt: attempts, issues: check.issues, text: rendered });
     if (action === "accept") break;
     if (attempts === MAX_ATTEMPTS + 1) {
       throw giveUp(new LlmUnavailable(
-        `The model's answer did not match the source figures after ${attempts} attempts (${check.issues.join("; ")}).`
+        // Covers wrong figures AND real figures in a false relationship, so it
+        // names neither specifically.
+        `The model's answer failed the explanation checks after ${attempts} attempts (${check.issues.map((i) => i.split(" :: ")[0]).join("; ")}).`
       ));
     }
   }

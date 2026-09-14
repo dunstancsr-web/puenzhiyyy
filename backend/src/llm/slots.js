@@ -23,40 +23,98 @@
 // digits" stays a simple and total rule.
 const PLACEHOLDER = /\{([a-z_]+)\}/g;
 
-// ── Slots withheld per alert type ────────────────────────────────────────────
+// ── The trigger, as one engine-written clause ────────────────────────────────
 //
 // Slots guarantee every FIGURE is real. They do not guarantee the model puts
-// the right two figures side by side, and that gap produced a wrong sentence on
-// the first live gateway call (2026-09-14):
+// the right figures side by side, and that gap produced three wrong sentences
+// in two days, every figure in each one real:
 //
-//   "{available_stock} exceeds the maximum policy level of {max_stock}
-//    by {overstock_amount}"   ->   "580 MT exceeds ... 400 MT by 220 MT"
+//   "{available_stock} exceeds the maximum policy level of {max_stock} by
+//    {overstock_amount}"                    580 vs 400 "by" 220; 580 is not on-hand
+//   "the approved reorder point ({reorder_point})"   alert fired on another value
+//   "inventory position has reached {reorder_point}"  position 230, not 250
 //
-// Every value was correct and the sentence was verified. But overstock is
-// measured on ON-HAND stock (620 - 400 = 220), available stock is on-hand minus
-// reservations, and 580 - 400 is not 220. A reader doing the subtraction
-// concludes the numbers are made up, which is exactly the doubt this whole
-// module exists to rule out.
+// The first two were fixed by withholding one misleading placeholder each.
+// The third showed that is whack-a-mole: as long as the figures of a
+// comparison are separate placeholders, a model can attach any of them to the
+// wrong phrase. So since TASK-96 the comparison that TRIGGERED each alert is
+// offered as ONE clause the engine writes, {alert_trigger}, and the separate
+// placeholders it is built from are withheld for that alert type. The model
+// decides where the reason goes in its prose; it can no longer decide which
+// number goes with which name. Same move as {recommended_action}.
 //
-// Catching that pairing after the fact would mean parsing sentences. Instead
-// the slot that cannot belong is not offered, so the pairing is unwritable,
-// the same move the no-digits rule makes for invented figures. If the model
-// reaches for it anyway, validateSlotted rejects it as an unknown placeholder
-// and the retry loop in explain.js asks again.
+// Each clause restates the alert card's own comparison with the same values,
+// worded to read naturally after "because". If the model reaches for a
+// withheld placeholder, validateSlotted rejects it as unknown and the retry
+// loop asks again; if it still writes a contradiction in its own words,
+// src/llm/semantic.js catches it in the verifier.
 //
-// An entry belongs here only when an alert's TRIGGER is measured on a figure
-// that a sibling slot looks interchangeable with. Withholding is not free: the
-// model loses a fact, so it is reserved for facts that actively mislead.
-const WITHHELD_BY_ALERT = {
-  OVERSTOCK: ["available_stock"],
-  // REORDER fires on inventory position (available plus inbound). On-hand
-  // includes reservations, so it is the bigger, wrong figure to set beside the
-  // reorder point, and llama3 used it to write "290 MT is reaching its maximum
-  // capacity" on a low-stock alert (TASK-95). The maximum stock level goes for
-  // the same reason: a low-stock alert has no use for a ceiling, and offering
-  // one hands the model the exact word behind that error.
-  REORDER: ["on_hand_stock", "max_stock"],
+// WHO WRITES THE SENTENCE. A first version offered the clause as a
+// placeholder, {alert_trigger}, and required the model to use it. On llama3
+// that requirement failed the placeholder format so often that 28 of 32
+// answers fell back to free text at 2.91 calls each, against 2.03 without it:
+// correct, but half as much again in paid calls. So the system writes the
+// opening sentence itself (triggerSentence below) and the model is asked only
+// for what it means and what to do. The reason and its figures are then
+// guaranteed present, and the model has one fewer thing to get wrong.
+const TRIGGERS = {
+  STOCKOUT_RISK: {
+    clause: (s, a, f) => `its ${s.days_of_cover} days of cover are shorter than the ${s.lead_time_days} day supplier lead time, so it is projected to run out ${s.stockout_gap_days} days before a new order could arrive`,
+    // Plus figures a stockout explanation has no use for. The benchmark caught
+    // "our current 240 MT and 80 MT combined" (on-hand plus reserved) here.
+    // min_order: the recommended action already carries "(min 20 MT)", and on
+    // its own llama3 turned it into "order at least that amount" against a
+    // suggested 597 MT.
+    withhold: ["days_of_cover", "lead_time", "stockout_gap", "on_hand_stock", "reserved_stock", "max_stock", "reorder_point", "min_order"],
+  },
+  REORDER: {
+    clause: (s, a, f) => `its inventory position of ${f.mt(s.inventory_position)} (stock available now plus stock already on order) is at or below the approved reorder point of ${f.mt(s.reorder_point_policy)}`,
+    // Position is available plus inbound, so available alone beside the reorder
+    // point is wrong whenever anything is inbound. On-hand includes
+    // reservations. A low-stock alert has no use for a maximum.
+    // min_order and safety_stock produced "a crucial consideration" and "an
+    // order that covers the buffer, which is 10 days": noise around the one
+    // quantity that matters, which the recommended action already states.
+    withhold: ["inventory_position", "reorder_point", "available_stock", "on_hand_stock", "max_stock", "reserved_stock", "min_order", "safety_stock"],
+  },
+  OVERSTOCK: {
+    clause: (s, a, f) => `its on-hand stock of ${f.mt(s.on_hand_qty)} is ${f.mt(s.overstock_qty)} above the maximum stock level of ${f.mt(s.max_stock)}`,
+    withhold: ["on_hand_stock", "max_stock", "overstock_amount", "available_stock", "reserved_stock", "reorder_point", "suggested_order", "min_order"],
+  },
+  IDLE: {
+    clause: (s, a, f) => `it has had no sales for ${s.days_since_last_sale_text || "over 90 days"} while ${f.mt(s.available_qty)} is still in stock`,
+    // The IDLE brief already says never to mention reorder points or ordering.
+    // supplier: idle stock is a disposal decision, and a supplier name invites
+    // a story about the supplier.
+    withhold: ["time_since_sale", "available_stock", "reorder_point", "suggested_order", "min_order", "max_stock", "lead_time", "safety_stock", "supplier"],
+  },
+  SLOW_MOVING: {
+    clause: (s, a, f) => `at its current sales pace, the stock it holds would take ${s.days_of_cover_text} to sell`,
+    withhold: ["days_of_cover", "reorder_point", "suggested_order", "min_order"],
+  },
+  AGEING: {
+    clause: (s, a, f) => `it has been held for ${s.inventory_age_text}, against a holding limit of ${f.duration(s.max_holding_days)}`,
+    // lead_time too: "consider Supplier JKL Japan's lead time" has nothing to
+    // do with stock that needs moving out.
+    // supplier: produced "The supplier has been informed of the situation", an
+    // action nobody took (15 Sep benchmark).
+    withhold: ["stock_age", "holding_limit", "reorder_point", "suggested_order", "min_order", "max_stock", "lead_time", "safety_stock", "supplier"],
+  },
 };
+
+/**
+ * The opening sentence of every explanation: why this alert fired, with its
+ * figures, written by the system. Null for an alert type without a trigger
+ * clause, in which case the model states the reason itself as before.
+ */
+function triggerSentence(sku, alert) {
+  const trigger = TRIGGERS[alert?.alert_type];
+  if (!trigger) return null;
+  const mt = (n) => (Number.isFinite(Number(n)) ? `${Math.round(Number(n)).toLocaleString("en-SG")} MT` : null);
+  const days = (n) => (Number.isFinite(Number(n)) ? `${Math.round(Number(n))} days` : null);
+  const duration = (n) => (n ? require("../engines/duration").humanDuration(n) : null);
+  return `${sku.product_name} was flagged because ${trigger.clause(sku, alert, { mt, days, duration })}.`;
+}
 
 // Reuse the engine's own formatted strings wherever they exist rather than
 // re-deriving presentation here. days_of_cover_text and friends are attached in
@@ -73,6 +131,8 @@ function buildSlots(sku, alert) {
   };
   const mt = (n) => (Number.isFinite(Number(n)) ? `${Math.round(Number(n)).toLocaleString("en-SG")} MT` : null);
   const days = (n) => (Number.isFinite(Number(n)) ? `${Math.round(Number(n))} days` : null);
+  const duration = (n) => (n ? require("../engines/duration").humanDuration(n) : null);
+  const trigger = TRIGGERS[alert?.alert_type];
 
   // value is what gets substituted; describes is what the prompt tells the model
   // the placeholder means. Naming the meaning is what stops "in sales" appearing
@@ -94,9 +154,7 @@ function buildSlots(sku, alert) {
     // capacity". The overstock relationship lives in overstock_amount instead,
     // which only an overstocked SKU is ever offered.
     on_hand_stock:      { value: mt(sku.on_hand_qty), describes: "total physical stock in the warehouse, including stock already promised to orders" },
-    // Only for REORDER, the alert that fires on it, so no other alert's
-    // placeholder list grows by one.
-    inventory_position: { value: alert?.alert_type === "REORDER" ? mt(sku.inventory_position) : null, describes: "stock available now plus stock already on order and inbound, the figure the reorder rule compares against the reorder point" },
+
     reserved_stock:     { value: sku.reserved_qty > 0 ? mt(sku.reserved_qty) : null, describes: "stock already promised to confirmed orders" },
     inbound_stock:      { value: sku.expected_incoming_qty > 0 ? mt(sku.expected_incoming_qty) : null, describes: "stock already ordered and on its way" },
     demand_rate:        { value: sku.blended_daily_usage > 0 ? `${sku.blended_daily_usage} MT per day` : null, describes: "how fast this sells" },
@@ -104,7 +162,12 @@ function buildSlots(sku, alert) {
     lead_time:          { value: days(sku.lead_time_days), describes: "how long the supplier takes to deliver a new order" },
     safety_stock:       { value: sku.safety_stock_days > 0 ? days(sku.safety_stock_days) : null, describes: "the buffer held on top of lead time demand" },
     max_stock:          { value: mt(sku.max_stock), describes: "the maximum stock level policy allows" },
-    overstock_amount:   { value: sku.overstock_qty > 0 ? mt(sku.overstock_qty) : null, describes: "how far on-hand stock sits above the maximum, i.e. on-hand stock minus the maximum" },
+    // Offered to NO alert type (TASK-96). OVERSTOCK's system-written opening
+    // sentence already states it, and on IDLE and AGEING alerts, where an
+    // idle SKU can also sit above its maximum, llama3 used it as "write down
+    // the 18 MT" when 78 MT was idle. Kept here only so an alert type without
+    // a trigger clause still has it.
+    overstock_amount:   { value: sku.overstock_qty > 0 && !TRIGGERS[alert?.alert_type] ? mt(sku.overstock_qty) : null, describes: "how far on-hand stock sits above the maximum, i.e. on-hand stock minus the maximum" },
     // The approved value, which is what the REORDER alert fires on since TASK-95.
     reorder_point:      { value: mt(sku.reorder_point_policy), describes: "the approved reorder point: a normal order is due when inventory position falls to or below it" },
     suggested_order:    { value: sku.suggested_order_qty > 0 ? mt(sku.suggested_order_qty) : null, describes: "how much to order, measured at the moment the shipment lands" },
@@ -124,7 +187,7 @@ function buildSlots(sku, alert) {
 
   // A slot with no value must not be offered, or the model will reach for it and
   // the sentence will render with a hole in it.
-  const withheld = new Set(WITHHELD_BY_ALERT[alert?.alert_type] || []);
+  const withheld = new Set(trigger ? trigger.withhold : []);
   const slots = {};
   for (const [k, v] of Object.entries(raw)) {
     if (withheld.has(k)) continue;
@@ -144,22 +207,40 @@ function describeSlots(slots) {
  * Check the model's RAW output before any substitution.
  * @returns {{ ok: boolean, issues: string[] }}
  */
-function validateSlotted(raw, slots) {
+function validateSlotted(raw, slots, { requireFigures = true } = {}) {
   const issues = [];
 
   // The whole guarantee rests on this one rule. If no digit can survive, no
   // figure can be invented, rounded or converted.
-  const digits = raw.match(/\d/g);
+  //
+  // Except in the product's own name and in pack sizes. Every SKU name in the
+  // catalogue carries a digit ("Japonica Short Grain 5KG"), the prompt header
+  // shows that name, and a model that writes it out is naming the product, not
+  // stating a figure. Treating it as one rejected answers on EVERY alert type:
+  // the 15 Sep diagnosis found IDLE failing placeholder mode 3 runs out of 3 on
+  // "wrote figures directly: 5KG" alone, which is most of why llama3 needed
+  // 2 to 3 calls per explanation. Pack sizes are the only thing this app
+  // measures in KG (stock is in MT), so a KG token cannot be a stock claim.
+  const name = slots.product && slots.product.value;
+  const withoutNames = (name ? raw.split(name).join(" ") : raw).replace(/\b\d+(?:\.\d+)?\s?KG\b/gi, " ");
+  const digits = withoutNames.match(/\d/g);
   if (digits) {
-    const sample = raw.match(/[^\s]*\d[^\s]*/g) || [];
+    const sample = withoutNames.match(/[^\s]*\d[^\s]*/g) || [];
     issues.push(`wrote figures directly instead of using placeholders: ${[...new Set(sample)].slice(0, 4).join(", ")}`);
   }
 
   const used = [...raw.matchAll(PLACEHOLDER)].map((m) => m[1]);
-  const unknown = [...new Set(used.filter((n) => !slots[n]))];
+  // ANY brace-wrapped token, not only lowercase ones. "{Product}" is not
+  // matched by PLACEHOLDER, so it used to pass validation and reach the reader
+  // as literal braces (15 Sep benchmark, TASK-96).
+  const tokens = [...raw.matchAll(/\{([^{}]*)\}/g)].map((m) => m[1]);
+  const unknown = [...new Set(tokens.filter((n) => !slots[n]))];
   if (unknown.length) issues.push(`used placeholders that do not exist: ${unknown.map((u) => `{${u}}`).join(", ")}`);
 
-  if (!used.length) issues.push("used no placeholders at all, so the explanation states no figures");
+  // Only when nothing else supplies figures. With a system-written opening
+  // sentence the figures that matter are already present, and rejecting prose
+  // that adds none of its own would spend a paid retry for nothing.
+  if (!used.length && requireFigures) issues.push("used no placeholders at all, so the explanation states no figures");
 
   // Placeholder values already carry their unit, so "{days_of_cover} days"
   // renders as "28 days days". Observed on the first real run.
@@ -180,7 +261,9 @@ function validateSlotted(raw, slots) {
  */
 function stripPreamble(text) {
   return String(text).replace(
-    /^\s*here(?:'s|\s+is)\s+(?:the\s+|an?\s+|my\s+)?(?:revised|rewritten|updated|corrected|new|final)?\s*(?:explanation|alert|summary|version|answer)\s*:?\s*/i,
+    // Also "Here's another attempt at explaining the alert:", seen on 15 Sep
+    // after a correction pass.
+    /^\s*here(?:'s|\s+is)\s+(?:the\s+|an?\s+|my\s+|another\s+)?(?:revised|rewritten|updated|corrected|new|final|second|better)?\s*(?:explanation|alert|summary|version|answer|attempt|try)\b[^:\n]{0,50}:\s*/i,
     ""
   );
 }
@@ -195,7 +278,12 @@ function renderSlots(raw, slots) {
 
   // Slot values are complete sentences ending in a full stop, so a model that
   // adds its own produces "...can arrive..". Cosmetic, but it reads as broken.
-  out = out.replace(/\.\s*\./g, ".").replace(/\.\s*,/g, ",");
+  out = out.replace(/\.\s*\./g, ".").replace(/\.\s*,/g, ",").replace(/\.\s*:\s*/g, ". ");
+
+  // "This alert was flagged because {product} was flagged because
+  // {alert_trigger}": the model wraps the clause's own example in a lead-in of
+  // its own. Collapse the repeat rather than print it.
+  out = out.replace(/\b(?:this alert|it|this)\s+was flagged because\s+(.{1,80}?)\s+was flagged because\b/gi, "$1 was flagged because");
 
   // "Vietnam Fragrant Vietnam Fragrant 10KG": the product name appears in the
   // prompt header AND in {product}, and the model writes a prefix of it before
@@ -213,4 +301,4 @@ function renderSlots(raw, slots) {
   return out.trim();
 }
 
-module.exports = { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble };
+module.exports = { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble, triggerSentence };

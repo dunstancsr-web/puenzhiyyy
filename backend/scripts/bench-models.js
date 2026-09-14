@@ -68,10 +68,13 @@ const SCENARIOS = {
 };
 
 async function prepareData() {
-  if (!SCENARIO) return null;
-  const scenario = SCENARIOS[SCENARIO];
+  return SCENARIO ? prepareDataFor(SCENARIO) : null;
+}
+
+async function prepareDataFor(name) {
+  const scenario = SCENARIOS[name];
   if (!scenario) {
-    console.error(`Unknown scenario "${SCENARIO}". Available: ${Object.keys(SCENARIOS).join(", ")}`);
+    console.error(`Unknown scenario "${name}". Available: ${Object.keys(SCENARIOS).join(", ")}`);
     process.exit(2);
   }
   const Database = require("better-sqlite3");
@@ -92,81 +95,11 @@ async function prepareData() {
 }
 
 // ── Semantic checks ──────────────────────────────────────────────────────────
-// The verifier checks that every FIGURE is real. These catch sentences that are
-// wrong although every figure in them is real, the failure class found on
-// 14 Sep: "580 MT exceeds the maximum of 400 MT by 220 MT" (all three real,
-// arithmetic false), and "290 MT is reaching its maximum capacity" on a
-// low-stock alert. They live here, not in the production verifier, until they
-// have been measured: a check that rejects good answers costs paid retries.
-const LOW_STOCK = new Set(["STOCKOUT_RISK", "REORDER"]);
-const HIGH_STOCK = new Set(["OVERSTOCK", "SLOW_MOVING", "IDLE"]);
-const mtNumbers = (s) => [...s.matchAll(/(\d[\d,]*(?:\.\d+)?)\s*MT\b/g)].map((m) => Number(m[1].replace(/,/g, "")));
-
-function semanticIssues(text, sku, alert) {
-  const issues = [];
-  const sentences = text.split(/(?<=[.!?])\s+/);
-
-  // "A exceeds / is below B by C": three quantities in one sentence, joined by
-  // "by", must satisfy |A - B| = C.
-  //
-  // Positional, not "the first three MT figures in the sentence": the two
-  // compared quantities must come BEFORE "by" and the difference right AFTER
-  // it. The first version flagged a correct sentence, "exceeds the maximum level
-  // (400 MT) by 220 MT, with a further 200 MT inbound", by pairing 400 with the
-  // unrelated 200 that followed.
-  for (const s of sentences) {
-    if (!/(exceed|above|over|below|under|short|less than|more than)/i.test(s)) continue;
-    const m = s.match(/^(.*)\bby\s+(\d[\d,]*(?:\.\d+)?)\s*MT\b/i);
-    if (!m) continue;
-    const before = mtNumbers(m[1]);
-    const diff = Number(m[2].replace(/,/g, ""));
-    if (before.length >= 2) {
-      const [a, b] = before.slice(-2);
-      if (Math.abs(Math.abs(a - b) - diff) > 0.5) {
-        issues.push(`arithmetic does not hold: ${a} vs ${b} "by" ${diff} MT :: ${s.trim()}`);
-      }
-    }
-  }
-
-  // Stock DESCRIBED as full, not the word "maximum" anywhere. A first version
-  // matched the bare word and flagged a correct stockout explanation that cited
-  // "the maximum stock level policy allows (700 MT)" as a sizing limit.
-  const LOW_WORDS = /\b(reach(es|ing)?|near(ing)?|at|above|exceed(s|ing)?|over)\s+(its|the|our|a)?\s*(maximum|max|capacity|ceiling)\b|\btoo much stock\b|\boverstock(ed)?\b|\bexcess stock\b/i;
-  const NEGATED = /\b(not|no|never|avoid|stop|pause|halt|suspend|defer|delay|hold off|refrain|instead of|rather than)\b|n't\b/i;
-  const ORDER_MORE = /\b(place|placing|raise|initiate)\b[^.]{0,30}\b(order|replenish)|\border more\b|\breorder now\b/i;
-  for (const s of sentences) {
-    if (LOW_STOCK.has(alert.alert_type) && LOW_WORDS.test(s)) {
-      issues.push(`describes a low-stock alert in too-much-stock terms :: ${s.trim()}`);
-    }
-    // Negation matters: "do not place any new orders" is exactly the right
-    // advice on a too-much-stock alert. The first version of this check had no
-    // negation handling and flagged it, which made 5 of 8 baseline
-    // "contradictions" untrustworthy until they were re-read.
-    if (HIGH_STOCK.has(alert.alert_type) && ORDER_MORE.test(s) && !NEGATED.test(s)) {
-      issues.push(`suggests ordering more on a too-much-stock alert :: ${s.trim()}`);
-    }
-  }
-
-  // The threshold a REORDER alert actually fired on is its threshold_value
-  // (the SUGGESTED reorder point). Quoting any other "reorder point" figure
-  // contradicts the alert card shown beside the summary.
-  if (alert.alert_type === "REORDER" && alert.threshold_value != null) {
-    // Only a figure ATTACHED to the phrase: "reorder point (250 MT)", "reorder
-    // point of 250 MT", "250 MT reorder point". A first version took any MT
-    // figure in the same sentence and flagged "an order of ~449 MT ... above
-    // the reorder point", where 449 is the order quantity, not the threshold.
-    const attached = /reorder (?:point|level|threshold)\s*(?:\(|of|at|is|was|:)?\s*(?:the\s+)?(\d[\d,]*(?:\.\d+)?)\s*MT|(\d[\d,]*(?:\.\d+)?)\s*MT\)?\s*reorder (?:point|level|threshold)/gi;
-    for (const s of sentences) {
-      for (const m of s.matchAll(attached)) {
-        const v = Number((m[1] || m[2]).replace(/,/g, ""));
-        if (Math.abs(v - Number(alert.threshold_value)) > 0.5) {
-          issues.push(`quotes reorder point ${v} MT, but the alert fired at ${Math.round(alert.threshold_value)} MT :: ${s.trim()}`);
-        }
-      }
-    }
-  }
-  return issues;
-}
+// Live in src/llm/semantic.js since TASK-96, shared with the production
+// verifier, so a check fixed in one place is fixed in both. Production now
+// folds them into runExplanation's own check, so a contradiction here shows up
+// as a dangerous issue on the run rather than a separate count.
+const { semanticIssues } = require("../src/llm/semantic");
 
 // ── Model call ───────────────────────────────────────────────────────────────
 async function ollama(model, system, user) {
@@ -188,9 +121,32 @@ async function ollama(model, system, user) {
 }
 
 // ── Run ──────────────────────────────────────────────────────────────────────
+// The fields the semantic checks read, kept with each saved answer so a
+// re-score does not depend on the database still holding the same values.
+const pickSku = (s) => ({
+  sku_id: s.sku_id, inventory_position: s.inventory_position, on_hand_qty: s.on_hand_qty,
+  available_qty: s.available_qty, max_stock: s.max_stock, reorder_point_policy: s.reorder_point_policy,
+  suggested_order_qty: s.suggested_order_qty,
+});
+
 async function rescore(file) {
   const { isDangerous } = require("../src/llm/explain");
   const saved = JSON.parse(fs.readFileSync(file, "utf8"));
+  // Files saved before TASK-96 kept only sku_id and inventory_position. Fill
+  // in the rest from the same scenario's data so the named-figure check has
+  // something to compare against. Note the reorder rule changed in TASK-95, so
+  // an older REORDER alert's threshold is re-read from today's data too.
+  if (saved.runs.some((r) => r.sku.on_hand_qty === undefined || r.sku.suggested_order_qty === undefined)) {
+    const data = saved.scenario ? await prepareDataFor(saved.scenario) : null;
+    const { getDb } = require("../src/db/init");
+    const { buildAnalytics } = require("../src/engines");
+    const live = buildAnalytics(getDb()).skus;
+    for (const r of saved.runs) {
+      const l = live.find((x) => x.sku_id === r.sku.sku_id);
+      if (l) r.sku = { ...pickSku(l), ...r.sku, on_hand_qty: l.on_hand_qty, available_qty: l.available_qty, max_stock: l.max_stock, reorder_point_policy: l.reorder_point_policy, suggested_order_qty: l.suggested_order_qty };
+    }
+    if (data) fs.rmSync(data.tmpDir, { recursive: true, force: true });
+  }
   console.log(`Re-scoring ${saved.runs.length} saved answers from ${file} (no model calls)\n`);
   const t = {};
   for (const r of saved.runs) {
@@ -232,6 +188,7 @@ async function main() {
         const started = Date.now();
         t.runs++;
         let text = "", issues = [], sem = [], finalMode = "failed", calls = 0;
+        const attemptIssues = [];
         try {
           if (LEGACY) {
             const facts = buildFacts(sku, alert);
@@ -239,7 +196,14 @@ async function main() {
             text = out.text; calls = 1; finalMode = "freetext";
             issues = verifyExplanation(text, facts).issues;
           } else {
-            const out = await runExplanation({ sku, alert, callModel: ({ system, user }) => ollama(model, system, user) });
+            // Records WHY each rejected attempt was rejected, read from the
+            // correction the pipeline sends on the next call. Retries are the
+            // cost driver on the paid tier, so the reasons are what to fix.
+            const out = await runExplanation({ sku, alert, callModel: ({ system, user }) => {
+              const m = user.match(/Your previous answer broke the rules: ([\s\S]*?)\.\nWrite it again/);
+              if (m) attemptIssues.push(m[1].split(" :: ")[0].slice(0, 160));
+              return ollama(model, system, user);
+            } });
             text = out.rendered; calls = out.spent.model_calls; finalMode = out.mode;
             issues = out.check.issues;
             if (out.mode === "slots" && out.spent.model_calls === 1) t.firstTry++;
@@ -248,7 +212,11 @@ async function main() {
           // it. The first version of this benchmark scored a model 7/7 for
           // returning nothing at all. Liveness before quality.
           if (text.length < 80) issues = [...issues, `empty or truncated response (${text.length} chars)`];
-          sem = semanticIssues(text, sku, alert);
+          // Re-applied here for the legacy path, which bypasses the pipeline,
+          // and merged without duplicates for the production path, which has
+          // already folded them into its own issues.
+          sem = [...new Set([...issues.filter((i) => i.startsWith("contradicts the alert")), ...semanticIssues(text, sku, alert)])];
+          issues = issues.filter((i) => !i.startsWith("contradicts the alert"));
         } catch (err) {
           calls = err.spent?.model_calls ?? 0;
           issues = [err.message];
@@ -261,7 +229,7 @@ async function main() {
         if (sem.length) t.contradicts++;
         if (!danger && !sem.length) t.usable++;
         t.issues.push(...issues, ...sem);
-        savedRuns.push({ model, alert, sku: { sku_id: sku.sku_id, inventory_position: sku.inventory_position }, finalMode, calls, ms, issues, text });
+        savedRuns.push({ model, alert, sku: pickSku(sku), finalMode, calls, ms, issues, text, attemptIssues });
 
         const flag = finalMode === "failed" ? "FAILED" : danger ? "DANGER" : sem.length ? "CONTRA" : issues.length ? "tidy" : "clean";
         if (flag !== "clean" || REPEATS === 1) {
