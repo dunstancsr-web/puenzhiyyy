@@ -109,8 +109,13 @@ puenzhiyyy/
 ├── .kiro/
 │   ├── hooks/            # auto devlog, lint, commit reminder
 │   ├── steering/         # this file — always loaded
-│   └── specs/            # feature specs
-├── DEVLOG.md             # auto-updated by hook on session end
+│   ├── specs/            # feature specs
+│   └── DEVLOG.md         # dated development log
+├── docs/
+│   ├── (Stan) 1 Reference/  # Stan's tracker, deploy checklist, spend ledger
+│   ├── (Stan) 2 To review/  # drafts waiting for Stan's comments
+│   └── Submission/          # the judges' write-up and its images
+├── CLAUDE.md             # agent onboarding, must stay at the root
 └── README.md
 ```
 

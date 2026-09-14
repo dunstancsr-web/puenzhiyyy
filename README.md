@@ -231,5 +231,6 @@ illustrative and is labelled as such everywhere it appears. It is not a governan
 | `.kiro/specs/mvp1-inventory-visibility/requirements.md` | numbered requirements |
 | `.kiro/specs/mvp1-inventory-visibility/design.md` | engine formulas and data model |
 | `.kiro/specs/mvp1-inventory-visibility/tasks.md` | task breakdown and status |
-| `DEVLOG.md` | dated development log |
+| `.kiro/DEVLOG.md` | dated development log |
+| `docs/Submission/WRITEUP.md` | the hackathon write-up |
 | `CLAUDE.md` | conventions for AI agents working in this repo |

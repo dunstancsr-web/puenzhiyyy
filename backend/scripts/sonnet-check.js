@@ -10,7 +10,7 @@
 //
 // It refuses to touch the paid tier without --confirm-spend, because the key
 // draws on the shared AWS credit that also pays for hosting, and Stan decides
-// when that is spent (see docs/(Stan) MODEL SPEND.md).
+// when that is spent (see docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md).
 //
 // Runs the production path, explainAlert, so the audit trail records every
 // call and scripts/spend.js prices it. Uses the database the dev server uses,
@@ -78,7 +78,7 @@ const CALLS_PER_EXPLANATION = 1.06;
     const usd = rows.reduce((a, r) => a + r.usd, 0);
     const calls = rows.reduce((a, r) => a + r.modelCalls, 0);
     console.log(`Paid this run: ${calls} model call(s) over ${rows.length} explanation(s), about USD ${usd.toFixed(4)}.`);
-    console.log("Add these to docs/(Stan) MODEL SPEND.md (SGT = UTC + 8):");
+    console.log("Add these to docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md (SGT = UTC + 8):");
     for (const r of rows) console.log(`  ${r.at} UTC | Sonnet check, ${r.sku} ${r.alert}${r.failed ? " (failed)" : ""} | ${r.modelCalls} | ${r.inputTokens} / ${r.outputTokens} | ${r.usd.toFixed(4)}`);
   }
 })();

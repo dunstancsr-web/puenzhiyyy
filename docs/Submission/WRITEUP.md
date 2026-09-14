@@ -15,10 +15,10 @@ AWS NUS-ISS SMYA 2026 Hackathon
 > 2. **The demo PIN** in section 8. Type it into the PDF, never into this file: the repository is
 >    public, and a PIN committed here is a PIN anyone can find.
 > 3. **The development spend figure** in section 3, after the final paid check near the deadline
->    (`node scripts/spend.js` and `docs/(Stan) MODEL SPEND.md`).
+>    (`node scripts/spend.js` and `docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md`).
 >
 > Export with any markdown to PDF tool (Typora, Pandoc, or VS Code's "Markdown PDF"),
-> from the repository root so the image paths resolve.
+> from this folder (`docs/Submission/`) so the image paths resolve.
 
 ---
 
@@ -186,7 +186,7 @@ Asking "why?" on an alert first returns the chain that produced it, not a restat
 It is rule-based: built from the SKU's live figures by documented rules, in four short plain-English
 steps. It needs no model, costs nothing, and gives the same answer every time for the same figures.
 
-![The explanation modal, showing four numbered steps: what we see, how we worked it out, if we do nothing, and what to do, and why.](docs/images/reasoning-trace.jpg)
+![The explanation modal, showing four numbered steps: what we see, how we worked it out, if we do nothing, and what to do, and why.](images/reasoning-trace.jpg)
 
 *Four steps: what we see, how we worked it out, what happens if we do nothing, and what to do, and why.
 Every figure is checkable against the Inventory page.*
@@ -299,7 +299,7 @@ the measured value and the threshold it breached, so a manager can disagree with
 than only with the conclusion. Modify is a first-class action rather than an escape hatch, because in
 practice the right answer is frequently "yes, but not that much."
 
-![The Alerts page. Each alert states the measured value and the threshold it breached, names the decision the buttons act on, and terminates at approve, modify or reject.](docs/images/alerts-human-in-the-loop.jpg)
+![The Alerts page. Each alert states the measured value and the threshold it breached, names the decision the buttons act on, and terminates at approve, modify or reject.](images/alerts-human-in-the-loop.jpg)
 
 *Every recommendation terminates at a human decision, and the primary button states what approving will
 record. Severity is carried by the left stripe, type by the icon and chip, so the card encodes each fact
@@ -338,7 +338,7 @@ only. An audit trail that can fail the restock it is recording is worse than no 
 The Activity page renders the whole trail as a chronological list of plain-English sentences, with the
 exact stored payload one click away. Raw JSON is not observability either; it is a prerequisite for it.
 
-![The Activity page with one record expanded, showing the stored input and output payloads side by side.](docs/images/activity-audit-record.jpg)
+![The Activity page with one record expanded, showing the stored input and output payloads side by side.](images/activity-audit-record.jpg)
 
 *The manager decision above, as the audit trail stored it: what the system proposed, what the manager
 did instead, and the delta between the two quantities.*

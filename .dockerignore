@@ -32,8 +32,7 @@ npm-debug.log*
 
 # Documentation and specs: not needed at runtime.
 .kiro
-DEVLOG.md
-SUBMISSION.md
+docs
 README.md
 CLAUDE.md
 frontend/mockups

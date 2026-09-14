@@ -5,7 +5,7 @@ const path = require("path");
 // after the routes are required would arrive too late to change anything.
 //
 // Uses Node's built-in loader rather than the dotenv package, since this repo
-// already requires Node 22+ (see render.yaml and the Dockerfile).
+// already requires Node 22+ (see the Dockerfile).
 //
 // The file is optional on purpose. On a host (Lightsail, Render) the values
 // come from the platform's own environment settings and no .env file exists,

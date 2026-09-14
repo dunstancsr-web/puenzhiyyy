@@ -318,7 +318,7 @@ function seed() {
 
   // The wipe below erases audit_log, which is the only record of paid model
   // spend on this machine (TASK-93). Say what is about to go, so it can be
-  // copied into docs/(Stan) MODEL SPEND.md first. A notice, not a prompt: the
+  // copied into docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md first. A notice, not a prompt: the
   // seed is run from scripts and on first boot, where nothing can answer one.
   try {
     const { paidSpend } = require("../llm/spend");
@@ -326,7 +326,7 @@ function seed() {
     if (s.calls.length) {
       console.log(
         `NOTE: erasing ${s.calls.length} paid model call record(s), about USD ${s.usd.toFixed(4)}. ` +
-        `If they are not in docs/(Stan) MODEL SPEND.md yet, they are now lost from this database.`
+        `If they are not in docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md yet, they are now lost from this database.`
       );
     }
   } catch { /* first boot: no audit_log yet, nothing to report */ }

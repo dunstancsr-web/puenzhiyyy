@@ -7,17 +7,17 @@ Four deliverables. Status as of 15 Sep.
 | # | Deliverable | Status | Next step, and who |
 |---|---|---|---|
 | 1 | GitHub repo | done, kept current | nothing |
-| 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Stan starts the AWS lease once the organizers answer on Slack, then follows `docs/(Stan) DEPLOY-LIGHTSAIL.md` |
+| 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Stan starts the AWS lease once the organizers answer on Slack, then follows `(Stan) DEPLOY-LIGHTSAIL.md` in this folder |
 | 3 | YouTube demo video | script below, updated 15 Sep | Stan records, near the end, with the final paid check |
-| 4 | PDF write-up | `WRITEUP.md` refreshed 15 Sep, screenshots current except the Activity one | fill in the URL, PIN and spend figure **in the PDF only**, then export |
+| 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 15 Sep, screenshots current except the Activity one | fill in the URL, PIN and spend figure **in the PDF only**, then export |
 
 ## Before submitting, in this order
 
 1. **Deploy** and run `node backend/scripts/check-deploy.js <url>` against the live service.
 2. **Final paid check**: `node backend/scripts/sonnet-check.js --confirm-spend` (about USD 0.035 for
-   all six alert types). Add the rows to `docs/(Stan) MODEL SPEND.md`.
+   all six alert types). Add the rows to `(Stan) MODEL SPEND.md` in this folder.
 3. **Record the video** on freshly seeded data (`npm run seed` from `backend/`).
-4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `WRITEUP.md`.
+4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `docs/Submission/WRITEUP.md`.
 5. **Submit**, then capture evidence of the live service before the lease ends.
 
 ## Decisions already made
@@ -81,7 +81,7 @@ Recording notes:
 - `npm run seed` immediately before, so alerts and the audit trail replay cleanly.
 - Light theme, and unlock AWS Bedrock in Settings with the demo PIN before starting.
 - Beat 6 last and unrushed. Observability is the criterion most demos forget to show.
-- **Recapture `docs/images/activity-audit-record.jpg`** from beat 6 for the write-up; the current one
+- **Recapture `docs/Submission/images/activity-audit-record.jpg`** from beat 6 for the write-up; the current one
   shows the old design.
 
 ---
@@ -93,4 +93,3 @@ Recording notes:
   passes cover the UI.
 - **Stockout and ageing wording on Sonnet** has only been checked on llama3 since the 15 Sep prompt
   change; the final paid check covers it.
-- **`render.yaml`** is an unused fallback from before the Lightsail decision.

@@ -1,6 +1,6 @@
 # StockSense, single container: Express serves the API and the built frontend.
-# This is the Fly.io path, and the fallback if Render's Node runtime gives
-# trouble. Render itself does not need this file, see render.yaml.
+# GitHub Actions builds it (.github/workflows/container.yml) and AWS Lightsail
+# runs it.
 #
 # Two things break naive versions of this image, and both are handled below.
 #
@@ -60,7 +60,7 @@ COPY --from=builder /app/frontend/dist ./frontend/dist
 
 # SQLite lives here. Declared as a volume so a host can mount real storage over
 # it; without a mount the database is ephemeral and reseeds itself on boot,
-# which is a supported mode rather than a failure, see render.yaml.
+# which is a supported mode rather than a failure.
 RUN mkdir -p /data && chown -R node:node /data
 VOLUME ["/data"]
 

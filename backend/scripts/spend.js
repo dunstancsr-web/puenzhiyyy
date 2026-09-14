@@ -6,7 +6,7 @@
 //
 // Lists every paid model call recorded in THIS machine's audit trail and the
 // estimated USD it cost. Read-only. See src/llm/spend.js for what the estimate
-// can and cannot see, and docs/(Stan) MODEL SPEND.md for the running ledger
+// can and cannot see, and docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md for the running ledger
 // that survives reseeds.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -34,4 +34,4 @@ console.log(
   `${s.inputTokens} in / ${s.outputTokens} out tokens`
 );
 console.log(`  Total: ${usd(s.usd)}`);
-console.log("\nCopy new rows into docs/(Stan) MODEL SPEND.md before running npm run seed, which erases this trail.");
+console.log("\nCopy new rows into docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md before running npm run seed, which erases this trail.");

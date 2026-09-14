@@ -141,7 +141,7 @@ The submission asks for "Deployment evidence/URL", and the lease will eventually
 - [ ] Screenshot the Lightsail service page showing **Running** and the public domain.
 - [ ] Save the full output of `check-deploy.js`.
 - [ ] Screenshot the Dashboard and one Why? summary on the live URL.
-- [ ] Paste the URL into `WRITEUP.md` section 8 and into the Slack submission.
+- [ ] Paste the URL into `docs/Submission/WRITEUP.md` section 8 and into the Slack submission.
 
 ---
 

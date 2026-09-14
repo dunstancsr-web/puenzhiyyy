@@ -33,6 +33,7 @@ Thumbs.db
 .idea/
 
 # Personal notes (private, do not publish)
+# Matches in any folder, so the guide stays private in docs/(Stan) 1 Reference/.
+# A (Stan) PREFIX is tracked on purpose; only the suffix marks a private file.
 CLAUDE_CLI_GUIDE.md
-CLAUDE_CLI_GUIDE (Stan).md
 *(Stan).md

@@ -5,7 +5,7 @@
 // the model is off, locked or rejected. Rewritten in TASK-97 as a shorter
 // version of the TASK-37 original, reviewed by Stan before it replaced it on
 // 15 Sep. Side-by-side comparison of old and new wording with real figures:
-// docs/(Stan) ELI18 EXPLANATIONS DRAFT.md
+// docs/(Stan) 2 To review/Reviewed/(Stan) ELI18 EXPLANATIONS DRAFT.md
 //
 // The brief: explain like the reader is a smart 18-year-old who has never run
 // a warehouse. Short sentences, everyday words, every figure still exact and

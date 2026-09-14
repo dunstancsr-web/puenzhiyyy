@@ -2,7 +2,7 @@
 
 Read `.kiro/steering/project-context.md` first for project background, domain terms, and tech stack.
 Then check `.kiro/specs/mvp1-inventory-visibility/` (`requirements.md`, `design.md`, `tasks.md`) and
-`DEVLOG.md` for what has already been built and why, before making changes.
+`.kiro/DEVLOG.md` for what has already been built and why, before making changes.
 
 ## Writing style (added 2026-09-12, user feedback)
 
@@ -15,7 +15,7 @@ writing going forward. It is not a mandate to rewrite every existing comment in 
 
 This project was originally scaffolded with Kiro. `.kiro/hooks/*.json` files (such as
 `auto-devlog.json`) are Kiro-specific configuration and do not fire during a Claude Code session. If a
-session ends without a `DEVLOG.md` entry, add one by hand in the existing format rather than trying to
+session ends without a `.kiro/DEVLOG.md` entry, add one by hand in the existing format rather than trying to
 make the Kiro hook run.
 
 ## Onboarding for agents: Stan's preferences and this codebase's quirks
@@ -129,6 +129,16 @@ feedback, not suggestions to re-litigate.
 
 ### Where things live
 
+- **Documents are filed by who reads them** (Stan's decision, 15 Sep). Agent
+  material lives in `.kiro/` (steering, specs, hooks, `DEVLOG.md`); only this
+  file stays at the root, because Claude Code reads it from there.
+  `docs/(Stan) 1 Reference/` holds what Stan looks things up in (the submission
+  tracker, deploy checklist, spend ledger). `docs/(Stan) 2 To review/` holds a
+  draft waiting for his comments; move it to `Reviewed/` once he has decided.
+  `docs/Submission/` holds what judges read (the write-up and its images).
+  `README.md` stays at the root for GitHub. A new document for Stan goes in one
+  of his two folders with `(Stan)` at the START of its name; a `(Stan)` suffix
+  is gitignored and means private.
 - `backend/src/engines/` deterministic analytics, the source of truth for every
   figure. `index.js` orchestrates; nothing else should recompute what it emits.
 - `backend/src/llm/` the explanation layer. The model narrates and never
