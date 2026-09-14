@@ -192,9 +192,17 @@ function describe(event) {
       };
 
     case "LLM_CALL":
+      // Since TASK-93 a paid explanation that gave up after spending tokens is
+      // also recorded, so its cost is counted. It must not read as a success.
+      if (o.failed) {
+        return {
+          headline: `AI explanation attempted for ${sku}, no usable answer`,
+          detail: `${o.model_calls || o.attempts || 1} model call(s) spent. ${o.reason || ""}`.trim(),
+        };
+      }
       return {
         headline: `AI explanation generated for ${sku}`,
-        detail: o.model ? `Model: ${o.model}` : null,
+        detail: i.model ? `Model: ${i.model}` : null,
       };
 
     case "LLM_UNLOCKED":

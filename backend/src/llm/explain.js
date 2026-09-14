@@ -367,17 +367,29 @@ function fromCache(key) {
  *
  * @returns {{ text, model, provider, cached, usage }}
  */
-async function explainAlert(sku, alert, { tier } = {}) {
-  // Resolved here once, so the cache key and the model call can never disagree
-  // about which tier this request is for.
-  tier = resolveTier(tier);
-  const key = cacheKey(sku, alert, tier);
-  const cached = fromCache(key);
-  if (cached) return { ...cached, cached: true };
-
+/**
+ * The explanation pipeline itself: placeholder attempts, the free-text
+ * fallback, validation, the verifier and the retry policy. Everything EXCEPT
+ * which model answers, the cache, and the audit trail (TASK-94).
+ *
+ * Extracted so scripts/bench-models.js runs this exact function with a
+ * different `callModel`. The benchmark used to build its own copy of the
+ * free-text prompt and never exercised the placeholder path at all, so its
+ * score described a pipeline judges never see. A benchmark that re-implements
+ * what it measures is measuring its copy.
+ *
+ * @param {object} opts
+ * @param {object} opts.sku
+ * @param {object} opts.alert
+ * @param {(p: {system: string, user: string}) => Promise<{text, model, provider, usage}>} opts.callModel
+ * @returns {Promise<{ rendered, mode, attempts, check, result, raw, facts, slots, spent }>}
+ * @throws the model's own error or LlmUnavailable, with `err.spent`,
+ *   `err.lastResult` and `err.mode` attached so a caller can still account for
+ *   the calls that were made before it gave up.
+ */
+async function runExplanation({ sku, alert, callModel }) {
   const facts = buildFacts(sku, alert);
   const slots = buildSlots(sku, alert);
-  const started = Date.now();
 
   // Two modes, tried in order of how strong a guarantee they give.
   //
@@ -398,6 +410,13 @@ async function explainAlert(sku, alert, { tier } = {}) {
   let attempts = 0;
   let mode = "slots";
 
+  // Tokens across EVERY model call this explanation makes (TASK-93). Until
+  // this, only the final call's usage was logged, so an explanation that took
+  // three attempts was recorded at a third of its real cost, and one that
+  // failed every attempt was not recorded at all, though each call was billed.
+  const spent = { model_calls: 0, input_tokens: 0, output_tokens: 0 };
+  const giveUp = (err) => Object.assign(err, { spent, lastResult: result, mode });
+
   // Deliberately contains no digits. The alert message and the recommended
   // action are offered as placeholders instead of being pasted in, because a
   // prompt that forbids digits while displaying them is a contradiction the
@@ -416,7 +435,15 @@ async function explainAlert(sku, alert, { tier } = {}) {
     const system = mode === "slots" ? SLOT_SYSTEM : SYSTEM;
     const user = (mode === "slots" ? slotUser : freeUser) + correction;
 
-    result = await chat({ system, user, tier });
+    try {
+      result = await callModel({ system, user });
+    } catch (err) {
+      // e.g. the gateway rate limits the third attempt after two were billed.
+      throw giveUp(err);
+    }
+    spent.model_calls += 1;
+    spent.input_tokens += result.usage?.input_tokens || 0;
+    spent.output_tokens += result.usage?.output_tokens || 0;
 
     if (mode === "slots") {
       // Structural check on the RAW output, before substitution. This is the
@@ -444,19 +471,59 @@ async function explainAlert(sku, alert, { tier } = {}) {
     const action = onDriftDetected({ attempt: attempts, issues: check.issues, text: rendered });
     if (action === "accept") break;
     if (attempts === MAX_ATTEMPTS + 1) {
-      throw new LlmUnavailable(
+      throw giveUp(new LlmUnavailable(
         `The model's answer did not match the source figures after ${attempts} attempts (${check.issues.join("; ")}).`
-      );
+      ));
     }
   }
 
   if (!rendered) {
-    throw new LlmUnavailable(
+    throw giveUp(new LlmUnavailable(
       `The model could not produce a usable explanation (${check.issues.join("; ")}).`
-    );
+    ));
   }
 
-  const ms = Date.now() - started;
+  return {
+    rendered, mode, attempts: Math.min(attempts, MAX_ATTEMPTS + 1), check, result,
+    raw: mode === "slots" ? result.text : null,
+    facts, slots, spent,
+  };
+}
+
+async function explainAlert(sku, alert, { tier } = {}) {
+  // Resolved here once, so the cache key and the model call can never disagree
+  // about which tier this request is for.
+  tier = resolveTier(tier);
+  const key = cacheKey(sku, alert, tier);
+  const cached = fromCache(key);
+  if (cached) return { ...cached, cached: true };
+
+  const started = Date.now();
+  let out;
+  try {
+    out = await runExplanation({ sku, alert, callModel: ({ system, user }) => chat({ system, user, tier }) });
+  } catch (err) {
+    // A paid explanation that gave up AFTER spending still leaves a record of
+    // what it cost (TASK-93). One that never got an answer spent nothing.
+    if (err.spent?.model_calls > 0) {
+      const info = providerInfo(tier);
+      logEvent(EVENTS.LLM_CALL, {
+        skuId: sku.sku_id,
+        input: { alert_type: alert.alert_type, provider: err.lastResult?.provider || info.provider, model: err.lastResult?.model || info.model, mode: err.mode },
+        output: {
+          failed: true,
+          reason: err.message,
+          explanation: null,
+          latency_ms: Date.now() - started,
+          attempts: err.spent.model_calls,
+          ...err.spent,
+        },
+      });
+    }
+    throw err;
+  }
+
+  const { rendered, mode, attempts, check, result, raw, facts, slots, spent } = out;
 
   // The LLM_CALL event that db/audit.js reserved from the start. Records what
   // the model was given and what it returned, so a model written explanation is
@@ -474,13 +541,15 @@ async function explainAlert(sku, alert, { tier } = {}) {
     },
     output: {
       explanation: rendered,
-      raw_template: mode === "slots" ? result.text : null,
-      latency_ms: ms,
+      raw_template: raw,
+      latency_ms: Date.now() - started,
       attempts,
       verified: check.ok,
       drift_issues: check.issues.length ? check.issues : null,
-      input_tokens: result.usage?.input_tokens ?? null,
-      output_tokens: result.usage?.output_tokens ?? null,
+      // Totals across every attempt, not the final call alone. See `spent`.
+      input_tokens: spent.input_tokens,
+      output_tokens: spent.output_tokens,
+      model_calls: spent.model_calls,
     },
   });
 
@@ -489,4 +558,4 @@ async function explainAlert(sku, alert, { tier } = {}) {
   return { ...value, cached: false };
 }
 
-module.exports = { explainAlert, providerInfo, LlmUnavailable, buildFacts, cacheKey, verifyExplanation, isDangerous, SYSTEM };
+module.exports = { explainAlert, runExplanation, providerInfo, LlmUnavailable, buildFacts, cacheKey, verifyExplanation, isDangerous, SYSTEM, ALERT_BRIEF };
