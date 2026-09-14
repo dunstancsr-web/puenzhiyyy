@@ -12,6 +12,13 @@ frontend/build/
 .env
 .env.local
 .env.*.local
+# The template too, since 2026-09-14. It sits beside the real .env with the
+# same names and layout, and a key was typed into it once instead of into .env.
+# Ignoring it means a filled-in copy can never be committed by accident. The
+# cost is that a fresh clone has no template: the model settings are explained
+# in backend/src/llm/provider.js, and `grep -rn process.env backend/src` lists
+# every setting the server reads.
+.env.example
 
 # Logs
 *.log
@@ -24,3 +31,8 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Personal notes (private, do not publish)
+CLAUDE_CLI_GUIDE.md
+CLAUDE_CLI_GUIDE (Stan).md
+*(Stan).md

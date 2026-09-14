@@ -1,6 +1,24 @@
+const path = require("path");
+
+// Load backend/.env BEFORE anything else is required. Order matters here:
+// llm/provider.js reads its settings once, at require time, so a file loaded
+// after the routes are required would arrive too late to change anything.
+//
+// Uses Node's built-in loader rather than the dotenv package, since this repo
+// already requires Node 22+ (see render.yaml and the Dockerfile).
+//
+// The file is optional on purpose. On a host (Lightsail, Render) the values
+// come from the platform's own environment settings and no .env file exists,
+// which throws ENOENT here and is exactly the expected case. Values already
+// set in the real environment are not overwritten by the file.
+try {
+  process.loadEnvFile(path.join(__dirname, "../.env"));
+} catch (err) {
+  if (err.code !== "ENOENT") throw err;
+}
+
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
 const { initDb, getDb } = require("./db/init");
 
 // Initialise database on startup (creates tables if not exist)
