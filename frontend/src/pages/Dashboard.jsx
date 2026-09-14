@@ -234,15 +234,21 @@ function buildNeedsAttention(skus) {
       });
     });
 
+  // The SAME rule as the REORDER alert in backend/src/engines/alerts.js
+  // (TASK-95): inventory position (available plus inbound) at or below the
+  // approved reorder point, not already a stockout, not idle. This row used to
+  // apply its own test, available stock with no inbound and only when cover was
+  // already below band, so the Alerts page and this table could disagree about
+  // whether the same SKU needed reordering.
   skus
-    .filter((s) => s.coverage_band === "below" && s.stockout_gap_days === 0 && s.available_qty <= s.reorder_point_policy && s.movement_class !== "Idle")
+    .filter((s) => s.stockout_gap_days === 0 && s.inventory_position <= s.reorder_point_policy && s.movement_class !== "Idle")
     .forEach((s) => {
       actions.push({
         priority: 2,
         sku_id: s.sku_id,
         name: s.product_name,
         action: "Procurement review",
-        reason: `Available ${s.available_qty} MT at reorder point ${s.reorder_point_policy} MT`,
+        reason: `Position ${s.inventory_position} MT (available + inbound) at or below reorder point ${s.reorder_point_policy} MT`,
         value: s.available_qty * (s.unit_price_sgd - s.unit_cost_sgd),
         valueLabel: "margin exposed",
         tag: "REORDER",

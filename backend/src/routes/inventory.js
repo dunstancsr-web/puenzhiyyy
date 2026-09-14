@@ -120,7 +120,8 @@ router.get("/skus/:id/projection", (req, res) => {
       dailyDemand: sku.blended_daily_usage,
       openPos: sku.open_pos,
       safetyStockMt: sku.safety_stock_mt,
-      reorderPoint: sku.reorder_point_suggested,
+      // The approved value, the one the REORDER alert fires on (TASK-95).
+      reorderPoint: sku.reorder_point_policy,
       days: 90,
     });
 

@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { chat, providerInfo, resolveTier, LlmUnavailable } = require("./provider");
-const { buildSlots, describeSlots, validateSlotted, renderSlots } = require("./slots");
+const { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble } = require("./slots");
 const { EVENTS, logEvent } = require("../db/audit");
 
 const SYSTEM = `You are an inventory analyst at a rice importer and distributor in Singapore.
@@ -57,7 +57,10 @@ Worked example of the difference:
 // figures; only this guarantees the meaning.
 const ALERT_BRIEF = {
   STOCKOUT_RISK: "This SKU will run out before a replacement order could arrive. The problem is too little stock. Ordering more, quickly, is the answer.",
-  REORDER: "This SKU has reached the level where a normal replenishment order should be placed. There is still time to order at normal freight rates.",
+  // Names the rule, not just the conclusion (TASK-95): what is compared with
+  // what. The earlier one-liner left llama3 to guess, and it described the
+  // SKU as near its maximum and quoted the wrong threshold.
+  REORDER: "Inventory position, meaning stock available now plus stock already on order, has fallen to the approved reorder point. The problem is that stock will run low if nothing is ordered, but there is still time to order at normal freight rates. Ordering is the answer. Do NOT describe the stock as high, full or near any maximum.",
   OVERSTOCK: "This SKU holds more than its maximum policy level. The problem is too much stock. Do NOT suggest ordering more. The answer is to stop or defer buying.",
   IDLE: "This SKU has had no sales at all for a long period. The problem is that capital is trapped in stock nobody is buying. Do NOT suggest ordering more and do NOT mention reorder points. Replenishing is the wrong answer entirely: the decision is how to dispose of what is already held.",
   SLOW_MOVING: "This SKU is selling, but far too slowly for the quantity held. The problem is too much stock relative to demand. Do NOT suggest ordering more. The answer is to buy less next time.",
@@ -128,7 +131,11 @@ function buildFacts(sku, alert) {
   add("Supplier lead time", sku.lead_time_days, " days");
   add("Safety stock held", sku.safety_stock_days, " days");
   add("Maximum stock level", sku.max_stock, " MT");
-  add("Approved reorder point", sku.reorder_point_policy, " MT");
+  // For REORDER, the figure the alert compares and the rule that compares it
+  // (TASK-95). Without it the free-text fallback had "Available stock" and
+  // "On hand stock" but not the position the alert fired on.
+  addIf(alert.alert_type === "REORDER", "Inventory position (available plus already on order)", sku.inventory_position, " MT");
+  add("Approved reorder point (the REORDER alert fires at or below this)", sku.reorder_point_policy, " MT");
   add("Suggested order quantity", sku.suggested_order_qty, " MT");
   add("Supplier minimum order", sku.min_order_qty, " MT");
   add("Value class (ABC)", sku.abc_class);
@@ -459,7 +466,7 @@ async function runExplanation({ sku, alert, callModel }) {
       // corrected in slot mode sometimes carries the habit over and emits
       // "{days since last sale}". Strip anything brace-wrapped rather than
       // print it.
-      rendered = result.text.replace(/\{[^{}]*\}/g, "").replace(/\s{2,}/g, " ").trim();
+      rendered = stripPreamble(result.text.replace(/\{[^{}]*\}/g, "").replace(/\s{2,}/g, " ")).trim();
     }
 
     // Slots cannot stop the model calling a margin figure "sales" or hedging

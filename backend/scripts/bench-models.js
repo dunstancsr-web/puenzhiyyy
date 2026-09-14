@@ -62,7 +62,7 @@ const OLLAMA = process.env.OLLAMA_URL || "http://localhost:11434";
 // the real one. Each is a single, documented edit a user could make in the app.
 const SCENARIOS = {
   reorder: {
-    about: "TW-25KG reservations 30 -> 60 MT: position 230 MT falls below the suggested reorder point 242 MT while cover stays above lead time, raising REORDER.",
+    about: "TW-25KG reservations 30 -> 60 MT: position 230 MT falls to the approved reorder point 250 MT while cover stays above lead time, raising REORDER.",
     apply: (db) => db.prepare("UPDATE inventory_positions SET reserved_qty = 60 WHERE sku_id = 'TW-25KG'").run(),
   },
 };
@@ -108,11 +108,23 @@ function semanticIssues(text, sku, alert) {
 
   // "A exceeds / is below B by C": three quantities in one sentence, joined by
   // "by", must satisfy |A - B| = C.
+  //
+  // Positional, not "the first three MT figures in the sentence": the two
+  // compared quantities must come BEFORE "by" and the difference right AFTER
+  // it. The first version flagged a correct sentence, "exceeds the maximum level
+  // (400 MT) by 220 MT, with a further 200 MT inbound", by pairing 400 with the
+  // unrelated 200 that followed.
   for (const s of sentences) {
-    if (!/\bby\b/i.test(s) || !/(exceed|above|over|below|under|short|less than|more than)/i.test(s)) continue;
-    const n = mtNumbers(s);
-    if (n.length >= 3 && Math.abs(Math.abs(n[0] - n[1]) - n[2]) > 0.5) {
-      issues.push(`arithmetic does not hold: ${n[0]} vs ${n[1]} "by" ${n[2]} MT :: ${s.trim()}`);
+    if (!/(exceed|above|over|below|under|short|less than|more than)/i.test(s)) continue;
+    const m = s.match(/^(.*)\bby\s+(\d[\d,]*(?:\.\d+)?)\s*MT\b/i);
+    if (!m) continue;
+    const before = mtNumbers(m[1]);
+    const diff = Number(m[2].replace(/,/g, ""));
+    if (before.length >= 2) {
+      const [a, b] = before.slice(-2);
+      if (Math.abs(Math.abs(a - b) - diff) > 0.5) {
+        issues.push(`arithmetic does not hold: ${a} vs ${b} "by" ${diff} MT :: ${s.trim()}`);
+      }
     }
   }
 

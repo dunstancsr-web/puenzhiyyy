@@ -162,9 +162,13 @@ The system must generate typed alerts automatically.
 
 Alert types:
 - STOCKOUT_RISK:   days_of_cover < lead_time_days, UNLESS covered_by_po
-- REORDER:         inventory_position <= reorder_point_suggested, AND movement_class != "Idle"
-                    (compares against the *inventory position* — on-hand + expected incoming — not raw
-                    available, so an already-adequate inbound PO doesn't also fire this alert)
+- REORDER:         inventory_position <= reorder_point_policy, AND movement_class != "Idle"
+                    (compares the *inventory position*, meaning available stock plus expected incoming,
+                    so an already-adequate inbound PO doesn't also fire this alert; and compares it
+                    against the APPROVED reorder point a manager sets, not the calculated
+                    reorder_point_suggested, which is shown as advice. Changed 15 Sep 2026, TASK-95:
+                    this line previously said suggested, contradicting design.md, the explanation
+                    trace and the editable Reorder point field.)
 - OVERSTOCK:       overstock_qty > 0, AND movement_class != "Idle" (Idle overstock is covered by the
                     IDLE alert instead, to avoid double-alerting the same SKU)
 - SLOW_MOVING:     movement_class = "Slow Moving" AND days_of_cover > 120

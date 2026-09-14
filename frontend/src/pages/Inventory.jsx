@@ -651,8 +651,11 @@ function ProjectionChart({ skuId }) {
             <ReferenceLine y={reference.safety_stock_mt} stroke="var(--yellow)" strokeDasharray="4 4"
               label={{ value: "Safety stock", position: "insideBottomRight", fontSize: 11, fill: "var(--yellow)" }} />
           )}
-          {reference.reorder_point_suggested > 0 && (
-            <ReferenceLine y={reference.reorder_point_suggested} stroke="var(--text-secondary)" strokeDasharray="4 4"
+          {/* The approved reorder point, which is what the REORDER alert fires
+              on (TASK-95). This line was the one place left drawing the
+              calculated value after the stock bars moved to policy. */}
+          {reference.reorder_point_policy > 0 && (
+            <ReferenceLine y={reference.reorder_point_policy} stroke="var(--text-secondary)" strokeDasharray="4 4"
               label={{ value: "Reorder point", position: "insideTopRight", fontSize: 11, fill: "var(--text-secondary)" }} />
           )}
           {reference.max_stock > 0 && (

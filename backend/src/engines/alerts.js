@@ -64,14 +64,26 @@ function alertsForSku(s) {
     });
   }
 
-  // REORDER - inventory position (on-hand + expected incoming), not just on-hand
-  else if (s.inventory_position <= s.reorder_point_suggested && s.movement_class !== "Idle") {
+  // REORDER - inventory position (AVAILABLE + expected incoming, see
+  // position.js) against the APPROVED reorder point.
+  //
+  // Policy, not the calculated value (TASK-95). This compared against
+  // reorder_point_suggested, while design.md, the rule-based explanation, the
+  // stock bars and the Inventory page's editable "Reorder point" field all
+  // treated the approved value as the one that governs. So a manager who edited
+  // the reorder point changed nothing about when this alert fired, and the AI
+  // summary, offered the approved figure, quoted a threshold the alert card
+  // beside it contradicted. The calculated value stays visible as advice.
+  //
+  // The message used to call the position "on-hand + expected incoming". It is
+  // available stock, which excludes reservations: 230 MT, not the 290 on hand.
+  else if (s.inventory_position <= s.reorder_point_policy && s.movement_class !== "Idle") {
     push({
       alert_type: "REORDER",
       severity: "warning",
       triggered_value: Math.round(s.inventory_position),
-      threshold_value: Math.round(s.reorder_point_suggested),
-      message: `${s.product_name} inventory position (${fmtMt(s.inventory_position)} on-hand + expected incoming) is at or below the reorder point (${fmtMt(s.reorder_point_suggested)}).`,
+      threshold_value: Math.round(s.reorder_point_policy),
+      message: `${s.product_name} inventory position (${fmtMt(s.inventory_position)}: available stock plus expected incoming) is at or below the approved reorder point (${fmtMt(s.reorder_point_policy)}).`,
       recommended_action: `Initiate a standard replenishment order of ~${fmtMt(orderQty(s))} within the lead-time window.`,
       ai_recommendation_qty: orderQty(s),
     });

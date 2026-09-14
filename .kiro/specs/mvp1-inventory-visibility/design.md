@@ -218,9 +218,11 @@ suggested_order_qty     = max(0, target_stock - projected_available_at_lead_time
                                                                        (see Projected Inventory below; upgraded
                                                                        2026-09-12 from a snapshot-based proxy)
 ```
-`reorder_point_suggested` is shown alongside `reorder_point_policy` for comparison — alerts and health
-status key off the **policy** value (the approved operating level), matching the source spec's
-raw-vs-approved pattern (Step 11).
+`reorder_point_suggested` is shown alongside `reorder_point_policy` for comparison. The REORDER alert,
+the Dashboard's REORDER rows and the projection chart's reorder line all key off the **policy** value
+(the approved operating level), matching the source spec's raw-vs-approved pattern (Step 11). Health
+status does not use a reorder point at all; it works from days of cover. (Clarified 15 Sep 2026,
+TASK-95: the alert code had drifted to the suggested value, and requirements.md said so too.)
 
 ### Projected Inventory (glossary #29 / spec Step 12 — REQ-18, TASK-07)
 ```

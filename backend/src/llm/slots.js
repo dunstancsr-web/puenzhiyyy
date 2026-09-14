@@ -49,6 +49,13 @@ const PLACEHOLDER = /\{([a-z_]+)\}/g;
 // model loses a fact, so it is reserved for facts that actively mislead.
 const WITHHELD_BY_ALERT = {
   OVERSTOCK: ["available_stock"],
+  // REORDER fires on inventory position (available plus inbound). On-hand
+  // includes reservations, so it is the bigger, wrong figure to set beside the
+  // reorder point, and llama3 used it to write "290 MT is reaching its maximum
+  // capacity" on a low-stock alert (TASK-95). The maximum stock level goes for
+  // the same reason: a low-stock alert has no use for a ceiling, and offering
+  // one hands the model the exact word behind that error.
+  REORDER: ["on_hand_stock", "max_stock"],
 };
 
 // Reuse the engine's own formatted strings wherever they exist rather than
@@ -80,9 +87,16 @@ function buildSlots(sku, alert) {
     recommended_action: { value: alert.recommended_action, describes: "the full action already decided for this SKU, a complete sentence, to be stated on its own at the end" },
     stockout_gap:       { value: sku.stockout_gap_days > 0 ? `${sku.stockout_gap_days} days` : null, describes: "how long the shelf is empty before replenishment lands" },
     available_stock:    { value: mt(sku.available_qty), describes: "stock available to sell right now" },
-    // Names the relationship, not just the quantity. These descriptions are
-    // shared by every alert type, so each one says only what is true for all.
-    on_hand_stock:      { value: mt(sku.on_hand_qty), describes: "total physical stock in the warehouse, the figure the maximum stock level is measured against" },
+    // Deliberately neutral again (TASK-95). A 14 Sep version added "the figure
+    // the maximum stock level is measured against" for the overstock fix, and
+    // because descriptions are shared by every alert type, that word
+    // "maximum" leaked into a REORDER explanation as "reaching its maximum
+    // capacity". The overstock relationship lives in overstock_amount instead,
+    // which only an overstocked SKU is ever offered.
+    on_hand_stock:      { value: mt(sku.on_hand_qty), describes: "total physical stock in the warehouse, including stock already promised to orders" },
+    // Only for REORDER, the alert that fires on it, so no other alert's
+    // placeholder list grows by one.
+    inventory_position: { value: alert?.alert_type === "REORDER" ? mt(sku.inventory_position) : null, describes: "stock available now plus stock already on order and inbound, the figure the reorder rule compares against the reorder point" },
     reserved_stock:     { value: sku.reserved_qty > 0 ? mt(sku.reserved_qty) : null, describes: "stock already promised to confirmed orders" },
     inbound_stock:      { value: sku.expected_incoming_qty > 0 ? mt(sku.expected_incoming_qty) : null, describes: "stock already ordered and on its way" },
     demand_rate:        { value: sku.blended_daily_usage > 0 ? `${sku.blended_daily_usage} MT per day` : null, describes: "how fast this sells" },
@@ -91,7 +105,8 @@ function buildSlots(sku, alert) {
     safety_stock:       { value: sku.safety_stock_days > 0 ? days(sku.safety_stock_days) : null, describes: "the buffer held on top of lead time demand" },
     max_stock:          { value: mt(sku.max_stock), describes: "the maximum stock level policy allows" },
     overstock_amount:   { value: sku.overstock_qty > 0 ? mt(sku.overstock_qty) : null, describes: "how far on-hand stock sits above the maximum, i.e. on-hand stock minus the maximum" },
-    reorder_point:      { value: mt(sku.reorder_point_policy), describes: "the approved level at which to reorder" },
+    // The approved value, which is what the REORDER alert fires on since TASK-95.
+    reorder_point:      { value: mt(sku.reorder_point_policy), describes: "the approved reorder point: a normal order is due when inventory position falls to or below it" },
     suggested_order:    { value: sku.suggested_order_qty > 0 ? mt(sku.suggested_order_qty) : null, describes: "how much to order, measured at the moment the shipment lands" },
     min_order:          { value: sku.min_order_qty > 0 ? mt(sku.min_order_qty) : null, describes: "the supplier's minimum order quantity" },
     value_class:        { value: sku.abc_class, describes: "the ABC value class, A being the most valuable" },
@@ -156,13 +171,27 @@ function validateSlotted(raw, slots) {
   return { ok: issues.length === 0, issues };
 }
 
+/**
+ * Remove a model's lead-in such as "Here's the explanation:" or "Here is the
+ * rewritten alert:". Small models add one whenever a correction pass mentions
+ * rewriting. It used to be stripped in placeholder mode only, so free-text
+ * fallbacks shipped with it (seen in the 15 Sep benchmark). Shared so both
+ * paths strip the same forms.
+ */
+function stripPreamble(text) {
+  return String(text).replace(
+    /^\s*here(?:'s|\s+is)\s+(?:the\s+|an?\s+|my\s+)?(?:revised|rewritten|updated|corrected|new|final)?\s*(?:explanation|alert|summary|version|answer)\s*:?\s*/i,
+    ""
+  );
+}
+
 /** Substitute values in. Only called once validateSlotted has passed. */
 function renderSlots(raw, slots) {
   let out = raw.replace(PLACEHOLDER, (whole, name) => (slots[name] ? slots[name].value : whole));
 
   // Small models open with "Here is the revised explanation:" whenever the
   // prompt mentions rewriting, which the correction pass always does.
-  out = out.replace(/^\s*here(?:'s|\s+is)\s+(?:the\s+|an?\s+)?(?:revised|rewritten|updated|corrected|new)?\s*explanation\s*:?\s*/i, "");
+  out = stripPreamble(out);
 
   // Slot values are complete sentences ending in a full stop, so a model that
   // adds its own produces "...can arrive..". Cosmetic, but it reads as broken.
@@ -184,4 +213,4 @@ function renderSlots(raw, slots) {
   return out.trim();
 }
 
-module.exports = { buildSlots, describeSlots, validateSlotted, renderSlots };
+module.exports = { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble };

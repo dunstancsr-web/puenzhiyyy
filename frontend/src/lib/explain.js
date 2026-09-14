@@ -107,16 +107,22 @@ function reorder(s) {
       heading: "What was measured",
       body: para(
         `Inventory position is ${mt(s.inventory_position)}: ${mt(s.available_qty)} available plus ${mt(s.expected_incoming_qty)} already on order.`,
-        `The calculated reorder point is ${mt(s.reorder_point_suggested)}.`
+        // The approved point FIRST, because it is the one this alert fired on
+        // (TASK-95). This step used to lead with the calculated value, so the
+        // trace named a threshold the alert card beside it did not use.
+        `The approved reorder point is ${mt(s.reorder_point_policy)}, and the position has reached it.`
       ),
     },
     {
       heading: "How it was derived",
       body: para(
-        `The reorder point is lead-time demand plus safety stock: ${mt(s.lead_time_demand_mt)} consumed over the ${day(s.lead_time_days)} wait, plus ${mt(s.safety_stock_mt)} of buffer.`,
+        `The system's own calculation is lead-time demand plus safety stock: ${mt(s.lead_time_demand_mt)} consumed over the ${day(s.lead_time_days)} wait, plus ${mt(s.safety_stock_mt)} of buffer, which comes to ${mt(s.reorder_point_suggested)}.`,
         `That buffer is sized for a ${Math.round((s.target_service_level || 0) * 100)}% service level against demand variability of ${s.demand_cv} and lead-time variability of ${day(s.lead_time_std_days)}.`,
+        // "Alerts and health status follow the approved value" was half true:
+        // health status does not use a reorder point at all, it uses days of
+        // cover. Only the claim that is true stays.
         Math.abs((s.reorder_point_policy || 0) - (s.reorder_point_suggested || 0)) >= 1
-          ? `Note the approved operating point is ${mt(s.reorder_point_policy)}, which differs from the calculation. Alerts and health status follow the approved value; the gap between the two is worth a policy review.`
+          ? `That calculation differs from the approved ${mt(s.reorder_point_policy)}. This alert follows the approved value, which a manager sets on the Inventory page; the gap between the two is worth a policy review.`
           : null
       ),
     },
