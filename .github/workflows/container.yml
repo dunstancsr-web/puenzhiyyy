@@ -1,0 +1,161 @@
+# Build, test and publish the StockSense container (TASK-91).
+#
+# WHY GITHUB BUILDS IT. The team's Mac has an Apple (arm64) chip and no Docker,
+# and AWS Lightsail's container service runs linux/amd64. Building here, on an
+# amd64 Linux runner, removes both problems: nothing to install locally, and
+# the image is built on the same chip family it will run on, so the native
+# better-sqlite3 module is compiled for the right target rather than emulated.
+#
+# WHAT IT PROVES BEFORE PUBLISHING. An image is only pushed after it has
+#   1. started with the production settings and answered /api/health,
+#   2. served the built site and the seeded demo data,
+#   3. applied the production guards (rule-based default, no local model,
+#      paid tier switched off without credentials),
+#   4. been searched for anything that looks like a secret.
+# A broken or leaky image never reaches the registry.
+#
+# DEPLOYING. Lightsail pulls ghcr.io/<owner>/<repo>:sha-<commit>. Pin the sha
+# tag rather than `latest`, so a redeploy is always a known build. Lightsail
+# can only pull PUBLIC images, so the package's visibility must be switched to
+# public once, in the package settings on GitHub.
+#
+# Secrets (DEMO_PIN, LLM_GATEWAY_API_KEY) are never used or stored here. They
+# are set in the Lightsail console at deploy time and exist only there.
+
+name: Container
+
+on:
+  push:
+    branches: [main]
+    # Docs and design tuners do not change the image, so they do not spend
+    # build minutes.
+    paths-ignore:
+      - "**.md"
+      - "frontend/tuners/**"
+      - "frontend/mockups/**"
+      - ".kiro/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Image name and tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Built once and loaded into the runner's Docker, so the exact image that
+      # is tested below is the one that gets pushed. Rebuilding for the push
+      # would publish something that was never tested.
+      - name: Build (linux/amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: stocksense:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start the container with production settings
+        run: |
+          # A throwaway PIN for this run only. No gateway credentials are
+          # given, so the paid tier must report itself unavailable.
+          docker run -d --name app -p 8080:8080 \
+            -e DEMO_PIN="ci-$(openssl rand -hex 8)" \
+            stocksense:ci
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/api/health >/dev/null; then
+              echo "healthy after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "container never became healthy"; docker logs app; exit 1
+
+      - name: Smoke test the running app
+        run: |
+          set -euo pipefail
+          fail() { echo "FAIL: $1"; docker logs app | tail -40; exit 1; }
+
+          # The built site is served, including a deep link (SPA fallback).
+          curl -fsS http://localhost:8080/ | grep -q '<div id="root">' || fail "home page is not the built app"
+          curl -fsS http://localhost:8080/alerts | grep -q '<div id="root">' || fail "deep link /alerts does not return the app"
+
+          # The database seeded itself on first boot, with the known demo value.
+          value=$(curl -fsS http://localhost:8080/api/dashboard/stats | jq -r '.data.totalInventoryValue')
+          [ "$value" = "3711450" ] || fail "expected seeded inventory value 3711450, got $value"
+
+          # Production guards.
+          mode=$(curl -fsS http://localhost:8080/api/llm/mode)
+          [ "$(echo "$mode" | jq -r '.data.mode')" = "rules" ] || fail "default tier is not rules"
+          [ "$(echo "$mode" | jq -r '.data.modes[] | select(.id=="local") | .available')" = "false" ] || fail "local model offered on a server"
+          [ "$(echo "$mode" | jq -r '.data.modes[] | select(.id=="cloud") | .available')" = "false" ] || fail "paid tier available without credentials"
+
+          # A paid request without a pass must not reach any model.
+          r=$(curl -fsS -X POST http://localhost:8080/api/alerts/explain \
+                -H 'Content-Type: application/json' \
+                -d '{"sku_id":"VF-10KG","alert_type":"OVERSTOCK","tier":"cloud"}')
+          [ "$(echo "$r" | jq -r '.data.available')" = "false" ] || fail "paid explanation served without a pass"
+
+          # Runs as the unprivileged user the Dockerfile sets.
+          [ "$(docker exec app whoami)" = "node" ] || fail "container is running as root"
+
+          echo "all smoke tests passed"
+
+      - name: Scan the image for secrets
+        run: |
+          set -euo pipefail
+          # Any env file anywhere in the image is a failure, whatever it holds.
+          envs=$(docker run --rm --entrypoint sh stocksense:ci -c \
+            'find / -xdev \( -name ".env" -o -name ".env.*" \) 2>/dev/null' || true)
+          if [ -n "$envs" ]; then echo "FAIL: env files in image:"; echo "$envs"; exit 1; fi
+
+          # The shapes of the real credentials, in the app's own files. Values
+          # are never printed, only file names. node_modules is excluded: its
+          # integrity hashes are hex and would bury a real finding in noise.
+          hits=$(docker run --rm --entrypoint sh stocksense:ci -c \
+            'grep -rlE "(^|[^0-9a-fA-F])[0-9a-f]{48}([^0-9a-fA-F]|$)|sk-ant-[A-Za-z0-9_-]{10,}|AKIA[0-9A-Z]{16}|(API_KEY|SECRET|TOKEN|PASSWORD)=[^ \$\{(<][^ ]{7,}|DEMO_PIN=[^ \$\{(<][^ ]{3,}" /app/backend/src /app/frontend/dist 2>/dev/null' || true)
+          if [ -n "$hits" ]; then echo "FAIL: possible secrets in:"; echo "$hits"; exit 1; fi
+          echo "no env files and no credential-shaped strings in the image"
+
+      - name: Stop the container
+        if: always()
+        run: docker rm -f app >/dev/null 2>&1 || true
+
+      # Only from main, and only after every check above passed.
+      - name: Log in to GitHub Container Registry
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the tested image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          for tag in ${{ join(fromJSON(steps.meta.outputs.json).tags, ' ') }}; do
+            docker tag stocksense:ci "$tag"
+            docker push "$tag"
+            echo "published $tag"
+          done
