@@ -17,8 +17,7 @@ AWS NUS-ISS SMYA 2026 Hackathon
 > 3. **The development spend figure** in section 3, after the final paid check near the deadline
 >    (`node scripts/spend.js` and `docs/(Stan) MODEL SPEND.md`).
 >
-> Recapture `docs/images/reasoning-trace.jpg` before export: it shows the old, longer wording of the
-> Why? explanation. Export with any markdown to PDF tool (Typora, Pandoc, or VS Code's "Markdown PDF"),
+> Export with any markdown to PDF tool (Typora, Pandoc, or VS Code's "Markdown PDF"),
 > from the repository root so the image paths resolve.
 
 ---

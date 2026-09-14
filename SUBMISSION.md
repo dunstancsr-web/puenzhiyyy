@@ -1,176 +1,96 @@
 # Submission tracker
 
-AWS NUS-ISS SMYA 2026 Hackathon. **Deadline 28 September 2026.**
+AWS NUS-ISS SMYA 2026 Hackathon. **Shortlisting deadline: 28 September 2026, 9:00am. Finale: 10 October.**
 
-Four artifacts are required. As of 13 Sep the repo is done, the write-up is drafted, and the demo and
-deployment are prepared but need Stan: one needs the AWS lease, the other needs him on a microphone.
+Four deliverables. Status as of 15 Sep.
 
-| # | Deliverable | Status | Owner |
+| # | Deliverable | Status | Next step, and who |
 |---|---|---|---|
-| 1 | GitHub repo | exists, README rewritten 13 Sep | done, keep current |
-| 2 | Deployment URL | image built and tested by CI, **Lightsail service not yet created**; checklist in `docs/(Stan) DEPLOY-LIGHTSAIL.md` | Stan, needs the AWS lease |
-| 3 | YouTube demo video | script ready | Stan records |
-| 4 | PDF write-up | drafted, screenshots in, **needs the URL only** | Stan reviews and exports |
+| 1 | GitHub repo | done, kept current | nothing |
+| 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Stan starts the AWS lease once the organizers answer on Slack, then follows `docs/(Stan) DEPLOY-LIGHTSAIL.md` |
+| 3 | YouTube demo video | script below, updated 15 Sep | Stan records, near the end, with the final paid check |
+| 4 | PDF write-up | `WRITEUP.md` refreshed 15 Sep, screenshots current except the Activity one | fill in the URL, PIN and spend figure **in the PDF only**, then export |
+
+## Before submitting, in this order
+
+1. **Deploy** and run `node backend/scripts/check-deploy.js <url>` against the live service.
+2. **Final paid check**: `node backend/scripts/sonnet-check.js --confirm-spend` (about USD 0.035 for
+   all six alert types). Add the rows to `docs/(Stan) MODEL SPEND.md`.
+3. **Record the video** on freshly seeded data (`npm run seed` from `backend/`).
+4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `WRITEUP.md`.
+5. **Submit**, then capture evidence of the live service before the lease ends.
+
+## Decisions already made
+
+| Decision | Choice | Why |
+|---|---|---|
+| Hosting | AWS Lightsail container service, Nano | the organizers' allowed platform; rubric item 7 scores Platform & Tooling Usage; Render's free tier sleeps |
+| Model | Claude Sonnet 4.5 through the organizers' Bedrock gateway | sponsored; shares the USD 100 AWS credit with hosting |
+| Judge access to the paid model | demo PIN printed in the PDF | a leaked PIN is bounded by the 200 calls a day cap, about USD 1.20 |
+| Paid testing | none until the final check before submission | conserve credit; correctness safeguards do not depend on the model |
+| Video's Why? beat | Sonnet, a few takes | it is what judges will score; repeat views of one alert are cached and free |
+| Data on the server | seeds itself on first boot; a restart resets the demo | removes the whole class of disk problems |
+
+## Judging criteria
+
+From the steering doc: **Architecture & Reasoning Loop, Tool Use & Integration, Autonomy &
+Human-in-the-Loop, Observability**, plus the organizers' rubric item 7, **Platform & Tooling Usage**.
+
+- **Architecture & Reasoning Loop.** Strong on both halves now. Nine deterministic engines, and a live
+  model layer that narrates without computing: placeholders make an invented figure unwritable, the
+  system writes the opening sentence and guarantees the action, and every answer is checked before it
+  is shown, with the rule-based explanation as the fallback.
+- **Tool Use & Integration.** SQLite, a REST API for the Control Tower and another for the warehouse
+  floor, three model tiers behind one call, a CI pipeline that builds, smoke tests and secret scans
+  the image.
+- **Autonomy & Human-in-the-Loop.** Nothing auto-executes. Approve, modify or reject, with the
+  proposal stored beside the decision. The model cannot claim an action was taken; a check rejects it.
+- **Observability.** Eleven audit event types, field-level diffs, every model call with its tokens,
+  failed attempts included, and model spend read from the trail rather than estimated.
+- **Platform & Tooling Usage.** Lightsail, Bedrock through the gateway, GitHub Actions to GHCR.
 
 ## The client and the logo
 
 The demo is pitched at a fictional Singapore rice importer, **四海米行 / Four Seas Rice Trading**,
-named from the team name. The naming rationale, the logo in six treatments, the spoken pitch for
-judges, and three options for where the mark sits in the sidebar all live on one page:
+named from the team name. The naming rationale, the logo, and the spoken pitch are on one page:
 
 - Published: https://claude.ai/code/artifact/55f682c6-a10b-4219-a8cc-8def83a31fd6
 - In the repo: `frontend/tuners/brand.html` (generated; sources in `frontend/tuners/src/`)
 
-**The fifteen-second version to say out loud** is on that page, but the line that does the work is:
-*"the name keeps both halves of ours: the four, and the family."* That is the beat where a judge
-hears that the name was derived rather than decorated.
-
-Judging criteria to optimise for, from the steering doc: **Architecture & Reasoning Loop, Tool Use &
-Integration, Autonomy & Human-in-the-Loop, Observability.**
-
-Where the build currently stands against each:
-
-- **Architecture & Reasoning Loop.** Strong on the deterministic half: nine engines in dependency order,
-  each with a documented formula. Weak on the AI half: TASK-11 is still a rule-based placeholder.
-- **Tool Use & Integration.** Adequate. Real SQLite, real REST surface, real engine pipeline.
-- **Autonomy & Human-in-the-Loop.** Strong, and arguably the best story in the build. Nothing is ever
-  auto-executed, every recommendation carries an approve/modify/reject, and the decision plus the
-  proposal it overrode are both persisted.
-- **Observability.** Was the weakest (a created-but-never-written audit table). Closed on 13 Sep by
-  TASK-31: seven event types, field-level diffs, and an Activity page that renders the trail.
+The line that does the work out loud: *"the name keeps both halves of ours: the four, and the
+family."* That is where a judge hears the name was derived rather than decorated.
 
 ---
 
-## 2. Deployment
+## Demo video script
 
-### The constraint that decides the host
-
-The app writes to a SQLite file on local disk. That rules out anything with an ephemeral or read-only
-filesystem, which rules out Vercel and Netlify functions for the backend. The realistic options are a
-host with a persistent disk or a container.
-
-**Decision (14 Sep): AWS Lightsail, not Render.** This supersedes the Render recommendation that used
-to sit here. The organizers' briefing lists Lightsail as the allowed hosting and their Slack
-announcement says to "use the platform for testing and hosting", rubric item 7 scores Platform &
-Tooling Usage, and the hosting spend comes out of the same AWS-sponsored USD 100 as the model calls.
-Render's free tier also sleeps after 15 minutes, which is the first thing a judge opening the URL would
-hit.
-
-The route is a **Lightsail container service** running the image that GitHub Actions builds, tests
-and publishes (`.github/workflows/container.yml`), because the team Mac has no Docker and an Apple
-chip while Lightsail runs linux/amd64. The step by step checklist, including the environment variables
-and the verification script, is **`docs/(Stan) DEPLOY-LIGHTSAIL.md`**. `render.yaml` stays in the repo as an
-unused fallback.
-
-Two constraints to plan around: the Hackathon Lease expires **15 days after it is submitted** with no
-approval step, so its start date has to cover the judging window; and the account is cleaned up when
-the lease ends, so capture deployment evidence while it is live.
-
-A second, simpler option worth keeping in reserve: **seed at boot and treat the database as
-disposable.** The demo data is fully regenerated by `npm run seed` from a fixed random seed. If the
-persistent disk turns into a fight, call the seeder on startup when the DB is empty and accept that a
-restart resets the demo. For a judged demo that is an acceptable trade, and it removes the entire
-class of disk problems. Decide this early rather than after an hour of debugging volumes.
-
-### Work required
-
-> **Update, 13 Sep 02:40.** Items 1, 2, 3, 5 and 6 below are **done and verified locally**. A production
-> server was booted against an empty temp directory: it created the data dir, seeded itself, served the
-> built frontend, returned `index.html` for a hard refresh on `/activity`, and still returned a JSON 404
-> for a bad `/api` path. Local dev is unchanged with no env vars set. What remains is item 4 and the
-> host itself.
->
-> Deploy settings: superseded by `docs/(Stan) DEPLOY-LIGHTSAIL.md` (14 Sep). The Render build and start
-> commands that were here no longer apply; the container image sets `NODE_ENV`, `PORT` and `DATA_DIR`
-> itself, and the secrets are entered in the Lightsail console.
-
-
-1. **Serve the frontend from the backend in production.** Today the two run separately and Vite proxies
-   `/api` to port 4000 (`frontend/vite.config.js`). That proxy is a dev-server feature and does not
-   exist in a production build. Add to `backend/src/index.js`, after the API routes and before the 404
-   handler:
-   - `express.static` pointing at `frontend/dist`
-   - a catch-all that returns `index.html` for any non-`/api` GET, so React Router deep links such as
-     `/activity` survive a hard refresh
-   Order matters here. The existing 404 handler will swallow the catch-all if it is registered first.
-
-2. **CORS.** `backend/src/index.js` hardcodes `origin: "http://localhost:5173"`. Once the frontend is
-   served from the same origin this is unnecessary for the deployed app but will still block local dev
-   against a remote API. Read the allowed origin from an env var with the localhost value as default.
-
-3. **Port.** Already correct: `process.env.PORT || 4000`. Render injects `PORT`.
-
-4. **Build command.** `npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend`.
-   Start command: `npm start --prefix backend`.
-
-5. **Database location.** `db/init.js` writes to `backend/data/stocksense.db`. On Render this path needs
-   to be either on the mounted disk or accepted as ephemeral per the fallback above. Make the directory
-   configurable by env var rather than hardcoded.
-
-6. **Seed on first boot.** Guard on an empty `skus` table so a redeploy does not wipe a live demo that
-   someone has been clicking through.
-
-**Time estimate: most of a day.** First deploys always bite. Do this well before the 28th. A dead URL
-on submission day cannot be recovered, and it is the one deliverable with an external dependency.
-
----
-
-## 3. Demo video
-
-Script it around the reasoning loop rather than around a tour of the pages. A feature tour shows what
-was built; the loop shows what it is *for*, and it hits three of the four judging criteria in one take.
-
-**Target length: 3 to 4 minutes.**
+Built around the reasoning loop rather than a tour of the pages. A tour shows what was built; the loop
+shows what it is *for*, and it covers every judging criterion in one take. **Target: 3 to 4 minutes.**
 
 | Beat | Screen | What to say |
 |---|---|---|
-| 1. The problem, 20s | Dashboard hero | Two objectives that pull against each other: never miss an order, never tie up cash. A spreadsheet makes a manager hold both in their head for every SKU. |
-| 2. What the system saw, 30s | Dashboard KPIs, health by value | These numbers are computed, not generated. Nine engines, run in order, every figure traceable to a formula. Name the two KPI groups out loud, they are the two objectives. |
-| 3. The exception, 40s | Alerts, open the idle Japonica alert | The system is not asking you to read ten SKUs, it is asking you to decide on one. Read the actual numbers: no sales in 96 days, SGD 250K tied up. |
-| 4. The AI moment, 30s | Ask AI on that alert | The one place a model is invoked, and only because a human asked. Say the ninety-percent-deterministic line explicitly, it is a design decision and judges should hear it as one. |
-| 5. The human decides, 40s | Modify, enter a smaller quantity and a reason | Nothing auto-executes. Modify rather than approve, so the override is visible. Give a real business reason out loud. |
-| 6. The trail, 40s | Activity page, expand that decision | This is the payoff. The decision, what the system had proposed, the delta, and the reason. Expand the record to show the raw input and output. Point out that the alert that started the loop is three rows below. |
+| 1. The problem, 20s | Home, then the Dashboard | Two objectives that pull against each other: never miss an order, never tie up cash. Home shows the three people involved: the dock, the floor, the manager. |
+| 2. What the system saw, 30s | Key Metrics | These numbers are computed, not generated. Nine engines, every figure traceable to a formula. The two groups are the two objectives. |
+| 3. The exception, 30s | Alerts, the idle Japonica alert | The system is not asking you to read ten SKUs, it is asking you to decide on one. No sales in 96 days, SGD 250K tied up. |
+| 4. Why, 50s | Why? on that alert, with AWS Bedrock unlocked | The rule-based explanation appears instantly; Claude's follows. Say the key line: the model never handles a number. Figures are placeholders filled from the engines, the opening sentence is written by the system, and a wrong answer is replaced, never shown. |
+| 5. The human decides, 40s | Modify, a smaller quantity and a reason | Nothing auto-executes. Modify rather than approve, so the override is visible. Give a real business reason. |
+| 6. The trail, 40s | Activity, expand that decision, then the model call | The decision beside what the system proposed, and the model call with its tokens: observability includes what the AI cost. |
 | 7. Close, 20s | Dashboard | One line on what MVP 2 adds. |
 
-Notes for the recording:
-- Run `npm run seed` immediately before recording. It resets alerts and the audit trail so the loop
-  replays cleanly and the Activity page is not cluttered with test rows.
-- Record in light theme. It is the one that has been tuned, and it reads better on compressed video.
-- Do beat 6 last and do not rush it. Observability is the criterion most demos forget to show.
-
----
-
-## 4. PDF write-up
-
-Most of this already exists as prose. Assemble, do not rewrite.
-
-| Section | Source |
-|---|---|
-| Problem statement | README "the idea in one paragraph" + steering doc business problem |
-| Architecture | README architecture tree + the reasoning-loop diagram |
-| Why deterministic-first | steering doc LLM usage principle. Frame the 90/10 split as a cost and trust decision for SMEs, which is what it is |
-| Domain modelling | README domain-rules table. This is the strongest differentiator and most teams will have nothing like it |
-| Human-in-the-loop | decisions schema, the approve/modify/reject flow, the stored proposal-versus-action delta |
-| Observability | README observability section, plus a screenshot of an expanded Activity record |
-| What we deliberately did not build | spec "Explicitly Deferred". Stating scope decisions with reasons reads as engineering maturity, not as a gap |
-| Roadmap | MVP 2 from the steering doc |
-
-Include two screenshots: the Alerts page with an alert open, and an expanded Activity record. The
-second one is the observability evidence.
+Recording notes:
+- `npm run seed` immediately before, so alerts and the audit trail replay cleanly.
+- Light theme, and unlock AWS Bedrock in Settings with the demo PIN before starting.
+- Beat 6 last and unrushed. Observability is the criterion most demos forget to show.
+- **Recapture `docs/images/activity-audit-record.jpg`** from beat 6 for the write-up; the current one
+  shows the old design.
 
 ---
 
 ## Open items
 
-- **TASK-11, the real LLM call.** Blocked on an Anthropic API key, not on design. The call site, the
-  `LLM_CALL` audit event, and the UI all exist. This is the single highest-scoring change remaining and
-  it is roughly an hour of work once a key is available. If no key is provided, lean into the
-  deterministic architecture as the pitch rather than presenting it as an unfinished feature.
-- **No automated tests.** Deliberate. With the time remaining and no CI requirement in the submission,
-  they earn nothing. The interactive audit passes have been doing this job.
-- ~~Japonica's idle bar, `fmt$` rounding, Needs Attention ranking, ragged KPI strip.~~ All four fixed
-  in TASK-35. One caveat: the re-ranking is verified by inspection only, because the seeded portfolio
-  produces no REORDER row to demonstrate it on screen.
-- **The Docker image has never been built.** No container runtime is installed on this machine. The
-  layout and runtime contract it depends on were verified by other means (TASK-34), but if the Render
-  Node runtime works there is no reason to reach for the Dockerfile at all.
+- **No automated test suite.** Deliberate. CI smoke tests the built container, the benchmark
+  (`backend/scripts/bench-models.js`) measures the explanation pipeline, and the interactive audit
+  passes cover the UI.
+- **Stockout and ageing wording on Sonnet** has only been checked on llama3 since the 15 Sep prompt
+  change; the final paid check covers it.
+- **`render.yaml`** is an unused fallback from before the Lightsail decision.
