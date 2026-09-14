@@ -6,12 +6,20 @@ AWS NUS-ISS SMYA 2026 Hackathon
 
 ---
 
-> **Note for Stan, delete before export.** This is the PDF write-up draft, assembled from README.md and
-> `.kiro/specs/mvp1-inventory-visibility/design.md` per the outline in SUBMISSION.md. Prose that already
-> existed was reused rather than rewritten. The three screenshots are in, captured from live
-> seeded data. The deployment URL still needs filling in once the service is live. Export with any markdown to PDF
-> tool; Typora, Pandoc, or VS Code's "Markdown PDF" extension all handle this file as-is. Export from
-> the repository root so the three image paths resolve.
+> **Note for Stan, delete before export.** This is the PDF write-up draft, refreshed on 15 Sep for
+> everything built since 13 Sep: the live model layer and its safeguards, the demo PIN, spend tracking,
+> the warehouse floor screens and the plain-English explanations. Three things to fill in, **in the
+> exported PDF only**:
+>
+> 1. **Live URL** in section 8, once the service is up.
+> 2. **The demo PIN** in section 8. Type it into the PDF, never into this file: the repository is
+>    public, and a PIN committed here is a PIN anyone can find.
+> 3. **The development spend figure** in section 3, after the final paid check near the deadline
+>    (`node scripts/spend.js` and `docs/(Stan) MODEL SPEND.md`).
+>
+> Recapture `docs/images/reasoning-trace.jpg` before export: it shows the old, longer wording of the
+> Why? explanation. Export with any markdown to PDF tool (Typora, Pandoc, or VS Code's "Markdown PDF"),
+> from the repository root so the image paths resolve.
 
 ---
 
@@ -66,10 +74,29 @@ groups on the dashboard.
 
 Every arrow in that diagram writes a row to `audit_log`.
 
+### Three workspaces, one database
+
+Stock arrives, stock leaves, and somebody decides what to do about what is left. Those are three
+different jobs done by different people on different devices, so the first screen offers three ways in
+rather than one navigation:
+
+- **Goods In**, on a handheld at the dock. Receive against a purchase order in four steps (pick the
+  delivery, verify the SKU, count it, confirm), so the system records "195 MT arrived against 200
+  expected, five short, damaged in transit" rather than "someone typed a number".
+- **Goods Out**, on the same handheld. Pick against an open sales order.
+- **The Control Tower**, on a desktop, for the manager: Dashboard, Inventory, Alerts and Activity.
+
+Floor operators sign in with a four digit PIN, because a shared rugged terminal on a charging cradle is
+used by whoever picks it up, and every movement still has to be attributed to a named person. Every
+receipt and issue changes the same stock figures the Control Tower analyses, and lands in the same audit
+trail.
+
 ### Stack
 
 React 18 and Vite on the front end, Express on the back, SQLite via better-sqlite3 for storage, Recharts
-for charts, and plain CSS custom properties for styling.
+for charts, and plain CSS custom properties for styling. Explanations come from Claude Sonnet 4.5 on
+Amazon Bedrock through the hackathon gateway, with a local llama3 for free development and a rule-based
+explanation that needs no model at all (section 3).
 
 SQLite was chosen over PostgreSQL deliberately: one file, no server to provision, and the entire demo
 state is reproducible from a fixed random seed with a single command. For a hackathon handoff that
@@ -84,14 +111,18 @@ ratios are checked against WCAG AA rather than inherited from a framework's defa
 ```
 backend/src/
   db/init.js       schema: skus, inventory_positions, sales_transactions,
-                   purchase_orders, alerts_log, decisions, audit_log
-  db/seed.js       deterministic generator, 10 rice SKUs, 241 sales transactions
+                   purchase_orders, sales_orders, goods_movements, operators,
+                   inventory_history, alerts_log, decisions, audit_log
+  db/seed.js       deterministic generator: 10 rice SKUs, 961 sales transactions,
+                   24 months of balanced stock history
   db/audit.js      audit-log write path
   engines/         the nine engines below, plus index.js as orchestrator
-  routes/          the REST surface
+  llm/             the explanation layer: placeholders, checks, tiers, PIN gate
+  routes/          the Control Tower API and the warehouse floor API
 
 frontend/src/
-  pages/           Dashboard, Inventory, Alerts, Activity
+  pages/           Home, Dashboard, Inventory, Alerts, Activity
+  warehouse/       Goods In, Goods Out and operator sign-in, for the handheld
   components/      StockPositionBar (bullet graph), StatCard, HoverHint, ...
   api/             fetch client
   index.css        the design system, light and dark
@@ -150,14 +181,75 @@ by construction.
 The language model earns its place precisely where deterministic logic is weak: turning a correct but
 terse recommendation into an explanation a human can evaluate and argue with.
 
-Asking "why?" on an alert returns the chain that produced it, not a restatement of the conclusion:
+### The explanation a manager always gets
 
-![The explanation modal, showing four numbered steps: what was measured, how it was derived, what happens if nothing changes, and why this action.](docs/images/reasoning-trace.jpg)
+Asking "why?" on an alert first returns the chain that produced it, not a restatement of the conclusion.
+It is rule-based: built from the SKU's live figures by documented rules, in four short plain-English
+steps. It needs no model, costs nothing, and gives the same answer every time for the same figures.
 
-*Four steps: what was measured, how it was derived, what happens if nothing changes, why this action.
-Every figure is traceable to a formula in design.md and checkable against the Inventory page. This
-structure is also the prompt context a live model will receive, which is why assembling it
-deterministically is the right foundation rather than a stopgap.*
+![The explanation modal, showing four numbered steps: what we see, how we worked it out, if we do nothing, and what to do, and why.](docs/images/reasoning-trace.jpg)
+
+*Four steps: what we see, how we worked it out, what happens if we do nothing, and what to do, and why.
+Every figure is checkable against the Inventory page.*
+
+### The model narrates and never computes
+
+A model summary is then requested in the background. The hard problem with a language model near money
+is not that it is sometimes wrong; it is that it is wrong fluently, with real-looking numbers. So the
+model is never trusted with a number, and the protection is built in three layers.
+
+**1. It cannot write a figure.** The model is not given the figures. It receives each one as a named
+placeholder, `{available_stock}` or `{lead_time}`, and writes prose around them; the system substitutes
+the engine's own values afterwards. A digit in the model's answer is rejected outright (the pack size
+in a product name, "5KG", is the one exception), and so is any placeholder that does not exist. Stating
+a figure the engines did not produce is not merely detectable in this mode, it is unwritable.
+
+**2. It cannot mix up why the alert fired.** Real figures in a false relationship are the next failure,
+and we saw it in testing: *"The inventory position has reached 250 MT"*, where 250 MT was the reorder
+point and the position was 230 MT. Every number real, the sentence wrong. So the system writes the
+opening sentence itself, stating the rule that fired with its figures, and withholds those figures from
+the model entirely. The model cannot re-pair numbers it is never given. The approved action is
+guaranteed the same way: if the model's answer does not state it, the system appends it.
+
+**3. Everything else is checked before it is shown.** Every figure in the final text is traced back to
+the engine's data for that alert. Semantic checks then catch the rest: arithmetic that does not hold
+("exceeds by"), a figure attached to the wrong named quantity, an order quantity other than the
+recommended one, ordering advised on an overstock alert, or a claim that an action was already taken
+when every action waits for a manager. A rejected answer is retried with the reasons it failed, twice
+with placeholders, then once more with the model writing figures itself, each checked against the
+engine's data. If all three fail, the manager sees the rule-based explanation instead. **A wrong
+figure is never shown**, which is why the model can be switched on at all.
+
+### Measured, not assumed
+
+`backend/scripts/bench-models.js` runs the production pipeline with only the model call swapped, across
+every live alert type, and records why each attempt was rejected. Reading those reasons, rather than
+concluding "the model is weak", is what fixed it: most retries were the checks rejecting harmless text,
+such as the "5KG" in a product name.
+
+| Measured on llama3, every live alert type | Before the safeguards | After (32 explanations) |
+|---|---:|---:|
+| Accepted on the first attempt | 0% | 94 to 97% |
+| Model calls per explanation (this is the cost) | 2.59 | 1.03 to 1.06 |
+| Contradictions shown to the manager | 3 | 0 |
+
+The guarantees in layers 1 and 2 hold for any model, because the model never handles those figures.
+Wording is what varies between models, so the paid model gets a final check of its own before submission.
+
+### Three tiers, and a PIN on the one that costs money
+
+| Tier | Where it runs | Cost |
+|---|---|---|
+| Rule-based | everywhere, always | free |
+| Local model | llama3 on a developer's machine | free |
+| AWS Bedrock | Claude Sonnet 4.5 through the hackathon gateway | about USD 0.0055 per explanation |
+
+Each visitor picks a tier for themselves; one visitor's choice never changes another's. The paid tier
+needs a demo PIN, checked on the server. A repeated question on an unchanged alert is served from cache
+for free, and a daily cap of 200 paid calls bounds the worst possible day at about USD 1.20. Every paid
+call, including failed attempts, is recorded with its tokens, so spend is a query rather than a guess.
+Paid model spend across all of development: **USD [fill in] over [n] calls.**
+
 
 ---
 
@@ -218,13 +310,13 @@ once.*
 
 ## 6. Observability
 
-`audit_log` records seven event types, each storing both the input the system saw and the output it
+`audit_log` records eleven event types, each storing both the input the system saw and the output it
 produced:
 
-`ALERT_TRIGGERED` · `DECISION_RECORDED` · `RESTOCK` · `SKU_UPDATED` · `SKU_CREATED` ·
-`ALERT_ACKNOWLEDGED` · `LLM_CALL`
+`ALERT_TRIGGERED` · `ALERT_ACKNOWLEDGED` · `DECISION_RECORDED` · `RESTOCK` · `SKU_CREATED` ·
+`SKU_UPDATED` · `GOODS_RECEIVED` · `GOODS_ISSUED` · `LLM_CALL` · `LLM_UNLOCKED` · `LLM_UNLOCK_LOCKED_OUT`
 
-Three details make this an audit trail rather than a log file:
+Four details make this an audit trail rather than a log file:
 
 **`SKU_UPDATED` stores a field-level before and after diff.** "A row changed" is not observability.
 "Lead time went 45 to 50 days" is. A save that changes nothing records nothing, so the trail does not
@@ -236,6 +328,10 @@ distinction the event is noise.
 
 **`DECISION_RECORDED` stores the proposal next to the action,** plus the delta between the two
 quantities, which is what makes override rate a query rather than a research project.
+
+**`LLM_CALL` stores what the model cost and what it got wrong,** including attempts that failed the
+checks: the tier, the model, tokens in and out, the number of calls, and the issues found. Model spend
+is read from this table, not estimated, and a PIN lockout on the paid tier is recorded as its own event.
 
 Logging is best-effort by design: a failed audit insert is swallowed and reported to the server log
 only. An audit trail that can fail the restock it is recording is worse than no audit trail.
@@ -254,9 +350,10 @@ did instead, and the delta between the two quantities.*
 
 Stating scope decisions with reasons is more honest than presenting a partial system as complete.
 
-**The LLM layer is not yet wired.** "Ask AI" currently returns a rule-based explanation. The call site,
-the `LLM_CALL` audit event, and the surrounding UI are all in place; connecting a real model is a change
-at one function. This is blocked on an API key rather than on design.
+**The model does not decide anything.** It explains a recommendation the engines already made. It
+cannot change a quantity, raise or clear an alert, or trigger an action, and its answer is checked
+before anyone reads it. Giving it more reach is a governance question, not a prompt, and it waits until
+the decisions table shows how far managers trust the engines themselves.
 
 **Scoped out of MVP 1 on purpose:**
 
@@ -287,10 +384,14 @@ every metered backend. Anyone can use the rule-based and deterministic explanati
 
 Because the seed is deterministic, persistence is optional rather than load-bearing. The instance seeds
 itself on first boot when the SKU table is empty, so a restarted container returns with exactly the same
-10 SKUs, 241 sales transactions, and 4 open purchase orders. Attaching a persistent disk preserves
+10 SKUs, 961 sales transactions, 4 open purchase orders and 13 open sales orders. Attaching a persistent disk preserves
 visitor-created state as well; running without one is a supported mode rather than a degraded one.
 
 **Live URL:** `[fill in once deployed]`
+
+**Demo PIN for judges:** `[fill in the PDF only]`. Open Settings in the sidebar, choose AWS Bedrock, and
+enter it to see Claude's explanation beside the rule-based one. Warehouse floor PINs are shown on the
+sign-in screen.
 
 ---
 

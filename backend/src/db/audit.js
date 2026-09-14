@@ -42,9 +42,8 @@ const EVENTS = Object.freeze({
   // the building, so they carry the operator and any variance reason.
   GOODS_RECEIVED: "GOODS_RECEIVED",
   GOODS_ISSUED: "GOODS_ISSUED",
-  // Reserved for TASK-11. The explanation layer is still rule-based, so nothing
-  // emits this yet. The reader and the UI already handle it, so wiring the real
-  // model call is a one-line addition at that call site.
+  // One row per model explanation (TASK-11), failed attempts included, with
+  // tokens and call count. scripts/spend.js prices paid spend from these rows.
   LLM_CALL: "LLM_CALL",
 });
 
