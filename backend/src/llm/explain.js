@@ -41,6 +41,10 @@ about to commit money based on it.
 6. Plain English prose. No bullets, no headings, no markdown.
 7. Never use an em dash or an en dash. Use a comma, a colon, or a new sentence.
 8. End with the single action you would take, stated plainly.
+9. NO CLAIMS BEYOND THE FIGURES. Do not invent costs, savings, fees, deadlines or
+   urgency that no figure supports. Never write "expedited freight", "act today",
+   "delay makes it worse" or "the economics worsen" unless a figure says so.
+   State the risk at the size the figures show, no bigger.
 
 Worked example of the difference:
   Figures:  Days since last sale: 97 days. Gross margin at risk: 26217 SGD.
@@ -61,7 +65,11 @@ const ALERT_BRIEF = {
   // Names the rule, not just the conclusion (TASK-95): what is compared with
   // what. The earlier one-liner left llama3 to guess, and it described the
   // SKU as near its maximum and quoted the wrong threshold.
-  REORDER: "Inventory position, meaning stock available now plus stock already on order, has fallen to the approved reorder point. The problem is that stock will run low if nothing is ordered, but there is still time to order at normal freight rates. Ordering is the answer. Do NOT describe the stock as high, full or near any maximum.",
+  // "normal freight rates" was dropped (TASK-99): Sonnet read it as a cue and
+  // wrote "avoids expedited freight costs" and "delay beyond today and the
+  // economics worsen", neither supported by any figure. It also claimed cover
+  // "does not leave enough time", which is the STOCKOUT_RISK condition.
+  REORDER: "Inventory position, meaning stock available now plus stock already on order, has fallen to the approved reorder point. The problem is that stock will run low if nothing is ordered, but this alert fires early, while a normal order can still arrive in time. Ordering is the answer. Do NOT describe the stock as high, full or near any maximum. Do NOT say there is not enough time to receive an order: that would be a stockout alert, which this is not. The order is due, not urgent: say it should be placed within the lead-time window, never \"as soon as possible\", \"urgently\" or \"immediately\".",
   OVERSTOCK: "This SKU holds more than its maximum policy level. The problem is too much stock. Do NOT suggest ordering more. The answer is to stop or defer buying.",
   IDLE: "This SKU has had no sales at all for a long period. The problem is that capital is trapped in stock nobody is buying. Do NOT suggest ordering more and do NOT mention reorder points. Replenishing is the wrong answer entirely: the decision is how to dispose of what is already held.",
   SLOW_MOVING: "This SKU is selling, but far too slowly for the quantity held. The problem is too much stock relative to demand. Do NOT suggest ordering more. The answer is to buy less next time.",
