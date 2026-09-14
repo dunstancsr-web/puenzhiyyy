@@ -23,6 +23,34 @@
 // digits" stays a simple and total rule.
 const PLACEHOLDER = /\{([a-z_]+)\}/g;
 
+// ── Slots withheld per alert type ────────────────────────────────────────────
+//
+// Slots guarantee every FIGURE is real. They do not guarantee the model puts
+// the right two figures side by side, and that gap produced a wrong sentence on
+// the first live gateway call (2026-09-14):
+//
+//   "{available_stock} exceeds the maximum policy level of {max_stock}
+//    by {overstock_amount}"   ->   "580 MT exceeds ... 400 MT by 220 MT"
+//
+// Every value was correct and the sentence was verified. But overstock is
+// measured on ON-HAND stock (620 - 400 = 220), available stock is on-hand minus
+// reservations, and 580 - 400 is not 220. A reader doing the subtraction
+// concludes the numbers are made up, which is exactly the doubt this whole
+// module exists to rule out.
+//
+// Catching that pairing after the fact would mean parsing sentences. Instead
+// the slot that cannot belong is not offered, so the pairing is unwritable,
+// the same move the no-digits rule makes for invented figures. If the model
+// reaches for it anyway, validateSlotted rejects it as an unknown placeholder
+// and the retry loop in explain.js asks again.
+//
+// An entry belongs here only when an alert's TRIGGER is measured on a figure
+// that a sibling slot looks interchangeable with. Withholding is not free: the
+// model loses a fact, so it is reserved for facts that actively mislead.
+const WITHHELD_BY_ALERT = {
+  OVERSTOCK: ["available_stock"],
+};
+
 // Reuse the engine's own formatted strings wherever they exist rather than
 // re-deriving presentation here. days_of_cover_text and friends are attached in
 // engines/index.js precisely so every surface renders a duration identically.
@@ -52,7 +80,9 @@ function buildSlots(sku, alert) {
     recommended_action: { value: alert.recommended_action, describes: "the full action already decided for this SKU, a complete sentence, to be stated on its own at the end" },
     stockout_gap:       { value: sku.stockout_gap_days > 0 ? `${sku.stockout_gap_days} days` : null, describes: "how long the shelf is empty before replenishment lands" },
     available_stock:    { value: mt(sku.available_qty), describes: "stock available to sell right now" },
-    on_hand_stock:      { value: mt(sku.on_hand_qty), describes: "total physical stock in the warehouse" },
+    // Names the relationship, not just the quantity. These descriptions are
+    // shared by every alert type, so each one says only what is true for all.
+    on_hand_stock:      { value: mt(sku.on_hand_qty), describes: "total physical stock in the warehouse, the figure the maximum stock level is measured against" },
     reserved_stock:     { value: sku.reserved_qty > 0 ? mt(sku.reserved_qty) : null, describes: "stock already promised to confirmed orders" },
     inbound_stock:      { value: sku.expected_incoming_qty > 0 ? mt(sku.expected_incoming_qty) : null, describes: "stock already ordered and on its way" },
     demand_rate:        { value: sku.blended_daily_usage > 0 ? `${sku.blended_daily_usage} MT per day` : null, describes: "how fast this sells" },
@@ -60,7 +90,7 @@ function buildSlots(sku, alert) {
     lead_time:          { value: days(sku.lead_time_days), describes: "how long the supplier takes to deliver a new order" },
     safety_stock:       { value: sku.safety_stock_days > 0 ? days(sku.safety_stock_days) : null, describes: "the buffer held on top of lead time demand" },
     max_stock:          { value: mt(sku.max_stock), describes: "the maximum stock level policy allows" },
-    overstock_amount:   { value: sku.overstock_qty > 0 ? mt(sku.overstock_qty) : null, describes: "how far above the maximum this SKU currently sits" },
+    overstock_amount:   { value: sku.overstock_qty > 0 ? mt(sku.overstock_qty) : null, describes: "how far on-hand stock sits above the maximum, i.e. on-hand stock minus the maximum" },
     reorder_point:      { value: mt(sku.reorder_point_policy), describes: "the approved level at which to reorder" },
     suggested_order:    { value: sku.suggested_order_qty > 0 ? mt(sku.suggested_order_qty) : null, describes: "how much to order, measured at the moment the shipment lands" },
     min_order:          { value: sku.min_order_qty > 0 ? mt(sku.min_order_qty) : null, describes: "the supplier's minimum order quantity" },
@@ -79,8 +109,12 @@ function buildSlots(sku, alert) {
 
   // A slot with no value must not be offered, or the model will reach for it and
   // the sentence will render with a hole in it.
+  const withheld = new Set(WITHHELD_BY_ALERT[alert?.alert_type] || []);
   const slots = {};
-  for (const [k, v] of Object.entries(raw)) if (v.value !== null && v.value !== undefined && v.value !== "") slots[k] = v;
+  for (const [k, v] of Object.entries(raw)) {
+    if (withheld.has(k)) continue;
+    if (v.value !== null && v.value !== undefined && v.value !== "") slots[k] = v;
+  }
   return slots;
 }
 
