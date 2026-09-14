@@ -275,7 +275,15 @@ The full list with rationale is in the spec's "Explicitly Deferred" section.
 ## 8. Deployment
 
 The application deploys as a single service: the Express process serves both the API and the built
-front end from one origin.
+front end from one origin. It runs as a container on AWS Lightsail. GitHub Actions builds the image for
+linux/amd64 on every push, starts it with production settings, runs smoke tests against the live
+container, scans it for anything shaped like a credential, and only then publishes it; Lightsail pulls
+that exact tested image. The gateway key and the demo PIN exist only in Lightsail's environment
+settings, never in the repository or the image.
+
+On a public URL the paid model tier is gated per visitor: a demo PIN, checked on the server, unlocks a
+signed two hour pass for that browser tab, with lockouts against guessing and a daily call cap covering
+every metered backend. Anyone can use the rule-based and deterministic explanations without it.
 
 Because the seed is deterministic, persistence is optional rather than load-bearing. The instance seeds
 itself on first boot when the SKU table is empty, so a restarted container returns with exactly the same
