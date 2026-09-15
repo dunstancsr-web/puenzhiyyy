@@ -32,11 +32,11 @@ and a language model only explains, never computes.**
    Read it before any UI change.
 3. **`.kiro/specs/mvp1-inventory-visibility/design.md`** for the formulas and data model.
 4. **`.kiro/DEVLOG.md`**, newest entries at the bottom, for why recent things are the way they are.
-5. **`tasks.md`** in the same spec folder **stops at TASK-52.** TASK-53 to TASK-99 are recorded only
-   in the devlog. Do not conclude from `tasks.md` that later work is missing.
+5. **`tasks.md`** in the same spec folder has full write-ups to TASK-52 and a one-line index for
+   TASK-46 and TASK-53 to TASK-99, whose detail is in the devlog.
 
-`.kiro/steering/project-context.md` holds the domain glossary and the original goals; its folder tree
-predates most of the build, so trust this file and `CLAUDE.md` for layout.
+`.kiro/steering/project-context.md` holds the business problem and the domain concepts (on hand
+versus available, the two reorder points, and so on). Kiro loads it with this file.
 
 ## Where each fact lives
 
@@ -87,23 +87,13 @@ summary is requested in the background. Three tiers, chosen per visitor: **Rule-
 **Local model** (llama3 via Ollama, dev only), **AWS Bedrock** (Claude Sonnet 4.5 through the
 organizers' gateway, paid, gated by a demo PIN on a public server).
 
-Protection against wrong figures, in `backend/src/llm/`:
-
-1. **`slots.js`**: the model writes `{placeholders}`, never digits; the system substitutes engine
-   values. A digit in the answer is rejected (product pack sizes like "5KG" excepted).
-2. **The system writes the opening sentence** (why the alert fired, with its figures) and withholds
-   those figures from the model. If the answer omits the approved action, the system appends it.
-3. **`explain.js` verifies every figure, `semantic.js` catches real figures in false
-   relationships** (bad arithmetic, wrong figure on a named quantity, wrong order quantity, advice in
-   the wrong direction, claims an action was already taken). Retry with the reasons, twice with
-   placeholders, once free text; then fall back to rule-based. A wrong figure is never shown.
+The model never handles a figure: it writes placeholders, the system writes the opening sentence and
+guarantees the approved action, and every answer is checked before it is shown, with the rule-based
+explanation as the fallback. **The full design, file by file, is `design.md`, "Explanation Layer".**
 
 **If you change a prompt, a brief or a check, re-run
 `node backend/scripts/bench-models.js llama3 --repeat 4 --scenario reorder` and compare.** One run of
 16 is noise; four passes is the number to trust. Record the result in the devlog entry.
-
-`demoAccess.js` is the PIN gate: 5 wrong tries lock a client 15 minutes, 30 in total pause unlocking,
-a pass lasts 2 hours. `provider.js` caps paid calls per day (`LLM_DAILY_CALL_LIMIT`).
 
 ## History, in phases
 

@@ -2,8 +2,14 @@
 
 ## Overview
 Replace spreadsheet-based rice inventory monitoring with a live dashboard.
-The system must give management a real-time view of inventory health across all rice SKUs —
-without requiring any AI/LLM. All logic is deterministic.
+The system must give management a real-time view of inventory health across all rice SKUs. Every
+figure, status and alert is deterministic.
+
+> **2026-09-15 scope update**: the build grew past visibility. REQ-19 to REQ-24 at the end cover what
+> was added between 13 and 15 Sep: warehouse floor movements, inventory history, bulk edit, the
+> explanation layer, paid model access, and deployment. The original "no LLM" rule is replaced by
+> REQ-21: a model may explain an alert, and may never compute a figure or take an action. Detailed
+> design for each lives in `design.md`; the reasoning behind each change is in `.kiro/DEVLOG.md`.
 
 > **2026-09-12 domain-alignment pass**: a teammate supplied two real-world rice-inventory operations
 > documents (see `reference/rice-inventory-technical-spec.md` and
@@ -162,7 +168,9 @@ The system must generate typed alerts automatically.
 
 Alert types:
 - STOCKOUT_RISK:   days_of_cover < lead_time_days, UNLESS covered_by_po
-- REORDER:         inventory_position <= reorder_point_policy, AND movement_class != "Idle"
+- REORDER:         inventory_position <= reorder_point_policy, AND movement_class != "Idle",
+                    AND the SKU has no STOCKOUT_RISK alert (stockout is the more urgent form of the
+                    same problem, so one SKU never carries both)
                     (compares the *inventory position*, meaning available stock plus expected incoming,
                     so an already-adequate inbound PO doesn't also fire this alert; and compares it
                     against the APPROVED reorder point a manager sets, not the calculated
@@ -237,23 +245,31 @@ Features:
 - Sort by severity (critical first)
 - Each alert card shows: SKU name, alert type, severity badge, triggered value, threshold, plain-English message, recommended action
 - Manual dismiss (marks alert as acknowledged, does not delete)
+- Approve, Modify (quantity and reason) or Reject each recommendation; the decision is stored beside
+  what the system proposed (see `decisions` in design.md)
+- **Why?** on each alert opens the explanation described in REQ-21
 
 ---
 
 ### REQ-13 — API Structure
 All data served via REST API from Express backend.
 
-Required endpoints:
-- GET  /api/skus                  — list all SKUs with computed fields
-- GET  /api/skus/:id              — single SKU detail
-- POST /api/skus                  — create SKU
-- PUT  /api/skus/:id              — update SKU
-- GET  /api/dashboard/stats       — KPI summary
-- GET  /api/alerts                — all active alerts
-- POST /api/alerts/:id/acknowledge — dismiss alert
-- GET  /api/inventory             — inventory positions
-- POST /api/inventory/restock     — add stock
-- GET  /api/sales/velocity        — sales velocity per SKU
+Two route files with opposite shapes: `backend/src/routes/inventory.js` serves the Control Tower,
+`backend/src/routes/warehouse.js` the handheld floor. **The route files are the source of truth for the
+endpoint list**; this is the shape as of 15 Sep.
+
+- SKUs: `GET /api/skus`, `GET /api/skus/:id`, `GET /api/skus/:id/projection`, `POST /api/skus`,
+  `PUT /api/skus/:id`, CSV `GET /api/skus/export` and `POST /api/skus/import`, history CSV
+  `GET /api/skus/history/export` and `POST /api/skus/history/import`
+- Dashboard: `GET /api/dashboard/stats`, `GET /api/dashboard/history`
+- Alerts and decisions: `GET /api/alerts`, `POST /api/alerts/:id/acknowledge`, `GET /api/decisions`,
+  `POST /api/decisions`, `POST /api/inventory/restock`
+- Explanations: `POST /api/alerts/explain`, `GET /api/llm/mode`, `POST /api/llm/unlock`
+- Audit: `GET /api/audit`
+- Warehouse floor: `POST /api/warehouse/login`, `GET /api/warehouse/operators`,
+  `GET /api/warehouse/inbound`, `POST /api/warehouse/inbound/receive`, `GET /api/warehouse/outbound`,
+  `POST /api/warehouse/outbound/pick`, `GET /api/warehouse/movements`
+- `GET /api/health`. (`/api/products` is a legacy in-memory demo store, unrelated to the schema.)
 
 ---
 
@@ -348,6 +364,77 @@ Acceptance criteria:
 
 ---
 
+### REQ-19 - Warehouse Floor Movements (handheld) ✅ 2026-09-13 (TASK-46, TASK-47)
+Receiving and picking on a handheld, attributed to a named operator.
+
+- Operators sign in with a four digit PIN (shared rugged device; demo PINs shown on screen, labelled
+  as a prototype affordance)
+- **Goods In**: receive against an open purchase order in four steps (pick the delivery, verify the
+  SKU, count, confirm). Adds to `on_hand_qty` and closes the PO
+- **Goods Out**: pick against an open sales order. Removes from `on_hand_qty` and `reserved_qty`;
+  cannot ship more than is physically on hand
+- A quantity different from the expected one is allowed (short and over deliveries happen) but must
+  carry a variance reason
+- Every movement gets a sequential document number (GRN-0001, DN-0001), a `goods_movements` row, and a
+  GOODS_RECEIVED or GOODS_ISSUED audit event with operator and variance
+
+---
+
+### REQ-20 - Inventory History and Trends ✅ 2026-09-14 (TASK-85, TASK-86)
+- 24 months of monthly balances per SKU (opening, receipts, issues, closing, unit cost), seeded so
+  every period balances and the newest closing equals today's on-hand
+- The Dashboard hero chart shows closing inventory value per month, split into stock that arrived that
+  month and stock carried over (FIFO), with 6M, YTD, 12M and ALL windows
+- Trend arrows on Key Metrics come from stored history, never from hand-set prior values
+- History can be exported and re-imported as CSV
+
+---
+
+### REQ-21 - Alert Explanations ("Why?") ✅ 2026-09-15 (TASK-11, 42 to 45, 89, 95 to 99)
+- **Why?** on any alert shows a rule-based explanation at once: four plain-English steps (what we see,
+  how we worked it out, if we do nothing, what to do), built from the SKU's live figures. It needs no
+  model and is always available
+- A model summary may be requested in addition. Three tiers, chosen per visitor: Rule-based, Local
+  model (Ollama, development only), AWS Bedrock (paid, REQ-22)
+- **The model never computes and never acts.** It must not be able to state a figure the engines did
+  not produce; it must not re-pair figures into a false statement of why the alert fired; it must
+  state the approved action and never claim an action was already taken; it must not invent costs or
+  urgency no figure supports
+- Any answer failing those checks is retried, then replaced by the rule-based explanation. A wrong
+  figure is never shown
+- Each explanation is cached per alert and figures, and every model call, failed attempts included,
+  is written to the audit trail with its tokens
+
+---
+
+### REQ-22 - Paid Model Access and Spend ✅ 2026-09-15 (TASK-90, TASK-93)
+- On a public server, the paid tier requires a demo PIN checked server side. Wrong guesses lock the
+  client out, and repeated failures pause unlocking for everyone. A correct PIN grants a time-limited
+  pass for that browser tab only
+- One visitor's tier choice never changes another visitor's
+- A daily cap bounds paid calls across all visitors
+- Paid spend is computed from the audit trail (`backend/scripts/spend.js`) and recorded in the spend
+  ledger; no paid call is made for testing without Stan's approval
+
+---
+
+### REQ-23 - Bulk Edit by CSV ✅ 2026-09-14 (TASK-60)
+- Export every SKU's editable fields to CSV, edit in a spreadsheet, import back
+- Computed columns in the export are for context and ignored on import
+- An import is validated before anything is written, and changes are audited
+
+---
+
+### REQ-24 - Deployment ✅ image ready 2026-09-15 (TASK-33, 34, 91, 92)
+- One container serves the API and the built frontend from one origin
+- GitHub Actions builds it for linux/amd64, starts it with production settings, smoke tests it, scans
+  it for credentials, and only then publishes it; the host runs that exact image
+- Hosted on AWS Lightsail (container service). Secrets exist only in the host's environment settings
+- The instance seeds itself when the database is empty
+- Status of the live service: the submission tracker, not this document
+
+---
+
 ## Explicitly Deferred (Phase 2/3)
 
 The source technical spec (`reference/rice-inventory-technical-spec.md`) describes a mature enterprise
@@ -358,20 +445,22 @@ overlooked. Each links to the spec step it comes from.
 |---|---|---|
 | Append-only movement ledger (immutable, rebuildable balances) | Step 2 | `inventory_positions` stays a mutable snapshot table; a real ledger is a schema/engine rewrite, not a naming pass, and isn't demo-visible |
 | Lot/batch genealogy, FEFO allocation | Steps 1, 6 | No lot concept anywhere in the current schema; rice repacking mass-balance and lot tracking are a substantial data-model addition |
-| Mobile receiving / barcode workflow | Step 4B | Needs a device-facing workflow and offline sync — a separate app surface |
+| Barcode scanning and offline sync for the floor | Step 4B | Handheld receiving and picking against a PO or sales order are BUILT (REQ-19); scanning hardware and offline sync are not |
 | Import clearance & customs milestones | Step 4A | Depends on external document/permit integrations out of this project's control |
 | Full quality/stock-status taxonomy (blocked, damaged, rejected, in eligible/ineligible splits) | Step 3 | MVP1 models only reserved + quality-hold; the rest needs workflow screens to actually move stock between statuses |
 | Statistically backtested demand forecasting (vs. today's blended 30/90-day average) | Step 10 | Needs a forecasting service with backtest harness — a model-building project of its own; the projection curve (REQ-18) still uses this flat blended rate as its demand input |
 | Governance-approved compliance rule (vs. REQ-16's illustrative placeholder) | Step 11A | Requires an actual compliance owner to approve the real formula, scope, and effective date — not a technical decision |
-| Agent execution governance (tool-permission tiers, idempotent execution, approval-token workflow) | Steps 14-15 | No agent exists yet in this codebase (TASK-11 "Ask AI" is still open); when it's built it must follow this spec's permitted/prohibited list and approval contract, but there's nothing to govern yet |
+| Agent execution governance (tool-permission tiers, idempotent execution, approval-token workflow) | Steps 14-15 | The model layer (REQ-21) only explains; it has no tools and cannot act, so there is nothing to govern yet. Giving it the ability to act would require this governance first |
 | Freshness state machine (current/delayed/stale/unreconciled/unavailable) | Step 18A | REQ-17 above ships only the as-of *timestamp*; the full staleness-detection behaviour needs monitoring infrastructure this project doesn't have |
 | Full audit/reconciliation controls (daily opening=closing checks, idempotency keys, duplicate-replay protection) | Steps 2, 7, 18 | No ledger to reconcile yet (see row 1); `audit_log` exists but isn't schema-validated per event type |
 
 ---
 
 ### Non-Functional Requirements
-- No LLM calls in MVP 1. All logic is rules-based and deterministic.
-- Backend must restart cleanly without data loss (SQLite file persists).
+- Every figure, status and alert is computed deterministically. A model may only narrate (REQ-21).
+- Locally the SQLite file persists across restarts. On the deployed container, a restart without a
+  mounted disk reseeds the demo from the deterministic seed, which is a supported mode (REQ-24).
+- No secret (API key, demo PIN) in the repository or the image.
 - Seed data must use realistic rice SKU names, suppliers, and quantities.
 - All monetary values in SGD.
 - UOM: metric tonnes (MT) for bulk rice, KG for retail packs.

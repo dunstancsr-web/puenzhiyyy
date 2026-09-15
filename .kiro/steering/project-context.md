@@ -2,14 +2,16 @@
 inclusion: always
 ---
 
-# Project: StockSense — Agentic Rice Inventory Management System
+# Project: StockSense, agentic rice inventory management
+
+## About this file
+The domain background: the business problem and the inventory concepts every change must respect.
+It is loaded into every Kiro chat. **Start with `handoff.md` in this folder** for the current state,
+architecture, rules and where each fact lives; this file does not repeat them.
 
 ## Hackathon Context
-- Event: AWS NUS-ISS SMYA 2026 Hackathon
-- Deadlines and deliverable status: `docs/(Stan) 1 Reference/(Stan) SUBMISSION TRACKER.md`
-- Submission requires: GitHub repo, YouTube demo video, PDF write-up, deployment URL
-- Team: Stan (you) + Taw (second developer) + 2 others
-- Stan works independently from Taw to avoid file conflicts
+- Event: AWS NUS-ISS SMYA 2026 Hackathon. Team Puenzhiyyy; Stan leads and decides.
+- Deadlines, deliverables, judging criteria and status: `docs/(Stan) 1 Reference/(Stan) SUBMISSION TRACKER.md`
 
 ## Business Problem
 Rice importer/distributor needs to move from reactive spreadsheet-based inventory management to a proactive, AI-assisted system.
@@ -17,34 +19,26 @@ Two competing objectives:
 - Customer fulfilment (avoid stockouts)
 - Working capital efficiency (avoid excess stock, ageing, storage costs)
 
-## MVP Scope — Currently Building: MVP 1 (Inventory Visibility)
-Replace spreadsheet monitoring with a live dashboard. No AI/LLM yet at this stage.
-
-MVP 1 deliverables:
-- Central data model (SQLite)
-- Inventory balance per SKU
-- Historical usage / sales velocity
-- Months of stock remaining
-- Fast / Normal / Slow / Idle SKU classification
-- Ageing report (by batch received date)
-- Management dashboard with health status (GREEN / YELLOW / ORANGE / RED)
-- Alert engine (stockout risk, overstock, slow-moving, idle, ageing)
-
-After MVP 1 is solid → MVP 2 adds demand forecasting, lead-time intelligence, safety stock, reorder points, projected stock curve.
+## Scope
+What began as MVP 1 (inventory visibility) now also includes safety stock and reorder points, the
+projected stock curve, handheld goods receipt and issue, 24 months of history, and a model layer that
+explains alerts. The authoritative scope is `requirements.md` (REQ-01 to REQ-24) and its "Explicitly
+Deferred" section; forecasting with backtesting and lead-time intelligence remain MVP 2.
 
 ## LLM / AI Usage Principle
-- 90% of logic is deterministic (calculations, rules, thresholds)
-- LLM activates ONLY when a human explicitly clicks "Why?" or "What should I do?" on a flagged SKU
-- This is intentional: target users are SMEs with limited token budgets
-- For the hackathon demo: implement one clear, obvious AI/LLM interaction that wows judges (natural language explanation of a recommendation)
-- Judging criteria to optimise for: Architecture & Reasoning Loop, Tool Use & Integration, Autonomy & Human-in-the-Loop, Observability
+- Every figure, status and alert is deterministic. The model is invoked only when a person presses
+  **Why?** on an alert, and it narrates: it never computes a figure and never takes an action.
+- This is intentional: trust, correctness, and SME token budgets.
+- How that is enforced: `design.md`, "Explanation Layer".
 
 ## Tech Stack
 - Frontend: React 18 + Vite (port 5173) + Recharts + Lucide React + React Router v6
-- Backend: Node.js + Express (port 4000)
-- Database: SQLite (via better-sqlite3) — replaces in-memory store
-- LLM: Kiro's built-in model (used sparingly, only on explicit human trigger)
-- Styling: Plain CSS variables (no Tailwind, no CSS frameworks)
+- Backend: Node.js 22+ + Express (port 4000)
+- Database: SQLite via better-sqlite3
+- Explanations in the app: Claude Sonnet 4.5 on Amazon Bedrock through the hackathon gateway (paid,
+  PIN gated), llama3 via Ollama in development (free), or rule-based (no model)
+- Styling: plain CSS custom properties, no framework; the six step type scale in `CLAUDE.md`
+- Hosting: AWS Lightsail container service, image built by GitHub Actions
 
 ## Inventory Hierarchy (analysis level)
 Company → Warehouse → Product Category → SKU → Supplier/Origin → Batch/Lot
@@ -80,8 +74,8 @@ For MVP 1: track at SKU level. Batch-level tracking added in MVP 2+.
 - Compliance Position (`compliance_position`) — a rice-specific regulatory stockpile buffer, distinct
   from operational Safety Stock. MVP1's version is illustrative/placeholder, not a governance-approved
   rule; always label it as such.
-- Triggers: Stockout Risk, Reorder, Overstock, Slow Moving, Idle, Ageing, Quality Risk, Supplier Delay,
-  Demand Surge, Demand Collapse.
+- Triggers in the domain: Stockout Risk, Reorder, Overstock, Slow Moving, Idle, Ageing, Quality Risk,
+  Supplier Delay, Demand Surge, Demand Collapse. The first six are implemented (REQ-09); the rest are not.
 - What StockSense deliberately does **not** model yet: an immutable movement ledger (balances are a
   mutable snapshot, not rebuildable from history), lot/batch genealogy, blocked/damaged/rejected stock
   statuses, agent execution governance. See the spec's "Explicitly Deferred" section for the full list
@@ -91,49 +85,17 @@ For MVP 1: track at SKU level. Batch-level tracking added in MVP 2+.
 Each SKU has: SKU ID, product name, rice variety, grade, country of origin, brand, packaging size, UOM, supplier, min order qty, reorder point policy, min stock, max stock, safety stock %, active status.
 
 ## File Structure
-```
-puenzhiyyy/
-├── backend/
-│   ├── src/
-│   │   ├── data/         # seed data and DB setup
-│   │   ├── routes/       # Express routes
-│   │   └── index.js
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── api/          # fetch calls to backend
-│   │   ├── components/   # shared UI (Layout, Sidebar, StatCard, Badge)
-│   │   ├── pages/        # Dashboard, Inventory, Alerts
-│   │   └── App.jsx
-│   └── package.json
-├── .kiro/
-│   ├── hooks/            # auto devlog, lint, commit reminder
-│   ├── steering/         # this file — always loaded
-│   ├── specs/            # feature specs
-│   └── DEVLOG.md         # dated development log
-├── docs/
-│   ├── (Stan) 1 Reference/  # Stan's tracker, deploy checklist, spend ledger
-│   ├── (Stan) 2 To review/  # drafts waiting for Stan's comments
-│   └── Submission/          # the judges' write-up and its images
-├── CLAUDE.md             # agent onboarding, must stay at the root
-└── README.md
-```
+See `handoff.md`, "How it fits together", and `design.md`, "Backend File Structure".
 
 ## Decisions Made
-- SQLite chosen over PostgreSQL: zero server setup, single file, easy to hand off
-- In-memory store (products.js) to be replaced with SQLite in MVP 1 rebuild
-- No Tailwind: plain CSS variables for portability and simplicity
-- LLM delayed until explicit user trigger to minimise token costs
-- Stan develops independently from Taw until results are proven
+The current list, with reasons, is in the submission tracker ("Decisions already made"). Settled early
+and still true: SQLite over PostgreSQL (one file, no server, easy handoff); no CSS framework; the model
+only on an explicit human trigger.
 
-## Writing Style (added 2026-09-12, user feedback)
-Do not use an em dash or an en dash anywhere in this project: not in UI copy, not in code comments, not
-in commit messages, not in this file. The user flagged heavy dash use as an obvious "AI vibes" tell.
-Use a plain hyphen, a comma, a colon, parentheses, or split into two sentences instead. This applies to
-new writing going forward; it is not a mandate to rewrite every existing comment in one pass.
+## Writing Style
+No em dashes or en dashes anywhere. The full rule and the other writing rules: `CLAUDE.md` and the
+rules in `handoff.md`.
 
 ## Current State
-- Boilerplate built: React frontend + Express backend + 10 seeded products
-- Pages: Dashboard, Inventory table, Alerts
-- GitHub repo: https://github.com/dunstancsr-web/puenzhiyyy
-- Next: Replace mock data with SQLite, update data model to rice SKUs, build MVP 1 properly
+Not recorded here, so it cannot go stale here: see the submission tracker for status and next steps,
+and `.kiro/DEVLOG.md` for the latest work. Repository: https://github.com/dunstancsr-web/puenzhiyyy

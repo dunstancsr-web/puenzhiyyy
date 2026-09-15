@@ -182,7 +182,7 @@ out-of-scope `setApprovalModal` identifier and threw `ReferenceError` on click �
 
 ---
 
-## TASK-11 — Build AI explanation layer ⏸ blocked 2026-09-12
+## TASK-11 — Build AI explanation layer ⏸ blocked 2026-09-12, unblocked and built 2026-09-13 (see "TASK-11 - AI explanation layer, unblocked" below)
 LLM activates ONLY when a human explicitly clicks "Ask AI". No automatic calls.
 
 **Provider decided, not yet started**: Anthropic Claude API (`@anthropic-ai/sdk`, `ANTHROPIC_API_KEY`) —
@@ -1575,6 +1575,67 @@ every backdrop root. Same CSS, different DOM position, opposite result.
 - [x] Recorded in CLAUDE.md, because it presents as a styling problem and is a DOM problem.
 
 Verified by temporarily widening the breakpoint, then diffing index.css back to byte identical.
+
+## TASK-46 onward: index
+
+From TASK-53 the detail of each task is recorded only in `.kiro/DEVLOG.md` (search for the task number),
+so it is not written twice. This index names each one so a reader of this file knows the work exists.
+TASK-46 was the warehouse floor API, shipped with TASK-47.
+
+| Task | Date | What |
+|---|---|---|
+| 46 | 13 Sep | Warehouse floor API: operators, goods receipt and goods issue against POs and sales orders |
+| 53 | 13 Sep | Settings popover copy |
+| 54 | 13 Sep | Type scale tuner, text sizes raised |
+| 55 | 14 Sep | Six step type scale made a standing rule in CLAUDE.md |
+| 56 | 14 Sep | Every inline font size migrated onto the scale |
+| 57 | 14 Sep | Dashboard restructured: Key Metrics, Needs Attention |
+| 58 | 14 Sep | Key Metrics heading and refinements |
+| 59 | 14 Sep | Needs Attention reveal button on the faded row |
+| 60 | 14 Sep | Bulk edit by CSV export and import |
+| 61 | 14 Sep | Table density tuner |
+| 62 | 14 Sep | Density values applied |
+| 63 | 14 Sep | Compliance Position moved into Service & availability |
+| 64 | 14 Sep | Operators renamed to the team |
+| 65 | 14 Sep | Hero chart on real consumption history |
+| 66 | 14 Sep | Hero chart placement |
+| 67 | 14 Sep | Hero baseline line and label |
+| 68 | 14 Sep | Team credit on Home and sidebar |
+| 69 | 14 Sep | Client named: 四海米行 / Four Seas Rice Trading, and its mark |
+| 70 | 14 Sep | Spoken pitch on the brand sheet |
+| 71 | 14 Sep | Client mark integrated |
+| 72 | 14 Sep | Seal and wordmark studies |
+| 73 | 14 Sep | StockSense mark shipped |
+| 74 | 14 Sep | Home rebuilt client-led |
+| 75 | 14 Sep | Home critique and mockups |
+| 76 | 14 Sep | Home layout editor tuner |
+| 77 | 14 Sep | Home variants |
+| 78 | 14 Sep | Home shipped |
+| 79 | 14 Sep | Control tower icon |
+| 80 | 14 Sep | Device sensing on Home |
+| 81 | 14 Sep | Sidebar aligned with Home |
+| 82 | 14 Sep | Sidebar colour restraint |
+| 83 | 14 Sep | Hover refinements |
+| 84 | 14 Sep | Settings trigger hover |
+| 85 | 14 Sep | 24 months of inventory history; trend arrows from real data |
+| 86 | 14 Sep | Plain-English Key Metrics labels; hero split into new and carried stock |
+| 87 | 14 Sep | Needs Attention Show all scope |
+| 88 | 14 Sep | Secrets: `.env` loading, template ignored, pre-commit secret check |
+| 89 | 14 Sep | First live gateway call; semantic error found |
+| 90 | 15 Sep | Per-visitor tiers and the demo PIN gate |
+| 91 | 15 Sep | Container built by GitHub Actions |
+| 92 | 15 Sep | First green Actions run; deploy checklist and check script |
+| 93 | 15 Sep | Paid spend tracking and ledger |
+| 94 | 15 Sep | Audit undercounts of failed attempts fixed |
+| 95 | 15 Sep | REORDER unified on the approved reorder point |
+| 96 | 15 Sep | Explanation errors made unwritable; semantic checks |
+| 97 | 15 Sep | Plain-English rule-based explanations |
+| 98 | 15 Sep | Approved action guaranteed; paid check scripted |
+| 99 | 15 Sep | No invented costs or urgency in explanations |
+
+After TASK-99, work is logged in the devlog without task numbers.
+
+---
 
 ## Deferred (Phase 2+)
 See `requirements.md` → "Explicitly Deferred (Phase 2/3)" for the full table with rationale. Summary:
