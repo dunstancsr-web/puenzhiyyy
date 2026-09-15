@@ -75,11 +75,11 @@ check("inventory_position", "Inventory Position", "available_qty + expected_inco
   ],
 });
 
-// Sales Velocity: the spec sums quantity with no status filter.
-const specSales = (r, days) => r.sales.filter((x) => x.sale_date >= isoDaysAgo(days, now)).reduce((a, x) => a + x.quantity_mt, 0);
+// Sales Velocity: fulfilled sales only (design.md, decided 15 Sep).
+const specSales = (r, days) => r.sales.filter((x) => x.status === "fulfilled" && x.sale_date >= isoDaysAgo(days, now)).reduce((a, x) => a + x.quantity_mt, 0);
 const specAvg30 = (r) => specSales(r, 30) / 30;
 const specAvg90 = (r) => specSales(r, 90) / 90;
-check("sales_30d", "Sales Velocity", "SUM(quantity) WHERE sale_date >= today - 30", {
+check("sales_30d", "Sales Velocity", "SUM(quantity) of FULFILLED sales WHERE sale_date >= today - 30", {
   tol: 0.05,
   perSku: (s, r) => [specSales(r, 30), s.sales_30d],
 });
@@ -125,17 +125,19 @@ check("suggested_order_qty", "Reorder Point / Projected Inventory", "max(0, targ
 // Movement Classification.
 const a30s = skus.map((s) => specAvg30(raw[s.sku_id])).filter((v) => v > 0).sort((a, b) => a - b);
 const p75 = (() => { if (!a30s.length) return 0; const i = (a30s.length - 1) * 0.75, lo = Math.floor(i), hi = Math.ceil(i); return a30s[lo] + (a30s[hi] - a30s[lo]) * (i - lo); })();
+// Days of cover comes from the ENGINE, so this checks the movement rule on its
+// own; the cover formula has its own check above.
 function specMovement(s, r) {
-  const last = r.sales.filter((x) => x.sale_date >= isoDaysAgo(90, now));
+  const last = r.sales.filter((x) => x.status === "fulfilled" && x.sale_date >= isoDaysAgo(90, now));
   if (!last.length) return "Idle";
   const a30 = specAvg30(r);
-  const avail = r.pos.on_hand_qty - r.pos.reserved_qty - r.pos.quality_hold_qty;
-  if (a30 > 0 && avail / a30 > 120) return "Slow Moving";
+  if (a30 > 0 && s.days_of_cover != null && s.days_of_cover > 120) return "Slow Moving";
   if (a30 >= p75 && p75 > 0) return "Fast Moving";
   return "Normal";
 }
 check("movement_class", "Movement Classification", "Idle: no sales in 90d; Slow: cover > 120d; Fast: >= p75 of avg_daily_30d", {
   compare: same,
+  undocumented: ["days_of_cover (engine, pending the cover decision)"],
   perSku: (s, r) => [specMovement(s, r), s.movement_class],
 });
 

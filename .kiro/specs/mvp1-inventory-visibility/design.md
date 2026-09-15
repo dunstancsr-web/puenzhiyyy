@@ -263,7 +263,8 @@ backend/scripts/        # bench-models.js, sonnet-check.js, spend.js, check-depl
 
 > **Checked by code.** `backend/scripts/check-formulas.js` recalculates each formula below from the raw
 > data and compares it with the engines, in CI on every push. Known disagreements waiting for Stan's
-> decision, with their impact, are in `backend/scripts/formula-decisions.json`.
+> decision, with their impact, are in `backend/scripts/formula-decisions.json`; decided ones are
+> recorded in "Formula decisions" at the end of this section.
 
 > Field names and formulas below match `reference/rice-inventory-terms-glossary.md`; see
 > `reference/terminology-map.md` for the full rename diff and the reasoning behind each one.
@@ -286,8 +287,9 @@ zero here. Not a bug; a scoped-out capability (see requirements.md "Explicitly D
 
 ### Sales Velocity
 ```
-sales_30d = SUM(quantity) WHERE sale_date >= today - 30
-avg_daily_30d = sales_30d / 30
+sales_30d = SUM(quantity_mt) WHERE status = 'fulfilled' AND sale_date >= today - 30
+            (lost sales, orders that could not be filled, are excluded: they feed fill rate)
+avg_daily_30d = sales_30d / 30         (60, 90 and 180 day windows follow the same rule)
 
 velocity_trend:
   if avg_daily_30d > avg_daily_90d * 1.10 → "accelerating"
@@ -348,9 +350,10 @@ ORANGE triggers when supply is already inbound, so a real-but-non-emergency gap 
 
 ### Movement Classification (velocity — kept separate from the ABC value classification below)
 ```
-Idle        if no sales in 90 days
+Evaluated in this order, first match wins (engines/classification.js):
+Idle        if no fulfilled sales in 90 days
 Slow Moving if avg_daily_30d > 0 AND days_of_cover > 120
-Fast Moving if avg_daily_30d >= p75 of all active SKUs
+Fast Moving if avg_daily_30d >= p75 of avg_daily_30d across SKUs that are selling
 Normal      otherwise
 ```
 
@@ -397,6 +400,38 @@ before any real compliance figure is presented as authoritative).
 
 ---
 
+### Formula decisions
+
+Where this document and the code disagreed, found by `check-formulas.js`. Each entry records the
+conflict, what Stan chose and why, and the definition now in force above. Newest first.
+
+**2026-09-15, Movement Classification: what makes a SKU Slow Moving.**
+- Conflict: this document and requirements.md REQ-06 said Slow Moving means selling AND more than 120
+  days of cover. The code ranked SKUs and called the slowest quarter by blended rate Slow Moving,
+  whatever their stock. The ranking always labels some SKU slow, and it disagreed with the SLOW_MOVING
+  alert, which already required cover over 120 days.
+- Chosen: the spec. The code was changed.
+- Why: Stan judged the spec more correct. Slow Moving should mean too much stock for the SKU's own
+  demand, which is what a manager acts on. Trade-off accepted: a fast seller holding over 120 days of
+  stock is now Slow Moving rather than Fast, because the rules are ordered and Slow is tested first.
+  Fast Moving also now ranks by the 30 day average, as written, rather than the blended rate.
+- Effect on the 15 Sep seed: VF-10KG moved from Normal to Slow Moving, adding a SLOW_MOVING alert,
+  and Stock That Is Not Selling rose from about SGD 1.36M (36.7% of inventory) to 1.93M (52%). No health
+  status changed; no other SKU changed class.
+
+**2026-09-15, Sales Velocity: which sales count.**
+- Conflict: this document said sales windows sum every sale; the code summed only fulfilled sales.
+- Chosen: the code. This document was corrected.
+- Why: a lost sale is an order that could not be filled, not consumption. Counting it would inflate
+  demand for exactly the SKUs that ran short, and count the same order again against fill rate, which
+  already uses lost sales. No figure on screen changed.
+
+**Open: Days / Months of Cover, which demand rate.** This document says the 30 day average; the code
+uses the blended rate (half 30 day, half 90 day). Waiting for Stan; the options and impact are in
+`backend/scripts/formula-decisions.json`.
+
+---
+
 ## Seed Data Plan (10 Rice SKUs)
 
 | SKU ID     | Product                  | Variety           | Origin    | Supplier          |
@@ -416,7 +451,7 @@ Seed data includes (deterministic, safe to rerun with `npm run seed`):
 - about 180 days of sales transactions (varying volumes to create velocity patterns), open purchase
   orders, open sales orders, the four operators, and 24 months of balanced inventory history
 - Deliberate scenarios, as the alerts actually fire after a seed: TJ-25KG stockout risk, VF-10KG
-  overstock, JP-5KG idle and ageing, BM-5KG, BM-25KG and BR-10KG slow moving. No REORDER fires on the
+  overstock and slow moving, JP-5KG idle and ageing, BM-5KG, BM-25KG and BR-10KG slow moving. No REORDER fires on the
   seed; `bench-models.js --scenario reorder` raises one on a temporary copy
 
 ---

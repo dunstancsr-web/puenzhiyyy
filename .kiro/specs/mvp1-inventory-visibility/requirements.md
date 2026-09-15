@@ -83,6 +83,9 @@ Required windows:
 - Last 60 days
 - Last 90 days
 
+Sales are FULFILLED sales only; lost sales (orders that could not be filled) are excluded here and
+counted in fill rate instead (decided 15 Sep, see design.md "Formula decisions").
+
 Derived metrics:
 - avg_daily_usage_30d = sales_30d / 30
 - avg_daily_usage_90d = sales_90d / 90
@@ -111,11 +114,12 @@ render "Not Applicable."
 ### REQ-06 — SKU Movement Classification
 Every SKU must be automatically assigned a movement class.
 
-Rules (configurable thresholds):
-- Fast Moving:   avg_daily_usage_30d >= fast_threshold (default: top 25% of all SKUs)
-- Normal:        between slow and fast thresholds
+Rules, evaluated in this order, first match wins (the exact definition is design.md "Movement
+Classification"; changed in code 15 Sep to match this, see design.md "Formula decisions"):
+- Idle:          no fulfilled sales in last 90 days
 - Slow Moving:   avg_daily_usage_30d > 0 AND days_of_cover > 120
-- Idle:          no sales in last 90 days
+- Fast Moving:   avg_daily_usage_30d in the top 25% of selling SKUs
+- Normal:        otherwise
 
 Note: this is a **velocity** classification, deliberately kept separate from the **economic-value**
 ABC classification (new REQ-14 below) — spec Step 8A is explicit that "the two dimensions must remain
