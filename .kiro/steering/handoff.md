@@ -127,6 +127,7 @@ npm run install:all                  # once
 npm run dev:backend                  # http://localhost:4000
 npm run dev:frontend                 # http://localhost:5173
 cd backend && npm run seed           # reset demo data
+cd backend && npm run demo:reset     # reset for recording, and check the video script's beats are ready
 cd frontend && npx vite build        # the build must pass before committing
 node backend/scripts/bench-models.js llama3 --repeat 4 --scenario reorder   # after LLM changes
 node backend/scripts/check-formulas.js   # after ANY engine change: do the formulas still match design.md?

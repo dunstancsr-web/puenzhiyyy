@@ -8,7 +8,7 @@ Four deliverables. Status as of 15 Sep.
 |---|---|---|---|
 | 1 | GitHub repo | done, kept current | nothing |
 | 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Stan starts the AWS lease once the organizers answer on Slack, then follows `(Stan) DEPLOY-LIGHTSAIL.md` in this folder |
-| 3 | YouTube demo video | script below, updated 15 Sep | Stan records, near the end, with the final paid check |
+| 3 | YouTube demo video | script below, updated 15 Sep; `npm run demo:reset` checks the app is ready | Stan records, near the end, with the final paid check |
 | 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 15 Sep, screenshots current except the Activity one | fill in the URL, PIN and spend figure **in the PDF only**, then export |
 
 ## Before submitting, in this order
@@ -17,7 +17,8 @@ Four deliverables. Status as of 15 Sep.
 2. **Final paid check**: run `node backend/scripts/sonnet-check.js` first, which prints the alerts and
    the estimated cost, then again with `--confirm-spend`. Add the rows to `(Stan) MODEL SPEND.md` in
    this folder.
-3. **Record the video** on freshly seeded data (`npm run seed` from `backend/`).
+3. **Record the video**: run `npm run demo:reset` from `backend/` first. It reseeds, then checks the running
+   app has everything the script below needs, and prints READY or what to fix.
 4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `docs/Submission/WRITEUP.md`.
 5. **Submit**, then capture evidence of the live service before the lease ends.
 
@@ -79,7 +80,8 @@ shows what it is *for*, and it covers every judging criterion in one take. **Tar
 | 7. Close, 20s | Dashboard | One line on what MVP 2 adds. |
 
 Recording notes:
-- `npm run seed` immediately before, so alerts and the audit trail replay cleanly.
+- `npm run demo:reset` (from `backend/`) immediately before, and wait for READY. It reseeds so alerts
+  and the audit trail replay cleanly, and refuses to erase paid calls not yet in the spend ledger.
 - Light theme, and unlock AWS Bedrock in Settings with the demo PIN before starting.
 - Beat 6 last and unrushed. Observability is the criterion most demos forget to show.
 - **Recapture `docs/Submission/images/activity-audit-record.jpg`** from beat 6 for the write-up; the current one
