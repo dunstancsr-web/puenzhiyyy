@@ -608,6 +608,11 @@ Requirements: REQ-21 and REQ-22. The model narrates; it never computes and never
   re-pair them. The model is told the opening is already written. The model's own "was flagged"
   sentence is dropped and the system opening is prepended.
 - **Approved action**: if the answer does not contain `alert.recommended_action`, it is appended.
+- **Tone** (`tone.js`), by rule rather than retry: on every alert except STOCKOUT_RISK, urgency words
+  are removed ("take immediate action" becomes "take action"; descriptions such as "not selling
+  quickly enough" are kept); placeholder names leaked as bare words become plain words, never values;
+  and "I recommend that" in front of the engine's capitalised action is dropped. It never edits a
+  sentence containing the approved action, and runs before the opening sentence is added.
 - **Checks on the rendered text**: `verifyExplanation` traces every figure to the known facts, the
   opening and the slot values; `semanticIssues` (`semantic.js`) flags false arithmetic, a figure
   attached to the wrong named quantity, an order quantity other than the recommended one, direction

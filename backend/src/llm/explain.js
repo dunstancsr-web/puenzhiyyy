@@ -16,6 +16,7 @@
 
 const { chat, providerInfo, resolveTier, LlmUnavailable } = require("./provider");
 const { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble, triggerSentence } = require("./slots");
+const { calmTone } = require("./tone");
 const { EVENTS, logEvent } = require("../db/audit");
 const { semanticIssues } = require("./semantic");
 
@@ -509,6 +510,11 @@ async function runExplanation({ sku, alert, callModel }) {
     if (alert.recommended_action && !rendered.includes(alert.recommended_action)) {
       rendered = `${rendered.trim()}\n\n${alert.recommended_action}`;
     }
+
+    // Urgency on a non-stockout alert, and placeholder names leaked as bare
+    // words, are removed by rule rather than retried (tone.js). Runs before the
+    // system's opening sentence is added, and never edits the approved action.
+    rendered = calmTone(rendered, alert, slots).text;
 
     if (opening) {
       rendered = rendered.replace(/^\s*(?:this alert|this sku|this product|it|[A-Z][\w ]{0,40}?)\s+(?:was|has been|is)\s+(?:flagged|triggered)\b[^.]*\.\s*/i, "");
