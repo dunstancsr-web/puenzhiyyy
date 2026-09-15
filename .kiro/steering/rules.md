@@ -131,7 +131,8 @@ Read before making UI changes.
   called the Launchpad; Stan renamed it because everyone already knows what Home means.
 - **The Control Tower**: the desktop side, Dashboard, Inventory, Alerts, Activity. The only part with
   the sidebar.
-- **Goods In** and **Goods Out**: the handheld warehouse floor flows. Industry terms: inbound / goods
+- **Goods In** and **Goods Out**: the handheld warehouse floor flows (Goods Out has an API but no screens
+  yet). Industry terms: inbound / goods
   receipt, outbound / goods issue.
 - **Key Metrics**: the top card on the Dashboard (hero value, baseline comparison, the Service &
   availability and Working capital groups). The Dashboard's sections after it, in order: **Needs

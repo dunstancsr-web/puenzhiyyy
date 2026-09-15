@@ -82,7 +82,8 @@ rather than one navigation:
 - **Goods In**, on a handheld at the dock. Receive against a purchase order in four steps (pick the
   delivery, verify the SKU, count it, confirm), so the system records "195 MT arrived against 200
   expected, five short, damaged in transit" rather than "someone typed a number".
-- **Goods Out**, on the same handheld. Pick against an open sales order.
+- **Goods Out**, on the same handheld: picking against an open sales order works in the API, and its
+  handheld screens are the next thing to build (shown as "Coming soon" on Home).
 - **The Control Tower**, on a desktop, for the manager: Dashboard, Inventory, Alerts and Activity.
 
 Floor operators sign in with a four digit PIN, because a shared rugged terminal on a charging cradle is
@@ -121,7 +122,7 @@ backend/src/
 
 frontend/src/
   pages/           Home, Dashboard, Inventory, Alerts, Activity
-  warehouse/       Goods In, Goods Out and operator sign-in, for the handheld
+  warehouse/       Goods In and operator sign-in, for the handheld
   components/      StockPositionBar (bullet graph), StatCard, HoverHint, ...
   api/             fetch client
   index.css        the design system, light and dark

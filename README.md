@@ -65,8 +65,9 @@ Three workspaces share one database, because the people doing the work are in di
 - **Goods In** (handheld, at the dock). Receive against a purchase order in four steps: pick the
   delivery, verify the SKU, count it, confirm. A quantity different from the one expected is allowed
   but must carry a reason.
-- **Goods Out** (handheld, on the floor). Pick against an open sales order; stock that is not
-  physically there cannot be shipped. Operators sign in with a four digit PIN, so every movement is
+- **Goods Out** (handheld, on the floor). **Coming soon on screen**: picking against an open sales
+  order already works in the API (stock that is not physically there cannot be shipped), but its
+  handheld screens are not built yet. Operators sign in with a four digit PIN, so every movement is
   attributed to a person.
 - **The Control Tower** (desktop, for the manager):
   - **Dashboard.** Key Metrics (inventory value over time split into new and carried stock, plus the
@@ -124,7 +125,7 @@ backend/src/
 backend/scripts/   formula check, demo reset, deploy rehearsal and check, model benchmark
 frontend/src/
   pages/      Home, Dashboard, Inventory, Alerts, Activity
-  warehouse/  Goods In, Goods Out, operator sign-in
+  warehouse/  Goods In and operator sign-in (Goods Out screens not built yet)
   index.css   the design system: plain CSS custom properties, a six step type scale, light and dark
 ```
 

@@ -562,7 +562,8 @@ The first screen: three workspaces on one centre axis, grouped by device. Goods 
 
 ### Goods In and Goods Out (handheld)
 Operator PIN sign-in, then one action per screen with large targets. Goods In: pick the delivery,
-verify the SKU, count, confirm with any variance reason. Goods Out: pick against an open sales order.
+verify the SKU, count, confirm with any variance reason. Goods Out: the API picks against an open
+sales order; its screens are not built, and Home shows the card as "Coming soon".
 
 ### Dashboard
 In order: **Key Metrics** (hero inventory value with the new versus carried chart, baseline comparison,
@@ -688,7 +689,8 @@ C), scoped to what's realistic after the hackathon rather than the full enterpri
 | Done | Approval workflow persistence (TASK-12) — decisions durably recorded, independent of the AI layer | Backend wiring | ✅ |
 | Done | Real projected-inventory curve (TASK-07) — `suggested_order_qty` now exact, not a proxy | Backend wiring | ✅ |
 | Done | Explanation layer (TASK-11 and TASK-42 to TASK-99): narrates only, no tools, cannot act; see "Explanation Layer" | - | ✅ |
-| Done | Handheld Goods In and Goods Out against POs and sales orders (TASK-46, TASK-47) | - | ✅ |
+| Done | Handheld Goods In against purchase orders (TASK-47), and the Goods Out API against sales orders (TASK-46) | - | ✅ |
+| Next | Goods Out handheld screens, on the existing API | - | - |
 | Done | 24 months of inventory history and real trend arrows (TASK-85) | - | ✅ |
 | Next | Any agent that can ACT (raise a PO, move stock) must first follow the spec's Step 14/15 permission model | Stan's decision; the decisions table as evidence of trust | - |
 | Then | Append-only movement ledger (spec Step 2) — replaces the mutable `inventory_positions` snapshot | Real usage/demand for audit trail | — |

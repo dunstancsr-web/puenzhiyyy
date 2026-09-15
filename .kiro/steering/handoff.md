@@ -74,13 +74,13 @@ backend/scripts/
   rehearse-deploy.sh  runs the app like the container on a Mac, then runs check-deploy.js
 frontend/src/
   pages/       Home, Dashboard, Inventory, Alerts, Activity (the Control Tower)
-  warehouse/   Goods In, Goods Out, operator PIN sign-in (the handheld)
+  warehouse/   Goods In and operator PIN sign-in (the handheld; Goods Out screens not built)
   lib/explain.js    the rule-based Why? explanation, four plain-English steps
 frontend/tuners/    Stan's design tuners: sliders over real components, he pastes back CSS
 .github/workflows/container.yml   build, smoke test, secret scan, publish
 ```
 
-Three workspaces share one database: **Goods In** and **Goods Out** on a handheld, the **Control
+Three workspaces share one database: **Goods In** and **Goods Out** (API only, "Coming soon" on screen) on a handheld, the **Control
 Tower** on a desktop. The Dashboard's sections, in order: Key Metrics, Needs Attention, Cover vs Lead
 + Safety beside Inventory Health, Value × Movement.
 
