@@ -34,6 +34,7 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 |---|---|---|
 | [Guide/FEATURES GUIDE.md](<Guide/FEATURES GUIDE.md>) | Every screen with screenshots, by role and task: Home, the receiver's Goods In flow, Goods Out (coming soon), the manager's Dashboard, Alerts, Inventory and Activity, and settings | You want to see what the app does, or show someone |
 | every file in `docs/Guide/images/` | The guide's screenshots | Recapturing a screen after the app changes |
+| `docs/Guide/build-pdf.py` | Rebuilds the guide's PDF into `~/Downloads` (`python3 docs/Guide/build-pdf.py`). The PDF is a copy and is never committed | After editing the guide or recapturing a screenshot |
 
 ## For the judges
 
@@ -65,6 +66,7 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 |---|---|
 | `backend/scripts/demo-reset.js` (`npm run demo:reset`) | Reseeds and checks the running app is ready for the demo video |
 | `backend/scripts/check-formulas.js` | Checks every design.md formula against the engines; runs in CI |
+| `backend/scripts/test-tone.js` | Checks the model wording clean-up (`backend/src/llm/tone.js`) changes what it should and nothing else |
 | `backend/scripts/formula-decisions.json` | Known formula disagreements waiting for Stan's decision (empty when none) |
 | `backend/scripts/bench-models.js` | Measures the explanation pipeline on free local llama3 |
 | `backend/scripts/sonnet-check.js` | The one paid model check; spends nothing without `--confirm-spend` |

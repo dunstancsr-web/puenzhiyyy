@@ -21,6 +21,19 @@ Four deliverables. Status as of 15 Sep.
 4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `docs/Submission/WRITEUP.md`.
 5. **Submit**, then capture evidence of the live service before the lease ends.
 
+## Waiting for Stan's decision
+
+| Question | Options | Where the detail is |
+|---|---|---|
+| When does stock become "At Risk"? | **A.** keep the code: bands scaled to each product's own holding limit (At Risk from 90% of the limit). **B.** follow requirements.md REQ-08: fixed day bands (At Risk from day 271 for every product). Nothing changes on today's data; it matters for short-life products (Brown Rice's 180 day limit: A warns at day 162, B at day 271) | design.md, "Supporting Formulas", ageing status |
+
+## To do, not blocked
+
+- **Recapture two features-guide screenshots** that show old versions: `docs/Guide/images/11-inventory.jpg`
+  (the table before the Edit button fix) and `16-why.jpg` (the summary before urgency wording was
+  removed). Then rebuild the PDF: `python3 docs/Guide/build-pdf.py`.
+- **Goods Out screens** (optional before submission): the API exists; Home shows the card as "Coming soon".
+
 ## Decisions already made
 
 | Decision | Choice | Why |
@@ -31,6 +44,10 @@ Four deliverables. Status as of 15 Sep.
 | Paid testing | none until the final check before submission | conserve credit; correctness safeguards do not depend on the model |
 | Video's Why? beat | Sonnet, a few takes | it is what judges will score; repeat views of one alert are cached and free |
 | Data on the server | seeds itself on first boot; a restart resets the demo | removes the whole class of disk problems |
+| AWS lease | can be extended, so deploy without waiting (15 Sep) | deploying early costs only hosting credit |
+| Formulas where the spec and the code disagreed | lost sales are not sales; Slow Moving means over 120 days of cover; one demand rate, the 30 day moving average, across the whole app (15 Sep) | each conflict, choice and reason: design.md, "Formula decisions" |
+| Urgency in model summaries | removed by a rule after the model answers, not by retries (15 Sep) | free and predictable; design.md, "Explanation Layer", Tone |
+| How documents and rules are kept | filed by reader, listed in `docs/DIRECTORY.md`, every rule in `.kiro/steering/rules.md`, one owner per fact (15 Sep) | `.kiro/steering/rules.md` |
 
 ## Judging criteria
 
@@ -120,8 +137,9 @@ happened in this project:
 
 ## Open items
 
-- **No automated test suite.** Deliberate. CI smoke tests the built container, the benchmark
-  (`backend/scripts/bench-models.js`) measures the explanation pipeline, and the interactive audit
-  passes cover the UI.
-- **Stockout and ageing wording on Sonnet** has only been checked on llama3 since the 15 Sep prompt
-  change; the final paid check covers it.
+- **No full automated test suite.** Deliberate. CI runs the formula check (every design.md formula
+  against the engines) and smoke tests the built container; `backend/scripts/bench-models.js` measures
+  the explanation pipeline; `backend/scripts/test-tone.js` checks the wording clean-up; interactive
+  audit passes cover the UI.
+- **Model wording on Sonnet** has only been checked on llama3 since the 15 Sep prompt and tone
+  changes; the final paid check covers it. Watch for weak timing claims, which no check catches.

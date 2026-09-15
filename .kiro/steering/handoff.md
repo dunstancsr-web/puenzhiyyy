@@ -63,10 +63,13 @@ One owner per fact. Read it there, change it there, and link to it from anywhere
 backend/src/
   engines/     nine deterministic engines, index.js orchestrates. The source of truth for EVERY
                figure. Never recompute what they emit elsewhere.
-  llm/         the explanation layer (see "The model layer" below)
+  llm/         the explanation layer (see "The model layer" below); tone.js cleans the model's wording
   routes/      inventory.js is the Control Tower API, warehouse.js the handheld floor API
   db/          SQLite schema, deterministic seed, audit log
 backend/scripts/
+  check-formulas.js recalculates every design.md formula and compares with the engines (runs in CI)
+  demo-reset.js     npm run demo:reset: reseed, then check the running app is ready to record
+  test-tone.js      checks tone.js changes what it should and nothing else
   bench-models.js   measures the explanation pipeline on free local llama3
   sonnet-check.js   the ONE paid check, refuses to spend without --confirm-spend
   spend.js          paid spend from the audit trail
@@ -77,7 +80,8 @@ frontend/src/
   warehouse/   Goods In and operator PIN sign-in (the handheld; Goods Out screens not built)
   lib/explain.js    the rule-based Why? explanation, four plain-English steps
 frontend/tuners/    Stan's design tuners: sliders over real components, he pastes back CSS
-.github/workflows/container.yml   build, smoke test, secret scan, publish
+docs/Guide/         the features guide (Markdown, screenshots) and build-pdf.py for its PDF
+.github/workflows/container.yml   formula check, build, smoke test, secret scan, publish
 ```
 
 Three workspaces share one database: **Goods In** and **Goods Out** (API only, "Coming soon" on screen) on a handheld, the **Control
@@ -93,7 +97,9 @@ organizers' gateway, paid, gated by a demo PIN on a public server).
 
 The model never handles a figure: it writes placeholders, the system writes the opening sentence and
 guarantees the approved action, and every answer is checked before it is shown, with the rule-based
-explanation as the fallback. **The full design, file by file, is `design.md`, "Explanation Layer".**
+explanation as the fallback. Urgency words on non-stockout alerts and leaked placeholder names are
+removed by rule (`tone.js`) rather than retried. **The full design, file by file, is `design.md`,
+"Explanation Layer".**
 
 **If you change a prompt, a brief or a check, re-run
 `node backend/scripts/bench-models.js llama3 --repeat 4 --scenario reorder` and compare.** One run of
@@ -112,6 +118,9 @@ explanation as the fallback. **The full design, file by file, is `design.md`, "E
 | 14 to 15 Sep | 88 to 94 | Going live: `.env` loading, secret hygiene and pre-commit check, per-visitor tiers, demo PIN, GitHub Actions container, paid spend tracking |
 | 15 Sep | 95 to 99 | REORDER unified on the approved reorder point; wrong explanations made unwritable; plain-English rule-based explanations; no invented urgency |
 | 15 Sep | none | Write-up and tracker refreshed; documents organised by reader |
+| 15 Sep | none | One rulebook (rules.md) and one master directory (docs/DIRECTORY.md); end of session docs check for Claude Code and Kiro; Kiro specs and steering brought up to date |
+| 15 Sep | none | Formula check in CI (26 checks). Stan's formula decisions: fulfilled sales only, Slow Moving by cover, the 30 day average as the one demand rate app-wide |
+| 15 Sep | none | Deploy rehearsal without Docker; README rewritten; goods movements shown on Activity; features guide with screenshots and PDF; Inventory table fitted to laptop widths; urgency and leaked names removed from model wording by rule |
 
 ## Decisions already made
 
@@ -135,6 +144,9 @@ cd backend && npm run demo:reset     # reset for recording, and check the video 
 cd frontend && npx vite build        # the build must pass before committing
 node backend/scripts/bench-models.js llama3 --repeat 4 --scenario reorder   # after LLM changes
 node backend/scripts/check-formulas.js   # after ANY engine change: do the formulas still match design.md?
+node backend/scripts/test-tone.js        # after editing backend/src/llm/tone.js
+sh backend/scripts/rehearse-deploy.sh    # run the app like the Lightsail container, then check it
+python3 docs/Guide/build-pdf.py          # rebuild the features guide PDF into ~/Downloads
 node backend/scripts/sonnet-check.js # plan and cost only; PAID with --confirm-spend
 ```
 
@@ -142,8 +154,9 @@ Check UI changes in a real browser against the real stylesheet, in light theme f
 
 ## Open work
 
-The ordered list is "Before submitting" in the submission tracker, and paid spend so far is in the
-spend ledger. Check both before starting; do not rely on a summary of them.
+The ordered list is "Before submitting" in the submission tracker, with "Waiting for Stan's decision"
+and "To do, not blocked" above it; paid spend so far is in the spend ledger. Check them before starting;
+do not rely on a summary of them.
 
 ## Keeping this in sync
 

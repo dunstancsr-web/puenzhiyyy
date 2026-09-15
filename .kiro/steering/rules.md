@@ -124,6 +124,21 @@ Read before making UI changes.
   state once produced a green result on broken code.
 - **Do not test only for bad things.** A verifier that looks for errors scores an empty response as
   perfect. Check liveness before quality.
+- **Prove a new check can fail.** Before trusting a check, give it a case it must catch. On 15 Sep the
+  formula check was proven by breaking a health rule on purpose, and the directory check turned out to
+  pass everything under `docs/` until a deliberately unlisted file slipped through it.
+- **Describe what the running app does, not what the backend supports.** Goods Out has an API but no
+  screens, and five documents called it a working flow until someone clicked through the app. Check a
+  feature on screen before writing that it exists.
+- **Never point a prompt brief at a figure that has no placeholder.** An ageing brief saying "the
+  figures say how much time remains" made llama3 invent `{time_remaining}`, every attempt was rejected,
+  and calls per explanation rose from 1.08 to 1.33.
+- **For model wording, prefer a rule applied afterwards over more prompt text.** Prompt rules against
+  urgency moved it between alert types; removing it by rule (`tone.js`) took it to zero with no retries.
+  The system-written opening and the appended action follow the same idea.
+- **Quote marks inside a quoted JavaScript string break the file**, and the dev server reloads into the
+  broken file. After editing prompt strings, load the module (`node -e 'require("./src/llm/explain")'`)
+  before running anything else.
 
 ## 6. Names we use
 
