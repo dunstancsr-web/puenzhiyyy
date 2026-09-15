@@ -16,10 +16,12 @@ writing going forward. It is not a mandate to rewrite every existing comment in 
 
 ## Note on tooling
 
-This project was originally scaffolded with Kiro. `.kiro/hooks/*.json` files (such as
-`auto-devlog.json`) are Kiro-specific configuration and do not fire during a Claude Code session. If a
-session ends without a `.kiro/DEVLOG.md` entry, add one by hand in the existing format rather than trying to
-make the Kiro hook run.
+This project was originally scaffolded with Kiro, and both tools now work on it. `.kiro/hooks/*.json`
+fire only in Kiro; `.claude/settings.json` fires only in Claude Code. The one check both share is
+`.kiro/hooks/docs-check.sh`: when an agent finishes responding with files changed since the last
+devlog entry, it asks for the entry (Claude Code blocks the stop once; Kiro, which cannot block, prints a
+reminder). Devlog entries are always written by hand in the existing format. Kiro trigger names are
+PascalCase (`AgentStop`, `PostTaskExecution`); the old `Stop` and `PostTaskExec` never matched.
 
 ## Onboarding for agents: Stan's preferences and this codebase's quirks
 

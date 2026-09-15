@@ -3,7 +3,7 @@
   "hooks": [
     {
       "name": "Commit Reminder",
-      "trigger": "PostTaskExec",
+      "trigger": "PostTaskExecution",
       "description": "After a spec task completes, checks for uncommitted changes and prints a reminder to commit and push. Zero tokens.",
       "action": {
         "type": "command",

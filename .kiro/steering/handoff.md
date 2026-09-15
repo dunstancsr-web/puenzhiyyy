@@ -135,8 +135,8 @@ the model narrates and never computes or acts; light theme first.
 - **Never read out, paste or commit a secret.** Keys and the demo PIN live only in `backend/.env`
   (gitignored) and in Lightsail's environment settings. To check one exists, print its length.
 - **Commit only when Stan asks.** End commits with the attribution your tool requires.
-- **Add a devlog entry by hand** at the end of a session in the existing format. The Kiro devlog hook
-  writes only an empty template.
+- **Add a devlog entry by hand** at the end of a session in the existing format (see "Keeping this in
+  sync").
 - **Say "rule-based"**, never "hard-coded", for the explanation layer.
 - **Font sizes come from the six step scale** in `frontend/src/index.css`, never a raw number.
 - **`npm run seed`** (from `backend/`) after anything that changes stock. It erases the audit trail,
@@ -177,5 +177,7 @@ At the end of a session in which you changed the project:
 4. Update this file only if something it describes changed: the architecture, a rule, the reading
    order, or where a fact lives.
 
-`.claude/hooks/docs-check.sh` checks step 1 automatically when a session ends, in both Claude Code and
-Kiro.
+`.kiro/hooks/docs-check.sh` checks step 1 automatically whenever an agent finishes responding with
+files changed since the last entry: Claude Code runs it from `.claude/settings.json` and pauses once to
+ask for the entry; Kiro runs it from `.kiro/hooks/docs-sync.json` and prints a reminder. If you are
+only pausing to ask Stan a question, say so and stop.
