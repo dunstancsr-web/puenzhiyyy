@@ -44,7 +44,10 @@ about to commit money based on it.
 9. NO CLAIMS BEYOND THE FIGURES. Do not invent costs, savings, fees, deadlines or
    urgency that no figure supports. Never write "expedited freight", "act today",
    "delay makes it worse" or "the economics worsen" unless a figure says so.
-   State the risk at the size the figures show, no bigger.
+   State the risk at the size the figures show, no bigger. Only a stockout risk
+   alert is urgent. On every other alert never use "urgent", "immediate",
+   "immediately", "as soon as possible", "soon", "swift", "quickly" or "pressing":
+   the manager has time to decide, and the figures say how much.
 
 Worked example of the difference:
   Figures:  Days since last sale: 97 days. Gross margin at risk: 26217 SGD.
@@ -69,11 +72,16 @@ const ALERT_BRIEF = {
   // wrote "avoids expedited freight costs" and "delay beyond today and the
   // economics worsen", neither supported by any figure. It also claimed cover
   // "does not leave enough time", which is the STOCKOUT_RISK condition.
+  // IDLE and AGEING gained "not an emergency" lines on 15 Sep: on llama3 they used
+  // urgency wording in 4 of 4 and 3 of 4 answers. A first AGEING wording said
+  // "the figures say how much time remains", and the model invented placeholders
+  // ({time_remaining}) for a figure it is never given, raising calls per
+  // explanation from 1.08 to 1.33. Never point a brief at a figure without a slot.
   REORDER: "Inventory position, meaning stock available now plus stock already on order, has fallen to the approved reorder point. The problem is that stock will run low if nothing is ordered, but this alert fires early, while a normal order can still arrive in time. Ordering is the answer. Do NOT describe the stock as high, full or near any maximum. Do NOT say there is not enough time to receive an order: that would be a stockout alert, which this is not. The order is due, not urgent: say it should be placed within the lead-time window, never \"as soon as possible\", \"urgently\" or \"immediately\".",
   OVERSTOCK: "This SKU holds more than its maximum policy level. The problem is too much stock. Do NOT suggest ordering more. The answer is to stop or defer buying.",
-  IDLE: "This SKU has had no sales at all for a long period. The problem is that capital is trapped in stock nobody is buying. Do NOT suggest ordering more and do NOT mention reorder points. Replenishing is the wrong answer entirely: the decision is how to dispose of what is already held.",
+  IDLE: "This SKU has had no sales at all for a long period. The problem is that capital is trapped in stock nobody is buying. Do NOT suggest ordering more and do NOT mention reorder points. Replenishing is the wrong answer entirely: the decision is how to dispose of what is already held. This is a steady cost, not an emergency: do NOT call it urgent or ask for swift or immediate action.",
   SLOW_MOVING: "This SKU is selling, but far too slowly for the quantity held. The problem is too much stock relative to demand. Do NOT suggest ordering more. The answer is to buy less next time.",
-  AGEING: "This SKU has been in the warehouse a long time and is approaching its holding limit. The problem is time, not quantity. The answer is to move it before quality becomes the binding constraint.",
+  AGEING: "This SKU has been in the warehouse a long time and is approaching its holding limit. The problem is time, not quantity. The answer is to move it before quality becomes the binding constraint. There is still time before the holding limit, which the opening sentence already states, so this is planned work, not an emergency: do NOT say 'soon', 'as soon as possible', 'quickly' or 'immediately'.",
 };
 
 const SLOT_SYSTEM = `You are an inventory analyst at a rice importer and distributor in Singapore.
