@@ -14,6 +14,23 @@ in commit messages, not in this file. The user flagged heavy dash use as an obvi
 a plain hyphen, a comma, a colon, parentheses, or split into two sentences instead. This applies to new
 writing going forward. It is not a mandate to rewrite every existing comment in one pass.
 
+## One source of truth (added 2026-09-15, Stan's standing preference)
+
+Every fact that can change lives in exactly one document, and everywhere else LINKS to it instead of
+repeating it. Stan asked for this after a paid spend total was copied into the handoff: a copied
+figure goes stale silently, and nobody knows which copy is right. It applies to docs, comments and
+code alike.
+
+- Before writing a figure, date, status, count or decision into a document, check whether it already
+  has an owner (the table "Where each fact lives" in `.kiro/steering/handoff.md`). If it does, link to
+  the owner. If it is new, give it one owner and add it to that table.
+- Good: "Paid spend so far: see `(Stan) MODEL SPEND.md`." Bad: "Paid spend so far: USD x.xx." (a number typed in by hand)
+- The same rule in code: read the engine's field rather than re-deriving it (see "Derived values
+  computed twice" below).
+- The one deliberate exception is `docs/Submission/WRITEUP.md`, an export snapshot whose copies are
+  refreshed before each export.
+- When you find a duplicate, remove it in the same change and say so.
+
 ## Note on tooling
 
 This project was originally scaffolded with Kiro, and both tools now work on it. `.kiro/hooks/*.json`

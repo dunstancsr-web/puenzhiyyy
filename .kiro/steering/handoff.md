@@ -119,6 +119,9 @@ the model narrates and never computes or acts; light theme first.
 
 - **No em dashes or en dashes, anywhere**: code, comments, copy, commits. Use a hyphen, comma, colon
   or a new sentence.
+- **One source of truth.** Never copy a figure, date, status or decision that already lives somewhere
+  else: link to its owner in "Where each fact lives". A new fact gets one owner, added to that table.
+  Stan's standing preference; details in `CLAUDE.md`, "One source of truth".
 - **Never call the paid model** (gateway, Bedrock, Anthropic API) for testing unless Stan approves
   that specific run in the current conversation. Test on llama3 or a fake model. After any approved
   paid call, add it to `docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md`.
