@@ -14,8 +14,9 @@ Four deliverables. Status as of 15 Sep.
 ## Before submitting, in this order
 
 1. **Deploy** and run `node backend/scripts/check-deploy.js <url>` against the live service.
-2. **Final paid check**: `node backend/scripts/sonnet-check.js --confirm-spend` (about USD 0.035 for
-   all six alert types). Add the rows to `(Stan) MODEL SPEND.md` in this folder.
+2. **Final paid check**: run `node backend/scripts/sonnet-check.js` first, which prints the alerts and
+   the estimated cost, then again with `--confirm-spend`. Add the rows to `(Stan) MODEL SPEND.md` in
+   this folder.
 3. **Record the video** on freshly seeded data (`npm run seed` from `backend/`).
 4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `docs/Submission/WRITEUP.md`.
 5. **Submit**, then capture evidence of the live service before the lease ends.
@@ -26,7 +27,7 @@ Four deliverables. Status as of 15 Sep.
 |---|---|---|
 | Hosting | AWS Lightsail container service, Nano | the organizers' allowed platform; rubric item 7 scores Platform & Tooling Usage; Render's free tier sleeps |
 | Model | Claude Sonnet 4.5 through the organizers' Bedrock gateway | sponsored; shares the USD 100 AWS credit with hosting |
-| Judge access to the paid model | demo PIN printed in the PDF | a leaked PIN is bounded by the 200 calls a day cap, about USD 1.20 |
+| Judge access to the paid model | demo PIN printed in the PDF | a leaked PIN is bounded by the daily call cap (cost per day in `(Stan) MODEL SPEND.md`) |
 | Paid testing | none until the final check before submission | conserve credit; correctness safeguards do not depend on the model |
 | Video's Why? beat | Sonnet, a few takes | it is what judges will score; repeat views of one alert are cached and free |
 | Data on the server | seeds itself on first boot; a restart resets the demo | removes the whole class of disk problems |

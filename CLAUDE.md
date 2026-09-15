@@ -1,7 +1,10 @@
 # CLAUDE.md
 
-Read `.kiro/steering/project-context.md` first for project background, domain terms, and tech stack.
-Then check `.kiro/specs/mvp1-inventory-visibility/` (`requirements.md`, `design.md`, `tasks.md`) and
+Read `.kiro/steering/handoff.md` first: the current state, history, settled decisions and rules in one
+page, kept up to date for any agent (Kiro loads it automatically; Claude Code does not, so open it).
+It also lists where each fact lives: one owner per fact, linked rather than copied. At the end of a
+session follow its "Keeping this in sync" steps.
+`.kiro/steering/project-context.md` has the domain terms and original goals. Then check `.kiro/specs/mvp1-inventory-visibility/` (`requirements.md`, `design.md`, `tasks.md`) and
 `.kiro/DEVLOG.md` for what has already been built and why, before making changes.
 
 ## Writing style (added 2026-09-12, user feedback)

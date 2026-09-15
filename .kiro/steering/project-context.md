@@ -6,7 +6,7 @@ inclusion: always
 
 ## Hackathon Context
 - Event: AWS NUS-ISS SMYA 2026 Hackathon
-- Submission deadline: 28 September 2026
+- Deadlines and deliverable status: `docs/(Stan) 1 Reference/(Stan) SUBMISSION TRACKER.md`
 - Submission requires: GitHub repo, YouTube demo video, PDF write-up, deployment URL
 - Team: Stan (you) + Taw (second developer) + 2 others
 - Stan works independently from Taw to avoid file conflicts
