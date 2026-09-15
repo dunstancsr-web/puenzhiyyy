@@ -267,7 +267,12 @@ export default function StockPositionBar({
 
       {/* axis labels - sit under their ticks */}
       <div style={{ position: "relative", height: 14, fontSize: "var(--text-xs)", marginTop: 1 }}>
-        <span style={{ position: "absolute", left: 0, color: "var(--text-muted)" }}>0</span>
+        {/* The zero label is dropped when the reorder label would sit on top of it
+            (a reorder point in the first quarter of the scale, seen on VF-10KG at
+            laptop widths). A scale starting at zero needs no label to say so. */}
+        {!(showReorder && reorderPct < 25) && (
+          <span style={{ position: "absolute", left: 0, color: "var(--text-muted)" }}>0</span>
+        )}
         {showReorder && (
           <HoverHint panelWidth={280} content={reorderCopy(true, sug)}>
             <span style={tickLabelStyle(reorderPct, true)}>Reorder {fmt(rop)} MT</span>

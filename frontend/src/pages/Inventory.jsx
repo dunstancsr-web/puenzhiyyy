@@ -22,34 +22,33 @@ import BulkEdit from "../components/BulkEdit";
 const HEALTH_STATUSES = ["All", "RED", "ORANGE", "YELLOW", "GREEN"];
 const MOVEMENT_CLASSES = ["All", "Fast Moving", "Normal", "Slow Moving", "Idle"];
 
-const HEALTH_DOT = { RED: "#ef4444", ORANGE: "#f97316", YELLOW: "#f59e0b", GREEN: "#22c55e" };
 const HEALTH_ORDER = { RED: 0, ORANGE: 1, YELLOW: 2, GREEN: 3 };
 
 // ── Column definitions ──────────────────────────────────────────────────────
 const COLS = [
   {
-    key: "health_status", label: "Status", width: "11%",
+    key: "health_status", label: "Status", width: "15%",
     tip: {
       what: "The overall health of this SKU's inventory position.",
       how: "🔴 RED - Critical. Either you'll run out before the next shipment arrives, or stock has been sitting idle too long.\n🟠 ORANGE - Action needed soon. You're approaching your reorder point or you're holding too much stock.\n🟡 YELLOW - Watch this one. It's slow-moving or drifting toward a problem.\n🟢 GREEN - You're in good shape. No action needed right now.",
     },
   },
   {
-    key: "product_name", label: "Product", width: "23%",
+    key: "product_name", label: "Product", width: "17%",
     tip: {
       what: "The rice SKU name, internal SKU code, country of origin, and supplier.",
       how: "Use the search bar above to find a specific product by name, SKU code, or supplier. Click a product to open its full record.",
     },
   },
   {
-    key: "available_qty", label: "Stock Position", width: "30%",
+    key: "available_qty", label: "Stock Position", width: "28%",
     tip: {
       what: "Where this SKU's available stock sits against its reorder point and maximum.",
       how: "The coloured bar is available stock; its colour is the health status - red below the reorder point, amber just above it, green healthy, purple overstock.\n\nThe two tick marks are the reorder point and the maximum, labelled with their values beneath. Grey shading marks the ranges to avoid: below the reorder point (order now) or above the maximum (overstock). Aim to keep the bar between the two ticks.\n\nAvailable = on-hand stock − reserved for orders − quality hold.",
     },
   },
   {
-    key: "days_of_cover", label: "Coverage vs Lead Time", width: "14%",
+    key: "days_of_cover", label: "Coverage vs Lead Time", width: "13%",
     tip: {
       what: "How many days your current stock will last, compared to how long it takes to get more.",
       how: "Formula: Days of cover = Available stock ÷ Average daily sales (last 30 days).\n\nThe grey marker on the mini bar shows your supplier's lead time. If the coloured bar doesn't reach the marker - you will run out before new stock arrives.\n\nExample: 26 days of cover, 45-day lead time = 19-day gap. Red bar, order now.\n\nIf no demand is shown, this SKU hasn't sold anything recently and is classified as Idle.",
@@ -63,7 +62,7 @@ const COLS = [
     },
   },
   {
-    key: null, label: "Actions", width: "10%",
+    key: null, label: "Actions", width: "15%",
     tip: {
       what: "Quick actions you can take on this SKU.",
       how: "Restock - record a new incoming quantity (e.g. a shipment just arrived).\nEdit - open the full SKU record to change policy thresholds, supplier, costs, lead time, and stock adjustments.",
@@ -381,12 +380,11 @@ export default function Inventory() {
                   <tr key={sku.sku_id}
                     style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}
                   >
-                    {/* Status */}
-                    <td style={{ padding: "13px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: HEALTH_DOT[sku.health_status], flexShrink: 0 }} />
-                        <Badge type={sku.health_status} />
-                      </div>
+                    {/* Status. The coloured badge alone: a matching dot beside it said the
+                        same thing twice and pushed "Action Required" out of the column at
+                        laptop widths. */}
+                    <td style={{ padding: "13px 8px 13px 16px" }}>
+                      <Badge type={sku.health_status} />
                     </td>
 
                     {/* Product - click to open the record */}
@@ -471,9 +469,12 @@ export default function Inventory() {
                       </div>
                     </td>
 
-                    {/* Actions */}
-                    <td style={{ padding: "13px 16px" }}>
-                      <div style={{ display: "flex", gap: 6 }}>
+                    {/* Actions. 15% of the table, with tighter padding than the other
+                        cells: at 10% the two buttons (about 116px) overflowed the cell
+                        at laptop widths and the card clipped Edit. Wrapping is a safety
+                        net, never the intended layout. */}
+                    <td style={{ padding: "13px 8px 13px 12px" }}>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         <ActionBtn label="Restock" onClick={() => { setRestockTarget(sku); setRestockQty(""); setRestockError(null); }} />
                         <ActionBtn label="Edit" onClick={() => setSelectedSku(sku)} variant="ghost" />
                       </div>
