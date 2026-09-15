@@ -159,7 +159,7 @@ function buildSlots(sku, alert) {
 
     reserved_stock:     { value: sku.reserved_qty > 0 ? mt(sku.reserved_qty) : null, describes: "stock already promised to confirmed orders" },
     inbound_stock:      { value: sku.expected_incoming_qty > 0 ? mt(sku.expected_incoming_qty) : null, describes: "stock already ordered and on its way" },
-    demand_rate:        { value: sku.blended_daily_usage > 0 ? `${sku.blended_daily_usage} MT per day` : null, describes: "how fast this sells" },
+    demand_rate:        { value: sku.avg_daily_usage_30d > 0 ? `${sku.avg_daily_usage_30d} MT per day` : null, describes: "how fast this sells" },
     days_of_cover:      { value: sku.days_of_cover_text, describes: "how long current stock will last at that demand rate" },
     lead_time:          { value: days(sku.lead_time_days), describes: "how long the supplier takes to deliver a new order" },
     safety_stock:       { value: sku.safety_stock_days > 0 ? days(sku.safety_stock_days) : null, describes: "the buffer held on top of lead time demand" },

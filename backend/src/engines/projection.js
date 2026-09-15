@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // PROJECTED INVENTORY ENGINE (TASK-07, spec Step 12 / glossary #29)
-//   Projected available(day) = Available today - (blended daily usage x day)
+//   Projected available(day) = Available today - (30 day average daily usage x day)
 //                               + Σ open-PO qty landing on or before that day
 // Flat-rate demand (no seasonality) — matches every other engine's demand
 // model in this MVP. No confirmed-order netting (see design.md's documented
@@ -17,7 +17,7 @@ const round = (n) => Math.round(n * 100) / 100;
 /**
  * @param {object} p
  * @param {number} p.availableQty   current available stock (MT)
- * @param {number} p.dailyDemand    blended daily usage (MT/day), flat-rate
+ * @param {number} p.dailyDemand    30 day average daily usage (MT/day), flat-rate
  * @param {Array<{ordered_qty:number, eta:string}>} p.openPos  open purchase orders
  * @param {number} [p.safetyStockMt]     for first_safety_breach_date
  * @param {number} [p.reorderPoint]      for recovery_date

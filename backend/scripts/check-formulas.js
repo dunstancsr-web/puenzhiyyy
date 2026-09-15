@@ -114,11 +114,10 @@ function specProjection(s, r, day) {
   const landed = r.openPos
     .filter((p) => p.eta && Math.round((new Date(p.eta).getTime() - now) / DAY_MS) <= day && Math.round((new Date(p.eta).getTime() - now) / DAY_MS) >= 0)
     .reduce((a, p) => a + p.ordered_qty, 0);
-  return avail - s.blended_daily_usage * day + landed;
+  return avail - specAvg30(r) * day + landed;
 }
 check("suggested_order_qty", "Reorder Point / Projected Inventory", "max(0, target_stock - projected_available(lead_time_days))", {
   tol: 0.5,
-  undocumented: ["blended_daily_usage (the projection's demand rate)"],
   perSku: (s, r) => [Math.max(0, s.target_stock - specProjection(s, r, Math.round(s.lead_time_days))), s.suggested_order_qty],
 });
 
@@ -137,7 +136,7 @@ function specMovement(s, r) {
 }
 check("movement_class", "Movement Classification", "Idle: no sales in 90d; Slow: cover > 120d; Fast: >= p75 of avg_daily_30d", {
   compare: same,
-  undocumented: ["days_of_cover (engine, pending the cover decision)"],
+  undocumented: ["days_of_cover (engine; checked on its own above)"],
   perSku: (s, r) => [specMovement(s, r), s.movement_class],
 });
 
@@ -157,21 +156,21 @@ check("health_status", "Health Status", "RED / ORANGE / YELLOW / GREEN rules, fi
 });
 
 // ABC Value Classification.
-const acv = skus.map((s) => ({ id: s.sku_id, v: s.blended_daily_usage * 365 * s.unit_cost_sgd })).sort((a, b) => b.v - a.v);
+const acv = skus.map((s) => ({ id: s.sku_id, v: specAvg30(raw[s.sku_id]) * 365 * s.unit_cost_sgd })).sort((a, b) => b.v - a.v);
 const acvTotal = acv.reduce((a, x) => a + x.v, 0) || 1;
 const specAbc = {};
 { let cum = 0; for (const x of acv) { cum += x.v; const pct = cum / acvTotal; specAbc[x.id] = pct <= 0.8 ? "A" : pct <= 0.95 ? "B" : "C"; } }
-check("abc_class", "ABC Value Classification", "cumulative share of blended_daily_usage * 365 * unit_cost_sgd: A <= 80%, B <= 95%", {
+check("abc_class", "ABC Value Classification", "cumulative share of avg_daily_30d * 365 * unit_cost_sgd: A <= 80%, B <= 95%", {
   compare: same,
   perSku: (s) => [specAbc[s.sku_id], s.abc_class],
 });
 
 // Compliance Position (portfolio).
-check("compliance_position", "Compliance Position", "SUM(on_hand_qty) - 2 * SUM(blended_daily_usage) * 30", {
+check("compliance_position", "Compliance Position", "SUM(on_hand_qty) - 2 * SUM(avg_daily_30d) * 30", {
   tol: 1,
   portfolio: () => {
     const eligible = skus.reduce((a, s) => a + raw[s.sku_id].pos.on_hand_qty, 0);
-    const required = 2 * skus.reduce((a, s) => a + s.blended_daily_usage, 0) * 30;
+    const required = 2 * skus.reduce((a, s) => a + specAvg30(raw[s.sku_id]), 0) * 30;
     return [eligible - required, stats.compliancePosition];
   },
 });

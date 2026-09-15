@@ -69,7 +69,7 @@ function stockoutRisk(s) {
     {
       heading: H.seen,
       body: para(
-        `${mt(s.available_qty)} is available and ${s.blended_daily_usage} MT sells each day.`,
+        `${mt(s.available_qty)} is available and ${s.avg_daily_usage_30d} MT sells each day.`,
         s.days_of_cover != null ? `That lasts ${days(s.days_of_cover)}.` : `Nothing is selling right now, so there is no "days left" figure.`
       ),
     },
@@ -125,7 +125,7 @@ function reorder(s) {
     },
     {
       heading: H.next,
-      body: para(`Stock keeps falling by ${s.blended_daily_usage} MT a day. Once it cannot last the ${dayAdj(s.lead_time_days)} wait, this becomes a stockout alert, and only paying for faster shipping helps.`),
+      body: para(`Stock keeps falling by ${s.avg_daily_usage_30d} MT a day. Once it cannot last the ${dayAdj(s.lead_time_days)} wait, this becomes a stockout alert, and only paying for faster shipping helps.`),
     },
     {
       heading: H.act,
@@ -214,7 +214,7 @@ function slowMoving(s) {
     },
     {
       heading: H.how,
-      body: para(`That is ${mt(s.available_qty)} of stock divided by the ${s.blended_daily_usage} MT that sells each day.`),
+      body: para(`That is ${mt(s.available_qty)} of stock divided by the ${s.avg_daily_usage_30d} MT that sells each day.`),
     },
     {
       heading: H.next,

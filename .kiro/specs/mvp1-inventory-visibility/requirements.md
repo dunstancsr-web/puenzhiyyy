@@ -86,7 +86,7 @@ Required windows:
 Sales are FULFILLED sales only; lost sales (orders that could not be filled) are excluded here and
 counted in fill rate instead (decided 15 Sep, see design.md "Formula decisions").
 
-Derived metrics:
+Derived metrics (avg_daily_usage_30d is the one demand rate used by every other requirement):
 - avg_daily_usage_30d = sales_30d / 30
 - avg_daily_usage_90d = sales_90d / 90
 - velocity_trend: "accelerating" | "stable" | "decelerating"
@@ -284,7 +284,7 @@ remain separate"). Already implemented in code (`segmentation.js`, `abc_class`/`
 missing from this document until now.
 
 Formula:
-  annual_consumption_value = blended_daily_usage × 365 × unit_cost_sgd
+  annual_consumption_value = avg_daily_usage_30d × 365 × unit_cost_sgd
   Sort SKUs descending by annual_consumption_value; assign by cumulative % of portfolio total:
     A: cumulative <= 80%   B: cumulative <= 95%   C: remainder
 
@@ -322,7 +322,7 @@ SKUs) because the real scheme is a company-wide requirement, not a per-SKU one.
 Formula:
   compliance_eligible_qty = Σ on_hand_qty across all active SKUs (MVP1 has no blocked/damaged/rejected
                             statuses to exclude — see "Explicitly Deferred" below)
-  compliance_required_qty = 2 × Σ(blended_daily_usage across active SKUs) × 30 (placeholder rule —
+  compliance_required_qty = 2 × Σ(avg_daily_usage_30d across active SKUs) × 30 (placeholder rule —
                             substitutes portfolio demand throughput for real import-receipt history,
                             which this project doesn't have)
   compliance_position      = compliance_eligible_qty − compliance_required_qty
@@ -351,7 +351,7 @@ Acceptance criteria:
 The system must show a dated projection, not one net number (spec Step 12 / glossary term #29), so a
 manager can see the first future risk, its size, and its expected recovery — not just today's snapshot.
 
-Formula: `projected_available(day) = available_qty − (blended_daily_usage × day) + Σ open-PO qty
+Formula: `projected_available(day) = available_qty − (avg_daily_usage_30d × day) + Σ open-PO qty
 landing on or before that day`, run out 90 days from today. Flat-rate demand, no seasonality — matches
 every other engine's demand model in this MVP (documented simplification, not a bug).
 
@@ -452,7 +452,7 @@ overlooked. Each links to the spec step it comes from.
 | Barcode scanning and offline sync for the floor | Step 4B | Handheld receiving and picking against a PO or sales order are BUILT (REQ-19); scanning hardware and offline sync are not |
 | Import clearance & customs milestones | Step 4A | Depends on external document/permit integrations out of this project's control |
 | Full quality/stock-status taxonomy (blocked, damaged, rejected, in eligible/ineligible splits) | Step 3 | MVP1 models only reserved + quality-hold; the rest needs workflow screens to actually move stock between statuses |
-| Statistically backtested demand forecasting (vs. today's blended 30/90-day average) | Step 10 | Needs a forecasting service with backtest harness — a model-building project of its own; the projection curve (REQ-18) still uses this flat blended rate as its demand input |
+| Statistically backtested demand forecasting (vs. today's flat 30-day moving average) | Step 10 | Needs a forecasting service with backtest harness — a model-building project of its own; the projection curve (REQ-18) still uses this flat 30-day average as its demand input |
 | Governance-approved compliance rule (vs. REQ-16's illustrative placeholder) | Step 11A | Requires an actual compliance owner to approve the real formula, scope, and effective date — not a technical decision |
 | Agent execution governance (tool-permission tiers, idempotent execution, approval-token workflow) | Steps 14-15 | The model layer (REQ-21) only explains; it has no tools and cannot act, so there is nothing to govern yet. Giving it the ability to act would require this governance first |
 | Freshness state machine (current/delayed/stale/unreconciled/unavailable) | Step 18A | REQ-17 above ships only the as-of *timestamp*; the full staleness-detection behaviour needs monitoring infrastructure this project doesn't have |

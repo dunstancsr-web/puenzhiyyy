@@ -1,9 +1,1 @@
-{
-  "days_of_cover": {
-    "status": "awaiting Stan's decision",
-    "found": "2026-09-15",
-    "code": "available_qty / blended_daily_usage, rounded to whole days, where blended_daily_usage = half the 30 day average plus half the 90 day average. The same blended rate drives the projection, ABC and compliance, which the spec already documents as blended.",
-    "impact": "applying the spec's 30 day rate changes no alert or health status on the 15 Sep seed, but every displayed days-of-cover figure moves (for example BM-5KG 292 to about 313), and cover would jump whenever one busy or quiet month passes.",
-    "recommendation": "keep the code, correct the spec (design.md and requirements.md REQ-05): one demand rate across the app, and a smoother figure for decisions."
-  }
-}
+{}

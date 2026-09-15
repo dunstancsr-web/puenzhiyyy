@@ -133,7 +133,7 @@ Each runs in dependency order and contributes fields to a single enriched SKU re
 
 | Engine | Responsibility |
 |---|---|
-| `velocity` | rolling 30/60/90/180-day consumption, blended daily rate, demand variability, trend |
+| `velocity` | rolling 30/60/90/180-day consumption, the 30-day average demand rate, demand variability, trend |
 | `position` | available quantity, expected incoming, inventory position |
 | `safetystock` | statistical safety stock from a target service level (King's formula) |
 | `classification` | Fast / Normal / Slow / Idle, by throughput |
@@ -148,10 +148,10 @@ Representative formulas, all from `design.md`:
 ```
 available_qty       = on_hand_qty - reserved_qty - quality_hold_qty
 inventory_position  = available_qty + expected_incoming_qty
-days_of_cover       = available_qty / avg_daily_30d      (Not Applicable when demand is zero)
+days_of_cover       = available_qty / avg_daily_usage_30d (Not Applicable when demand is zero)
 reorder_point_sugg. = lead_time_demand_mt + safety_stock_mt
-annual_cons._value  = blended_daily_usage * 365 * unit_cost_sgd
-projected_avail(d)  = available_qty - (blended_daily_usage * d)
+annual_cons._value  = avg_daily_usage_30d * 365 * unit_cost_sgd
+projected_avail(d)  = available_qty - (avg_daily_usage_30d * d)
                       + sum of open-PO quantity landing on or before day d
 ```
 

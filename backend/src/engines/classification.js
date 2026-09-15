@@ -9,7 +9,7 @@
 //   Normal       otherwise
 //
 // Changed 15 Sep 2026 on Stan's decision. Slow Moving used to be a ranking
-// (the bottom quarter by blended rate), which always labels some SKU slow and
+// (the bottom quarter by demand rate), which always labels some SKU slow and
 // disagreed with both specs and with the SLOW_MOVING alert, which already
 // requires cover over 120 days. The trade-off accepted: a fast seller holding
 // more than 120 days of stock is now Slow Moving, because too much stock for

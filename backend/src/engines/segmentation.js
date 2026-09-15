@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ABC × XYZ SEGMENTATION ENGINE
-//   ABC — Pareto on annual consumption value (blended daily × 365 × unit cost)
+//   ABC — Pareto on annual consumption value (30 day average daily usage × 365 × unit cost)
 //         A: cumulative ≤ 80%   B: ≤ 95%   C: remainder
 //   XYZ — demand predictability by coefficient of variation
 //         X: cv < 0.25   Y: 0.25–0.5   Z: > 0.5

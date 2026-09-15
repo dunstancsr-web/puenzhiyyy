@@ -24,7 +24,7 @@ function zScore(serviceLevel) {
 
 /**
  * @param {object} p
- * @param {number} p.avgDailyDemand   blended daily usage (MT/day)
+ * @param {number} p.avgDailyDemand   30 day average daily usage (MT/day)
  * @param {number} p.demandCv         coefficient of variation of daily demand
  * @param {number} p.leadTimeDays
  * @param {number} p.leadTimeStdDays

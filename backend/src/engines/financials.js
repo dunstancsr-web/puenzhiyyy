@@ -11,11 +11,11 @@
  */
 function skuFinancials(s) {
   const marginPerMt = s.unit_price_sgd - s.unit_cost_sgd;
-  const blended = s.blended_daily_usage || 0;
+  const dailyRate = s.avg_daily_usage_30d || 0;
 
   const inventory_value = round(s.on_hand_qty * s.unit_cost_sgd);
-  const annual_cogs = round(blended * 365 * s.unit_cost_sgd);
-  const annual_gross_margin = round(blended * 365 * marginPerMt);
+  const annual_cogs = round(dailyRate * 365 * s.unit_cost_sgd);
+  const annual_gross_margin = round(dailyRate * 365 * marginPerMt);
   const gross_margin_pct = s.unit_price_sgd > 0 ? round((marginPerMt / s.unit_price_sgd) * 100) : 0;
 
   // Overstock (above max) — value plus the annual cost of holding it
@@ -33,7 +33,7 @@ function skuFinancials(s) {
     s.days_of_cover != null && !s.covered_by_po
       ? Math.max(0, s.lead_time_days - s.days_of_cover)
       : 0;
-  const lost_units_risk = round(gapDays * blended);
+  const lost_units_risk = round(gapDays * dailyRate);
   const lost_margin_risk = round(lost_units_risk * marginPerMt);
   const lost_sales_value_risk = round(lost_units_risk * s.unit_price_sgd);
 
@@ -101,7 +101,7 @@ function portfolioStats(skus, demand) {
   // stockpile scheme is company-wide, not per-SKU. Uses demand as an honest stand-in for real
   // import-receipt history, which this project doesn't have.
   const complianceEligibleQty = round(sum(active, "on_hand_qty"));
-  const complianceRequiredQty = round(2 * sum(active, "blended_daily_usage") * 30);
+  const complianceRequiredQty = round(2 * sum(active, "avg_daily_usage_30d") * 30);
   const compliancePosition = round(complianceEligibleQty - complianceRequiredQty);
 
   // Value-weighted coverage band

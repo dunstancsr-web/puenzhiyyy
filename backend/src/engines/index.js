@@ -45,17 +45,18 @@ function buildAnalytics(db, asOf = Date.now()) {
 
     const demandCv = v.demand_cv > 0 ? v.demand_cv : m.demand_cv;
     const ss = computeSafetyStock({
-      avgDailyDemand: v.blended_daily_usage,
+      avgDailyDemand: v.avg_daily_usage_30d,
       demandCv,
       leadTimeDays: m.lead_time_days,
       leadTimeStdDays: m.lead_time_std_days,
       serviceLevel: m.target_service_level,
     });
 
-    const blended = v.blended_daily_usage;
-    const days_of_cover = blended > 0 ? Math.round(p.available_qty / blended) : null;
+    // The one demand rate: the 30 day moving average (velocity.js).
+    const dailyRate = v.avg_daily_usage_30d;
+    const days_of_cover = dailyRate > 0 ? Math.round(p.available_qty / dailyRate) : null;
     const months_of_cover = days_of_cover != null ? round1(days_of_cover / 30) : null;
-    const target_days_of_cover = blended > 0 ? Math.round(m.target_stock / blended) : null;
+    const target_days_of_cover = dailyRate > 0 ? Math.round(m.target_stock / dailyRate) : null;
 
     const covered_by_po =
       p.expected_incoming_qty > 0 &&
@@ -69,7 +70,7 @@ function buildAnalytics(db, asOf = Date.now()) {
     // using the real projection curve (TASK-07) run out to the lead time.
     const projectionAtReceipt = projectInventory({
       availableQty: p.available_qty,
-      dailyDemand: blended,
+      dailyDemand: dailyRate,
       openPos: p.open_pos,
       days: Math.max(0, Math.round(m.lead_time_days)),
       asOf: now,
@@ -97,7 +98,7 @@ function buildAnalytics(db, asOf = Date.now()) {
       days_since_last_sale_text: humanDuration(v.days_since_last_sale),
       inventory_age_text: humanDuration(p.inventory_age_days),
       ageing_status: ageingStatus(p.inventory_age_days, m.max_holding_days),
-      annual_cogs: Math.round(blended * 365 * m.unit_cost_sgd),
+      annual_cogs: Math.round(dailyRate * 365 * m.unit_cost_sgd),
     };
   });
 

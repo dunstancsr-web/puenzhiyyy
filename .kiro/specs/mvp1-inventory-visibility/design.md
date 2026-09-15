@@ -291,6 +291,10 @@ sales_30d = SUM(quantity_mt) WHERE status = 'fulfilled' AND sale_date >= today -
             (lost sales, orders that could not be filled, are excluded: they feed fill rate)
 avg_daily_30d = sales_30d / 30         (60, 90 and 180 day windows follow the same rule)
 
+avg_daily_30d is THE demand rate: every formula in this document that needs a daily demand rate
+(cover, projection, suggested order, safety stock, ABC, compliance, financials) uses it and nothing
+else. Stored on each SKU as avg_daily_usage_30d.
+
 velocity_trend:
   if avg_daily_30d > avg_daily_90d * 1.10 → "accelerating"
   if avg_daily_30d < avg_daily_90d * 0.90 → "decelerating"
@@ -299,7 +303,7 @@ velocity_trend:
 
 ### Days / Months of Cover (glossary #22 — renamed from "Days/Months of Stock")
 ```
-days_of_cover = available_qty / avg_daily_30d
+days_of_cover = available_qty / avg_daily_30d, rounded to whole days
 (displayed as "Not Applicable" in the UI if avg_daily_30d = 0, per glossary #22 — not left blank/null)
 months_of_cover = days_of_cover / 30
 ```
@@ -320,7 +324,7 @@ TASK-95: the alert code had drifted to the suggested value, and requirements.md 
 
 ### Projected Inventory (glossary #29 / spec Step 12 — REQ-18, TASK-07)
 ```
-projected_available(day) = available_qty - (blended_daily_usage * day)
+projected_available(day) = available_qty - (avg_daily_30d * day)
                             + Σ open-PO qty landing on or before that day
 ```
 Run flat-rate 90 days out (`backend/src/engines/projection.js`), exposed at
@@ -359,7 +363,7 @@ Normal      otherwise
 
 ### ABC Value Classification (spec Step 8A)
 ```
-annual_consumption_value = blended_daily_usage * 365 * unit_cost_sgd
+annual_consumption_value = avg_daily_30d * 365 * unit_cost_sgd
 ABC: sort descending by annual_consumption_value, assign by cumulative % of portfolio total
      A <= 80%   B <= 95%   C remainder
 ```
@@ -389,7 +393,7 @@ licence/warehouse/ownership" describes the *scope* a real rule can narrow to, bu
 ```
 compliance_eligible_qty = Σ on_hand_qty across all active SKUs
                            (MVP1 has no blocked/damaged/rejected statuses to exclude yet)
-compliance_required_qty = 2 * Σ(blended_daily_usage across active SKUs) * 30
+compliance_required_qty = 2 * Σ(avg_daily_30d across active SKUs) * 30
                            -- placeholder rule; substitutes portfolio demand throughput for real import-
                            -- receipt history, which this project doesn't have. Honestly labelled below.
 compliance_position     = compliance_eligible_qty - compliance_required_qty
@@ -426,9 +430,22 @@ conflict, what Stan chose and why, and the definition now in force above. Newest
   demand for exactly the SKUs that ran short, and count the same order again against fill rate, which
   already uses lost sales. No figure on screen changed.
 
-**Open: Days / Months of Cover, which demand rate.** This document says the 30 day average; the code
-uses the blended rate (half 30 day, half 90 day). Waiting for Stan; the options and impact are in
-`backend/scripts/formula-decisions.json`.
+**2026-09-15, Sales Velocity: one demand rate for the whole app.**
+- Conflict: this document said days of cover divides by the 30 day average. The code divided it, and
+  also projection, suggested order, safety stock, target cover, ABC, compliance and the financials, by a
+  blended rate: half the 30 day average plus half the 90 day average. Its only recorded reason was a
+  code comment ("smooths a noisy 30d window"); the 50/50 weighting was never tested.
+- Chosen: the spec's 30 day average (a 30 day simple moving average: the last 30 days counted back from
+  today, divided by 30), applied EVERYWHERE rather than only to cover, so no two figures use different
+  rates. The blended field was deleted rather than kept under a misleading name, and the Inventory
+  page's live preview (`frontend/src/mock/analytics.js`), which had used the 30 day average for cover but
+  the blend for everything else, now uses it throughout.
+- Why: Stan chose to follow the spec and keep the app consistent. The trade-off accepted: figures react
+  faster to a real change in demand, and also move more after one unusually busy or quiet month.
+- Effect on the 15 Sep seed: no alert, movement class, ABC class, health status or coverage band
+  changed. Figures moved modestly, for example TJ-25KG cover 28 to 29 days, suggested order 597 to 591
+  MT and stockout gap 17 to 16 days; BM-5KG cover 292 to 312; portfolio turnover 3.4 to 3.5, GMROI 0.68
+  to 0.70, compliance position 1,058 to 994 MT. All 14 formula checks pass.
 
 ---
 
@@ -599,4 +616,4 @@ C), scoped to what's realistic after the hackathon rather than the full enterpri
 | Then | Append-only movement ledger (spec Step 2) — replaces the mutable `inventory_positions` snapshot | Real usage/demand for audit trail | — |
 | Then | Lot/batch tracking, full stock-status taxonomy (blocked/damaged/rejected) | Movement ledger | — |
 | Then | Governance-approved Compliance Position rule (replaces REQ-16's placeholder) | A compliance owner, not a technical blocker | — |
-| Then | Statistically backtested demand forecasting — replaces the flat blended-rate demand input the projection curve (REQ-18) currently uses | A model-building effort of its own | — |
+| Then | Statistically backtested demand forecasting — replaces the flat 30 day average demand input the projection curve (REQ-18) currently uses | A model-building effort of its own | — |

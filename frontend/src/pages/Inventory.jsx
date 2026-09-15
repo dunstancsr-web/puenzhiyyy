@@ -586,7 +586,7 @@ function FormSection({ title, children }) {
 
 // ── Projected inventory curve (TASK-07) ─────────────────────────────────────
 // Real 90-day projection from the backend (backend/src/engines/projection.js) -
-// available stock depleting at the blended daily rate, stepped up by open POs
+// available stock depleting at the 30 day average daily rate, stepped up by open POs
 // on their ETA day. Fetched fresh per SKU; not blocking the rest of the modal.
 function ProjectionChart({ skuId }) {
   const [projection, setProjection] = useState(null);

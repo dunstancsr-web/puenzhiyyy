@@ -70,7 +70,7 @@ const avgDaysOfCover = Math.round(
 // The real rice-stockpile scheme is company-wide, not per-SKU. Uses demand as an
 // honest stand-in for real import-receipt history, which this project doesn't have.
 const complianceEligibleQty = Math.round(activeSkus.reduce((sum, s) => sum + s.on_hand_qty, 0));
-const complianceRequiredQty = Math.round(2 * activeSkus.reduce((sum, s) => sum + s.blended_daily_usage, 0) * 30);
+const complianceRequiredQty = Math.round(2 * activeSkus.reduce((sum, s) => sum + s.avg_daily_usage_30d, 0) * 30);
 const compliancePosition = complianceEligibleQty - complianceRequiredQty;
 
 // ── Data Status (REQ-17, glossary #39) - informational as-of timestamp only; no

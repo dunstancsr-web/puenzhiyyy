@@ -124,7 +124,7 @@ function buildFacts(sku, alert) {
   add("On hand stock", sku.on_hand_qty, " MT");
   add("Reserved for confirmed orders", sku.reserved_qty, " MT");
   add("Already on order and inbound", sku.expected_incoming_qty, " MT");
-  add("Demand rate (blended)", sku.blended_daily_usage, " MT per day");
+  add("Demand rate (30 day average)", sku.avg_daily_usage_30d, " MT per day");
   add("Days of cover remaining", sku.days_of_cover, " days");
   // Same treatment as days since last sale, for the field that fix missed. The
   // slow movers carry 200 to 300 days of cover, and models reached for "nearly
@@ -358,7 +358,7 @@ function cacheKey(sku, alert, tier = "local") {
     `in${bucket(sku.expected_incoming_qty, 10)}`,
     // Demand rate, to the nearest 1 MT per day. Together with stock this is
     // what days of cover is made of, so it does not need its own entry.
-    `dd${bucket(sku.blended_daily_usage, 1)}`,
+    `dd${bucket(sku.avg_daily_usage_30d, 1)}`,
     // Idle and ageing alerts lead on these two, and neither is derived from
     // stock, so they are genuinely independent.
     `ls${bucket(sku.days_since_last_sale, 5)}`,

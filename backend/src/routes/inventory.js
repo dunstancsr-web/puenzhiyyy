@@ -117,7 +117,7 @@ router.get("/skus/:id/projection", (req, res) => {
 
     const result = projectInventory({
       availableQty: sku.available_qty,
-      dailyDemand: sku.blended_daily_usage,
+      dailyDemand: sku.avg_daily_usage_30d,
       openPos: sku.open_pos,
       safetyStockMt: sku.safety_stock_mt,
       // The approved value, the one the REORDER alert fires on (TASK-95).

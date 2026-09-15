@@ -71,7 +71,6 @@ export function computeSkuAnalytics(sku, { recomputeHealth = true } = {}) {
   const reserved = num(s.reserved_qty);
   const hold = num(s.quality_hold_qty);
   const avg30 = num(s.avg_daily_usage_30d);
-  const avg90 = num(s.avg_daily_usage_90d);
   const unitCost = num(s.unit_cost_sgd);
   const unitPrice = s.unit_price_sgd == null ? Math.round(unitCost * 1.2) : num(s.unit_price_sgd);
   const marginPerMt = unitPrice - unitCost;
@@ -82,21 +81,22 @@ export function computeSkuAnalytics(sku, { recomputeHealth = true } = {}) {
   const months_of_cover = days_of_cover != null ? +(days_of_cover / 30).toFixed(1) : null;
 
   // ── Velocity / financials ─────────────────────────────────────────────────
-  const blended_daily_usage = +(0.5 * avg30 + 0.5 * avg90).toFixed(2);
+  // One demand rate everywhere, the 30 day moving average, as the backend engines
+  // use (design.md, "Formula decisions", 15 Sep 2026).
   const expected_incoming_qty = num(s.expected_incoming_qty);
   const inventory_position = +(available_qty + expected_incoming_qty).toFixed(2); // glossary #18 (simplified - see design.md)
   const gross_margin_pct = unitPrice > 0 ? +((marginPerMt / unitPrice) * 100).toFixed(1) : 0;
-  const annual_cogs = Math.round(blended_daily_usage * 365 * unitCost);
-  const annual_gross_margin = Math.round(blended_daily_usage * 365 * marginPerMt);
+  const annual_cogs = Math.round(avg30 * 365 * unitCost);
+  const annual_gross_margin = Math.round(avg30 * 365 * marginPerMt);
   const inventory_value = Math.round(onHand * unitCost);
 
   // ── Statistical safety stock + reorder point ──────────────────────────────
   const safety_stock_days = Math.round(
     zScore(num(s.target_service_level, 0.95)) * num(s.demand_cv, 0.3) * Math.sqrt(num(s.lead_time_days, 45))
   );
-  const safety_stock_mt = Math.round(safety_stock_days * blended_daily_usage);
-  const reorder_point_suggested = Math.round(num(s.lead_time_days, 45) * blended_daily_usage + safety_stock_mt);
-  const target_days_of_cover = blended_daily_usage > 0 ? Math.round(num(s.target_stock) / blended_daily_usage) : null;
+  const safety_stock_mt = Math.round(safety_stock_days * avg30);
+  const reorder_point_suggested = Math.round(num(s.lead_time_days, 45) * avg30 + safety_stock_mt);
+  const target_days_of_cover = avg30 > 0 ? Math.round(num(s.target_stock) / avg30) : null;
   const suggested_order_qty = Math.max(0, +(num(s.target_stock) - inventory_position).toFixed(1)); // glossary #30, simplified
 
   // ── Coverage band ────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ export function computeSkuAnalytics(sku, { recomputeHealth = true } = {}) {
 
   const gapDays = days_of_cover != null ? Math.max(0, num(s.lead_time_days, 45) - days_of_cover) : 0;
   const stockout_gap_days = covered_by_po ? 0 : gapDays;
-  const lost_units_risk = +(stockout_gap_days * blended_daily_usage).toFixed(1);
+  const lost_units_risk = +(stockout_gap_days * avg30).toFixed(1);
   const lost_margin_risk = Math.round(lost_units_risk * marginPerMt);
   const lost_sales_value_risk = Math.round(lost_units_risk * unitPrice);
 
@@ -134,7 +134,6 @@ export function computeSkuAnalytics(sku, { recomputeHealth = true } = {}) {
     available_qty,
     days_of_cover,
     months_of_cover,
-    blended_daily_usage,
     expected_incoming_qty,
     inventory_position,
     gross_margin_pct,

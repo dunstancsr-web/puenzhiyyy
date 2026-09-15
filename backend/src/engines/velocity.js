@@ -1,7 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // VELOCITY ENGINE
-// Rolling sales consumption over 30 / 60 / 90 / 180-day windows, a blended
-// daily rate, the demand coefficient of variation (for XYZ), and a trend flag.
+// Rolling sales consumption over 30 / 60 / 90 / 180-day windows, the daily
+// demand rate, the demand coefficient of variation (for XYZ), and a trend flag.
+// The ONE demand rate used across the app is avg_daily_usage_30d, the 30 day
+// moving average (design.md, "Formula decisions", 15 Sep 2026). It replaced a
+// 50/50 blend of the 30 and 90 day averages that was never justified.
 // Only status = 'fulfilled' rows count as consumption; 'lost' rows are demand
 // that was not met and feed the fill-rate calc in financials.js.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,9 +50,6 @@ function computeVelocity(db, skuId, asOf = Date.now()) {
   const avg_daily_60d = round(sales_60d / 60);
   const avg_daily_90d = round(sales_90d / 90);
 
-  // Blended rate: 50/50 of the 30d and 90d rates smooths a noisy 30d window.
-  const blended_daily = round(0.5 * avg_daily_30d + 0.5 * avg_daily_90d);
-
   // Demand CV from weekly buckets over the last 12 weeks.
   const weekly = bucketWeekly(fulfilled, now, 12);
   const demand_cv = coefficientOfVariation(weekly);
@@ -71,7 +71,6 @@ function computeVelocity(db, skuId, asOf = Date.now()) {
     avg_daily_usage_30d: avg_daily_30d,
     avg_daily_usage_60d: avg_daily_60d,
     avg_daily_usage_90d: avg_daily_90d,
-    blended_daily_usage: blended_daily,
     demand_cv: round(demand_cv),
     velocity_trend,
     last_sale_date: lastSale,

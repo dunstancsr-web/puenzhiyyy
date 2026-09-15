@@ -124,7 +124,7 @@ const SKUS = [
 // there, and because a year-on-year comparison needs 13 months minimum.
 //
 // Safe to raise. velocity.js bounds its own fetch at 200 days and annual_cogs
-// annualises from the 30/90-day blend, so nothing behind today's KPIs, ABC
+// annualises from the 30 day average, so nothing behind today's KPIs, ABC
 // classes, health statuses or alerts reads past week 29. Verified before this
 // was changed, not assumed.
 const HISTORY_MONTHS = 24;
