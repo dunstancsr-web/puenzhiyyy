@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   PackagePlus, SlidersHorizontal, Truck, BellRing, BellOff,
   UserCheck, Cpu, RefreshCw, ChevronRight, FileSearch, KeyRound, ShieldAlert,
+  ArrowDownToLine, ArrowUpFromLine,
 } from "lucide-react";
 import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
@@ -30,6 +31,10 @@ const TYPE_META = {
   SKU_CREATED:        { icon: PackagePlus,       color: "var(--purple)", label: "SKU added" },
   ALERT_ACKNOWLEDGED: { icon: BellOff,           color: "var(--text-muted)", label: "Alert dismissed" },
   LLM_CALL:           { icon: Cpu,               color: "var(--purple)", label: "AI explanation" },
+  // Handheld floor movements (TASK-46). Until 15 Sep these had no entry and
+  // rendered as the raw event code with no detail and no filter chip.
+  GOODS_RECEIVED:     { icon: ArrowDownToLine,   color: "var(--green)",  label: "Goods in" },
+  GOODS_ISSUED:       { icon: ArrowUpFromLine,   color: "var(--orange)", label: "Goods out" },
   // TASK-90. Unlocking is a spending decision and reads like one; a lockout is
   // the only security event in this log, so it takes the alarm colour.
   LLM_UNLOCKED:          { icon: KeyRound,    color: "var(--yellow)", label: "Paid AI unlocked" },
@@ -42,7 +47,7 @@ const TYPE_META = {
 // story rather than as a legend.
 const TYPE_ORDER = [
   "ALERT_TRIGGERED", "DECISION_RECORDED", "LLM_CALL",
-  "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
+  "GOODS_RECEIVED", "GOODS_ISSUED", "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
   "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT",
 ];
 
@@ -168,6 +173,24 @@ function describe(event) {
         headline: `Received ${num(i.quantity_mt)} MT of ${sku}`,
         detail: `On hand went ${num(i.on_hand_before)} to ${num(o.on_hand_after)} MT. Available to promise is now ${num(o.available_qty)} MT.`,
       };
+
+    case "GOODS_RECEIVED": {
+      const parts = [`${o.movement_no || "Receipt"} against ${i.po_number || "a purchase order"}${i.operator ? `, by ${i.operator}` : ""}.`];
+      if (i.variance_qty) {
+        parts.push(`${num(Math.abs(i.variance_qty))} MT ${i.variance_qty > 0 ? "more" : "less"} than the ${num(i.expected_qty)} MT expected${i.variance_reason ? `: ${unpunctuated(i.variance_reason)}` : ""}.`);
+      }
+      if (o.on_hand_before != null && o.on_hand_after != null) parts.push(`On hand went ${num(o.on_hand_before)} to ${num(o.on_hand_after)} MT.`);
+      return { headline: `Received ${num(i.received_qty)} MT of ${sku}`, detail: parts.join(" ") };
+    }
+
+    case "GOODS_ISSUED": {
+      const parts = [`${o.movement_no || "Pick"} against ${i.so_number || "a sales order"}${i.operator ? `, by ${i.operator}` : ""}.`];
+      if (i.short_by > 0) {
+        parts.push(`${num(i.short_by)} MT short of the ${num(i.ordered_qty)} MT ordered${i.short_reason ? `: ${unpunctuated(i.short_reason)}` : ""}.`);
+      }
+      if (o.on_hand_before != null && o.on_hand_after != null) parts.push(`On hand went ${num(o.on_hand_before)} to ${num(o.on_hand_after)} MT.`);
+      return { headline: `Picked ${num(i.picked_qty)} MT of ${sku}${i.customer ? ` for ${i.customer}` : ""}`, detail: parts.join(" ") };
+    }
 
     case "SKU_UPDATED": {
       const changes = i.changes || {};

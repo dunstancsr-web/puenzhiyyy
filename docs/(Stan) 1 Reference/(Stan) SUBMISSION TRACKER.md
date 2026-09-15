@@ -9,7 +9,7 @@ Four deliverables. Status as of 15 Sep.
 | 1 | GitHub repo | done, kept current | nothing |
 | 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Stan starts the AWS lease once the organizers answer on Slack, then follows `(Stan) DEPLOY-LIGHTSAIL.md` in this folder |
 | 3 | YouTube demo video | script below, updated 15 Sep; `npm run demo:reset` checks the app is ready | Stan records, near the end, with the final paid check |
-| 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 15 Sep, screenshots current except the Activity one | fill in the URL, PIN and spend figure **in the PDF only**, then export |
+| 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 15 Sep, all three screenshots current | fill in the URL, PIN and spend figure **in the PDF only**, then export |
 
 ## Before submitting, in this order
 
@@ -95,8 +95,6 @@ Between takes: if a take recorded a decision, dismissed an alert or used Why?, r
 During and after:
 
 - [ ] Beat 6 last and unrushed. Observability is the criterion most demos forget to show.
-- [ ] Recapture `docs/Submission/images/activity-audit-record.jpg` from beat 6 for the write-up; the
-      current one shows the old design.
 - [ ] Add the takes' paid calls to the spend ledger.
 
 **Why run `demo:reset` instead of just starting to record.** Each reason is something that has already

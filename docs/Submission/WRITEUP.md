@@ -340,8 +340,8 @@ exact stored payload one click away. Raw JSON is not observability either; it is
 
 ![The Activity page with one record expanded, showing the stored input and output payloads side by side.](images/activity-audit-record.jpg)
 
-*The manager decision above, as the audit trail stored it: what the system proposed, what the manager
-did instead, and the delta between the two quantities.*
+*A manager cutting a suggested 591 MT stockout order to 500 MT, as the audit trail stored it: what the
+system proposed, what the manager did instead, the reason, and the delta between the two quantities.*
 
 ---
 
