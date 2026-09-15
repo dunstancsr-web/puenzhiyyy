@@ -28,6 +28,13 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 | [Reviewed/(Stan) ELI18 EXPLANATIONS DRAFT.md](<(Stan) 2 To review/Reviewed/(Stan) ELI18 EXPLANATIONS DRAFT.md>) | Old and new wording of the rule-based Why? explanation for all six alert types | Reviewed; applied to the app |
 | [Reviewed/(Stan) FORMULA MISMATCHES.md](<(Stan) 2 To review/Reviewed/(Stan) FORMULA MISMATCHES.md>) | Generated report: each design.md formula checked against the code, with any disagreements | Reviewed; your decisions are recorded in design.md, "Formula decisions" |
 
+## For anyone new to the app
+
+| Document | What is in it | Open it when |
+|---|---|---|
+| [Guide/FEATURES GUIDE.md](<Guide/FEATURES GUIDE.md>) | Every screen with screenshots, by role and task: Home, the receiver's Goods In flow, Goods Out (coming soon), the manager's Dashboard, Alerts, Inventory and Activity, and settings | You want to see what the app does, or show someone |
+| every file in `docs/Guide/images/` | The guide's screenshots | Recapturing a screen after the app changes |
+
 ## For the judges
 
 | Document | What is in it | Open it when |

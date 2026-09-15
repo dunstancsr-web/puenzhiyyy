@@ -7,7 +7,7 @@ Four deliverables. Status as of 15 Sep.
 | # | Deliverable | Status | Next step, and who |
 |---|---|---|---|
 | 1 | GitHub repo | done, kept current | nothing |
-| 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Stan starts the AWS lease once the organizers answer on Slack, then follows `(Stan) DEPLOY-LIGHTSAIL.md` in this folder |
+| 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Deploy now (Stan, 15 Sep: the lease can be extended, so there is no reason to wait): follow `(Stan) DEPLOY-LIGHTSAIL.md` in this folder |
 | 3 | YouTube demo video | script below, updated 15 Sep; `npm run demo:reset` checks the app is ready | Stan records, near the end, with the final paid check |
 | 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 15 Sep, all three screenshots current | fill in the URL, PIN and spend figure **in the PDF only**, then export |
 

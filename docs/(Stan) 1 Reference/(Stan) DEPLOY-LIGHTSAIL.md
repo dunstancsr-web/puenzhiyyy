@@ -46,8 +46,8 @@ fix it before deploy day, while the lease is not yet ticking.
 
 ## Before you start
 
-- [ ] **The lease timing is decided.** The Hackathon Lease expires 15 days after you submit it, and
-      approval is instant. See the organizer questions in the session notes before clicking Submit.
+- [ ] **The lease is active.** It runs 15 days from submission, approval is instant, and it can be
+      extended (confirmed by Stan, 15 Sep), so deploying early costs nothing but hosting credit.
 - [ ] **The latest Actions run on `main` is green.** github.com/dunstancsr-web/puenzhiyyy → Actions.
       Note its commit, e.g. `c5a349c`. That becomes the image tag `sha-c5a349c`.
 - [ ] **You have chosen a demo PIN of at least 6 characters.** The server refuses a shorter one and
