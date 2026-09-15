@@ -70,6 +70,7 @@ backend/scripts/
   sonnet-check.js   the ONE paid check, refuses to spend without --confirm-spend
   spend.js          paid spend from the audit trail
   check-deploy.js   checks a live deployment, never calls the model
+  rehearse-deploy.sh  runs the app like the container on a Mac, then runs check-deploy.js
 frontend/src/
   pages/       Home, Dashboard, Inventory, Alerts, Activity (the Control Tower)
   warehouse/   Goods In, Goods Out, operator PIN sign-in (the handheld)

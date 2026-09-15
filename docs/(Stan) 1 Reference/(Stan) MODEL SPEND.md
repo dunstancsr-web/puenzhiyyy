@@ -9,7 +9,7 @@
 | | USD |
 | --- | ---: |
 | AWS-sponsored credit, shared by hosting and model calls | 100.00 |
-| Hosting estimate, Lightsail Nano for a 15 day lease | about 3.50 |
+| Hosting estimate, Lightsail Nano (USD 7 a month, billed hourly) for a 15 day lease | about 3.50 |
 | **Model calls to date (below)** | **0.0212** |
 | Left, approximately | about 96.48 |
 

@@ -7,9 +7,9 @@
 A checklist for deploy day. Every console step below was checked against AWS's own Lightsail
 documentation on 15 Sep 2026; if a label on screen differs, the meaning is the same.
 
-**Time needed:** about 30 minutes, most of it waiting. **Cost:** a Nano container is USD 7 a month,
-billed hourly, so roughly USD 3.50 for a 15 day lease. It comes out of the same AWS-sponsored USD 100
-as the model calls.
+**Time needed:** about 30 minutes, most of it waiting. **Cost:** see the budget table in
+`(Stan) MODEL SPEND.md` in this folder. Hosting comes out of the same AWS-sponsored credit as the model
+calls.
 
 ---
 
@@ -25,6 +25,22 @@ GitHub (push to main)
 
 The key and the PIN never touch GitHub or the image. They are typed into Lightsail's environment
 variables on deploy day and exist only there.
+
+---
+
+## Step 0. Rehearse on your Mac (free, any time before the lease)
+
+From the repo root:
+
+```
+sh backend/scripts/rehearse-deploy.sh
+```
+
+It runs the app the way the container will (production mode, port 8080, an empty database that must
+seed itself, and only the settings Lightsail will have) and runs the same check as step 3 against it.
+Two results are expected on a Mac and are fine: a **WARN** for plain http, and a **FAIL** for the
+published image until step 1 below makes it public. Every other line must be **PASS**. If one is not,
+fix it before deploy day, while the lease is not yet ticking.
 
 ---
 
@@ -92,7 +108,7 @@ It must say `PASS ... can be pulled anonymously (public)`. Do not continue until
    | `LLM_GATEWAY_API_KEY` | the key from the organizers' email |
    | `LLM_GATEWAY_MODEL` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` |
 
-   Optional: `LLM_DAILY_CALL_LIMIT` (default 200, about USD 1.20 a day worst case) and
+   Optional: `LLM_DAILY_CALL_LIMIT` (default 200; the worst-day cost is in the spend ledger) and
    `DEMO_TOKEN_SECRET` (a long random string; without it, unlocked visitors must re-enter the PIN
    after a redeploy, which is harmless).
 
@@ -130,7 +146,7 @@ provisions the HTTPS certificate.
 
 3. **By hand, once:** open the site → **Alerts** → **Settings** (bottom of the sidebar) → **AWS Bedrock**
    → enter the PIN → **Why?** on any alert. A purple Summary from Claude Sonnet 4.5 means the gateway
-   works. That one call costs about USD 0.006.
+   works. It is one paid call: add it to the spend ledger.
 
 ---
 

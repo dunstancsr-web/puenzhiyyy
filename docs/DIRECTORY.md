@@ -63,6 +63,7 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 | `backend/scripts/sonnet-check.js` | The one paid model check; spends nothing without `--confirm-spend` |
 | `backend/scripts/spend.js` | Lists paid model calls from the audit trail, for the spend ledger |
 | `backend/scripts/check-deploy.js` | Checks a live deployment without calling the model |
+| `backend/scripts/rehearse-deploy.sh` | Runs the app on this Mac the way the Lightsail container will, then checks it |
 
 ## Design tools and build
 
