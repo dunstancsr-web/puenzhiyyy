@@ -261,6 +261,10 @@ backend/scripts/        # bench-models.js, sonnet-check.js, spend.js, check-depl
 
 ## Key Computation Logic
 
+> **Checked by code.** `backend/scripts/check-formulas.js` recalculates each formula below from the raw
+> data and compares it with the engines, in CI on every push. Known disagreements waiting for Stan's
+> decision, with their impact, are in `backend/scripts/formula-decisions.json`.
+
 > Field names and formulas below match `reference/rice-inventory-terms-glossary.md`; see
 > `reference/terminology-map.md` for the full rename diff and the reasoning behind each one.
 

@@ -30,7 +30,10 @@ These are settled preferences learned from Stan's feedback, not suggestions to r
   trail. Rerun it after anything that changes stock.
 - **Servers stay running.** Do not stop them at the end of a task.
 - **Measure, don't guess.** After changing a prompt, brief or check in `backend/src/llm/`, re-run the
-  benchmark (command in `handoff.md`). Before committing frontend changes, the build must pass.
+  benchmark. After changing anything in `backend/src/engines/` or a formula in `design.md`, run
+  `check-formulas.js` (commands in `handoff.md`); CI runs it too and blocks publishing on a new
+  disagreement. Never add an entry to `formula-decisions.json` to make a failure pass: only Stan's
+  decision puts one there. Before committing frontend changes, the build must pass.
 
 ## 2. One source of truth
 

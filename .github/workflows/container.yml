@@ -6,7 +6,8 @@
 # the image is built on the same chip family it will run on, so the native
 # better-sqlite3 module is compiled for the right target rather than emulated.
 #
-# WHAT IT PROVES BEFORE PUBLISHING. An image is only pushed after it has
+# WHAT IT PROVES BEFORE PUBLISHING. An image is only pushed after the formula
+# check has passed (the engines still match design.md) and the image has
 #   1. started with the production settings and answered /api/health,
 #   2. served the built site and the seeded demo data,
 #   3. applied the production guards (rule-based default, no local model,
@@ -50,6 +51,26 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # The formulas first, because they are the cheapest check and the most
+      # important one: every figure a judge reads comes from these engines.
+      # check-formulas.js recalculates each formula in design.md from a fresh
+      # seed and compares it with the engines. A disagreement not already
+      # listed in backend/scripts/formula-decisions.json fails the build, so a
+      # changed calculation cannot reach the published image unnoticed.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Formula check against design.md
+        working-directory: backend
+        run: |
+          npm ci --no-audit --no-fund
+          export DATA_DIR="$RUNNER_TEMP/formula-db"
+          node src/db/seed.js
+          node scripts/check-formulas.js
 
       - uses: docker/setup-buildx-action@v3
 

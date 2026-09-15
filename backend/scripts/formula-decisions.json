@@ -1,0 +1,30 @@
+{
+  "sales_30d": {
+    "status": "awaiting Stan's decision",
+    "found": "2026-09-15",
+    "code": "counts only sales with status 'fulfilled'. Lost sales (orders that could not be filled) are kept apart and feed the fill rate instead.",
+    "impact": "fixing the code to the spec would count orders we could NOT fill as sales, inflating demand for any SKU that ran short, and double counting them against the fill rate. The gap per SKU equals its lost sales exactly (TJ-25KG: 8 MT on the 15 Sep seed).",
+    "recommendation": "keep the code, correct the spec: sales windows sum FULFILLED sales only."
+  },
+  "velocity_trend": {
+    "status": "awaiting Stan's decision",
+    "found": "2026-09-15",
+    "code": "the same 30 versus 90 day rule, on fulfilled sales only.",
+    "impact": "caused entirely by the sales_30d difference above; it resolves with that decision.",
+    "recommendation": "decided together with sales_30d."
+  },
+  "days_of_cover": {
+    "status": "awaiting Stan's decision",
+    "found": "2026-09-15",
+    "code": "available_qty / blended_daily_usage, rounded to whole days, where blended_daily_usage = half the 30 day average plus half the 90 day average. The same blended rate drives the projection, ABC and compliance, which the spec already documents as blended.",
+    "impact": "applying the spec's 30 day rate changes no alert or health status on the 15 Sep seed, but every displayed days-of-cover figure moves (for example BM-5KG 292 to about 313), and cover would jump whenever one busy or quiet month passes.",
+    "recommendation": "keep the code, correct the spec (design.md and requirements.md REQ-05): one demand rate across the app, and a smoother figure for decisions."
+  },
+  "movement_class": {
+    "status": "awaiting Stan's decision",
+    "found": "2026-09-15",
+    "code": "Idle when no sale in 90 days or no demand; Fast when blended rate is in the top quarter; SLOW when blended rate is in the BOTTOM QUARTER of SKUs; Normal otherwise. A ranking, so some SKU is always slow.",
+    "impact": "the spec rule (slow when cover exceeds 120 days) makes VF-10KG Slow Moving on the 15 Sep seed: a new SLOW_MOVING alert, and Key Metrics' Stock That Is Not Selling rises from about SGD 1.36M to 1.93M. Health status does not change (VF-10KG stays ORANGE for overstock).",
+    "recommendation": "a genuine product choice. The spec's rule matches the plain meaning of slow (too much stock for its own demand) and matches the SLOW_MOVING alert, which already requires cover over 120 days; the code's ranking can call a well-stocked SKU slow just for being small. Leaning to the spec, which changes figures judges see, so decide before recording the video."
+  }
+}
