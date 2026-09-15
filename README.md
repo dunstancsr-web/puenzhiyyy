@@ -233,4 +233,4 @@ illustrative and is labelled as such everywhere it appears. It is not a governan
 | `.kiro/specs/mvp1-inventory-visibility/tasks.md` | task breakdown and status |
 | `.kiro/DEVLOG.md` | dated development log |
 | `docs/Submission/WRITEUP.md` | the hackathon write-up |
-| `CLAUDE.md` | conventions for AI agents working in this repo |
+| `.kiro/steering/rules.md` | the rules for AI agents working in this repo (imported by `CLAUDE.md`) |

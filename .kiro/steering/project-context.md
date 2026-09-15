@@ -6,8 +6,8 @@ inclusion: always
 
 ## About this file
 The domain background: the business problem and the inventory concepts every change must respect.
-It is loaded into every Kiro chat. **Start with `handoff.md` in this folder** for the current state,
-architecture, rules and where each fact lives; this file does not repeat them.
+It is loaded into every Kiro chat and imported by `CLAUDE.md`. **Start with `handoff.md`** for the
+architecture and where each fact lives, and `rules.md` for the rules; this file does not repeat them.
 
 ## Hackathon Context
 - Event: AWS NUS-ISS SMYA 2026 Hackathon. Team Puenzhiyyy; Stan leads and decides.
@@ -37,7 +37,7 @@ Deferred" section; forecasting with backtesting and lead-time intelligence remai
 - Database: SQLite via better-sqlite3
 - Explanations in the app: Claude Sonnet 4.5 on Amazon Bedrock through the hackathon gateway (paid,
   PIN gated), llama3 via Ollama in development (free), or rule-based (no model)
-- Styling: plain CSS custom properties, no framework; the six step type scale in `CLAUDE.md`
+- Styling: plain CSS custom properties, no framework; the six step type scale in `rules.md`
 - Hosting: AWS Lightsail container service, image built by GitHub Actions
 
 ## Inventory Hierarchy (analysis level)
@@ -91,10 +91,6 @@ See `handoff.md`, "How it fits together", and `design.md`, "Backend File Structu
 The current list, with reasons, is in the submission tracker ("Decisions already made"). Settled early
 and still true: SQLite over PostgreSQL (one file, no server, easy handoff); no CSS framework; the model
 only on an explicit human trigger.
-
-## Writing Style
-No em dashes or en dashes anywhere. The full rule and the other writing rules: `CLAUDE.md` and the
-rules in `handoff.md`.
 
 ## Current State
 Not recorded here, so it cannot go stale here: see the submission tracker for status and next steps,

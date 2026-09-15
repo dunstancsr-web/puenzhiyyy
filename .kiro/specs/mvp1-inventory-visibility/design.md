@@ -419,7 +419,7 @@ Seed data includes (deterministic, safe to rerun with `npm run seed`):
 
 ## Frontend Page Designs
 
-Screen names and Stan's design preferences are in `CLAUDE.md` ("Names we use", "Design
+Screen names and Stan's design preferences are in `.kiro/steering/rules.md` ("Names we use", "Design
 preferences"); this section records structure only.
 
 ### Home

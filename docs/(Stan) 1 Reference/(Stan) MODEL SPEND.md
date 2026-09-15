@@ -13,6 +13,10 @@
 | **Model calls to date (below)** | **0.0212** |
 | Left, approximately | about 96.48 |
 
+**Why this matters beyond cost:** hosting and model calls draw on the same sponsored pool, and going
+over it may pause the AWS account and affect competition standing. A visitor spending model credit
+can take the live site down with it, which is why the paid tier is PIN gated and capped.
+
 ## What one call costs
 
 Measured from the calls below, Claude Sonnet 4.5 through the organizers' gateway:
