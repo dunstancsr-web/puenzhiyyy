@@ -17,8 +17,7 @@ Four deliverables. Status as of 15 Sep.
 2. **Final paid check**: run `node backend/scripts/sonnet-check.js` first, which prints the alerts and
    the estimated cost, then again with `--confirm-spend`. Add the rows to `(Stan) MODEL SPEND.md` in
    this folder.
-3. **Record the video**: run `npm run demo:reset` from `backend/` first. It reseeds, then checks the running
-   app has everything the script below needs, and prints READY or what to fix.
+3. **Record the video**, following the recording checklist below.
 4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `docs/Submission/WRITEUP.md`.
 5. **Submit**, then capture evidence of the live service before the lease ends.
 
@@ -79,13 +78,45 @@ shows what it is *for*, and it covers every judging criterion in one take. **Tar
 | 6. The trail, 40s | Activity, expand that decision, then the model call | The decision beside what the system proposed, and the model call with its tokens: observability includes what the AI cost. |
 | 7. Close, 20s | Dashboard | One line on what MVP 2 adds. |
 
-Recording notes:
-- `npm run demo:reset` (from `backend/`) immediately before, and wait for READY. It reseeds so alerts
-  and the audit trail replay cleanly, and refuses to erase paid calls not yet in the spend ledger.
-- Light theme, and unlock AWS Bedrock in Settings with the demo PIN before starting.
-- Beat 6 last and unrushed. Observability is the criterion most demos forget to show.
-- **Recapture `docs/Submission/images/activity-audit-record.jpg`** from beat 6 for the write-up; the current one
-  shows the old design.
+### Recording checklist
+
+Before the first take:
+
+- [ ] **Spend ledger is up to date.** From `backend/`, run `node scripts/spend.js` and copy any new rows
+      into `(Stan) MODEL SPEND.md`.
+- [ ] **Run `npm run demo:reset`** from `backend/`, with both dev servers running, and wait for
+      **READY**. If it lists fixes, do them and run it again.
+- [ ] **Light theme**, browser zoom at 100%, other tabs and notifications closed.
+- [ ] **Unlock AWS Bedrock** in Settings (sidebar) with the demo PIN.
+
+Between takes: if a take recorded a decision, dismissed an alert or used Why?, run
+`npm run demo:reset` again before the next one (add `--yes` once the paid calls are in the ledger).
+
+During and after:
+
+- [ ] Beat 6 last and unrushed. Observability is the criterion most demos forget to show.
+- [ ] Recapture `docs/Submission/images/activity-audit-record.jpg` from beat 6 for the write-up; the
+      current one shows the old design.
+- [ ] Add the takes' paid calls to the spend ledger.
+
+**Why run `demo:reset` instead of just starting to record.** Each reason is something that has already
+happened in this project:
+
+1. **Practice clicks change what the video shows.** An alert that was approved or dismissed while
+   testing disappears from the Alerts page: on 15 Sep the idle Japonica alert (beat 3) and the stockout
+   alert were both missing for that reason. Every test decision also lands on the Activity page, so
+   beat 6 would show clutter instead of one clean decision.
+2. **Demo data drifts.** Tests change stock (TW-25KG was left at 60 MT reserved after the REORDER demo),
+   which changes figures, alerts and the story the script tells. The reset restores the known state
+   the script was written against.
+3. **A broken paid tier wastes a take and credit.** Beat 4 needs AWS Bedrock available, a demo PIN the
+   RUNNING backend has actually loaded (a PIN saved to `.env` after the backend started is not
+   loaded), and paid calls left under today's cap. The reset checks all three through the running app,
+   so you find out before recording, not halfway through a take.
+4. **It protects the spend ledger.** Reseeding erases the audit trail, the only record of paid calls.
+   A plain `npm run seed` only warns; the reset refuses unless you confirm the calls are in the ledger.
+5. **It checks the app, not just the data.** Both servers answering, and the alerts the script needs,
+   as the browser will see them.
 
 ---
 

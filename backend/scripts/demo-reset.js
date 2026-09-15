@@ -15,6 +15,7 @@
 //    "Demo video script"; this file only checks them.
 //
 // Prints READY or a list of what to fix. Spends nothing and never calls a model.
+// Why it exists, and when to run it: the recording checklist in the submission tracker.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const path = require("path");
@@ -96,5 +97,5 @@ async function get(url) {
     problems.forEach((p, i) => console.log(`  ${i + 1}. ${p}`));
     process.exit(1);
   }
-  console.log("READY. Now follow \"Recording notes\" in the submission tracker (light theme, unlock AWS Bedrock in Settings).");
+  console.log("READY. Now follow \"Recording checklist\" in the submission tracker.");
 })();
