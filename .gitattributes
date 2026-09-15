@@ -1,0 +1,5 @@
+# DEVLOG.md is append-only, one entry per session, always added at the
+# bottom. Two people adding entries in parallel is not a real conflict, so
+# let git's built-in union merge resolve it by keeping both additions instead
+# of stopping to ask.
+.kiro/DEVLOG.md merge=union

@@ -82,6 +82,8 @@ frontend/src/
 frontend/tuners/    Stan's design tuners: sliders over real components, he pastes back CSS
 docs/Guide/         the features guide (Markdown, screenshots) and build-pdf.py for its PDF
 .github/workflows/container.yml   formula check, build, smoke test, secret scan, publish
+.githooks/          shared git hooks (branch guard, secret scan, push guard), wired in by
+                     `npm run install:all`; see rules.md, "Tooling"
 ```
 
 Three workspaces share one database: **Goods In** and **Goods Out** (API only, "Coming soon" on screen) on a handheld, the **Control
