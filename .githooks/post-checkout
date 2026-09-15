@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Post-checkout reminder for StockSense. Tracked under .githooks/, see
+# pre-commit in this folder for how it gets installed.
+#
+# Fires after `git checkout -b <name>` (branch creation only, arg 3 = 1).
+# Fetches origin quietly and says if main has moved since the branch point,
+# so a branch cut from a stale main is caught at creation time rather than
+# discovered as a conflict later.
+
+set -u
+
+prev_head="$1"
+new_head="$2"
+is_branch_checkout="$3"
+
+[ "$is_branch_checkout" != "1" ] && exit 0
+
+git fetch origin main --quiet 2>/dev/null || exit 0
+
+behind=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
+if [ "$behind" -gt 0 ]; then
+  echo "post-checkout: origin/main is $behind commit(s) ahead of where this branch started."
+  echo "Consider: git rebase origin/main"
+fi
+
+exit 0

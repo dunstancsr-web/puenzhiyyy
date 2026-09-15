@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Inventory Monitoring System — Hackathon project",
   "scripts": {
-    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend && git config core.hooksPath .githooks",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend"
   }

@@ -20,6 +20,14 @@ These are settled preferences learned from Stan's feedback, not suggestions to r
   (gitignored) and the host's environment settings. To check one exists, print its length, never its
   value.
 - **Commit only when Stan asks.** End commits with the attribution your tool requires.
+- **Start work on an up to date main, then branch.** `git checkout main && git pull`, then
+  `git checkout -b <name>` before editing anything. `main` takes pull requests only: a direct commit
+  or push to it is refused by a shared hook (`.githooks/`, wired in by `install:all` via
+  `core.hooksPath`) and by GitHub branch protection, for anyone on any tool. Reason: with a teammate
+  on the repo, two people pushing straight to `main` is the fastest way to a real merge conflict; a
+  short-lived branch per task avoids that. `.kiro/hooks/branch-check.sh` (a Claude Code `SessionStart`
+  hook and a Kiro `PostTaskExecution` hook) reminds if you are on `main` or behind `origin/main`, but
+  the hooks in `.githooks/` are what actually refuse the commit or push.
 - **Keep the documents in sync** at the end of a session that changed the project, following
   "Keeping this in sync" in `handoff.md`. Devlog entries are written by hand, in the existing format.
 - **After any approved paid call**, add it to the spend ledger (see "Where each fact lives" in
@@ -179,3 +187,10 @@ Read before making UI changes.
   files changed since the last devlog entry, it asks for the entry. Claude Code blocks the stop once;
   Kiro, which cannot block, prints a reminder. If you are only pausing to ask Stan a question, say so
   and stop.
+- A second shared check, same pattern: `.kiro/hooks/branch-check.sh`, run as a Claude Code
+  `SessionStart` hook and a Kiro `PostTaskExecution` hook. It only reminds; it never blocks. The
+  actual enforcement of the branch workflow (see "Working rules") is `.githooks/pre-commit` and
+  `.githooks/pre-push`, plain git hooks that fire for a manual `git commit`/`git push` too, not only
+  inside an agent. They are tracked in the repo and wired in by `npm run install:all`
+  (`git config core.hooksPath .githooks`); a clone that never ran that command has no hooks, so if a
+  direct push to `main` gets through locally, check that first.

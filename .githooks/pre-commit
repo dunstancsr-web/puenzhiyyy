@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Pre-commit checks for StockSense. Tracked in the repo under .githooks/, so
+# every clone gets it the same way once `core.hooksPath` is set (see
+# "install:all" in the root package.json). Two checks, in order:
+#
+#   1. branch guard: refuses a commit made directly on main
+#   2. secret scan: refuses a commit that stages a secret
+#
+# False alarm on either? Commit with: git commit --no-verify
+# Only do that after checking the flagged line really is fine.
+
+set -u
+
+# 1. Branch guard. Work happens on a feature branch, main is merged into by
+# pull request only, see .kiro/steering/rules.md, "Working rules".
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "pre-commit: commit refused, you are on '$branch'."
+  echo "Create a feature branch first: git checkout -b <name>"
+  exit 1
+fi
+
+# 2. Secret scan. Scans only what is STAGED, and only the lines being added,
+# so it checks the exact content the commit would publish rather than
+# whatever happens to be on disk. Blocks the commit on:
+#
+#   a. a .env file of any kind being staged (by name)
+#   b. an env-style secret line with a value, e.g. LLM_GATEWAY_API_KEY=abc
+#   c. a 48 character hex token, the shape of the hackathon gateway key
+#   d. an Anthropic key (sk-ant-...) or an AWS access key id (AKIA...)
+#
+# Never prints the matched value, only file and line, so a blocked commit
+# does not put the key into terminal scrollback or a transcript.
+
+found=0
+
+# a. Env files by name. .env.example is included: it looks exactly like the
+# real file, which is how a key got typed into it once.
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  case "$(basename "$f")" in
+    .env|.env.*|*.env)
+      echo "  BLOCKED  $f  (env files hold secrets and must not be committed)"
+      found=1 ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACMR)
+
+# b-d. Content of added lines, with file and new line number tracked.
+report=$(git diff --cached -U0 --diff-filter=ACMR --no-color | awk '
+  /^\+\+\+ / { file = substr($0, 7); next }
+  /^@@ / {
+    split($3, a, ",");
+    line = substr(a[1], 2) + 0;
+    next
+  }
+  /^\+/ {
+    text = substr($0, 2);
+    why = "";
+    # Two shapes a real secret takes. A first version matched any
+    # NAME = anything, and flagged `const HEALTH_TOKEN = { ... }` in
+    # Dashboard.jsx: code assigns objects, env lookups and calls, a secret is
+    # a literal. So: env style with no spaces (KEY=value, 8+ chars, not a
+    # $VAR, {, ( or <placeholder>), or a quoted literal of 8+ chars.
+    if (text ~ /[A-Z0-9_]*(API_KEY|SECRET|TOKEN|PASSWORD)=[^ \t#${(<][^ \t]{7,}/ ||
+        text ~ /[A-Z0-9_]*(API_KEY|SECRET|TOKEN|PASSWORD)[ \t]*[:=][ \t]*["'"'"'][^"'"'"' \t]{8,}["'"'"']/) why = "secret setting with a value";
+    # The demo PIN (TASK-90) is short, so the 8 character rule above misses
+    # DEMO_PIN=482913. Env style only (no spaces around =), so code such as
+    # MIN_PIN_LENGTH = 6 is not flagged.
+    else if (text ~ /[A-Z0-9_]*PIN=[^ \t#${(<][^ \t]{3,}/)                       why = "PIN setting with a value";
+
+    # A value built by shell or template substitution is computed at run
+    # time, not written into the file, so it cannot be a leaked literal.
+    # Found when this hook blocked .github/workflows/container.yml on
+    #   -e DEMO_PIN="ci-$(openssl rand -hex 8)"
+    # a throwaway PIN generated inside CI. Only the NAMED-SETTING rules are
+    # excused this way; the key-shape checks below still run on every line,
+    # so a literal key sitting beside a substitution is still caught.
+    if (why != "" && text ~ /(PIN|API_KEY|SECRET|TOKEN|PASSWORD)[ \t]*[:=][ \t]*["'"'"']?[^ \t"'"'"']*\$[({A-Za-z_]/) why = "";
+
+    if (why == "") {
+      if (text ~ /(^|[^0-9a-fA-F])[0-9a-f]{48}([^0-9a-fA-F]|$)/)           why = "48 character hex token (gateway key shape)";
+      else if (text ~ /sk-ant-[A-Za-z0-9_-]{10,}/)                          why = "Anthropic API key";
+      else if (text ~ /AKIA[0-9A-Z]{16}/)                                    why = "AWS access key id";
+    }
+    if (why != "") printf "  BLOCKED  %s:%d  (%s)\n", file, line, why;
+    line++;
+    next
+  }
+')
+
+if [ -n "$report" ]; then
+  echo "$report"
+  found=1
+fi
+
+if [ "$found" -ne 0 ]; then
+  echo ""
+  echo "pre-commit: commit refused, it looks like it contains a secret."
+  echo "Move keys into backend/.env (gitignored), then git add again."
+  echo "Values are not shown above on purpose."
+  exit 1
+fi
+
+exit 0
