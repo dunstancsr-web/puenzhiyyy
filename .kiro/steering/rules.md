@@ -147,9 +147,13 @@ Read before making UI changes.
   `Reviewed/` once he decides). Judges: `docs/Submission/` and `README.md`.
 - **A document for Stan** gets `(Stan)` at the START of its name and goes in one of his two folders.
   A `(Stan)` SUFFIX is gitignored and means private, so a name ending in `(Stan).md` never reaches git.
-- **Stan's personal instructions** (where to find documents, using Claude Code and Kiro) live in his
-  one private guide, `docs/(Stan) 1 Reference/CLAUDE_CLI_GUIDE (Stan).md`. When a key document moves
-  or a new one appears, update its "Where to find things" table.
+- **`docs/DIRECTORY.md` lists every document**: who it is for, what is in it, when to open it. Creating,
+  moving, renaming or deleting a document includes updating its row in the same change. Describe
+  contents only; never write status or figures there. The end of session check flags documents it
+  does not list.
+- **Stan's personal instructions** (using Claude Code and Kiro) live in his one private guide,
+  `docs/(Stan) 1 Reference/CLAUDE_CLI_GUIDE (Stan).md`, which links to the directory rather than
+  keeping its own list.
 
 ## 8. Tooling
 

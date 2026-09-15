@@ -225,12 +225,6 @@ illustrative and is labelled as such everywhere it appears. It is not a governan
 
 ## Documentation
 
-| File | Contents |
-|---|---|
-| `.kiro/steering/project-context.md` | domain terms, tech decisions, working agreements |
-| `.kiro/specs/mvp1-inventory-visibility/requirements.md` | numbered requirements |
-| `.kiro/specs/mvp1-inventory-visibility/design.md` | engine formulas and data model |
-| `.kiro/specs/mvp1-inventory-visibility/tasks.md` | task breakdown and status |
-| `.kiro/DEVLOG.md` | dated development log |
-| `docs/Submission/WRITEUP.md` | the hackathon write-up |
-| `.kiro/steering/rules.md` | the rules for AI agents working in this repo (imported by `CLAUDE.md`) |
+Every document in the repository, who it is for and what is in it: [`docs/DIRECTORY.md`](docs/DIRECTORY.md).
+The write-up is [`docs/Submission/WRITEUP.md`](docs/Submission/WRITEUP.md); the formulas and data model are in
+[`design.md`](.kiro/specs/mvp1-inventory-visibility/design.md).

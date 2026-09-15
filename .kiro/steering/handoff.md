@@ -34,6 +34,8 @@ and a language model only explains, never computes.**
 5. **`tasks.md`** in the same spec folder has full write-ups to TASK-52 and a one-line index for
    TASK-46 and TASK-53 to TASK-99, whose detail is in the devlog.
 
+Every other document, with what is in it: `docs/DIRECTORY.md`.
+
 `.kiro/steering/project-context.md` holds the business problem and the domain concepts (on hand
 versus available, the two reorder points, and so on). Kiro loads it with this file.
 
