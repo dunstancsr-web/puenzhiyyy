@@ -291,6 +291,8 @@ sales_30d = SUM(quantity_mt) WHERE status = 'fulfilled' AND sale_date >= today -
             (lost sales, orders that could not be filled, are excluded: they feed fill rate)
 avg_daily_30d = sales_30d / 30         (60, 90 and 180 day windows follow the same rule)
 
+Rates (avg_daily_30d and the others) and demand_cv are held to 2 decimal places before use.
+
 avg_daily_30d is THE demand rate: every formula in this document that needs a daily demand rate
 (cover, projection, suggested order, safety stock, ABC, compliance, financials) uses it and nothing
 else. Stored on each SKU as avg_daily_usage_30d.
@@ -349,8 +351,8 @@ YELLOW if movement_class = "Slow Moving"
        OR days_of_cover > target_days_of_cover
 GREEN  otherwise
 ```
-`covered_by_po` = an open PO's ETA arrives no later than the projected stockout date — softens the RED/
-ORANGE triggers when supply is already inbound, so a real-but-non-emergency gap doesn't over-alarm.
+`covered_by_po` softens the RED and ORANGE triggers when supply is already inbound, so a real but
+non-emergency gap does not over-alarm. Its exact definition is in "Supporting Formulas" below.
 
 ### Movement Classification (velocity — kept separate from the ABC value classification below)
 ```
@@ -382,6 +384,82 @@ efficient replenishment; C+idle: low-priority discontinuation/clearance). Built 
 > widget's own caption told the reader to act on. The matrix now uses the axis the spec actually asks
 > for. `xyz_class` is still computed and still shown on the Inventory table (REQ-14 documents it); it
 > simply no longer drives this matrix.
+
+### Supporting Formulas (written down 15 Sep 2026; until then these existed only in code)
+
+The formulas above lean on these. All use the one demand rate, `avg_daily_30d` (Sales Velocity).
+
+**Demand variability and XYZ** (`velocity.js`, `segmentation.js`)
+```
+weekly_sales[w]  = fulfilled sales in week w, for the last 12 weeks
+demand_cv        = population standard deviation(weekly_sales) / mean(weekly_sales)   (0 when mean is 0)
+                   if demand_cv is 0, the SKU record's configured demand_cv is used instead
+xyz_class        = X if demand_cv < 0.25, Y if <= 0.5, else Z
+```
+
+**Safety stock and lead-time demand** (`safetystock.js`; King's formula)
+```
+z                    = service-level z-score, from the step table: the value for the highest listed
+                       level not above target_service_level (0.90 -> 1.28, 0.95 -> 1.65, 0.99 -> 2.33, ...)
+daily_demand_sd      = demand_cv * avg_daily_30d
+safety_stock_mt      = z * sqrt( lead_time_days * daily_demand_sd^2
+                                 + avg_daily_30d^2 * lead_time_std_days^2 )
+safety_stock_days    = round(safety_stock_mt / avg_daily_30d)                          (0 with no demand)
+lead_time_demand_mt  = avg_daily_30d * lead_time_days
+```
+
+**Target cover and coverage band** (`engines/index.js`)
+```
+target_days_of_cover = round(target_stock / avg_daily_30d)                           (null with no demand)
+coverage_band        = idle   if days_of_cover is null
+                       below  if days_of_cover < lead_time_days + safety_stock_days
+                       above  if days_of_cover > target_days_of_cover
+                       in     otherwise
+```
+
+**Covered by a purchase order** (`engines/index.js`)
+```
+incoming_eta_days = days until the EARLIEST open PO's ETA (0 if already due)
+covered_by_po     = expected_incoming_qty > 0
+                    AND incoming_eta_days <= days_of_cover     (the order lands before stock runs out)
+```
+
+**Stock age and ageing status** (`position.js`, `engines/index.js`)
+```
+inventory_age_days = whole days since last_received_date
+holding_limit      = max_holding_days, or 270 if not set
+ageing_status      = Fresh    if inventory_age_days / holding_limit < 0.34   (or no receipt date)
+                     Normal   if < 0.67
+                     Ageing   if < 0.90
+                     At Risk  otherwise
+```
+**Open decision:** requirements.md REQ-08 gives fixed day bands instead (Fresh 0 to 90, Normal 91 to
+180, Ageing 181 to 270, At Risk 271+). At the default 270 day limit the two agree except that the code
+starts At Risk at 243 days, not 271. See `backend/scripts/formula-decisions.json`.
+
+**Per-SKU financials** (`financials.js`)
+```
+inventory_value        = on_hand_qty * unit_cost_sgd
+margin_per_mt          = unit_price_sgd - unit_cost_sgd
+annual_cogs            = avg_daily_30d * 365 * unit_cost_sgd
+annual_gross_margin    = avg_daily_30d * 365 * margin_per_mt
+overstock_qty          = max(0, on_hand_qty - max_stock)
+overstock_value        = overstock_qty * unit_cost_sgd
+overstock_carrying_cost = overstock_value * annual_carrying_rate_pct / 100
+eo_value               = available_qty * unit_cost_sgd   if movement_class is Slow Moving or Idle, else 0
+eo_value_risk_adjusted = eo_value * obsolescence_risk_pct / 100
+stockout_gap_days      = max(0, lead_time_days - days_of_cover)   unless covered_by_po or no cover (then 0)
+lost_units_risk        = stockout_gap_days * avg_daily_30d
+lost_margin_risk       = lost_units_risk * margin_per_mt
+```
+
+**Portfolio KPIs** (`financials.js`, across active SKUs)
+```
+turnover   = SUM(annual_cogs) / SUM(inventory_value)
+dio        = 365 / turnover                                 (days inventory outstanding)
+gmroi      = SUM(annual_gross_margin) / SUM(inventory_value)
+fill_rate  = (demand_30d - lost_30d) / demand_30d * 100,  where demand_30d = fulfilled + lost sales, 30 days
+```
 
 ### Compliance Position (glossary #38 / spec Step 11A — new, simplified & illustrative)
 

@@ -83,14 +83,11 @@ Required windows:
 - Last 60 days
 - Last 90 days
 
-Sales are FULFILLED sales only; lost sales (orders that could not be filled) are excluded here and
-counted in fill rate instead (decided 15 Sep, see design.md "Formula decisions").
+Derived: a daily demand rate per window, and a velocity trend (accelerating, stable, decelerating).
+Only fulfilled sales count; lost sales feed fill rate. The 30 day average is the one demand rate every
+other requirement uses.
 
-Derived metrics (avg_daily_usage_30d is the one demand rate used by every other requirement):
-- avg_daily_usage_30d = sales_30d / 30
-- avg_daily_usage_90d = sales_90d / 90
-- velocity_trend: "accelerating" | "stable" | "decelerating"
-  (accelerating if 30d rate > 90d rate by >10%, decelerating if <10% below)
+**Formulas: design.md, "Sales Velocity".**
 
 ---
 
@@ -100,26 +97,22 @@ Calculate how long current available stock will last.
 (Renamed from "Months/Days of Stock" to match glossary term #22, Days of Cover — see
 `reference/terminology-map.md`.)
 
-Formula:
-  days_of_cover = available_qty / avg_daily_usage_30d
-  months_of_cover = days_of_cover / 30
+**Formulas: design.md, "Days / Months of Cover".**
 
-Edge case: if avg_daily_usage_30d = 0, classify as Idle and display days_of_cover as **"Not
-Applicable"** (per glossary term #22 — "when demand is zero, show Not Applicable rather than
-infinity"), not a blank or null value. Internally the field may still be `null`; the UI is what must
-render "Not Applicable."
+Acceptance: when there is no demand, days of cover displays as **"Not Applicable"** (glossary term #22,
+"when demand is zero, show Not Applicable rather than infinity"), never a blank, zero or infinity.
+Internally the field may be `null`; the UI must render "Not Applicable". (An earlier line here also
+said zero 30 day demand means Idle; it contradicted REQ-06 and was removed on 15 Sep. Idle is defined
+by REQ-06 alone.)
 
 ---
 
 ### REQ-06 — SKU Movement Classification
 Every SKU must be automatically assigned a movement class.
 
-Rules, evaluated in this order, first match wins (the exact definition is design.md "Movement
-Classification"; changed in code 15 Sep to match this, see design.md "Formula decisions"):
-- Idle:          no fulfilled sales in last 90 days
-- Slow Moving:   avg_daily_usage_30d > 0 AND days_of_cover > 120
-- Fast Moving:   avg_daily_usage_30d in the top 25% of selling SKUs
-- Normal:        otherwise
+Four classes, Idle, Slow Moving, Fast Moving and Normal, where Slow Moving means too much stock for
+the SKU's own demand. **Rules: design.md, "Movement Classification"** (decision history in "Formula
+decisions").
 
 Note: this is a **velocity** classification, deliberately kept separate from the **economic-value**
 ABC classification (new REQ-14 below) — spec Step 8A is explicit that "the two dimensions must remain
@@ -138,20 +131,10 @@ Every SKU must receive a health status based on its stock position.
 > was missing the `max_holding_days` RED trigger entirely. The backend's rule set (below) is now
 > canonical; both layers implement it identically. See `reference/terminology-map.md` item 1.
 
-Rules (evaluated top to bottom, first match wins):
-- RED:    days_of_cover < lead_time_days, UNLESS an open PO already covers the gap (`covered_by_po`)
-          OR inventory_age_days > max_holding_days
-          OR movement_class = "Idle" AND available_qty > 0  (idle stock sitting on hand is a risk, not a pass)
-- ORANGE: days_of_cover < (lead_time_days + safety_stock_days), UNLESS covered_by_po
-          OR on_hand_qty > max_stock
-- YELLOW: movement_class = "Slow Moving"
-          OR days_of_cover > target_days_of_cover
-- GREEN:  everything else
-
-`covered_by_po` = true when there is on-order quantity whose ETA arrives no later than the projected
-stockout date — i.e. an inbound PO already resolves what would otherwise be a RED/ORANGE trigger. This
-is a deliberate, documented softening of the raw days-of-cover rule (a real but non-emergency gap
-shouldn't cry wolf when supply is already inbound).
+Four statuses, RED (critical), ORANGE (action required), YELLOW (watch), GREEN (healthy), evaluated
+in order, first match wins. Idle stock sitting on hand must count as a risk, not a pass, and an inbound
+purchase order that lands before stock runs out must soften the stockout triggers so a covered gap
+does not over-alarm. **Rules: design.md, "Health Status"; `covered_by_po` in "Supporting Formulas".**
 
 ---
 
@@ -164,6 +147,10 @@ Per SKU (MVP 1 — no batch granularity yet):
 - ageing_status: Fresh (0–90d) | Normal (91–180d) | Ageing (181–270d) | At Risk (271d+)
 
 Thresholds are configurable per SKU; defaults above apply if not set.
+
+**Open decision (15 Sep):** the code instead scales the bands to each SKU's holding limit (design.md,
+"Supporting Formulas"), which starts At Risk at 243 days for a 270 day limit. When Stan decides, the
+losing definition is removed and only design.md keeps the formula.
 
 ---
 
@@ -283,12 +270,9 @@ Fast/Normal/Slow/Idle **velocity** classification in REQ-06 (spec Step 8A: "the 
 remain separate"). Already implemented in code (`segmentation.js`, `abc_class`/`xyz_class` columns) but
 missing from this document until now.
 
-Formula:
-  annual_consumption_value = avg_daily_usage_30d × 365 × unit_cost_sgd
-  Sort SKUs descending by annual_consumption_value; assign by cumulative % of portfolio total:
-    A: cumulative <= 80%   B: cumulative <= 95%   C: remainder
-
-XYZ (demand-predictability) axis, by coefficient of variation of demand: X < 0.25, Y 0.25–0.5, Z > 0.5.
+A, B or C by each SKU's share of annual consumption value (a Pareto split), plus the XYZ
+demand-predictability axis. **Formulas: design.md, "ABC Value Classification" and "Supporting
+Formulas".**
 
 ⚠️ **XYZ has no source-document backing** (noted 2026-09-13). It appears in no part of the technical
 spec, the glossary or the terminology map; it was implemented in `segmentation.js` first and written
@@ -303,12 +287,9 @@ management action"). Do not reintroduce ABC × XYZ without a source-doc basis fo
 The system must calculate a suggested replenishment quantity per SKU (glossary term #30), not just flag
 that reorder is needed.
 
-Formula (the glossary's actual formula, not a proxy — TASK-07's projection engine made this possible):
-  suggested_order_qty = max(0, target_stock − projected_available_at_lead_time)
-
-`projected_available_at_lead_time` runs the same projection curve used for REQ-18's chart
-(`backend/src/engines/projection.js`) out to `lead_time_days`, so the suggestion already accounts for
-any open PO arriving before then — not just today's snapshot. Must be clearly labelled as a
+The glossary's actual formula, not a proxy: it tops stock back up to target as projected at the
+moment a new order would arrive, so it accounts for sales during the wait and any purchase order
+landing before then. **Formula: design.md, "Reorder Point and Suggested Order Quantity".** Must be clearly labelled as a
 recommendation requiring manager approval, never auto-executed (spec Step 15 / glossary term #42).
 
 ---
@@ -319,13 +300,8 @@ adds a **simplified, illustrative, portfolio-level** version — not the formall
 the real spec requires — to demonstrate the concept. It's portfolio-level (summed across all active
 SKUs) because the real scheme is a company-wide requirement, not a per-SKU one.
 
-Formula:
-  compliance_eligible_qty = Σ on_hand_qty across all active SKUs (MVP1 has no blocked/damaged/rejected
-                            statuses to exclude — see "Explicitly Deferred" below)
-  compliance_required_qty = 2 × Σ(avg_daily_usage_30d across active SKUs) × 30 (placeholder rule —
-                            substitutes portfolio demand throughput for real import-receipt history,
-                            which this project doesn't have)
-  compliance_position      = compliance_eligible_qty − compliance_required_qty
+Eligible stock minus a placeholder requirement that uses portfolio demand as a stand-in for real
+import history. **Formula: design.md, "Compliance Position".**
 
 Acceptance criteria:
 - Must be visibly labelled "illustrative — pending governance approval of the actual rule, using demand
@@ -351,9 +327,8 @@ Acceptance criteria:
 The system must show a dated projection, not one net number (spec Step 12 / glossary term #29), so a
 manager can see the first future risk, its size, and its expected recovery — not just today's snapshot.
 
-Formula: `projected_available(day) = available_qty − (avg_daily_usage_30d × day) + Σ open-PO qty
-landing on or before that day`, run out 90 days from today. Flat-rate demand, no seasonality — matches
-every other engine's demand model in this MVP (documented simplification, not a bug).
+Run out 90 days from today at a flat demand rate with open purchase orders landing on their ETA
+(no seasonality, a documented simplification). **Formula: design.md, "Projected Inventory".**
 
 Acceptance criteria:
 - `GET /api/skus/:id/projection` returns the 90-day curve plus `first_stockout_date`,

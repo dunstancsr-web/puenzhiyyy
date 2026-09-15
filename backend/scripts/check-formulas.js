@@ -15,9 +15,9 @@
 // implementation the app uses, so it does not break the one-source rule: if the
 // two ever disagree, one of them is wrong and a person decides which.
 //
-// Where the spec uses a value it never defines (safety_stock_days,
-// target_days_of_cover, the age thresholds), the check takes that input from
-// the engine and says so in the report. Those are listed as UNDOCUMENTED.
+// Where one formula uses another's result (health uses days_of_cover, for
+// example), the check reads that input from the engine, so each formula is
+// tested on its own and one disagreement is reported once, not everywhere.
 //
 // Exit code: 1 when a check fails that is NOT in formula-decisions.json.
 // A failure listed there is a known disagreement waiting for Stan's decision:
@@ -104,7 +104,6 @@ check("months_of_cover", "Days / Months of Cover", "days_of_cover / 30 (using th
 });
 check("reorder_point_suggested", "Reorder Point", "lead_time_demand_mt + safety_stock_mt", {
   tol: 0.05,
-  undocumented: ["safety_stock_mt", "lead_time_demand_mt"],
   perSku: (s) => [s.lead_time_demand_mt + s.safety_stock_mt, s.reorder_point_suggested],
 });
 
@@ -136,7 +135,6 @@ function specMovement(s, r) {
 }
 check("movement_class", "Movement Classification", "Idle: no sales in 90d; Slow: cover > 120d; Fast: >= p75 of avg_daily_30d", {
   compare: same,
-  undocumented: ["days_of_cover (engine; checked on its own above)"],
   perSku: (s, r) => [specMovement(s, r), s.movement_class],
 });
 
@@ -144,7 +142,6 @@ check("movement_class", "Movement Classification", "Idle: no sales in 90d; Slow:
 // rule on its own rather than repeating the movement disagreement.
 check("health_status", "Health Status", "RED / ORANGE / YELLOW / GREEN rules, first match wins", {
   compare: same,
-  undocumented: ["safety_stock_days", "target_days_of_cover", "covered_by_po", "inventory_age_days", "movement_class (engine)"],
   perSku: (s) => {
     const dos = s.days_of_cover;
     let h = "GREEN";
@@ -174,6 +171,87 @@ check("compliance_position", "Compliance Position", "SUM(on_hand_qty) - 2 * SUM(
     return [eligible - required, stats.compliancePosition];
   },
 });
+
+// ── Supporting Formulas (design.md) ─────────────────────────────────────────
+function specDemandCv(s, r) {
+  const weeks = new Array(12).fill(0);
+  for (const x of r.sales) {
+    if (x.status !== "fulfilled") continue;
+    const wk = Math.floor((now - new Date(x.sale_date).getTime()) / DAY_MS / 7);
+    if (wk >= 0 && wk < 12) weeks[wk] += x.quantity_mt;
+  }
+  const mean = weeks.reduce((a, b) => a + b, 0) / 12;
+  const cv = mean === 0 ? 0 : Math.sqrt(weeks.reduce((a, b) => a + (b - mean) ** 2, 0) / 12) / mean;
+  const held = Math.round(cv * 100) / 100; // rates and CV are held to 2 decimal places (design.md)
+  return held > 0 ? held : s.demand_cv;
+}
+const Z_TABLE = [[0.5, 0], [0.75, 0.67], [0.8, 0.84], [0.85, 1.04], [0.9, 1.28], [0.91, 1.34], [0.92, 1.41], [0.93, 1.48], [0.94, 1.56], [0.95, 1.65], [0.96, 1.75], [0.97, 1.88], [0.98, 2.05], [0.99, 2.33], [0.999, 3.09]];
+const specZ = (level) => Z_TABLE.reduce((z, [p, v]) => (level >= p ? v : z), 0);
+check("xyz_class", "Supporting Formulas", "X if demand_cv < 0.25, Y if <= 0.5, else Z (12 weekly buckets)", {
+  compare: same,
+  perSku: (s, r) => { const cv = specDemandCv(s, r); return [cv < 0.25 ? "X" : cv <= 0.5 ? "Y" : "Z", s.xyz_class]; },
+});
+check("safety_stock_mt", "Supporting Formulas", "z * sqrt(LT * (cv * d)^2 + d^2 * LT_sd^2)", {
+  tol: 0.05,
+  perSku: (s, r) => {
+    const d = Math.round(specAvg30(r) * 100) / 100, sd = specDemandCv(s, r) * d;
+    return [specZ(s.target_service_level) * Math.sqrt(s.lead_time_days * sd * sd + d * d * s.lead_time_std_days ** 2), s.safety_stock_mt];
+  },
+});
+check("target_days_of_cover", "Supporting Formulas", "round(target_stock / avg_daily_30d)", {
+  tol: 0,
+  perSku: (s, r) => { const d = specAvg30(r); return [d > 0 ? Math.round(s.target_stock / d) : null, s.target_days_of_cover]; },
+});
+check("covered_by_po", "Supporting Formulas", "incoming > 0 AND earliest PO ETA (days) <= days_of_cover", {
+  compare: same,
+  perSku: (s, r) => {
+    const etas = r.openPos.filter((p) => p.eta).map((p) => Math.max(0, Math.ceil((new Date(p.eta).getTime() - now) / DAY_MS))).sort((a, b) => a - b);
+    const inc = r.openPos.reduce((a, p) => a + p.ordered_qty, 0);
+    return [Boolean(inc > 0 && etas.length && s.days_of_cover != null && etas[0] <= s.days_of_cover), Boolean(s.covered_by_po)];
+  },
+});
+check("coverage_band", "Supporting Formulas", "idle / below lead+safety / above target / in", {
+  compare: same,
+  perSku: (s) => {
+    const c = s.days_of_cover;
+    const band = c == null ? "idle" : c < s.lead_time_days + s.safety_stock_days ? "below" : s.target_days_of_cover != null && c > s.target_days_of_cover ? "above" : "in";
+    return [band, s.coverage_band];
+  },
+});
+check("ageing_status", "Supporting Formulas", "age / holding limit: < 0.34 Fresh, < 0.67 Normal, < 0.90 Ageing, else At Risk", {
+  compare: same,
+  perSku: (s) => {
+    if (s.last_received_date == null) return ["Fresh", s.ageing_status];
+    const age = Math.floor((now - new Date(s.last_received_date).getTime()) / DAY_MS);
+    const ratio = age / (s.max_holding_days || 270);
+    return [ratio < 0.34 ? "Fresh" : ratio < 0.67 ? "Normal" : ratio < 0.9 ? "Ageing" : "At Risk", s.ageing_status];
+  },
+});
+check("stockout_gap_days", "Supporting Formulas", "max(0, lead_time - days_of_cover), 0 if covered or no cover", {
+  tol: 0,
+  perSku: (s) => [s.days_of_cover != null && !s.covered_by_po ? Math.max(0, s.lead_time_days - s.days_of_cover) : 0, s.stockout_gap_days],
+});
+check("eo_value", "Supporting Formulas", "available * unit cost if Slow Moving or Idle, else 0", {
+  tol: 1,
+  perSku: (s) => [["Slow Moving", "Idle"].includes(s.movement_class) ? s.available_qty * s.unit_cost_sgd : 0, s.eo_value],
+});
+check("overstock_qty", "Supporting Formulas", "max(0, on_hand_qty - max_stock)", {
+  tol: 0.01,
+  perSku: (s, r) => [Math.max(0, r.pos.on_hand_qty - s.max_stock), s.overstock_qty],
+});
+function specPortfolio() {
+  const inv = skus.reduce((a, s) => a + raw[s.sku_id].pos.on_hand_qty * s.unit_cost_sgd, 0);
+  const rate = (s) => Math.round(specAvg30(raw[s.sku_id]) * 100) / 100;
+  const cogs = skus.reduce((a, s) => a + rate(s) * 365 * s.unit_cost_sgd, 0);
+  const gm = skus.reduce((a, s) => a + rate(s) * 365 * (s.unit_price_sgd - s.unit_cost_sgd), 0);
+  const since = isoDaysAgo(30, now);
+  let ful = 0, lost = 0;
+  for (const s of skus) for (const x of raw[s.sku_id].sales) if (x.sale_date >= since) { if (x.status === "fulfilled") ful += x.quantity_mt; else if (x.status === "lost") lost += x.quantity_mt; }
+  return { turnover: cogs / inv, gmroi: gm / inv, fill: (ful / (ful + lost)) * 100 };
+}
+check("turnover", "Supporting Formulas", "SUM(annual_cogs) / SUM(inventory_value)", { tol: 0.05, portfolio: () => [specPortfolio().turnover, stats.turnover] });
+check("gmroi", "Supporting Formulas", "SUM(annual_gross_margin) / SUM(inventory_value)", { tol: 0.005, portfolio: () => [specPortfolio().gmroi, stats.gmroi] });
+check("fill_rate", "Supporting Formulas", "(demand_30d - lost_30d) / demand_30d * 100", { tol: 0.05, portfolio: () => [specPortfolio().fill, stats.fillRate] });
 
 // Alert rules, requirements.md REQ-09, on the engine's inputs.
 check("alerts", "requirements.md REQ-09", "the six alert rules", {
