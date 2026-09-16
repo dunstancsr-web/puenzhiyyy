@@ -701,4 +701,4 @@ C), scoped to what's realistic after the hackathon rather than the full enterpri
 | Then | Append-only movement ledger (spec Step 2) — replaces the mutable `inventory_positions` snapshot | Real usage/demand for audit trail | — |
 | Then | Lot/batch tracking, full stock-status taxonomy (blocked/damaged/rejected) | Movement ledger | — |
 | Then | Governance-approved Compliance Position rule (replaces REQ-16's placeholder) | A compliance owner, not a technical blocker | — |
-| Then | Statistically backtested demand forecasting — replaces the flat 30 day average demand input the projection curve (REQ-18) currently uses | A model-building effort of its own | — |
+| Now | Statistically backtested demand forecasting — replaces the flat 30 day average demand input the projection curve (REQ-18) currently uses. The forecast ENGINE and its backtest are built (`../mvp2-demand-forecast/design.md`); wiring it into the app-wide demand rate is gated on Stan's replace-vs-blend decision | A model-building effort of its own | engine ✅, wiring pending |

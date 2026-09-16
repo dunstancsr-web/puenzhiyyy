@@ -25,6 +25,7 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 
 | Document | What is in it | Status |
 |---|---|---|
+| [(Stan) FORECAST DECISIONS.md](<(Stan) 2 To review/(Stan) FORECAST DECISIONS.md>) | The demand forecast engine is built; three decisions before it changes a figure (replace or blend the demand rate, the trust threshold, how far to take the model), with a per-SKU comparison and recommendations | Waiting for your decision |
 | [Reviewed/(Stan) ELI18 EXPLANATIONS DRAFT.md](<(Stan) 2 To review/Reviewed/(Stan) ELI18 EXPLANATIONS DRAFT.md>) | Old and new wording of the rule-based Why? explanation for all six alert types | Reviewed; applied to the app |
 | [Reviewed/(Stan) FORMULA MISMATCHES.md](<(Stan) 2 To review/Reviewed/(Stan) FORMULA MISMATCHES.md>) | Generated report: each design.md formula checked against the code, with any disagreements | Reviewed; your decisions are recorded in design.md, "Formula decisions" |
 
@@ -56,6 +57,7 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 | [`.kiro/specs/.../requirements.md`](../.kiro/specs/mvp1-inventory-visibility/requirements.md) | What the system must do, REQ-01 to REQ-24, and what was deliberately deferred | Checking whether something is in scope |
 | [`.kiro/specs/.../design.md`](../.kiro/specs/mvp1-inventory-visibility/design.md) | How it works: every formula, the schema, page designs, the explanation layer, deployment, and the log of formula decisions | Changing or explaining any figure |
 | [`.kiro/specs/.../tasks.md`](../.kiro/specs/mvp1-inventory-visibility/tasks.md) | Task write-ups to TASK-52 and an index of TASK-46 and 53 to 99 | Looking up a task number |
+| [`.kiro/specs/mvp2-demand-forecast/design.md`](../.kiro/specs/mvp2-demand-forecast/design.md) | MVP2: the demand forecast engine (the Reorder Loop steps 2-3), its formula, the backtest, and the decisions gated on Stan | Working on the forecast |
 | every file in `.kiro/specs/mvp1-inventory-visibility/reference/` | The rice industry source documents: the technical specification, the terms glossary, and the map from old field names to the canonical ones | Checking a term or formula against the industry source |
 | every file in `.kiro/hooks/` | Kiro hooks: the docs sync reminder (and `docs-check.sh`, shared with Claude Code), commit reminder, lint on save | A hook misbehaves |
 | `.claude/settings.json` | Claude Code's hook: the docs sync reminder | A hook misbehaves |
@@ -66,6 +68,7 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 |---|---|
 | `backend/scripts/demo-reset.js` (`npm run demo:reset`) | Reseeds and checks the running app is ready for the demo video |
 | `backend/scripts/check-formulas.js` | Checks every design.md formula against the engines; runs in CI |
+| `backend/scripts/check-forecast.js` | Checks the demand forecast engine against `mvp2-demand-forecast/design.md`, and proves the backtest can fail |
 | `backend/scripts/test-tone.js` | Checks the model wording clean-up (`backend/src/llm/tone.js`) changes what it should and nothing else |
 | `backend/scripts/formula-decisions.json` | Known formula disagreements waiting for Stan's decision (empty when none) |
 | `backend/scripts/bench-models.js` | Measures the explanation pipeline on free local llama3 |
