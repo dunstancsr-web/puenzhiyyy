@@ -619,6 +619,156 @@ router.post("/skus/history/import", (req, res) => {
   }
 });
 
+// ── Sales history onboarding upload (MVP2, step 1) ───────────────────────────
+//
+// APPEND-only, unlike the history import above: a sale has no natural unique
+// key, so there is nothing to diff against. The preview reports what would be
+// ADDED, not what would CHANGE — new rows, their date range, a per-SKU
+// breakdown, and any unknown SKUs, which are rejected and reported rather than
+// silently skipped or auto-created (same rule as the history import's
+// knownSku check). This shape is also what makes the import trivially
+// replaceable later by a live feed connector appending to the same table: no
+// schema change, just a different source for the same rows.
+const SALES_KEY = ["sku_id", "quantity_mt", "sale_date"];
+const SALES_OPTIONAL = ["customer", "channel", "status"];
+const SALES_COLUMNS = [...SALES_KEY, ...SALES_OPTIONAL];
+const SALES_STATUSES = ["fulfilled", "lost"];
+
+// GET /api/skus/history/export-sales?days=N — raw sales_transactions rows,
+// newest first. Same "download, edit, re-upload" shape as every other export
+// here, so onboarding a first dataset and correcting one later are the same
+// workflow, not two.
+router.get("/skus/history/export-sales", (req, res) => {
+  const days = Math.min(1000, Math.max(1, Number(req.query.days) || 180));
+  try {
+    const db = getDb();
+    const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    const rows = db.prepare(`
+      SELECT sku_id, quantity_mt, sale_date, customer, channel, status
+        FROM sales_transactions
+       WHERE sale_date >= ?
+       ORDER BY sale_date DESC, sku_id`).all(since);
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition",
+      `attachment; filename="stocksense-sales-history-${today()}.csv"`);
+    res.send(toCsv(SALES_COLUMNS, rows));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to export sales history" });
+  }
+});
+
+router.post("/skus/history/import-sales", (req, res) => {
+  const { csv, apply = false } = req.body || {};
+  if (typeof csv !== "string" || !csv.trim()) {
+    return res.status(400).json({ success: false, message: "No CSV content was received" });
+  }
+
+  let parsed;
+  try {
+    parsed = parseCsv(csv);
+  } catch (err) {
+    return res.status(400).json({ success: false, message: `Could not read the file: ${err.message}` });
+  }
+  for (const k of SALES_KEY) {
+    if (!parsed.columns.includes(k)) {
+      return res.status(400).json({
+        success: false,
+        message: `The file has no ${k} column, so there is no way to record each sale.`,
+      });
+    }
+  }
+
+  try {
+    const db = getDb();
+    const skuNames = new Map(
+      db.prepare(`SELECT sku_id, product_name FROM skus`).all().map((r) => [r.sku_id, r.product_name])
+    );
+    const ignored = parsed.columns.filter((c) => !SALES_COLUMNS.includes(c));
+
+    const toInsert = [];
+    const errors = [];
+    const unknownSkus = new Set();
+    const bySku = new Map(); // sku_id -> { name, count, qty_total }
+
+    for (const row of parsed.rows) {
+      const line = row.__line;
+      const sku = row.sku_id;
+      if (!sku) { errors.push({ line, message: `Row ${line} is missing sku_id` }); continue; }
+      if (!skuNames.has(sku)) { unknownSkus.add(sku); errors.push({ line, message: `${sku} is not a known SKU (line ${line})` }); continue; }
+
+      const qty = Number(row.quantity_mt);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        errors.push({ line, message: `${sku}: quantity_mt must be a positive number (line ${line})` });
+        continue;
+      }
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.sale_date || "")) {
+        errors.push({ line, message: `${sku}: sale_date must look like 2026-04-15 (line ${line})` });
+        continue;
+      }
+
+      const status = (row.status || "fulfilled").trim();
+      if (!SALES_STATUSES.includes(status)) {
+        errors.push({ line, message: `${sku}: status must be "fulfilled" or "lost", not "${status}" (line ${line})` });
+        continue;
+      }
+
+      const record = {
+        sku_id: sku,
+        quantity_mt: qty,
+        sale_date: row.sale_date,
+        customer: row.customer || null,
+        channel: (row.channel || "direct").trim(),
+        status,
+      };
+      toInsert.push({ line, record });
+
+      const agg = bySku.get(sku) || { sku_id: sku, name: skuNames.get(sku), count: 0, qty_total: 0 };
+      agg.count += 1;
+      agg.qty_total = Math.round((agg.qty_total + qty) * 10) / 10;
+      bySku.set(sku, agg);
+    }
+
+    const dates = toInsert.map((r) => r.record.sale_date).sort();
+    const summary = {
+      rows: parsed.rows.length,
+      changed: toInsert.length, // reused for BulkEdit.jsx's shared blocked/apply-button logic
+      unchanged: 0,             // append-only: there is no "already matches" case
+      errors,
+      warnings: [],
+      ignoredColumns: ignored,
+      unknownSkus: [...unknownSkus],
+      dateRange: dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null,
+      skuBreakdown: [...bySku.values()].sort((a, b) => b.qty_total - a.qty_total),
+      applied: false,
+    };
+
+    if (!apply || errors.length || !toInsert.length) {
+      return res.json({ success: true, data: summary });
+    }
+
+    const insSale = db.prepare(`
+      INSERT INTO sales_transactions (sku_id, quantity_mt, sale_date, customer, channel, status)
+      VALUES (@sku_id, @quantity_mt, @sale_date, @customer, @channel, @status)`);
+    const run = db.transaction(() => {
+      for (const { record } of toInsert) insSale.run(record);
+    });
+    run();
+
+    logEvent(EVENTS.SALES_HISTORY_IMPORTED, {
+      input: { row_count: toInsert.length, date_range: summary.dateRange, sku_count: bySku.size },
+      output: { inserted: toInsert.length },
+    });
+
+    res.json({ success: true, data: { ...summary, applied: true } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to import sales history" });
+  }
+});
+
 // ── Bulk edit: CSV out, CSV back in (TASK-60) ────────────────────────────────
 //
 // The workflow this exists for is "export everything, fix fifty rows in a

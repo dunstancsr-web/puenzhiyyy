@@ -71,7 +71,12 @@ function initDb() {
       abc_class                TEXT,             -- cached on refresh (A/B/C by consumption value)
       xyz_class                TEXT,             -- cached on refresh (X/Y/Z by demand CV)
       active                   INTEGER DEFAULT 1,
-      strategic_adjustment     REAL DEFAULT 0,   -- Phase 2 placeholder, always 0 in MVP 1
+      strategic_adjustment     REAL DEFAULT 0,   -- MVP2: risk-buffer contribution (MT) from riskbuffer.js,
+                                                  -- added to reorder_point_suggested; 0 when no active
+                                                  -- risk_events match this SKU's origin/supplier
+      forecast_model           TEXT,             -- MVP2: naive_seasonal | holt_winters | linear_trend | auto | NULL
+      use_forecast             INTEGER DEFAULT 0,-- MVP2: opt-in switch, decoupled from forecast_model so
+                                                  -- picking a model does not silently activate it
       created_at               TEXT DEFAULT (datetime('now'))
     );
 
@@ -163,6 +168,54 @@ function initDb() {
       strategic_adjustment REAL DEFAULT 0,
       FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
     );
+
+    -- ================================================================
+    -- FORECASTS  (MVP2)
+    -- One row per SKU per model per generation. is_active=1 marks the one row
+    -- per sku_id currently feeding safetystock.js; older rows stay as history
+    -- for later forecast-vs-actual comparison. avg_daily_demand_forecast and
+    -- demand_cv_forecast are the only two fields engines/index.js reads; the
+    -- rest is for the review UI and the backtest report.
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS forecasts (
+      id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+      sku_id                    TEXT NOT NULL,
+      model                     TEXT NOT NULL,   -- naive_seasonal | holt_winters | linear_trend
+      generated_at              TEXT DEFAULT (datetime('now')),
+      horizon_months            INTEGER NOT NULL,
+      avg_daily_demand_forecast REAL NOT NULL,
+      demand_cv_forecast        REAL NOT NULL,
+      monthly_forecast_json     TEXT NOT NULL,   -- [{period, qty_mt, lower, upper}, ...]
+      backtest_metric           TEXT,            -- 'WMAPE'
+      backtest_score            REAL,
+      candidate_scores_json     TEXT,            -- {model_id: wmape, ...} for every model tried, so
+                                                  -- auto-mode's pick is inspectable, not a black box
+      low_confidence            INTEGER DEFAULT 0, -- 1 when fold count was thin (sparse sales history)
+      is_active                 INTEGER DEFAULT 0,
+      FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_forecasts_sku_active ON forecasts(sku_id, is_active);
+
+    -- ================================================================
+    -- RISK EVENTS  (MVP2)
+    -- A seeded, illustrative supply-chain risk signal, matched to SKUs by
+    -- country_of_origin or supplier. NOT a live feed: real USDA GAIN/AMIS
+    -- integration is roadmap, not this build. is_illustrative always 1 here,
+    -- the same honesty label compliance_position already carries.
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS risk_events (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      label             TEXT NOT NULL,
+      country_of_origin TEXT,
+      supplier          TEXT,
+      severity          TEXT NOT NULL,    -- low | medium | high
+      buffer_days_add   REAL NOT NULL,
+      active            INTEGER DEFAULT 1,
+      is_illustrative   INTEGER DEFAULT 1,
+      notes             TEXT,
+      created_at        TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_risk_events_active ON risk_events(active);
 
     -- ================================================================
     -- OPERATORS  (warehouse floor staff, for handheld attribution)
@@ -290,6 +343,8 @@ function initDb() {
   ensureColumn(db, "skus", "obsolescence_risk_pct", "obsolescence_risk_pct REAL DEFAULT 10");
   ensureColumn(db, "skus", "abc_class", "abc_class TEXT");
   ensureColumn(db, "skus", "xyz_class", "xyz_class TEXT");
+  ensureColumn(db, "skus", "forecast_model", "forecast_model TEXT");
+  ensureColumn(db, "skus", "use_forecast", "use_forecast INTEGER DEFAULT 0");
   // Compliance Position (REQ-16) is a portfolio-level KPI, computed in financials.js — no SKU column needed.
   ensureColumn(db, "alerts_log", "dedupe_key", "dedupe_key TEXT");
   ensureColumn(db, "alerts_log", "status", "status TEXT DEFAULT 'open'");

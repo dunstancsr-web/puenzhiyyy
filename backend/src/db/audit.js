@@ -45,6 +45,10 @@ const EVENTS = Object.freeze({
   // One row per model explanation (TASK-11), failed attempts included, with
   // tokens and call count. scripts/spend.js prices paid spend from these rows.
   LLM_CALL: "LLM_CALL",
+  // MVP2 step 1: a one-off historical sales upload, append-only into
+  // sales_transactions. One row per import, not one per sales row, since the
+  // import as a whole is the auditable act.
+  SALES_HISTORY_IMPORTED: "SALES_HISTORY_IMPORTED",
 });
 
 // JSON.stringify can throw (circular refs) and can return undefined (for a bare

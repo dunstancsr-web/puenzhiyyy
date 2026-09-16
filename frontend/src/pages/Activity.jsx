@@ -39,6 +39,8 @@ const TYPE_META = {
   // the only security event in this log, so it takes the alarm colour.
   LLM_UNLOCKED:          { icon: KeyRound,    color: "var(--yellow)", label: "Paid AI unlocked" },
   LLM_UNLOCK_LOCKED_OUT: { icon: ShieldAlert, color: "var(--red)",    label: "PIN lockout" },
+  // MVP2 step 1: the onboarding sales-history upload.
+  SALES_HISTORY_IMPORTED: { icon: FileSearch, color: "var(--blue)", label: "Sales history uploaded" },
 };
 
 // Column order for the filter chips. Deliberately not alphabetical and not
@@ -48,7 +50,7 @@ const TYPE_META = {
 const TYPE_ORDER = [
   "ALERT_TRIGGERED", "DECISION_RECORDED", "LLM_CALL",
   "GOODS_RECEIVED", "GOODS_ISSUED", "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
-  "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT",
+  "SALES_HISTORY_IMPORTED", "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT",
 ];
 
 const PAGE_HINT = {
@@ -241,6 +243,17 @@ function describe(event) {
         headline: "Too many wrong demo PINs, unlocking was blocked",
         detail: o.reason || null,
       };
+
+    case "SALES_HISTORY_IMPORTED": {
+      const range = i.date_range ? `${i.date_range.from} to ${i.date_range.to}` : null;
+      return {
+        headline: `${num(o.inserted)} sale${o.inserted === 1 ? "" : "s"} added from an uploaded file`,
+        detail: [
+          i.sku_count ? `${i.sku_count} SKU${i.sku_count === 1 ? "" : "s"}` : null,
+          range,
+        ].filter(Boolean).join(" · ") || null,
+      };
+    }
 
     default:
       return { headline: event.event_type.replace(/_/g, " ").toLowerCase(), detail: null };

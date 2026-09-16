@@ -95,6 +95,21 @@ export const api = {
   },
   importHistoryCsv: (csv, apply) => request("/skus/history/import", { method: "POST", body: { csv, apply } }),
 
+  // Sales history onboarding upload (MVP2 step 1). Append-only, unlike the
+  // history import above, so the response shape is a "what would be added"
+  // summary rather than a field-by-field diff.
+  exportSalesHistoryCsv: async (days = 180) => {
+    let res;
+    try {
+      res = await fetch(`${BASE}/skus/history/export-sales?days=${days}`);
+    } catch {
+      throw new Error(UNREACHABLE);
+    }
+    if (!res.ok) throw new Error("Could not export sales history. Check the backend log.");
+    return res.text();
+  },
+  importSalesHistoryCsv: (csv, apply) => request("/skus/history/import-sales", { method: "POST", body: { csv, apply } }),
+
   // Dashboard
   getDashboardStats: () => request("/dashboard/stats"),
   getDashboardHistory: (months = 24) => request(`/dashboard/history?months=${months}`),

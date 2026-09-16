@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Table2, Download, Upload, CalendarRange, AlertTriangle, Check, ChevronRight } from "lucide-react";
+import { Table2, Download, Upload, CalendarRange, History, AlertTriangle, Check, ChevronRight } from "lucide-react";
 import Modal, { ModalBtn } from "./Modal";
 import { api } from "../api/inventory";
 
@@ -42,6 +42,17 @@ const DATASETS = {
     file: () => `stocksense-history-${new Date().toISOString().slice(0, 10)}.csv`,
     export: () => api.exportHistoryCsv(24),
     import: (csv, apply) => api.importHistoryCsv(csv, apply),
+  },
+  // MVP2 step 1: one-off historical sales onboarding. Append-only, so its
+  // preview is a different shape (what would be ADDED, not a field diff) —
+  // see the dataset === "salesHistory" branch in ImportPreview below.
+  salesHistory: {
+    label: "sales history",
+    downloadNote: "Individual sales transactions, most recent first",
+    uploadNote: "New rows are added; nothing existing is changed",
+    file: () => `stocksense-sales-history-${new Date().toISOString().slice(0, 10)}.csv`,
+    export: () => api.exportSalesHistoryCsv(180),
+    import: (csv, apply) => api.importSalesHistoryCsv(csv, apply),
   },
 };
 
@@ -113,10 +124,11 @@ export default function BulkEdit({ onImported }) {
   const applyImport = useCallback(async () => {
     setBusy("apply"); setError(null);
     try {
-      const result = await DATASETS[preview?.dataset || "skus"].import(csv, true);
+      const which = preview?.dataset || "skus";
+      const result = await DATASETS[which].import(csv, true);
       setPreview(null);
       setCsv(null);
-      setDone(result);
+      setDone({ ...result, dataset: which });
       onImported?.();
     } catch (err) {
       setError(err.message);
@@ -168,6 +180,15 @@ export default function BulkEdit({ onImported }) {
           <MenuItem icon={Upload} title="Upload history"
             note={DATASETS.history.uploadNote}
             onClick={() => { setMenuOpen(false); datasetRef.current = "history"; fileRef.current?.click(); }} />
+
+          <div style={{ height: 1, background: "var(--border)", margin: "5px 8px" }} />
+
+          <MenuItem icon={History} title="Download sales history"
+            note={DATASETS.salesHistory.downloadNote}
+            onClick={() => doExport("salesHistory")} />
+          <MenuItem icon={Upload} title="Upload sales history"
+            note={DATASETS.salesHistory.uploadNote}
+            onClick={() => { setMenuOpen(false); datasetRef.current = "salesHistory"; fileRef.current?.click(); }} />
         </div>
       )}
 
@@ -176,7 +197,9 @@ export default function BulkEdit({ onImported }) {
       {error && <Toast tone="bad" message={error} onDismiss={() => setError(null)} />}
       {done && (
         <Toast tone="good" onDismiss={() => setDone(null)}
-          message={`${done.changed} SKU${done.changed === 1 ? "" : "s"} updated from the spreadsheet.`} />
+          message={done.dataset === "salesHistory"
+            ? `${done.changed} sale${done.changed === 1 ? "" : "s"} added from the spreadsheet.`
+            : `${done.changed} SKU${done.changed === 1 ? "" : "s"} updated from the spreadsheet.`} />
       )}
 
       {preview && (
@@ -185,7 +208,9 @@ export default function BulkEdit({ onImported }) {
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
             <ModalBtn label="Cancel" onClick={() => { setPreview(null); setCsv(null); }} />
             <ModalBtn primary disabled={blocked || busy === "apply"}
-              label={busy === "apply" ? "Applying..." : `Apply ${preview.changed} change${preview.changed === 1 ? "" : "s"}`}
+              label={busy === "apply" ? "Applying..." : preview.dataset === "salesHistory"
+                ? `Add ${preview.changed} sale${preview.changed === 1 ? "" : "s"}`
+                : `Apply ${preview.changed} change${preview.changed === 1 ? "" : "s"}`}
               onClick={applyImport} />
           </div>
         </Modal>
@@ -214,6 +239,8 @@ function MenuItem({ icon: Icon, title, note, onClick }) {
 // stop; changes second, grouped by SKU so the unit of review is "this product"
 // rather than "this cell".
 function ImportPreview({ preview }) {
+  if (preview.dataset === "salesHistory") return <SalesHistoryPreview preview={preview} />;
+
   const { fileName, rows, changed, unchanged, errors, warnings, ignoredColumns } = preview;
   const halt = errors.length > 0;
 
@@ -290,6 +317,87 @@ function ImportPreview({ preview }) {
         <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
           Ignored, because these are calculated rather than stored:{" "}
           {ignoredColumns.join(", ")}.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sales history's preview is a different SHAPE from every other dataset here:
+// what would be ADDED, not a field-by-field diff, since an append-only import
+// has no "before" value to show. Reusing ImportPreview's changes-table for
+// this would mean showing every new row as N empty-to-value diffs, which is
+// noise, not review.
+function SalesHistoryPreview({ preview }) {
+  const { fileName, rows, changed, errors, unknownSkus, dateRange, skuBreakdown, ignoredColumns } = preview;
+  const halt = errors.length > 0;
+
+  return (
+    <div>
+      <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 16 }}>
+        <b style={{ color: "var(--text-primary)" }}>{fileName}</b> · {rows} row{rows === 1 ? "" : "s"} read
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+        <Stat n={changed} label="new sales" tone={changed ? "blue" : "muted"} />
+        <Stat n={errors.length} label={errors.length === 1 ? "problem" : "problems"} tone={halt ? "bad" : "muted"} />
+      </div>
+
+      {halt && (
+        <Panel tone="bad" icon={AlertTriangle}
+          title={`Nothing will be added until ${errors.length === 1 ? "this is" : "these are"} fixed`}
+          body="An import is all or nothing on purpose: adding the good rows and skipping the rest would leave no record of which sales made it in.">
+          <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: "var(--text-sm)", lineHeight: 1.6 }}>
+            {errors.slice(0, 12).map((e, i) => <li key={i}>{e.message}</li>)}
+          </ul>
+          {errors.length > 12 && (
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 8 }}>
+              and {errors.length - 12} more
+            </div>
+          )}
+          {unknownSkus?.length > 0 && (
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 8 }}>
+              Unknown SKU{unknownSkus.length === 1 ? "" : "s"}: {unknownSkus.join(", ")}. Add the product first, or fix the code in the file.
+            </div>
+          )}
+        </Panel>
+      )}
+
+      {!halt && changed === 0 && (
+        <Panel tone="muted" icon={Check} title="Nothing to add"
+          body="This file has no rows this import can read." />
+      )}
+
+      {changed > 0 && (
+        <>
+          {dateRange && (
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 12 }}>
+              Date range: <b style={{ color: "var(--text-primary)" }}>{dateRange.from}</b> to{" "}
+              <b style={{ color: "var(--text-primary)" }}>{dateRange.to}</b>
+            </div>
+          )}
+          <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+            {skuBreakdown.map((s) => (
+              <div key={s.sku_id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "11px 13px", borderBottom: "1px solid var(--border)", fontSize: "var(--text-sm)",
+              }}>
+                <span>
+                  {s.name}
+                  <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> · {s.sku_id}</span>
+                </span>
+                <span style={{ color: "var(--text-secondary)" }}>
+                  {s.count} row{s.count === 1 ? "" : "s"} · {s.qty_total} MT
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {ignoredColumns?.length > 0 && (
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
+          Ignored, not a recognised column: {ignoredColumns.join(", ")}.
         </div>
       )}
     </div>

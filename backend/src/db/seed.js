@@ -342,11 +342,11 @@ function seed() {
     // leave duplicate ALERT_TRIGGERED rows for conditions that were re-detected
     // on the fresh data, and clearing neither leaves the trail empty after a
     // reseed, because every alert is already materialized.
-    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "skus"]) {
+    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "forecasts", "risk_events", "skus"]) {
       db.exec(`DELETE FROM ${t}`);
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN
-      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','skus')`);
+      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','forecasts','risk_events','skus')`);
   });
   wipe();
 
@@ -458,7 +458,33 @@ function seed() {
     });
   }
 
-  console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${poSeq - 1} open POs, ${soCount} open sales orders, ${OPERATORS.length} operators`);
+  // ── Risk events (MVP2) ─────────────────────────────────────────────────────
+  // Illustrative, not a live feed — see riskbuffer.js and db/init.js. Modelled
+  // on real event shapes (India's 2023 non-basmati export ban is the closest
+  // real analog for RISK_EVENTS[0]) so the demo shows a plausible magnitude,
+  // not an invented one. Matches by country_of_origin OR supplier, so one
+  // entry (RISK_EVENTS[3]) is deliberately supplier-keyed to exercise both
+  // match paths rather than only the country one.
+  const RISK_EVENTS = [
+    { label: "India non-basmati export restriction (2023-style)", country_of_origin: "India", supplier: null,
+      severity: "high", buffer_days_add: 21,
+      notes: "India is roughly 40% of global rice exports; a restriction there is the textbook supply shock this buffer exists for." },
+    { label: "Thailand port and logistics congestion", country_of_origin: "Thailand", supplier: null,
+      severity: "medium", buffer_days_add: 10,
+      notes: "Freight/berth delays at origin, not a production shortfall." },
+    { label: "Vietnam export quota tightening", country_of_origin: "Vietnam", supplier: null,
+      severity: "medium", buffer_days_add: 8,
+      notes: "A quota cycle, not a ban — smaller buffer than the India entry." },
+    { label: "Supplier JKL Japan: temporary quality hold", country_of_origin: null, supplier: "Supplier JKL Japan",
+      severity: "low", buffer_days_add: 5,
+      notes: "Supplier-keyed rather than country-keyed, to exercise both match paths in riskbuffer.js." },
+  ];
+  const insertRisk = db.prepare(`
+    INSERT INTO risk_events (label, country_of_origin, supplier, severity, buffer_days_add, active, is_illustrative, notes)
+    VALUES (@label, @country_of_origin, @supplier, @severity, @buffer_days_add, 1, 1, @notes)`);
+  for (const r of RISK_EVENTS) insertRisk.run(r);
+
+  console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${poSeq - 1} open POs, ${soCount} open sales orders, ${OPERATORS.length} operators, ${RISK_EVENTS.length} risk events`);
   console.log(`✓ Seeded ${histCount} months of inventory history (${HISTORY_MONTHS} per SKU)`);
 
   // ── Tie-out ────────────────────────────────────────────────────────────────
