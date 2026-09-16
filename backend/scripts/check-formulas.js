@@ -381,6 +381,11 @@ check("alerts", "requirements.md REQ-09", "the six alert rules", {
     if (s.movement_class === "Idle" && s.available_qty > 0) want.push("IDLE");
     if (s.movement_class === "Slow Moving" && s.days_of_cover != null && s.days_of_cover > 120) want.push("SLOW_MOVING");
     if (s.ageing_status === "Ageing" || s.ageing_status === "At Risk") want.push("AGEING");
+    if (s.use_forecast && s.reorder_point_suggested_with_risk != null) {
+      const gap = Math.abs(s.reorder_point_suggested_with_risk - s.reorder_point_policy);
+      const gapPct = s.reorder_point_policy > 0 ? gap / s.reorder_point_policy : (s.reorder_point_suggested_with_risk > 0 ? 1 : 0);
+      if (gapPct > 0.10) want.push("POLICY_CHANGE_SUGGESTED");
+    }
     const got = alerts.filter((a) => a.sku_id === s.sku_id).map((a) => a.alert_type);
     return [want.sort().join(",") || "none", [...new Set(got)].sort().join(",") || "none"];
   },

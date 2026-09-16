@@ -227,6 +227,25 @@ const SKU_TABLE_FIELDS = [
 ];
 const POSITION_TABLE_FIELDS = ["reserved_qty", "quality_hold_qty"];
 
+// Shared by PUT /api/skus/:id below and POST /api/decisions' policy-approval
+// branch, so a human typing into the SKU form and an approved AI suggestion
+// go through exactly one write path, not two that could drift apart.
+function applySkuUpdate(db, skuId, fields) {
+  const skuUpdates = SKU_TABLE_FIELDS.filter((k) => fields[k] !== undefined);
+  const posUpdates = POSITION_TABLE_FIELDS.filter((k) => fields[k] !== undefined);
+  const run = db.transaction(() => {
+    if (skuUpdates.length) {
+      const setClause = skuUpdates.map((k) => `${k} = @${k}`).join(", ");
+      db.prepare(`UPDATE skus SET ${setClause} WHERE sku_id = @sku_id`).run({ ...fields, sku_id: skuId });
+    }
+    if (posUpdates.length) {
+      const setClause = posUpdates.map((k) => `${k} = @${k}`).join(", ");
+      db.prepare(`UPDATE inventory_positions SET ${setClause} WHERE sku_id = @sku_id`).run({ ...fields, sku_id: skuId });
+    }
+  });
+  run();
+}
+
 router.put("/skus/:id", (req, res) => {
   const b = req.body || {};
   const numericError = validateNumericFields(b);
@@ -243,20 +262,7 @@ router.put("/skus/:id", (req, res) => {
        WHERE s.sku_id = ?`).get(req.params.id);
     if (!existing) return res.status(404).json({ success: false, message: "SKU not found" });
 
-    const skuUpdates = SKU_TABLE_FIELDS.filter((k) => b[k] !== undefined);
-    const posUpdates = POSITION_TABLE_FIELDS.filter((k) => b[k] !== undefined);
-
-    const run = db.transaction(() => {
-      if (skuUpdates.length) {
-        const setClause = skuUpdates.map((k) => `${k} = @${k}`).join(", ");
-        db.prepare(`UPDATE skus SET ${setClause} WHERE sku_id = @sku_id`).run({ ...b, sku_id: req.params.id });
-      }
-      if (posUpdates.length) {
-        const setClause = posUpdates.map((k) => `${k} = @${k}`).join(", ");
-        db.prepare(`UPDATE inventory_positions SET ${setClause} WHERE sku_id = @sku_id`).run({ ...b, sku_id: req.params.id });
-      }
-    });
-    run();
+    applySkuUpdate(db, req.params.id, b);
 
     const { skus } = getAnalytics();
     const updated = skus.find((s) => s.sku_id === req.params.id);
@@ -1280,19 +1286,44 @@ router.post("/decisions", (req, res) => {
 
   try {
     const db = getDb();
-    const info = db.prepare(`
-      INSERT INTO decisions (sku_id, trigger_type, ai_recommendation, ai_quantity, manager_action, manager_quantity, manager_reason, decided_by)
-      VALUES (@sku_id, @trigger_type, @ai_recommendation, @ai_quantity, @manager_action, @manager_quantity, @manager_reason, @decided_by)
-    `).run({
-      sku_id: b.sku_id,
-      trigger_type: b.alert_type || b.trigger_type || null,
-      ai_recommendation: b.ai_recommendation ?? null,
-      ai_quantity: b.ai_quantity ?? null,
-      manager_action: b.manager_action,
-      manager_quantity: b.manager_quantity ?? null,
-      manager_reason: b.manager_reason || null,
-      decided_by: b.decided_by || "manager",
-    });
+
+    // The frontend sends this field as `alert_type` (Alerts.jsx's
+    // handleDecision), never `trigger_type` — resolved ONCE here and reused
+    // for both the insert and the apply-policy check below, rather than each
+    // reading the raw body separately, which is exactly the kind of drift
+    // that let a real approval silently apply nothing the first time this
+    // was tested through the actual UI instead of a hand-built curl request.
+    const triggerType = b.alert_type || b.trigger_type || null;
+
+    // A POLICY_CHANGE_SUGGESTED approval or amendment applies the new
+    // reorder_point_policy in the SAME transaction as recording the
+    // decision, via the exact function PUT /api/skus/:id uses — so this is
+    // one write path with two doors in, not a second one to keep in sync.
+    // Reject applies nothing. No new "pending" state on decisions: the
+    // suggestion lived as an alert until this moment, exactly like every
+    // other alert type's decision.
+    const applyPolicy =
+      triggerType === "POLICY_CHANGE_SUGGESTED" &&
+      b.manager_action !== "rejected" &&
+      b.manager_quantity != null;
+
+    const info = db.transaction(() => {
+      const result = db.prepare(`
+        INSERT INTO decisions (sku_id, trigger_type, ai_recommendation, ai_quantity, manager_action, manager_quantity, manager_reason, decided_by)
+        VALUES (@sku_id, @trigger_type, @ai_recommendation, @ai_quantity, @manager_action, @manager_quantity, @manager_reason, @decided_by)
+      `).run({
+        sku_id: b.sku_id,
+        trigger_type: triggerType,
+        ai_recommendation: b.ai_recommendation ?? null,
+        ai_quantity: b.ai_quantity ?? null,
+        manager_action: b.manager_action,
+        manager_quantity: b.manager_quantity ?? null,
+        manager_reason: b.manager_reason || null,
+        decided_by: b.decided_by || "manager",
+      });
+      if (applyPolicy) applySkuUpdate(db, b.sku_id, { reorder_point_policy: b.manager_quantity });
+      return result;
+    })();
 
     const created = db.prepare(`
       SELECT d.*, s.product_name AS sku_name FROM decisions d
@@ -1319,6 +1350,7 @@ router.post("/decisions", (req, res) => {
           created.ai_quantity != null && created.manager_quantity != null
             ? +(created.manager_quantity - created.ai_quantity).toFixed(2)
             : null,
+        policy_applied: applyPolicy ? { reorder_point_policy: b.manager_quantity } : null,
       },
     });
 

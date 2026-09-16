@@ -166,6 +166,9 @@ function describe(event) {
         const dir = o.delta_qty > 0 ? "raised" : "cut";
         detail = `${detail ? `${detail} ` : ""}Manager ${dir} the quantity by ${num(Math.abs(o.delta_qty))} MT, to ${num(o.manager_quantity)} MT.`;
       }
+      if (o.policy_applied?.reorder_point_policy != null) {
+        detail = `${detail ? `${detail} ` : ""}Approved reorder point is now ${num(o.policy_applied.reorder_point_policy)} MT.`;
+      }
       if (o.manager_reason) detail = `${detail ? `${detail} ` : ""}Reason given: "${o.manager_reason}"`;
       return { headline: `${verb} the recommendation for ${sku}`, detail };
     }
