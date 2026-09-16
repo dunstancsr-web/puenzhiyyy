@@ -951,6 +951,171 @@ router.post("/skus/import", (req, res) => {
   }
 });
 
+// ── Forecast (MVP2 Day 3) ─────────────────────────────────────────────────────
+const { runForecast, backtest, MODEL_IDS } = require("../engines/forecast");
+
+// GET /api/forecast/models — the shortlist + auto, shaped like GET /api/llm/mode
+// so the frontend picker follows the same convention as the explanation tiers.
+router.get("/forecast/models", (req, res) => {
+  const detail = {
+    naive_seasonal: "Same calendar month, averaged across every prior year in the history. No parameters, the floor every other model has to beat.",
+    linear_trend: "A straight trend line fit under the seasonal pattern. Easiest to explain in plain English: demand trending up or down by a fixed amount a month.",
+    holt_winters: "Trend plus seasonality, weighted toward recent months. The standard method when there is enough history to support it.",
+  };
+  const models = MODEL_IDS.map((id) => ({ id, label: MODEL_LABEL[id], detail: detail[id], available: true }));
+  models.push({
+    id: "auto",
+    label: "Auto",
+    detail: "Backtests all three models on this SKU's own history and picks whichever scores lowest error. Deterministic — never a model call.",
+    available: true,
+  });
+  res.json({ success: true, data: { models } });
+});
+const MODEL_LABEL = { naive_seasonal: "Naive seasonal", linear_trend: "Linear trend", holt_winters: "Holt-Winters" };
+
+// PUT /api/skus/:id/forecast-config — { forecast_model, use_forecast }
+//
+// Separate from PUT /api/skus/:id on purpose: picking a model is a distinct,
+// smaller action from every other policy edit, and keeping it out of
+// SKU_TABLE_FIELDS means forecast_model/use_forecast can never be set as a
+// side effect of an unrelated Save.
+const FORECAST_MODEL_VALUES = [...MODEL_IDS, "auto", null];
+router.put("/skus/:id/forecast-config", (req, res) => {
+  const b = req.body || {};
+  if (b.forecast_model !== undefined && !FORECAST_MODEL_VALUES.includes(b.forecast_model)) {
+    return res.status(400).json({ success: false, message: `forecast_model must be one of ${MODEL_IDS.join(", ")}, auto, or null` });
+  }
+  try {
+    const db = getDb();
+    const existing = db.prepare(`SELECT sku_id, forecast_model, use_forecast FROM skus WHERE sku_id = ?`).get(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    const fields = {};
+    if (b.forecast_model !== undefined) fields.forecast_model = b.forecast_model;
+    if (b.use_forecast !== undefined) fields.use_forecast = b.use_forecast ? 1 : 0;
+    if (Object.keys(fields).length) {
+      const setClause = Object.keys(fields).map((k) => `${k} = @${k}`).join(", ");
+      db.prepare(`UPDATE skus SET ${setClause} WHERE sku_id = @sku_id`).run({ ...fields, sku_id: req.params.id });
+
+      logEvent(EVENTS.SKU_UPDATED, {
+        skuId: req.params.id,
+        input: { source: "forecast_config", changed_fields: Object.keys(fields) },
+        output: { forecast_model: fields.forecast_model ?? existing.forecast_model, use_forecast: fields.use_forecast ?? existing.use_forecast },
+      });
+    }
+
+    const { skus } = getAnalytics();
+    res.json({ success: true, data: skus.find((s) => s.sku_id === req.params.id) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to update forecast config" });
+  }
+});
+
+// POST /api/forecast/recompute — { sku_id? }
+//
+// Runs for every SKU with a forecast_model set (not gated on use_forecast:
+// picking a model is intent to forecast, use_forecast is the separate switch
+// that activates it in safetystock.js — see engines/index.js). 'auto' runs
+// the real backtest and writes its winner; a pinned model runs without one.
+// This is the lazy-cache write side: engines/index.js only ever READS the
+// active row here, never recomputes inline (see the MVP2 plan's "Recompute
+// mechanism" — no scheduler, no job queue, an explicit trigger instead).
+router.post("/forecast/recompute", (req, res) => {
+  const { sku_id } = req.body || {};
+  try {
+    const db = getDb();
+    const targets = db.prepare(
+      `SELECT sku_id, forecast_model FROM skus WHERE active = 1 AND forecast_model IS NOT NULL${sku_id ? " AND sku_id = ?" : ""}`
+    ).all(...(sku_id ? [sku_id] : []));
+
+    if (sku_id && !targets.length) {
+      return res.status(404).json({ success: false, message: `${sku_id} has no forecast_model set` });
+    }
+
+    const results = [];
+    const run = db.transaction(() => {
+      for (const t of targets) {
+        let model = t.forecast_model;
+        let bt = null;
+        if (model === "auto") {
+          bt = backtest(db, t.sku_id, MODEL_IDS);
+          model = bt.winner;
+        }
+        const f = runForecast(db, t.sku_id, model, 6);
+
+        db.prepare(`UPDATE forecasts SET is_active = 0 WHERE sku_id = ? AND is_active = 1`).run(t.sku_id);
+        db.prepare(`
+          INSERT INTO forecasts (
+            sku_id, model, horizon_months, avg_daily_demand_forecast, demand_cv_forecast,
+            monthly_forecast_json, backtest_metric, backtest_score, candidate_scores_json, low_confidence, is_active
+          ) VALUES (@sku_id, @model, @horizon_months, @avg_daily_demand_forecast, @demand_cv_forecast,
+            @monthly_forecast_json, @backtest_metric, @backtest_score, @candidate_scores_json, @low_confidence, 1)`
+        ).run({
+          sku_id: t.sku_id, model, horizon_months: f.horizon_months,
+          avg_daily_demand_forecast: f.avg_daily_demand_forecast, demand_cv_forecast: f.demand_cv_forecast,
+          monthly_forecast_json: JSON.stringify(f.monthly),
+          backtest_metric: bt ? bt.metric : null,
+          backtest_score: bt ? bt.scores[model] : null,
+          candidate_scores_json: bt ? JSON.stringify(bt.scores) : null,
+          low_confidence: bt ? (bt.lowConfidence ? 1 : 0) : 0,
+        });
+        results.push({ sku_id: t.sku_id, model, avg_daily_demand_forecast: f.avg_daily_demand_forecast, backtest: bt });
+      }
+    });
+    run();
+
+    for (const r of results) {
+      logEvent(EVENTS.SKU_UPDATED, {
+        skuId: r.sku_id,
+        input: { source: "forecast_recompute", requested_model: targets.find((t) => t.sku_id === r.sku_id).forecast_model },
+        output: { model: r.model, avg_daily_demand_forecast: r.avg_daily_demand_forecast, backtest_winner: r.backtest?.winner || null },
+      });
+    }
+
+    res.json({ success: true, data: { recomputed: results.length, results } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to recompute forecasts" });
+  }
+});
+
+// GET /api/skus/:id/forecast — the active forecast row, decoded, for the
+// forecast panel's chart and step 6's approval rationale.
+router.get("/skus/:id/forecast", (req, res) => {
+  try {
+    const db = getDb();
+    const known = db.prepare(`SELECT 1 FROM skus WHERE sku_id = ?`).get(req.params.id);
+    if (!known) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    const row = db.prepare(`
+      SELECT model, generated_at, horizon_months, avg_daily_demand_forecast, demand_cv_forecast,
+             monthly_forecast_json, backtest_metric, backtest_score, candidate_scores_json, low_confidence
+        FROM forecasts WHERE sku_id = ? AND is_active = 1`).get(req.params.id);
+
+    if (!row) return res.json({ success: true, data: null });
+
+    res.json({
+      success: true,
+      data: {
+        model: row.model,
+        generated_at: row.generated_at,
+        horizon_months: row.horizon_months,
+        avg_daily_demand_forecast: row.avg_daily_demand_forecast,
+        demand_cv_forecast: row.demand_cv_forecast,
+        monthly: JSON.parse(row.monthly_forecast_json),
+        backtest_metric: row.backtest_metric,
+        backtest_score: row.backtest_score,
+        candidate_scores: row.candidate_scores_json ? JSON.parse(row.candidate_scores_json) : null,
+        low_confidence: !!row.low_confidence,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load forecast" });
+  }
+});
+
 // ── Inventory ────────────────────────────────────────────────────────────────
 
 // POST /api/inventory/restock — add on-hand quantity, reset the receipt clock

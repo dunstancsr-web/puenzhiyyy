@@ -287,8 +287,25 @@ function coefficientOfVariation(values) {
 const round1 = (n) => Math.round(n * 10) / 10;
 const round2 = (n) => Math.round(n * 100) / 100;
 
+/**
+ * The one `forecasts` row currently feeding safetystock.js for this SKU, or
+ * null if none has been generated yet (or use_forecast is off). Read here,
+ * not re-derived: `engines/index.js` never recomputes a forecast inline —
+ * see "Recompute mechanism" in the MVP2 plan.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @param {string} skuId
+ */
+function getActiveForecast(db, skuId) {
+  return db.prepare(`
+    SELECT model, avg_daily_demand_forecast, demand_cv_forecast, backtest_score, low_confidence
+      FROM forecasts
+     WHERE sku_id = ? AND is_active = 1`
+  ).get(skuId) || null;
+}
+
 module.exports = {
-  runForecast, backtest, monthlySeries,
+  runForecast, backtest, monthlySeries, getActiveForecast,
   MODELS, MODEL_IDS,
   periodToIndex, indexToPeriod, addMonths,
 };
