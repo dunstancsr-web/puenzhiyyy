@@ -180,11 +180,17 @@ const thStyle = {
 function Th({ label, sortKey, active, dir, onClick }) {
   const isActive = active === sortKey;
   return (
-    <th style={{ ...thStyle, cursor: "pointer", userSelect: "none" }} onClick={() => onClick(sortKey)}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+    <th style={thStyle} aria-sort={isActive ? (dir === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        onClick={() => onClick(sortKey)}
+        style={{
+          all: "unset", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
+        }}
+      >
         {label}
         {isActive && (dir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-      </span>
+      </button>
     </th>
   );
 }

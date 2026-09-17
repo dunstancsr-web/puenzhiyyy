@@ -128,14 +128,22 @@ export default function ForecastDetail() {
   const setMode_ = async (m) => {
     setMode(m);
     if (m === "auto" && sku.forecast_model !== "auto") {
-      await api.setForecastConfig(skuId, { forecast_model: "auto" });
-      await recompute();
+      try {
+        await api.setForecastConfig(skuId, { forecast_model: "auto" });
+        await recompute();
+      } catch (err) {
+        setError(err.message || "Failed to switch to auto mode");
+      }
     }
   };
 
   const toggleUseForecast = async () => {
-    await api.setForecastConfig(skuId, { use_forecast: !sku.use_forecast });
-    await load();
+    try {
+      await api.setForecastConfig(skuId, { use_forecast: !sku.use_forecast });
+      await load();
+    } catch (err) {
+      setError(err.message || "Failed to update forecast setting");
+    }
   };
 
   if (error) return <ErrorState message={error} onRetry={load} />;

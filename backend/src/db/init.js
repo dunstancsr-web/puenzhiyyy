@@ -36,7 +36,8 @@ function enterDemoMode() {
 }
 
 function exitDemoMode() {
-  demoDb = null; // GC reclaims it; nothing to reset because nothing is reused
+  if (demoDb) demoDb.close(); // release the native handle; nothing to reset because nothing is reused
+  demoDb = null;
 }
 
 function isDemoModeActive() {
@@ -241,7 +242,7 @@ function initDb(targetDb) {
     CREATE TABLE IF NOT EXISTS forecasts (
       id                        INTEGER PRIMARY KEY AUTOINCREMENT,
       sku_id                    TEXT NOT NULL,
-      model                     TEXT NOT NULL,   -- naive_seasonal | holt_winters | linear_trend
+      model                     TEXT NOT NULL,   -- naive_seasonal | holt_winters | linear_trend | holt_damped_seasonal
       generated_at              TEXT DEFAULT (datetime('now')),
       horizon_months            INTEGER NOT NULL,
       avg_daily_demand_forecast REAL NOT NULL,

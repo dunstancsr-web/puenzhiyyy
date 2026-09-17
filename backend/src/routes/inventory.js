@@ -1534,6 +1534,14 @@ router.post("/decisions", (req, res) => {
       b.manager_action !== "rejected" &&
       b.manager_quantity != null;
 
+    // applySkuUpdate is also reachable straight from PUT /api/skus/:id, which
+    // validates first — this is the other door in, so it needs the same check
+    // rather than trusting manager_quantity as already-safe.
+    if (applyPolicy) {
+      const numericError = validateNumericFields({ reorder_point_policy: b.manager_quantity });
+      if (numericError) return res.status(400).json({ success: false, message: numericError });
+    }
+
     const info = db.transaction(() => {
       const result = db.prepare(`
         INSERT INTO decisions (sku_id, trigger_type, ai_recommendation, ai_quantity, manager_action, manager_quantity, manager_reason, decided_by)
