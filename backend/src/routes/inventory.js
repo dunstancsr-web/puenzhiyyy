@@ -958,7 +958,9 @@ router.post("/skus/import", (req, res) => {
 });
 
 // ── Forecast (MVP2 Day 3) ─────────────────────────────────────────────────────
-const { runForecast, backtest, MODEL_IDS } = require("../engines/forecast");
+const { runForecast, backtest, monthlySeries, getActiveForecast, MODEL_IDS } = require("../engines/forecast");
+const { computeSafetyStock } = require("../engines/safetystock");
+const { computeRiskBuffer } = require("../engines/riskbuffer");
 
 // GET /api/forecast/models — the shortlist + auto, shaped like GET /api/llm/mode
 // so the frontend picker follows the same convention as the explanation tiers.
@@ -1086,34 +1088,39 @@ router.post("/forecast/recompute", (req, res) => {
   }
 });
 
-// GET /api/skus/:id/forecast — the active forecast row, decoded, for the
-// forecast panel's chart and step 6's approval rationale.
+// GET /api/skus/:id/forecast — real sales history (always present, possibly
+// empty) plus the active forecast row if one has been generated yet. Two
+// separate things in one response because the "Why This Forecast" page's
+// sales chart needs history even before any model has ever been run.
 router.get("/skus/:id/forecast", (req, res) => {
   try {
     const db = getDb();
     const known = db.prepare(`SELECT 1 FROM skus WHERE sku_id = ?`).get(req.params.id);
     if (!known) return res.status(404).json({ success: false, message: "SKU not found" });
 
+    const history = monthlySeries(db, req.params.id);
+
     const row = db.prepare(`
       SELECT model, generated_at, horizon_months, avg_daily_demand_forecast, demand_cv_forecast,
              monthly_forecast_json, backtest_metric, backtest_score, candidate_scores_json, low_confidence
         FROM forecasts WHERE sku_id = ? AND is_active = 1`).get(req.params.id);
 
-    if (!row) return res.json({ success: true, data: null });
-
     res.json({
       success: true,
       data: {
-        model: row.model,
-        generated_at: row.generated_at,
-        horizon_months: row.horizon_months,
-        avg_daily_demand_forecast: row.avg_daily_demand_forecast,
-        demand_cv_forecast: row.demand_cv_forecast,
-        monthly: JSON.parse(row.monthly_forecast_json),
-        backtest_metric: row.backtest_metric,
-        backtest_score: row.backtest_score,
-        candidate_scores: row.candidate_scores_json ? JSON.parse(row.candidate_scores_json) : null,
-        low_confidence: !!row.low_confidence,
+        history,
+        forecast: !row ? null : {
+          model: row.model,
+          generated_at: row.generated_at,
+          horizon_months: row.horizon_months,
+          avg_daily_demand_forecast: row.avg_daily_demand_forecast,
+          demand_cv_forecast: row.demand_cv_forecast,
+          monthly: JSON.parse(row.monthly_forecast_json),
+          backtest_metric: row.backtest_metric,
+          backtest_score: row.backtest_score,
+          candidate_scores: row.candidate_scores_json ? JSON.parse(row.candidate_scores_json) : null,
+          low_confidence: !!row.low_confidence,
+        },
       },
     });
   } catch (err) {
@@ -1121,6 +1128,91 @@ router.get("/skus/:id/forecast", (req, res) => {
     res.status(500).json({ success: false, message: "Failed to load forecast" });
   }
 });
+
+// GET /api/skus/:id/inventory-history?months=12 — real monthly on-hand
+// balance for the position chart's actual line, and the receipts/issues
+// split for the inflow/outflow chart. Same inventory_history rows the
+// portfolio-wide GET /dashboard/history reads, filtered to one SKU.
+router.get("/skus/:id/inventory-history", (req, res) => {
+  const months = Math.min(36, Math.max(1, Number(req.query.months) || 12));
+  try {
+    const db = getDb();
+    const known = db.prepare(`SELECT 1 FROM skus WHERE sku_id = ?`).get(req.params.id);
+    if (!known) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    const rows = db.prepare(`
+      SELECT period, opening_qty, receipts_qty, issues_qty, closing_qty
+        FROM inventory_history WHERE sku_id = ? ORDER BY period`).all(req.params.id);
+
+    res.json({ success: true, data: rows.slice(-months) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load inventory history" });
+  }
+});
+
+// POST /api/skus/:id/forecast/preview — { lead_time_days, lead_time_std_days,
+// target_service_level, target_stock }
+//
+// The "what if" sandbox's one and only source of truth for the formula:
+// re-runs computeSafetyStock() (safetystock.js, King's formula, unmodified)
+// and computeRiskBuffer() with hypothetical inputs, against the SKU's real
+// active forecast demand. Nothing is written to the database — this is a
+// preview, not a save. Requires an active forecast (Recompute first): this
+// page's whole premise is "what would forecast-driven policy look like,"
+// which has no answer before a forecast exists.
+const REVIEW_PERIOD_DAYS = 30; // assumed periodic review cycle; not yet tracked per SKU by this app
+router.post("/skus/:id/forecast/preview", (req, res) => {
+  const b = req.body || {};
+  try {
+    const db = getDb();
+    const sku = db.prepare(`SELECT * FROM skus WHERE sku_id = ?`).get(req.params.id);
+    if (!sku) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    const active = getActiveForecast(db, req.params.id);
+    if (!active) {
+      return res.status(400).json({ success: false, message: "No forecast yet — run Recompute first." });
+    }
+
+    const leadTimeDays = Number(b.lead_time_days ?? sku.lead_time_days);
+    const leadTimeStdDays = Number(b.lead_time_std_days ?? sku.lead_time_std_days);
+    const targetServiceLevel = Number(b.target_service_level ?? sku.target_service_level);
+    const targetStock = Number(b.target_stock ?? sku.target_stock);
+
+    const ss = computeSafetyStock({
+      avgDailyDemand: active.avg_daily_demand_forecast,
+      demandCv: active.demand_cv_forecast,
+      leadTimeDays,
+      leadTimeStdDays,
+      serviceLevel: targetServiceLevel,
+    });
+    const risk = computeRiskBuffer(db, sku);
+    const risk_buffer_mt = round1(risk.days * active.avg_daily_demand_forecast);
+    const reorder_point_suggested_with_risk = round1(ss.reorder_point_suggested + risk_buffer_mt);
+    const target_stock_suggested = round1(
+      active.avg_daily_demand_forecast * (REVIEW_PERIOD_DAYS + leadTimeDays) + ss.safety_stock_mt
+    );
+
+    res.json({
+      success: true,
+      data: {
+        forecast_avg_daily_demand: active.avg_daily_demand_forecast,
+        forecast_model: active.model,
+        lead_time_demand_mt: ss.lead_time_demand_mt,
+        safety_stock_mt: ss.safety_stock_mt,
+        risk_buffer_mt,
+        risk_buffer_reason: risk.reason,
+        reorder_point_suggested_with_risk,
+        target_stock_suggested,
+        inputs: { leadTimeDays, leadTimeStdDays, targetServiceLevel, targetStock },
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to compute preview" });
+  }
+});
+const round1 = (n) => Math.round(n * 10) / 10;
 
 // ── Inventory ────────────────────────────────────────────────────────────────
 

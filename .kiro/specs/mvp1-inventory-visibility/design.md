@@ -61,16 +61,67 @@ CREATE TABLE skus (
   min_stock            REAL DEFAULT 0,
   target_stock         REAL DEFAULT 0,
   max_stock            REAL DEFAULT 0,
-  safety_stock_pct     REAL DEFAULT 20,
+  safety_stock_pct     REAL DEFAULT 20,  -- legacy flat buffer; superseded by the statistical safety stock below
   lead_time_days       INTEGER DEFAULT 45,
+  lead_time_std_days   REAL DEFAULT 0,   -- supplier lead-time variability (1 sigma); used by Safety Stock below
+  target_service_level REAL DEFAULT 0.95,  -- e.g. 0.95; used by Safety Stock below
+  demand_cv            REAL DEFAULT 0.3, -- fallback when velocity.js's own weekly-sales CV is 0 (see Demand variability)
   unit_cost_sgd        REAL DEFAULT 0,
   max_holding_days     INTEGER DEFAULT 270,
   active               INTEGER DEFAULT 1,
-  strategic_adjustment REAL DEFAULT 0,  -- Phase 2 placeholder: price intelligence adjustment (MT)
+  strategic_adjustment REAL DEFAULT 0,  -- MVP2: repurposed as the risk-buffer contribution (MT), see Risk Buffer below;
+                                        -- was a Phase 2 placeholder, column unchanged, comment updated
   compliance_required_qty REAL,  -- cached on refresh: 2x trailing-3mo avg monthly receipts (REQ-16, illustrative rule)
+  forecast_model       TEXT,  -- MVP2: naive_seasonal | linear_trend | holt_winters | auto | NULL (not forecast-enabled)
+  use_forecast         INTEGER DEFAULT 0,  -- MVP2: opt-in switch, decoupled from forecast_model on purpose
+                                        -- (picking a model must not silently activate it) — see Forecast-Driven
+                                        -- Demand & Risk Buffer below
   created_at           TEXT DEFAULT (datetime('now'))
 );
 ```
+
+### Table: forecasts (MVP2)
+```sql
+CREATE TABLE forecasts (
+  id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+  sku_id                    TEXT NOT NULL,
+  model                     TEXT NOT NULL,   -- naive_seasonal | linear_trend | holt_winters
+  generated_at              TEXT DEFAULT (datetime('now')),
+  horizon_months            INTEGER NOT NULL,
+  avg_daily_demand_forecast REAL NOT NULL,  -- the only two fields engines/index.js reads (see below)
+  demand_cv_forecast        REAL NOT NULL,
+  monthly_forecast_json     TEXT NOT NULL,  -- [{period, qty}, ...], for the forecast panel's chart
+  backtest_metric           TEXT,           -- 'WMAPE'
+  backtest_score            REAL,           -- the ACTIVE model's own score
+  candidate_scores_json     TEXT,           -- {model_id: wmape, ...} for every model auto-mode tried
+  low_confidence            INTEGER DEFAULT 0,  -- 1 when the backtest had < 6 scored folds (sparse history)
+  is_active                 INTEGER DEFAULT 0,  -- one active row per sku_id; older rows kept as history
+  FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
+);
+```
+One row per generation, not per SKU — `is_active=1` marks the row currently in force; earlier ones stay
+for future forecast-vs-actual comparison, never deleted. Written only by `POST /api/forecast/recompute`
+(no scheduler — see "Recompute" below); read only by `getActiveForecast()`, never recomputed inline.
+
+### Table: risk_events (MVP2)
+```sql
+CREATE TABLE risk_events (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  label             TEXT NOT NULL,
+  country_of_origin TEXT,
+  supplier          TEXT,
+  severity          TEXT NOT NULL,   -- low | medium | high
+  buffer_days_add   REAL NOT NULL,
+  active            INTEGER DEFAULT 1,
+  is_illustrative   INTEGER DEFAULT 1,  -- always 1 today; see Risk Buffer below
+  notes             TEXT,
+  created_at        TEXT DEFAULT (datetime('now'))
+);
+```
+Seeded, not live: 4 entries (an India non-basmati export-ban analog, Thailand logistics, Vietnam quota,
+one deliberately supplier-keyed rather than country-keyed so both match paths get exercised). Real
+USDA GAIN/AMIS integration is roadmap, not this build — see "Formula decisions" for the honesty label
+this carries, the same pattern `compliance_position` already uses.
 
 ### Table: inventory_positions
 ```sql
@@ -245,6 +296,8 @@ backend/src/
 ├── engines/            # index.js runs them in dependency order into one enriched SKU record
 │   ├── velocity.js  position.js  safetystock.js  classification.js  segmentation.js
 │   ├── health.js  financials.js  alerts.js  projection.js
+│   ├── forecast.js     # MVP2: 3 Node-only demand models + the deterministic backtest/auto-mode selector
+│   ├── riskbuffer.js   # MVP2: deterministic risk_events match, illustrative (see Formula decisions)
 │   ├── duration.js     # readable durations, computed once ("1 month and 22 days")
 │   └── smoke.js        # npm run analytics
 ├── llm/                # the explanation layer, see "Explanation Layer" below
@@ -332,9 +385,103 @@ projected_available(day) = available_qty - (avg_daily_30d * day)
 Run flat-rate 90 days out (`backend/src/engines/projection.js`), exposed at
 `GET /api/skus/:id/projection`; also run out to just `lead_time_days` to produce
 `suggested_order_qty` above — same function, two callers (`engines/index.js` and the route). Surfaced
-as a line chart with reference lines (safety stock, reorder point, max stock) in the SKU edit modal —
-this app has no separate SKU detail page, so the existing edit modal (which already carries read-only
-current-position context) doubles as the detail view.
+as a line chart with reference lines (safety stock, reorder point, max stock) in the SKU edit modal.
+(MVP2, Day 5: one exception now exists — a dedicated per-SKU Forecast Detail page, see below — because
+the model picker, reasoning chain, what-if sandbox and reorder-cycle simulation together are dense
+enough to fight the modal's own layout. Every other per-SKU view stays in the modal.)
+
+### Forecast-Driven Demand & Risk Buffer (MVP2, Days 1–5)
+
+Deferred out of MVP1 explicitly ("Explicitly Deferred" in requirements.md: "a model-building effort of
+its own"). Built to the same architectural rule as the rest of this app: **deterministic engines compute
+every figure, a human approves every action, a language model narrates and never computes.** No LLM call
+anywhere in this section.
+
+**The three forecast models** (`engines/forecast.js`), over the monthly-bucketed sales history
+(`sales_transactions`, `status='fulfilled'`, same filter `velocity.js` already uses):
+```
+naive_seasonal   forecast(month) = average of that same calendar month across every prior year
+                                    in history — zero parameters, the floor every other model must beat
+linear_trend     deseasonalize each month by its own seasonal-naive baseline, fit OLS on the
+                 deseasonalized series, project forward, reseasonalize
+holt_winters     additive triple exponential smoothing, 12-month season; alpha/beta/gamma fit by grid
+                 search minimizing in-sample SSE (never hand-set); degrades to naive_seasonal below two
+                 full seasonal cycles of history rather than fit unstable parameters on too little data
+avg_daily_demand_forecast = mean(next horizon_months' forecast qty) / 30   -- /30, not calendar-exact,
+                                                                            to stay comparable with
+                                                                            avg_daily_30d (velocity.js)
+demand_cv_forecast        = coefficient of variation of the forecast month values
+```
+
+**Auto-mode model selection** (`backtest()`, `engines/forecast.js`) — a rolling-origin (walk-forward)
+holdout, never a single split, scored by WMAPE (not plain MAPE, which blows up on an Idle SKU's
+near-zero months):
+```
+WMAPE = Σ|actual - forecast| / Σ actual,  across every scored fold
+origin starts at month 12 (Holt-Winters needs one full season), rolls forward one month at a time
+winner = the candidate model with the lowest WMAPE
+low_confidence = true if fewer than 6 folds were scored (usually an Idle SKU's long zero-sales run)
+```
+Deterministic: `backtest_determinism` in `check-formulas.js` runs it twice on identical data and
+requires byte-identical WMAPE, guarding the "deterministic, not agentic" property this whole feature's
+legitimacy rests on.
+
+**Safety stock's forecast-aware branch** (`engines/index.js`, feeding the unmodified King's formula in
+`safetystock.js` above) — for a `use_forecast=1` SKU with an active `forecasts` row:
+```
+avgDailyDemand (into King's formula) = avg_daily_demand_forecast   (falls back to avg_daily_30d if
+demandCv       (into King's formula) = demand_cv_forecast           use_forecast=1 but no forecast
+                                                                      row exists yet — ?? not ||, so
+                                                                      a genuine 0 MT/day forecast is
+                                                                      not treated as absent)
+```
+This substitution happens **only inside this one call**. `avg_daily_30d` itself, and its seven other
+consumers (cover, projection, suggested order, ABC, financials, compliance), are untouched — the "one
+demand rate" decision above is about operational reality today, a different question from expected
+future demand. `demand_source` on the SKU record is `"velocity_30d"` or the active model's name,
+whichever is actually in force, so nothing has to be inferred from `use_forecast` alone.
+
+**Risk buffer** (`riskbuffer.js`) — a separate additive term after King's formula runs, not folded into
+the variance math, so the safety-stock formula itself stays provably unchanged and the buffer's own
+contribution stays separately explainable:
+```
+matching_events   = risk_events WHERE active=1 AND (country_of_origin = sku's OR supplier = sku's)
+risk_buffer_days  = min(30, Σ matching_events.buffer_days_add)
+risk_buffer_mt    = risk_buffer_days * (avg_daily_demand_forecast if use_forecast else avg_daily_30d)
+risk_buffer_reason = the highest-severity matching event's label
+```
+`strategic_adjustment` (the documented Phase 2 placeholder column) is the analytics-output field
+`risk_buffer_mt` lands in — a computed figure overriding the raw stored column, never written back to it.
+**Must always render with an "illustrative" label** (`risk_events.is_illustrative` is always 1 today) —
+the same honesty pattern `compliance_position` above already carries; real supply-chain risk feeds are
+roadmap, not this build.
+
+```
+reorder_point_suggested_with_risk = reorder_point_suggested + risk_buffer_mt
+```
+Left as a second field beside `reorder_point_suggested` — nothing currently consuming the un-risked
+figure starts silently including an unexplained addend.
+
+**Recompute** (`POST /api/forecast/recompute`, optional `?sku_id=`) — the lazy-cache write side. No
+scheduler, no job queue: `forecasts` rows are the cache, `engines/index.js` does one indexed read of the
+active row per SKU and never recomputes inline. `forecast_model='auto'` runs the real backtest above and
+writes its winner; a pinned model runs `runForecast()` directly without one. At this data scale (10 SKUs
+x 3 models x rolling folds) this is comfortably synchronous within one request.
+
+**What-if preview** (`POST /api/skus/:id/forecast/preview`, MVP2 Day 5) — the Forecast Detail page's
+sandbox recomputes King's formula live as a manager drags a lead-time/service-level/target-stock slider,
+by calling `computeSafetyStock()` and `computeRiskBuffer()` directly with the hypothetical inputs and the
+SKU's real active forecast demand. Nothing is written; this is a preview, not a save, and it is the
+**only** place outside `safetystock.js` itself allowed to call that formula — the alternative (the
+sandbox recomputing the formula in the frontend) would have been exactly the "derived value computed
+twice" bug class already documented twice in this repo's own history (`rules.md`).
+```
+target_stock_suggested = avg_daily_demand_forecast * (review_period_days + lead_time_days)
+                          + safety_stock_mt
+                          -- review_period_days = 30, an assumed periodic review cycle; this app does
+                          -- not yet track an actual per-SKU review cadence, so this is a stated
+                          -- assumption, not a derived number
+```
 
 ### Health Status (glossary Appendix A / spec Step 13 triggers; evaluated top to bottom, first match wins)
 
@@ -407,6 +554,11 @@ safety_stock_mt      = z * sqrt( lead_time_days * daily_demand_sd^2
 safety_stock_days    = round(safety_stock_mt / avg_daily_30d)                          (0 with no demand)
 lead_time_demand_mt  = avg_daily_30d * lead_time_days
 ```
+This formula itself is unmodified by MVP2. What changed: `avg_daily_30d` and `demand_cv` above are the
+values fed in for a SKU with `use_forecast=0` (the default); a `use_forecast=1` SKU feeds the active
+forecast's own demand rate and CV instead — see "Forecast-Driven Demand & Risk Buffer" below for the
+substitution, and `check-formulas.js`'s `safety_stock_mt` check is forecast-aware for the same reason
+(Formula decisions, 17 Sep).
 
 **Target cover and coverage band** (`engines/index.js`)
 ```
@@ -486,6 +638,22 @@ before any real compliance figure is presented as authoritative).
 
 Where this document and the code disagreed, found by `check-formulas.js`. Each entry records the
 conflict, what Stan chose and why, and the definition now in force above. Newest first.
+
+**2026-09-17, Safety Stock: the formula check had a real blind spot once `use_forecast` became live.**
+- Conflict: `check-formulas.js`'s `safety_stock_mt` check only ever re-derived the non-forecast path
+  (`avg_daily_30d`/its own `demand_cv`). This was a deliberate Day 3 decision, reasoned at the time as
+  "the regression that matters" since `use_forecast` was default-off everywhere and nothing exercised
+  the other branch. Day 5 built a real, live-toggleable `use_forecast` checkbox on the Forecast Detail
+  page, so the gap started to matter for real: flipping it on for BM-5KG during testing made the check
+  fail (spec 4.95, code 4.52) — a real discrepancy the check was never asked to catch, not a code bug.
+- Chosen: extend the check, not the code. `safety_stock_mt` in the engine was already correct (matches
+  `engines/index.js`'s own resolution exactly); the check's spec-side re-derivation was the stale half.
+- Why: the code's behavior — forecast demand/CV feeding King's formula only when `use_forecast=1` — was
+  the intended design from Day 3, documented and unchanged. Re-ran the check against the unfixed spec
+  logic to confirm it still fails, then against the fix to confirm it passes, before trusting it (this
+  repo's own "prove a new check can fail" rule).
+- Effect: no figure on screen changed — this was a test-coverage gap, not a formula disagreement. All 30
+  checks pass on the current seed with `safety_stock_mt` now correctly forecast-aware.
 
 **2026-09-15, Movement Classification: what makes a SKU Slow Moving.**
 - Conflict: this document and requirements.md REQ-06 said Slow Moving means selling AND more than 120
@@ -585,6 +753,24 @@ Modify, Reject, Why? and Dismiss.
 ### Activity Page
 The audit trail in plain-English sentences, filterable by event type, each with the stored input and
 output one click away.
+
+### Forecast Detail Page (MVP2 Day 5)
+`frontend/src/pages/ForecastDetail.jsx`, at `/inventory/:skuId/forecast` — the one exception to "no
+separate SKU detail page" (see Projected Inventory above). Model picker (Auto/Manual, WMAPE per model,
+real backtest on pick), the sales history + forecast chart, the what-if sandbox (four sliders, debounced
+live calls to `POST .../forecast/preview`, never a client-side formula), the reasoning chain
+(forecast demand × lead time + safety stock + risk buffer = suggested), a reorder-cycle simulation
+(client-side geometry over the preview's real numbers, not a second formula), and the monthly
+inflows/outflows chart. A recompute-freshness nudge (Day 6) turns the Recompute button's border yellow
+past 14 days since the active forecast's `generated_at`.
+
+### Forecast Overview Page (MVP2 Day 6)
+`frontend/src/pages/ForecastList.jsx`, at `/forecast` — a portfolio-wide table (every SKU, forecast
+status, active model + WMAPE, Approved → Suggested with the gap %, last-recomputed freshness), sortable,
+linking into each SKU's Forecast Detail page. Reachable from a "Forecast overview" link on the Inventory
+page header, deliberately **not** added to `Sidebar.jsx`'s permanent nav — MVP2 is still a feature
+branch, and Stan's call was to keep it reachable rather than commit to a 5th permanent destination before
+it ships to main.
 
 ---
 

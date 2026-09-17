@@ -61,6 +61,13 @@ function buildAnalytics(db, asOf = Date.now()) {
     const forecastDemand = activeForecast ? activeForecast.avg_daily_demand_forecast : null;
     const forecastCv = activeForecast ? activeForecast.demand_cv_forecast : null;
 
+    // Display-only metadata for the Forecast overview list (MVP2 Day 6):
+    // fetched regardless of use_forecast, since "has this SKU been forecast
+    // at all, and how stale is it" is a real question even for a SKU that
+    // hasn't been opted in yet. Never feeds computation — activeForecast
+    // above, gated on use_forecast, is the only row King's formula ever sees.
+    const forecastRow = m.forecast_model ? getActiveForecast(db, m.sku_id) : null;
+
     const ss = computeSafetyStock({
       avgDailyDemand: forecastDemand ?? v.avg_daily_usage_30d,
       demandCv: forecastCv ?? demandCv,
@@ -121,6 +128,10 @@ function buildAnalytics(db, asOf = Date.now()) {
       forecast_avg_daily_demand: forecastDemand,
       forecast_demand_cv: forecastCv,
       forecast_low_confidence: activeForecast ? !!activeForecast.low_confidence : false,
+      // Display-only (see forecastRow above) — independent of use_forecast.
+      forecast_active_model: forecastRow ? forecastRow.model : null,
+      forecast_backtest_score: forecastRow ? forecastRow.backtest_score : null,
+      forecast_generated_at: forecastRow ? forecastRow.generated_at : null,
       risk_buffer_mt,
       risk_buffer_days: risk.days,
       risk_buffer_reason: risk.reason,

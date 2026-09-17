@@ -192,10 +192,20 @@ check("xyz_class", "Supporting Formulas", "X if demand_cv < 0.25, Y if <= 0.5, e
   compare: same,
   perSku: (s, r) => { const cv = specDemandCv(s, r); return [cv < 0.25 ? "X" : cv <= 0.5 ? "Y" : "Z", s.xyz_class]; },
 });
+// MVP2 Day 5: use_forecast is now a real, live-toggleable switch on the
+// Forecast Detail page, not a default-off field nobody flips - the "regression
+// that matters" comment above (Day 3) no longer covers the whole surface, so
+// this branches the demand rate the same way engines/index.js and the
+// risk_buffer_mt check below already do, rather than leaving forecast-driven
+// SKUs unchecked.
 check("safety_stock_mt", "Supporting Formulas", "z * sqrt(LT * (cv * d)^2 + d^2 * LT_sd^2)", {
   tol: 0.05,
   perSku: (s, r) => {
-    const d = Math.round(specAvg30(r) * 100) / 100, sd = specDemandCv(s, r) * d;
+    const d = s.use_forecast && s.forecast_avg_daily_demand != null
+      ? s.forecast_avg_daily_demand
+      : Math.round(specAvg30(r) * 100) / 100;
+    const cv = s.use_forecast && s.forecast_demand_cv != null ? s.forecast_demand_cv : specDemandCv(s, r);
+    const sd = cv * d;
     return [specZ(s.target_service_level) * Math.sqrt(s.lead_time_days * sd * sd + d * d * s.lead_time_std_days ** 2), s.safety_stock_mt];
   },
 });
@@ -259,8 +269,8 @@ check("fill_rate", "Supporting Formulas", "(demand_30d - lost_30d) / demand_30d 
 // every other check here — engines/forecast.js is never called on the "spec"
 // side, only on the "code" side via runForecast()/backtest(). King's formula
 // (safetystock.js) itself needs no new check: it is unchanged, so the
-// existing safety_stock_mt check above already guards it for every SKU with
-// use_forecast off (the default), which is the regression that matters.
+// existing safety_stock_mt check above (now forecast-aware, see Day 5) covers
+// it for every SKU whether use_forecast is on or off.
 const round1 = (n) => Math.round(n * 10) / 10;
 function periodIdx(p) { const [y, m] = p.split("-").map(Number); return y * 12 + (m - 1); }
 function idxPeriod(i) { const y = Math.floor(i / 12), m = (i % 12) + 1; return `${y}-${String(m).padStart(2, "0")}`; }

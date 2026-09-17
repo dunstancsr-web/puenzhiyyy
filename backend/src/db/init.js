@@ -1,6 +1,58 @@
 const Database = require("better-sqlite3");
 const fs = require("fs");
 const path = require("path");
+const { AsyncLocalStorage } = require("async_hooks");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEMO MODE (MVP2 Day 7). A visitor can switch every request onto a genuinely
+// separate, empty, in-memory SQLite database instead of the real file, so the
+// real onboarding flow (an empty portfolio) can be demoed live without any
+// risk to the real data — there is no code path from inside demo mode that can
+// reach the real database.
+//
+// One shared sandbox, not per-visitor: Stan is the one demoing this live, not
+// concurrent unsupervised judges, so per-visitor isolation isn't worth the
+// complexity here. `demoDb` is the one shared instance, or null when demo mode
+// has never been entered (or has been exited, which just drops the reference —
+// no "reset" step, nothing to reset).
+//
+// getDb() is called directly, with no request object threaded through, by
+// almost every engine and route in this codebase — AsyncLocalStorage lets a
+// request-scoped "which database" decision reach every one of those calls
+// without changing a single call site.
+const demoContext = new AsyncLocalStorage();
+let demoDb = null;
+
+function createDemoDb() {
+  const instance = new Database(":memory:");
+  instance.pragma("foreign_keys = ON");
+  initDb(instance); // same schema-building code as the real database, see below
+  return instance;
+}
+
+function enterDemoMode() {
+  if (!demoDb) demoDb = createDemoDb();
+  return demoDb;
+}
+
+function exitDemoMode() {
+  demoDb = null; // GC reclaims it; nothing to reset because nothing is reused
+}
+
+function isDemoModeActive() {
+  return demoDb != null;
+}
+
+// Wraps one request's handling in the demo database's async context. Called by
+// the middleware in index.js for any request carrying the demo cookie. If the
+// shared instance was dropped (someone else exited) since this cookie was set,
+// self-heals by starting a fresh empty one — the alternative, silently falling
+// back to the real database for a visitor who believes they are in a sandbox,
+// is the one outcome this feature exists to make impossible.
+function runInDemoContext(fn) {
+  const instance = demoDb || enterDemoMode();
+  return demoContext.run(instance, fn);
+}
 
 // DATA_DIR is configurable so a deployed instance can point the database at a
 // mounted persistent disk, which is never inside the checked-out source tree.
@@ -12,6 +64,12 @@ const DB_PATH = path.join(DATA_DIR, "stocksense.db");
 let db;
 
 function getDb() {
+  // A demo-mode request (see runInDemoContext, above) gets the shared
+  // in-memory sandbox instead of the real file — every other call site in
+  // this codebase is unchanged and unaware this branch exists.
+  const demoInstance = demoContext.getStore();
+  if (demoInstance) return demoInstance;
+
   if (!db) {
     // A mounted volume can be empty on first boot, and better-sqlite3 will not
     // create a missing parent directory for you: it throws SQLITE_CANTOPEN.
@@ -31,8 +89,11 @@ function ensureColumn(db, table, column, ddl) {
   }
 }
 
-function initDb() {
-  const db = getDb();
+// targetDb: build the schema on a specific Database instance (createDemoDb's
+// in-memory one) instead of the real singleton. Every existing call site
+// (index.js's boot-time initDb()) passes nothing and behaves exactly as before.
+function initDb(targetDb) {
+  const db = targetDb || getDb();
 
   db.exec(`
     -- ================================================================
@@ -366,4 +427,7 @@ function initDb() {
   return db;
 }
 
-module.exports = { getDb, initDb, ensureColumn, DB_PATH };
+module.exports = {
+  getDb, initDb, ensureColumn, DB_PATH,
+  enterDemoMode, exitDemoMode, isDemoModeActive, runInDemoContext,
+};

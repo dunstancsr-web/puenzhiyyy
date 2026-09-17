@@ -58,6 +58,14 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  // Demo mode (MVP2 Day 7). `request()` already sends/receives cookies by
+  // default (same-origin via the Vite proxy in dev, same-origin for real in
+  // production), so no extra fetch option is needed for the demo cookie to
+  // round-trip correctly.
+  getDemoStatus: () => request("/demo/status"),
+  enterDemoMode: () => request("/demo/enter", { method: "POST" }),
+  exitDemoMode: () => request("/demo/exit", { method: "POST" }),
+
   // SKUs
   getSkus: () => request("/skus"),
   getSku: (id) => request(`/skus/${id}`),
@@ -66,6 +74,16 @@ export const api = {
   restockSku: (skuId, quantity) =>
     request("/inventory/restock", { method: "POST", body: { sku_id: skuId, quantity } }),
   getSkuProjection: (id) => request(`/skus/${id}/projection`),
+
+  // Forecasting (MVP2 Day 5). getSkuForecast returns { history, forecast } -
+  // history is always present, forecast is null until Recompute has run once.
+  getSkuForecast: (id) => request(`/skus/${id}/forecast`),
+  getSkuInventoryHistory: (id, months = 12) => request(`/skus/${id}/inventory-history?months=${months}`),
+  getForecastModels: () => request("/forecast/models"),
+  setForecastConfig: (id, body) => request(`/skus/${id}/forecast-config`, { method: "PUT", body }),
+  recomputeForecast: (skuId) => request("/forecast/recompute", { method: "POST", body: { sku_id: skuId } }),
+  // Preview: recomputes King's formula with hypothetical inputs, saves nothing.
+  previewForecast: (id, body) => request(`/skus/${id}/forecast/preview`, { method: "POST", body }),
 
   // Bulk edit (TASK-60). Export bypasses request() because the response is
   // text/csv, not the { success, data } envelope everything else returns.

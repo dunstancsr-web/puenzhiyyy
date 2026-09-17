@@ -298,7 +298,7 @@ const round2 = (n) => Math.round(n * 100) / 100;
  */
 function getActiveForecast(db, skuId) {
   return db.prepare(`
-    SELECT model, avg_daily_demand_forecast, demand_cv_forecast, backtest_score, low_confidence
+    SELECT model, avg_daily_demand_forecast, demand_cv_forecast, backtest_score, low_confidence, generated_at
       FROM forecasts
      WHERE sku_id = ? AND is_active = 1`
   ).get(skuId) || null;
