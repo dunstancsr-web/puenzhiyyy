@@ -1,5 +1,11 @@
 # Submission tracker
 
+> **This copy is stale (still 15 Sep).** The current tracker (17 Sep: MVP2 merge status, the
+> archived video script decision, the corrected engine count) lives on branch
+> `docs/mvp2-tracker-update` / PR #3, not yet merged to `main` as of 17 Sep. Read that version, not
+> this one, until the branches converge. This note exists so starting a fresh session on the wrong
+> branch doesn't mean trusting an out-of-date status.
+
 AWS NUS-ISS SMYA 2026 Hackathon. **Shortlisting deadline: 28 September 2026, 9:00am. Finale: 10 October.**
 
 Four deliverables. Status as of 15 Sep.
