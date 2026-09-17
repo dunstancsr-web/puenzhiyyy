@@ -74,7 +74,11 @@ function SuggestionLine({ label, field, unit, hint }) {
         {label}
         {hint && (
           <HoverHint content={hint} title="Where this default comes from">
-            <Info size={11} style={{ cursor: "help", verticalAlign: "middle" }} />
+            <button type="button" aria-label="Where this default comes from" onClick={(e) => e.stopPropagation()} style={{
+              display: "inline-flex", padding: 0, background: "none", border: "none", cursor: "help", lineHeight: 0,
+            }}>
+              <Info size={11} aria-hidden style={{ verticalAlign: "middle" }} />
+            </button>
           </HoverHint>
         )}
       </span>
