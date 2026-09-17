@@ -1065,3 +1065,8 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
   Verified live in both themes via `localStorage.setItem('theme.v2', 'dark')` (the real storage key, confirmed by reading ThemeContext.jsx rather than guessing at a plausible one after an initial wrong guess): light shows the tuned blue glow, dark shows white, and two screenshots roughly two seconds apart in dark mode showed visibly different intensity (a much dimmer corner the second time), real evidence the breathing animation is actually cycling rather than stuck at a fixed opacity.
 
   `check-formulas.js` and `npx vite build` both pass. No paid calls.
+
+## Session: 2026-09-17 (demo glow, second tuning pass)
+- **Branch:** feature/onboarding-demo-ux (same branch, pushed after the previous entry)
+- **Files changed:** frontend/src/components/DemoModeBadge.jsx
+- **Notes:** Stan went back into demo-glow.html and sent a second, wider set of values: ring 1.5px (was 1px), diffusion 55px (was 34px), spread 22px (was 6px), opacity breathing 0.17 to 0.38 (was 0.07 to 0.42) over 4.2s (was 3.6s). Same GLOW_RGB light/dark swap from the previous entry, unchanged. Verified live: visibly wider and softer than the first pass, dark mode still shows white correctly. `check-formulas.js` and `npx vite build` both pass. No paid calls.
