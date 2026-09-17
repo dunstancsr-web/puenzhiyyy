@@ -232,6 +232,31 @@ function initDb(targetDb) {
     );
 
     -- ================================================================
+    -- ORDER REQUESTS  (Reorder Loop step 7, "Separate the duties")
+    -- The one write the Control Tower is allowed to make: a request to the
+    -- buyer to order more of a SKU. It records INTENT for a buyer to act on;
+    -- it does NOT change stock. Stock only ever moves on the warehouse floor
+    -- (goods_movements), attributed to an operator, against an expected line.
+    --
+    -- This is why the office has no restock endpoint any more: the two duties
+    -- are separated, and this table is the office half of that split. A real
+    -- deployment would route these to a procurement system; here they are a
+    -- durable, auditable record that the request was raised.
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS order_requests (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_no    TEXT UNIQUE,                 -- REQ-0001
+      sku_id        TEXT NOT NULL,
+      quantity_mt   REAL NOT NULL,
+      reason        TEXT,
+      status        TEXT NOT NULL DEFAULT 'open', -- open | ordered | cancelled
+      requested_by  TEXT DEFAULT 'control tower',
+      created_at    TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_order_requests_sku ON order_requests(sku_id, status);
+
+    -- ================================================================
     -- FORECASTS  (MVP2)
     -- One row per SKU per model per generation. is_active=1 marks the one row
     -- per sku_id currently feeding safetystock.js; older rows stay as history

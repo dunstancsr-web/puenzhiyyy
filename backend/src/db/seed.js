@@ -342,11 +342,11 @@ function seed() {
     // leave duplicate ALERT_TRIGGERED rows for conditions that were re-detected
     // on the fresh data, and clearing neither leaves the trail empty after a
     // reseed, because every alert is already materialized.
-    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "forecasts", "risk_events", "skus"]) {
+    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "order_requests", "forecasts", "risk_events", "skus"]) {
       db.exec(`DELETE FROM ${t}`);
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN
-      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','forecasts','risk_events','skus')`);
+      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','order_requests','forecasts','risk_events','skus')`);
   });
   wipe();
 
@@ -484,7 +484,27 @@ function seed() {
     VALUES (@label, @country_of_origin, @supplier, @severity, @buffer_days_add, 1, 1, @notes)`);
   for (const r of RISK_EVENTS) insertRisk.run(r);
 
-  console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${poSeq - 1} open POs, ${soCount} open sales orders, ${OPERATORS.length} operators, ${RISK_EVENTS.length} risk events`);
+  // ── Order requests (Reorder Loop step 7) ────────────────────────────────────
+  // The Control Tower's one write: a request to the buyer, recording intent and
+  // never touching stock. Seeded so the feature is visible on a fresh demo
+  // rather than an empty list. Keyed to real seeded SKUs. One is left 'open' so
+  // there is a live request a demo can act on (mark ordered or cancelled); one
+  // is already 'ordered' so the lifecycle beyond 'open' shows without anyone
+  // having to click first. request_no continues the REQ-000N sequence the API
+  // hands out. These change no stock, exactly like the runtime endpoint.
+  const insertReq = db.prepare(`
+    INSERT INTO order_requests (request_no, sku_id, quantity_mt, reason, status, requested_by)
+    VALUES (@request_no, @sku_id, @quantity_mt, @reason, @status, @requested_by)`);
+  const ORDER_REQUESTS = [
+    { request_no: "REQ-0001", sku_id: "VF-10KG", quantity_mt: 200, status: "open",
+      reason: "Available below the approved reorder point; lead time from Vietnam trending up.",
+      requested_by: "control tower" },
+    { request_no: "REQ-0002", sku_id: "PH-25KG", quantity_mt: 150, status: "ordered",
+      reason: "Cover thin ahead of the festive period.", requested_by: "control tower" },
+  ];
+  for (const r of ORDER_REQUESTS) insertReq.run(r);
+
+  console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${poSeq - 1} open POs, ${soCount} open sales orders, ${OPERATORS.length} operators, ${RISK_EVENTS.length} risk events, ${ORDER_REQUESTS.length} order requests`);
   console.log(`✓ Seeded ${histCount} months of inventory history (${HISTORY_MONTHS} per SKU)`);
 
   // ── Tie-out ────────────────────────────────────────────────────────────────

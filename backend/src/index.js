@@ -83,7 +83,7 @@ app.use((req, res, next) => {
 app.use("/api/products", productRoutes); // legacy in-memory demo store, unrelated to the SQLite schema below
 app.use("/api", demoRoutes);
 app.use("/api", inventoryRoutes);
-app.use("/api", warehouseRoutes);       // warehouse floor: goods receipt and goods issue        // real schema: /api/skus, /api/dashboard/stats, /api/alerts, /api/inventory/restock
+app.use("/api", warehouseRoutes);       // warehouse floor: goods receipt and goods issue        // real schema: /api/skus, /api/dashboard/stats, /api/alerts, /api/order-requests
 
 // Health check
 app.get("/api/health", (req, res) => {

@@ -1350,40 +1350,149 @@ router.post("/skus/import-new", (req, res) => {
 });
 
 // ── Inventory ────────────────────────────────────────────────────────────────
+//
+// There is deliberately NO stock-writing endpoint here (Reorder Loop step 7,
+// "Separate the duties"). This router serves the Control Tower, which reads the
+// ledger but never changes what is physically in the building. Stock moves only
+// on the warehouse floor, against an expected line, attributed to an operator:
+// POST /api/warehouse/inbound/receive and POST /api/warehouse/outbound/pick.
+//
+// A POST /api/inventory/restock used to live here and added on-hand quantity
+// straight from the office, with no purchase order, no operator and no
+// variance. It was removed when the duties were separated: the one thing the
+// Control Tower may now trigger is a request to the buyer (POST
+// /api/order-requests), which records intent and never touches stock.
 
-// POST /api/inventory/restock — add on-hand quantity, reset the receipt clock
-router.post("/inventory/restock", (req, res) => {
-  const { sku_id, quantity } = req.body || {};
-  if (!sku_id) return res.status(400).json({ success: false, message: "sku_id is required" });
-  const qty = Number(quantity);
-  if (!qty || qty <= 0) return res.status(400).json({ success: false, message: "quantity must be a positive number" });
+// ── Order requests (Reorder Loop step 7) ──────────────────────────────────────
+// The Control Tower's one write. It records a request to the buyer to order
+// more of a SKU; it does NOT change stock. Deliberately in this router (the
+// Control Tower API) precisely because it is the office's only permitted write,
+// and it touches order_requests, never inventory_positions.
+
+// REQ-0001, sequential, zero padded — the same shape goods_movements uses for
+// its GRN/DN numbers, so the two id schemes read alike on the Activity page.
+function nextRequestNo(db) {
+  const row = db.prepare(`SELECT request_no FROM order_requests ORDER BY id DESC LIMIT 1`).get();
+  const n = row ? Number(String(row.request_no).split("-")[1]) + 1 : 1;
+  return `REQ-${String(n).padStart(4, "0")}`;
+}
+
+// POST /api/order-requests  { sku_id, quantity, reason? }
+router.post("/order-requests", (req, res) => {
+  const b = req.body || {};
+  if (!b.sku_id) return res.status(400).json({ success: false, message: "sku_id is required" });
+  const qty = Number(b.quantity);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return res.status(400).json({ success: false, message: "quantity must be a positive number" });
+  }
 
   try {
     const db = getDb();
-    const existing = db.prepare(`SELECT on_hand_qty FROM inventory_positions WHERE sku_id = ?`).get(sku_id);
-    if (!existing) return res.status(404).json({ success: false, message: "SKU not found" });
+    const sku = db.prepare(`SELECT sku_id, product_name FROM skus WHERE sku_id = ?`).get(b.sku_id);
+    if (!sku) return res.status(404).json({ success: false, message: "SKU not found" });
 
-    db.prepare(`
-      UPDATE inventory_positions
-         SET on_hand_qty = on_hand_qty + ?, last_received_date = ?, last_updated = datetime('now')
-       WHERE sku_id = ?`
-    ).run(qty, today(), sku_id);
+    const requestNo = nextRequestNo(db);
+    const reason = String(b.reason || "").trim() || null;
+    const requestedBy = String(b.requested_by || "").trim() || "control tower";
 
-    const { skus } = getAnalytics();
-    const after = skus.find((s) => s.sku_id === sku_id);
+    const info = db.prepare(`
+      INSERT INTO order_requests (request_no, sku_id, quantity_mt, reason, requested_by)
+      VALUES (?, ?, ?, ?, ?)`
+    ).run(requestNo, b.sku_id, qty, reason, requestedBy);
 
-    logEvent(EVENTS.RESTOCK, {
-      skuId: sku_id,
-      input: { quantity_mt: qty, on_hand_before: existing.on_hand_qty, received_date: today() },
-      output: after
-        ? { on_hand_after: existing.on_hand_qty + qty, available_qty: after.available_qty, health_status: after.health_status }
-        : null,
+    const created = db.prepare(`
+      SELECT r.*, s.product_name AS sku_name FROM order_requests r
+        LEFT JOIN skus s ON s.sku_id = r.sku_id
+       WHERE r.id = ?`).get(info.lastInsertRowid);
+
+    // No output stock figures on purpose: this event's whole point is that
+    // nothing about the physical position moved. Input carries the ask, output
+    // carries only the request identity and status.
+    logEvent(EVENTS.ORDER_REQUESTED, {
+      skuId: b.sku_id,
+      input: { quantity_mt: qty, reason, requested_by: requestedBy },
+      output: { request_no: requestNo, status: created.status },
     });
 
-    res.json({ success: true, data: after });
+    res.status(201).json({ success: true, data: created });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: "Failed to restock SKU" });
+    res.status(500).json({ success: false, message: "Failed to raise the order request" });
+  }
+});
+
+// GET /api/order-requests?sku_id=...&status=open
+router.get("/order-requests", (req, res) => {
+  try {
+    const db = getDb();
+    const where = [];
+    const params = {};
+    if (req.query.sku_id) { where.push("r.sku_id = @sku_id"); params.sku_id = req.query.sku_id; }
+    if (req.query.status) { where.push("r.status = @status"); params.status = req.query.status; }
+
+    const rows = db.prepare(`
+      SELECT r.*, s.product_name AS sku_name FROM order_requests r
+        LEFT JOIN skus s ON s.sku_id = r.sku_id
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+       ORDER BY r.id DESC
+       LIMIT 200`).all(params);
+
+    res.json({ success: true, count: rows.length, data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load order requests" });
+  }
+});
+
+// PATCH /api/order-requests/:id  { status: 'ordered' | 'cancelled' }
+//
+// The follow-through that closes an open request: a buyer either places the
+// order (status -> ordered) or drops it (status -> cancelled). This still
+// changes NO stock — marking a request "ordered" means an order now exists for
+// the warehouse to receive against later, and that receipt (on the floor, by an
+// operator) is the only thing that ever moves on_hand_qty. Kept a one-way step
+// from 'open', the same shape alert acknowledgement uses: a decided request is
+// not reopened, so a stale tab cannot flip an already-ordered line back.
+router.patch("/order-requests/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const status = String(req.body?.status || "").trim();
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ success: false, message: "A valid request id is required" });
+  }
+  if (!["ordered", "cancelled"].includes(status)) {
+    return res.status(400).json({ success: false, message: "status must be 'ordered' or 'cancelled'" });
+  }
+
+  try {
+    const db = getDb();
+    const existing = db.prepare(`SELECT * FROM order_requests WHERE id = ?`).get(id);
+    if (!existing) return res.status(404).json({ success: false, message: "Order request not found" });
+    if (existing.status !== "open") {
+      return res.status(409).json({
+        success: false,
+        message: `Request ${existing.request_no} is already ${existing.status} and cannot be changed.`,
+      });
+    }
+
+    db.prepare(`UPDATE order_requests SET status = ? WHERE id = ?`).run(status, id);
+
+    const updated = db.prepare(`
+      SELECT r.*, s.product_name AS sku_name FROM order_requests r
+        LEFT JOIN skus s ON s.sku_id = r.sku_id
+       WHERE r.id = ?`).get(id);
+
+    // Again no output stock figures: the whole point of step 7 is that this
+    // office action does not move the physical position.
+    logEvent(EVENTS.ORDER_REQUEST_UPDATED, {
+      skuId: existing.sku_id,
+      input: { request_no: existing.request_no, quantity_mt: existing.quantity_mt, from: existing.status },
+      output: { status },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to update the order request" });
   }
 });
 

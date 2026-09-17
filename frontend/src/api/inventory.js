@@ -71,8 +71,19 @@ export const api = {
   getSku: (id) => request(`/skus/${id}`),
   createSku: (body) => request("/skus", { method: "POST", body }),
   updateSku: (id, body) => request(`/skus/${id}`, { method: "PUT", body }),
-  restockSku: (skuId, quantity) =>
-    request("/inventory/restock", { method: "POST", body: { sku_id: skuId, quantity } }),
+  // Reorder Loop step 7: the one write the Control Tower may trigger. Records a
+  // request to the buyer, never a stock change. (The old restockSku, which
+  // added on-hand stock from the office, was removed when the duties were
+  // separated - stock now moves only on the warehouse floor.)
+  raiseOrderRequest: (body) => request("/order-requests", { method: "POST", body }),
+  getOrderRequests: (params) => {
+    const q = new URLSearchParams(params || {}).toString();
+    return request(`/order-requests${q ? `?${q}` : ""}`);
+  },
+  // Reorder Loop step 7 follow-through: a buyer closes an open request by
+  // marking it ordered or cancelled. Still no stock change.
+  updateOrderRequest: (id, status) =>
+    request(`/order-requests/${id}`, { method: "PATCH", body: { status } }),
   getSkuProjection: (id) => request(`/skus/${id}/projection`),
 
   // Forecasting (MVP2 Day 5). getSkuForecast returns { history, forecast } -

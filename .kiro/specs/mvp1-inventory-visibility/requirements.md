@@ -223,7 +223,9 @@ Features:
 - Sort by: any column
 - Inline stock bar showing on-hand vs max stock
 - Health status badge (colour-coded)
-- Restock modal (add quantity)
+- Request-order modal (raise a request to the buyer; records intent, never changes stock — Reorder
+  Loop step 7. Replaced the earlier Restock modal, which added stock from the office and was removed
+  when the warehouse-write vs Control-Tower-read duties were separated)
 - Add new SKU form
 
 ---
@@ -254,7 +256,11 @@ endpoint list**; this is the shape as of 15 Sep.
   `GET /api/skus/history/export` and `POST /api/skus/history/import`
 - Dashboard: `GET /api/dashboard/stats`, `GET /api/dashboard/history`
 - Alerts and decisions: `GET /api/alerts`, `POST /api/alerts/:id/acknowledge`, `GET /api/decisions`,
-  `POST /api/decisions`, `POST /api/inventory/restock`
+  `POST /api/decisions`
+- Order requests (Reorder Loop step 7, the Control Tower's one write, no stock change):
+  `POST /api/order-requests`, `GET /api/order-requests`. (`POST /api/inventory/restock` was removed
+  here when the duties were separated: the office no longer writes stock; stock moves only on the
+  warehouse floor.)
 - Explanations: `POST /api/alerts/explain`, `GET /api/llm/mode`, `POST /api/llm/unlock`
 - Audit: `GET /api/audit`
 - Warehouse floor: `POST /api/warehouse/login`, `GET /api/warehouse/operators`,
