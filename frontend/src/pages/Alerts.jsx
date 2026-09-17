@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, XCircle, TrendingUp, TrendingDown,
-  RefreshCw, X, CheckCircle, Clock, Cpu, History,
+  RefreshCw, X, CheckCircle, Clock, Cpu, History, Target,
 } from "lucide-react";
 import Badge from "../components/Badge";
 import ColHint from "../components/ColHint";
@@ -39,6 +39,7 @@ const TYPE_META = {
   SLOW_MOVING:   { icon: TrendingDown,  color: "var(--yellow)", bg: "var(--yellow-light)", label: "Slow Moving" },
   IDLE:          { icon: Clock,         color: "var(--red)",    bg: "var(--red-light)",    label: "Idle Stock" },
   AGEING:        { icon: AlertTriangle, color: "var(--yellow)", bg: "var(--yellow-light)", label: "Ageing" },
+  POLICY_CHANGE_SUGGESTED: { icon: Target, color: "var(--blue)", bg: "var(--blue-light)", label: "Policy Suggestion" },
 };
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
@@ -62,6 +63,7 @@ const ACTION_SUMMARY = {
   IDLE:        "Disposition review",
   SLOW_MOVING: "Reduce next order",
   AGEING:      "Escalate to QA and commercial",
+  POLICY_CHANGE_SUGGESTED: "Review the new reorder point",
 };
 
 // ELI18: plain language, no assumed prior inventory-ops vocabulary - matches
@@ -90,6 +92,10 @@ const TYPE_HINTS = {
   AGEING: {
     what: "Stock has been physically sitting in the warehouse a long time, approaching its shelf-life / holding-time limit.",
     how: "The number shown is days held. Rice doesn't spoil overnight, but quality and sellability drop the longer it sits past that limit.",
+  },
+  POLICY_CHANGE_SUGGESTED: {
+    what: "This SKU is opted into demand forecasting, and the forecast (plus any active risk buffer) now suggests a reorder point more than 10% away from the one currently approved.",
+    how: "The figures are the same either way; only the demand input changes, from a trailing average to a forecast. Approve or amend to update the approved reorder point, or reject to leave it as is.",
   },
 };
 // Ask AI is a placeholder until TASK-11 wires a real LLM call (blocked on an
@@ -340,6 +346,7 @@ export default function Alerts() {
       {approvalModal && (
         <ApprovalModal
           alert={approvalModal.alert || approvalModal}
+          sku={skus.find((s) => s.sku_id === (approvalModal.alert || approvalModal).sku_id)}
           preAction={approvalModal.preAction || "approved"}
           onDecide={handleDecision}
           onClose={() => setApprovalModal(null)}
@@ -362,6 +369,7 @@ const VALUE_UNIT = {
   STOCKOUT_RISK: "days cover", SLOW_MOVING: "days cover",
   REORDER: "MT", OVERSTOCK: "MT",
   IDLE: "days idle", AGEING: "days held",
+  POLICY_CHANGE_SUGGESTED: "MT reorder point",
 };
 
 function ActionButton({ onClick, children, variant = "quiet", title }) {
@@ -613,7 +621,7 @@ function AiModal({ aiModal, onClose }) {
 }
 
 // ── Approval modal ─────────────────────────────────────────────────────────────
-function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
+function ApprovalModal({ alert, sku, preAction = "approved", onDecide, onClose }) {
   const [action, setAction] = useState(preAction);
   const [qty, setQty] = useState(alert.ai_recommendation_qty ?? "");
   const [reason, setReason] = useState("");
@@ -665,10 +673,32 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
         <div style={{ padding: "12px 14px", background: "var(--surface-2)", borderRadius: "var(--radius)", marginBottom: 20, fontSize: "var(--text-sm)" }}>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>{alert.sku_name}</div>
           <div style={{ color: "var(--text-secondary)" }}>{alert.recommended_action}</div>
-          {alert.ai_recommendation_qty > 0 && (
-            <div style={{ marginTop: 6, color: "var(--blue)", fontWeight: 600 }}>
-              Suggested order quantity: {alert.ai_recommendation_qty} MT
+
+          {alert.alert_type === "POLICY_CHANGE_SUGGESTED" && sku ? (
+            // The rationale a quantity alone can't carry: which model produced
+            // it, how it scored in backtesting, and why a risk buffer is or
+            // isn't part of it — the same figures engines/index.js computed,
+            // never re-derived here.
+            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ color: "var(--text-secondary)" }}>
+                Forecast model: <b style={{ color: "var(--text-primary)" }}>{(sku.demand_source || "").replace(/_/g, " ")}</b>
+                {sku.forecast_low_confidence && <span style={{ color: "var(--yellow)", fontWeight: 600 }}> · low confidence (sparse history)</span>}
+              </div>
+              {sku.risk_buffer_mt > 0 && (
+                <div style={{ color: "var(--text-secondary)" }}>
+                  Risk buffer: <b style={{ color: "var(--text-primary)" }}>+{sku.risk_buffer_mt} MT</b> ({sku.risk_buffer_reason}, illustrative)
+                </div>
+              )}
+              <div style={{ color: "var(--blue)", fontWeight: 600 }}>
+                Suggested reorder point: {sku.reorder_point_policy} → {alert.ai_recommendation_qty} MT
+              </div>
             </div>
+          ) : (
+            alert.ai_recommendation_qty > 0 && (
+              <div style={{ marginTop: 6, color: "var(--blue)", fontWeight: 600 }}>
+                Suggested order quantity: {alert.ai_recommendation_qty} MT
+              </div>
+            )
           )}
         </div>
 
@@ -699,7 +729,9 @@ function ApprovalModal({ alert, preAction = "approved", onDecide, onClose }) {
           {action !== "rejected" && alert.ai_recommendation_qty != null && (
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
-                Quantity to {action === "approved" ? "approve" : "adjust"} (MT)
+                {alert.alert_type === "POLICY_CHANGE_SUGGESTED"
+                  ? "New reorder point (MT)"
+                  : `Quantity to ${action === "approved" ? "approve" : "adjust"} (MT)`}
               </label>
               <input type="number" min={0} step={1} value={qty} onChange={(e) => setQty(e.target.value)}
                 style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-sm)" }} />

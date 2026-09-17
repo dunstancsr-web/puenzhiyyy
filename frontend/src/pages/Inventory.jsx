@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { Search, Filter, Plus, ChevronUp, ChevronDown, X } from "lucide-react";
+import { Search, Filter, Plus, ChevronUp, ChevronDown, ChevronRight, TrendingUp, X } from "lucide-react";
 import Badge from "../components/Badge";
 import ColHint from "../components/ColHint";
 import StockPositionBar from "../components/StockPositionBar";
@@ -173,6 +174,19 @@ export default function Inventory() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSku, setSelectedSku] = useState(null);
 
+  // Onboarding's "Add one product by hand" hands off here rather than
+  // duplicating this form: /inventory?add=1 opens the same Add SKU modal a
+  // manual click on the header button would.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("add") === "1") {
+      setShowAddModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("add");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const loadSkus = useCallback(() => {
     setLoadError(null);
     setSkus(null);
@@ -305,6 +319,16 @@ export default function Inventory() {
             filled. Add SKU is the one primary action on this surface; two solid
             blue buttons side by side is a rainbow, not a hierarchy. */}
         <div style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0 }}>
+          {/* Outlined, same weight as Bulk edit, so "Add SKU" stays the one
+              primary action on this surface. MVP2 (branch-only for now) -
+              see the App.jsx route comment for why this isn't in Sidebar yet. */}
+          <Link to="/forecast" style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: "var(--radius)",
+            border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-secondary)",
+            fontSize: "var(--text-sm)", fontWeight: 600, textDecoration: "none",
+          }}>
+            <TrendingUp size={15} /> Forecast overview
+          </Link>
           <BulkEdit onImported={loadSkus} />
           <button
             onClick={() => setShowAddModal(true)}
@@ -672,6 +696,7 @@ function ProjectionChart({ skuId }) {
 
 // ── Edit an existing SKU ─────────────────────────────────────────────────────
 function SkuEditForm({ sku, onSave, onCancel }) {
+  const navigate = useNavigate();
   const initial = useMemo(() => {
     const f = {};
     for (const g of EDIT_GROUPS) {
@@ -798,6 +823,23 @@ function SkuEditForm({ sku, onSave, onCancel }) {
             </div>
           </FormSection>
 
+          <FormSection title="Demand forecasting">
+            <div style={{ gridColumn: "span 2", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                {sku.use_forecast
+                  ? `Reorder point is currently driven by the ${sku.demand_source?.replace("_", " ")} forecast.`
+                  : "Model picker, reasoning chain, and a what-if sandbox for this SKU's reorder point."}
+              </span>
+              <button type="button" onClick={() => { onCancel(); navigate(`/inventory/${sku.sku_id}/forecast`); }} style={{
+                display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: "var(--text-sm)",
+                padding: "8px 14px", borderRadius: "var(--radius)", border: "1px solid var(--blue)",
+                background: "var(--blue-light)", color: "var(--blue)", cursor: "pointer", flexShrink: 0,
+              }}>
+                View forecast <ChevronRight size={14} />
+              </button>
+            </div>
+          </FormSection>
+
           {sku.recommended_action && (
             <div style={{ fontSize: "var(--text-base)", lineHeight: 1.6, paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
               <span style={{ fontWeight: 600 }}>Recommended: </span>{sku.recommended_action}
@@ -854,7 +896,18 @@ function SkuEditForm({ sku, onSave, onCancel }) {
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px var(--space-4)", alignItems: "center" }}>
               <span>Available <strong>{preview.available_qty} MT</strong></span>
               <span>Days of cover <strong>{preview.days_of_cover ?? "-"}</strong></span>
-              <span>Reorder point (suggested) <strong>{preview.reorder_point_suggested} MT</strong></span>
+              {sku.use_forecast ? (
+                // MVP2 Day 5: this preview is the client-side approximation
+                // (mock/analytics.js), computed from the 30-day average. Once
+                // use_forecast is on, the real suggested figure comes from the
+                // forecast instead and this simplified formula would silently
+                // disagree with it - so it's suppressed rather than shown as
+                // a second, conflicting number (rules.md, "derived values
+                // computed twice eventually disagree").
+                <span>Reorder point (suggested) <strong>see Forecasting tab</strong></span>
+              ) : (
+                <span>Reorder point (suggested) <strong>{preview.reorder_point_suggested} MT</strong></span>
+              )}
               <span>Gross margin <strong>{preview.gross_margin_pct}%</strong></span>
               <Badge type={preview.health_status} />
             </div>

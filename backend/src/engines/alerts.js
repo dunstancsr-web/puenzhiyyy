@@ -11,6 +11,7 @@ const { humanDuration } = require("./duration");
 
 const TYPE_PRIORITY = {
   STOCKOUT_RISK: 0, IDLE: 1, REORDER: 2, OVERSTOCK: 3, AGEING: 4, SLOW_MOVING: 5,
+  POLICY_CHANGE_SUGGESTED: 6, // MVP2: a policy tuning suggestion, never more urgent than a real operational alert
 };
 
 const fmtMt = (n) => `${Math.round(n)} MT`;
@@ -139,6 +140,30 @@ function alertsForSku(s) {
       recommended_action: `Escalate to QA and commercial. Move stock before it reaches the holding limit, ${humanDuration(s.max_holding_days - s.inventory_age_days)} remain.`,
       ai_recommendation_qty: null,
     });
+  }
+
+  // POLICY_CHANGE_SUGGESTED (MVP2 Day 4) — only for a SKU opted into
+  // forecasting (engines/index.js sets use_forecast + reorder_point_suggested_with_risk),
+  // and only when that forecast-plus-risk-buffer view of the reorder point
+  // drifts far enough from the approved policy to be worth a manager's
+  // attention, not on every rounding difference. Severity "info": a tuning
+  // suggestion, never more urgent than a real operational alert above.
+  if (s.use_forecast && s.reorder_point_suggested_with_risk != null) {
+    const gap = Math.abs(s.reorder_point_suggested_with_risk - s.reorder_point_policy);
+    const gapPct = s.reorder_point_policy > 0 ? gap / s.reorder_point_policy : (s.reorder_point_suggested_with_risk > 0 ? 1 : 0);
+    if (gapPct > 0.10) {
+      const direction = s.reorder_point_suggested_with_risk > s.reorder_point_policy ? "raise" : "lower";
+      const riskPart = s.risk_buffer_mt > 0 ? ` Includes a +${fmtMt(s.risk_buffer_mt)} risk buffer: ${s.risk_buffer_reason}.` : "";
+      push({
+        alert_type: "POLICY_CHANGE_SUGGESTED",
+        severity: "info",
+        triggered_value: Math.round(s.reorder_point_suggested_with_risk),
+        threshold_value: Math.round(s.reorder_point_policy),
+        message: `${s.product_name}'s forecast (${s.demand_source.replace(/_/g, " ")}) suggests you ${direction} the reorder point from ${fmtMt(s.reorder_point_policy)} to ${fmtMt(s.reorder_point_suggested_with_risk)}.${riskPart}`,
+        recommended_action: `Review the forecast and either approve, amend, or reject the new reorder point.`,
+        ai_recommendation_qty: Math.round(s.reorder_point_suggested_with_risk),
+      });
+    }
   }
 
   return out;

@@ -113,7 +113,12 @@ function portfolioStats(skus, demand) {
   const healthByValue = ["RED", "ORANGE", "YELLOW", "GREEN"].map((k) => {
     const rows = active.filter((s) => s.health_status === k);
     const value = sum(rows, "inventory_value");
-    return { status: k, value, count: rows.length, pct: round((value / totalInventoryValue) * 100) };
+    // An empty portfolio (0 / 0) is 0% of nothing, not NaN — which JSON.stringify
+    // would otherwise silently turn into `null` over the wire (MVP2 demo mode,
+    // the first thing to actually exercise a genuinely empty database, surfaced
+    // this as "null% of inventory" on screen).
+    const pct = totalInventoryValue > 0 ? round((value / totalInventoryValue) * 100) : 0;
+    return { status: k, value, count: rows.length, pct };
   });
 
   return {
@@ -131,13 +136,13 @@ function portfolioStats(skus, demand) {
     stockoutSkuCount: stockoutSkus.length,
     overstockValue: r0(overstockValue),
     overstockCarryingCost: r0(overstockCarryingCost),
-    overstockPct: round((overstockValue / totalInventoryValue) * 100),
+    overstockPct: totalInventoryValue > 0 ? round((overstockValue / totalInventoryValue) * 100) : 0,
     overstockSkuCount: overstockSkus.length,
     eoValue: r0(eoValue),
     eoSlowValue: r0(eoSlowValue),
     eoIdleValue: r0(eoIdleValue),
     eoValueRiskAdjusted: r0(eoValueRiskAdjusted),
-    eoPct: round((eoValue / totalInventoryValue) * 100),
+    eoPct: totalInventoryValue > 0 ? round((eoValue / totalInventoryValue) * 100) : 0,
     eoSkuCount: eoSkus.length,
     complianceEligibleQty: r0(complianceEligibleQty),
     complianceRequiredQty: r0(complianceRequiredQty),

@@ -1,6 +1,59 @@
 const Database = require("better-sqlite3");
 const fs = require("fs");
 const path = require("path");
+const { AsyncLocalStorage } = require("async_hooks");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEMO MODE (MVP2 Day 7). A visitor can switch every request onto a genuinely
+// separate, empty, in-memory SQLite database instead of the real file, so the
+// real onboarding flow (an empty portfolio) can be demoed live without any
+// risk to the real data — there is no code path from inside demo mode that can
+// reach the real database.
+//
+// One shared sandbox, not per-visitor: Stan is the one demoing this live, not
+// concurrent unsupervised judges, so per-visitor isolation isn't worth the
+// complexity here. `demoDb` is the one shared instance, or null when demo mode
+// has never been entered (or has been exited, which just drops the reference —
+// no "reset" step, nothing to reset).
+//
+// getDb() is called directly, with no request object threaded through, by
+// almost every engine and route in this codebase — AsyncLocalStorage lets a
+// request-scoped "which database" decision reach every one of those calls
+// without changing a single call site.
+const demoContext = new AsyncLocalStorage();
+let demoDb = null;
+
+function createDemoDb() {
+  const instance = new Database(":memory:");
+  instance.pragma("foreign_keys = ON");
+  initDb(instance); // same schema-building code as the real database, see below
+  return instance;
+}
+
+function enterDemoMode() {
+  if (!demoDb) demoDb = createDemoDb();
+  return demoDb;
+}
+
+function exitDemoMode() {
+  if (demoDb) demoDb.close(); // release the native handle; nothing to reset because nothing is reused
+  demoDb = null;
+}
+
+function isDemoModeActive() {
+  return demoDb != null;
+}
+
+// Wraps one request's handling in the demo database's async context. Called by
+// the middleware in index.js for any request carrying the demo cookie. If the
+// shared instance was dropped (someone else exited) since this cookie was set,
+// self-heals by starting a fresh empty one — the alternative, silently falling
+// back to the real database for a visitor who believes they are in a sandbox,
+// is the one outcome this feature exists to make impossible.
+function runInDemoContext(fn) {
+  const instance = demoDb || enterDemoMode();
+  return demoContext.run(instance, fn);
+}
 
 // DATA_DIR is configurable so a deployed instance can point the database at a
 // mounted persistent disk, which is never inside the checked-out source tree.
@@ -12,6 +65,12 @@ const DB_PATH = path.join(DATA_DIR, "stocksense.db");
 let db;
 
 function getDb() {
+  // A demo-mode request (see runInDemoContext, above) gets the shared
+  // in-memory sandbox instead of the real file — every other call site in
+  // this codebase is unchanged and unaware this branch exists.
+  const demoInstance = demoContext.getStore();
+  if (demoInstance) return demoInstance;
+
   if (!db) {
     // A mounted volume can be empty on first boot, and better-sqlite3 will not
     // create a missing parent directory for you: it throws SQLITE_CANTOPEN.
@@ -31,8 +90,11 @@ function ensureColumn(db, table, column, ddl) {
   }
 }
 
-function initDb() {
-  const db = getDb();
+// targetDb: build the schema on a specific Database instance (createDemoDb's
+// in-memory one) instead of the real singleton. Every existing call site
+// (index.js's boot-time initDb()) passes nothing and behaves exactly as before.
+function initDb(targetDb) {
+  const db = targetDb || getDb();
 
   db.exec(`
     -- ================================================================
@@ -71,7 +133,12 @@ function initDb() {
       abc_class                TEXT,             -- cached on refresh (A/B/C by consumption value)
       xyz_class                TEXT,             -- cached on refresh (X/Y/Z by demand CV)
       active                   INTEGER DEFAULT 1,
-      strategic_adjustment     REAL DEFAULT 0,   -- Phase 2 placeholder, always 0 in MVP 1
+      strategic_adjustment     REAL DEFAULT 0,   -- MVP2: risk-buffer contribution (MT) from riskbuffer.js,
+                                                  -- added to reorder_point_suggested; 0 when no active
+                                                  -- risk_events match this SKU's origin/supplier
+      forecast_model           TEXT,             -- MVP2: naive_seasonal | holt_winters | linear_trend | auto | NULL
+      use_forecast             INTEGER DEFAULT 0,-- MVP2: opt-in switch, decoupled from forecast_model so
+                                                  -- picking a model does not silently activate it
       created_at               TEXT DEFAULT (datetime('now'))
     );
 
@@ -163,6 +230,54 @@ function initDb() {
       strategic_adjustment REAL DEFAULT 0,
       FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
     );
+
+    -- ================================================================
+    -- FORECASTS  (MVP2)
+    -- One row per SKU per model per generation. is_active=1 marks the one row
+    -- per sku_id currently feeding safetystock.js; older rows stay as history
+    -- for later forecast-vs-actual comparison. avg_daily_demand_forecast and
+    -- demand_cv_forecast are the only two fields engines/index.js reads; the
+    -- rest is for the review UI and the backtest report.
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS forecasts (
+      id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+      sku_id                    TEXT NOT NULL,
+      model                     TEXT NOT NULL,   -- naive_seasonal | holt_winters | linear_trend | holt_damped_seasonal
+      generated_at              TEXT DEFAULT (datetime('now')),
+      horizon_months            INTEGER NOT NULL,
+      avg_daily_demand_forecast REAL NOT NULL,
+      demand_cv_forecast        REAL NOT NULL,
+      monthly_forecast_json     TEXT NOT NULL,   -- [{period, qty_mt, lower, upper}, ...]
+      backtest_metric           TEXT,            -- 'WMAPE'
+      backtest_score            REAL,
+      candidate_scores_json     TEXT,            -- {model_id: wmape, ...} for every model tried, so
+                                                  -- auto-mode's pick is inspectable, not a black box
+      low_confidence            INTEGER DEFAULT 0, -- 1 when fold count was thin (sparse sales history)
+      is_active                 INTEGER DEFAULT 0,
+      FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_forecasts_sku_active ON forecasts(sku_id, is_active);
+
+    -- ================================================================
+    -- RISK EVENTS  (MVP2)
+    -- A seeded, illustrative supply-chain risk signal, matched to SKUs by
+    -- country_of_origin or supplier. NOT a live feed: real USDA GAIN/AMIS
+    -- integration is roadmap, not this build. is_illustrative always 1 here,
+    -- the same honesty label compliance_position already carries.
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS risk_events (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      label             TEXT NOT NULL,
+      country_of_origin TEXT,
+      supplier          TEXT,
+      severity          TEXT NOT NULL,    -- low | medium | high
+      buffer_days_add   REAL NOT NULL,
+      active            INTEGER DEFAULT 1,
+      is_illustrative   INTEGER DEFAULT 1,
+      notes             TEXT,
+      created_at        TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_risk_events_active ON risk_events(active);
 
     -- ================================================================
     -- OPERATORS  (warehouse floor staff, for handheld attribution)
@@ -290,6 +405,8 @@ function initDb() {
   ensureColumn(db, "skus", "obsolescence_risk_pct", "obsolescence_risk_pct REAL DEFAULT 10");
   ensureColumn(db, "skus", "abc_class", "abc_class TEXT");
   ensureColumn(db, "skus", "xyz_class", "xyz_class TEXT");
+  ensureColumn(db, "skus", "forecast_model", "forecast_model TEXT");
+  ensureColumn(db, "skus", "use_forecast", "use_forecast INTEGER DEFAULT 0");
   // Compliance Position (REQ-16) is a portfolio-level KPI, computed in financials.js — no SKU column needed.
   ensureColumn(db, "alerts_log", "dedupe_key", "dedupe_key TEXT");
   ensureColumn(db, "alerts_log", "status", "status TEXT DEFAULT 'open'");
@@ -311,4 +428,7 @@ function initDb() {
   return db;
 }
 
-module.exports = { getDb, initDb, ensureColumn, DB_PATH };
+module.exports = {
+  getDb, initDb, ensureColumn, DB_PATH,
+  enterDemoMode, exitDemoMode, isDemoModeActive, runInDemoContext,
+};

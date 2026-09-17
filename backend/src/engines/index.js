@@ -11,6 +11,8 @@
 const { computeVelocity, daysAgo } = require("./velocity");
 const { computePosition } = require("./position");
 const { computeSafetyStock } = require("./safetystock");
+const { getActiveForecast } = require("./forecast");
+const { computeRiskBuffer } = require("./riskbuffer");
 const { classifyPortfolio } = require("./classification");
 const { segmentPortfolio, buildMatrix } = require("./segmentation");
 const { computeHealth } = require("./health");
@@ -44,13 +46,47 @@ function buildAnalytics(db, asOf = Date.now()) {
     const p = computePosition(db, m.sku_id, now);
 
     const demandCv = v.demand_cv > 0 ? v.demand_cv : m.demand_cv;
+
+    // MVP2: for a SKU opted into forecasting, avgDailyDemand/demandCv going
+    // INTO King's formula come from the active forecast instead of the 30
+    // day average — but ONLY here. avg_daily_usage_30d itself, and its seven
+    // other consumers (cover, projection, suggested order, ABC, financials,
+    // compliance), are untouched: the "one demand rate" decision on record
+    // in design.md is about operational reality today, a different question
+    // from expected future demand. Falls back to the 30 day average if a
+    // SKU is flagged for forecasting but no forecast has been generated yet
+    // (?? not ||, so a genuine 0 MT/day forecast is not treated as absent),
+    // rather than a zero/undefined safety stock.
+    const activeForecast = m.use_forecast ? getActiveForecast(db, m.sku_id) : null;
+    const forecastDemand = activeForecast ? activeForecast.avg_daily_demand_forecast : null;
+    const forecastCv = activeForecast ? activeForecast.demand_cv_forecast : null;
+
+    // Display-only metadata for the Forecast overview list (MVP2 Day 6):
+    // fetched regardless of use_forecast, since "has this SKU been forecast
+    // at all, and how stale is it" is a real question even for a SKU that
+    // hasn't been opted in yet. Never feeds computation — activeForecast
+    // above, gated on use_forecast, is the only row King's formula ever sees.
+    const forecastRow = m.forecast_model ? getActiveForecast(db, m.sku_id) : null;
+
     const ss = computeSafetyStock({
-      avgDailyDemand: v.avg_daily_usage_30d,
-      demandCv,
+      avgDailyDemand: forecastDemand ?? v.avg_daily_usage_30d,
+      demandCv: forecastCv ?? demandCv,
       leadTimeDays: m.lead_time_days,
       leadTimeStdDays: m.lead_time_std_days,
       serviceLevel: m.target_service_level,
     });
+
+    // Risk buffer: added AFTER King's formula as a separate, visible addend,
+    // not folded into the variance math — so the formula itself stays
+    // provably unchanged (check-formulas.js recalculates it verbatim) and
+    // the buffer's own contribution stays separately explainable ("+12 MT
+    // for India export-ban exposure") instead of disappearing into an
+    // opaque Z*sigma number. strategic_adjustment (a documented Phase 2
+    // placeholder, see db/init.js) is the analytics-output field this lands
+    // in, overriding the raw stored column below rather than writing back
+    // to it — this is a computed figure, not stored state.
+    const risk = computeRiskBuffer(db, m);
+    const risk_buffer_mt = round1(risk.days * (forecastDemand ?? v.avg_daily_usage_30d));
 
     // The one demand rate: the 30 day moving average (velocity.js).
     const dailyRate = v.avg_daily_usage_30d;
@@ -88,6 +124,19 @@ function buildAnalytics(db, asOf = Date.now()) {
       reorder_point_suggested: ss.reorder_point_suggested,
       lead_time_demand_mt: ss.lead_time_demand_mt,
       service_z: ss.z,
+      demand_source: activeForecast ? activeForecast.model : "velocity_30d",
+      forecast_avg_daily_demand: forecastDemand,
+      forecast_demand_cv: forecastCv,
+      forecast_low_confidence: activeForecast ? !!activeForecast.low_confidence : false,
+      // Display-only (see forecastRow above) — independent of use_forecast.
+      forecast_active_model: forecastRow ? forecastRow.model : null,
+      forecast_backtest_score: forecastRow ? forecastRow.backtest_score : null,
+      forecast_generated_at: forecastRow ? forecastRow.generated_at : null,
+      risk_buffer_mt,
+      risk_buffer_days: risk.days,
+      risk_buffer_reason: risk.reason,
+      reorder_point_suggested_with_risk: round1(ss.reorder_point_suggested + risk_buffer_mt),
+      strategic_adjustment: risk_buffer_mt,
       days_of_cover,
       months_of_cover,
       days_of_cover_text: humanDuration(days_of_cover),

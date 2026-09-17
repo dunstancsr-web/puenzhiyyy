@@ -19,7 +19,9 @@ try {
 
 const express = require("express");
 const cors = require("cors");
-const { initDb, getDb } = require("./db/init");
+const { initDb, getDb, runInDemoContext } = require("./db/init");
+const demoRoutes = require("./routes/demo");
+const DEMO_COOKIE = demoRoutes.COOKIE_NAME;
 
 // Initialise database on startup (creates tables if not exist)
 initDb();
@@ -66,8 +68,20 @@ if (isProduction) app.set("trust proxy", 1);
 app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:5173" }));
 app.use(express.json({ limit: "8mb" })); // 8mb: a CSV import posts the whole spreadsheet as a string
 
+// Demo mode (MVP2 Day 7): a request carrying the demo cookie runs entirely
+// against the shared in-memory sandbox instead of the real database — see
+// db/init.js's runInDemoContext/getDb for the actual switch. Every route below
+// is unmodified and unaware this branch exists; only cookie presence decides.
+app.use((req, res, next) => {
+  const cookies = req.headers.cookie || "";
+  const inDemo = cookies.split(";").map((c) => c.trim()).includes(`${DEMO_COOKIE}=1`);
+  if (inDemo) return runInDemoContext(() => next());
+  next();
+});
+
 // Routes
 app.use("/api/products", productRoutes); // legacy in-memory demo store, unrelated to the SQLite schema below
+app.use("/api", demoRoutes);
 app.use("/api", inventoryRoutes);
 app.use("/api", warehouseRoutes);       // warehouse floor: goods receipt and goods issue        // real schema: /api/skus, /api/dashboard/stats, /api/alerts, /api/inventory/restock
 

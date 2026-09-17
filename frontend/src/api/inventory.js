@@ -58,6 +58,14 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  // Demo mode (MVP2 Day 7). `request()` already sends/receives cookies by
+  // default (same-origin via the Vite proxy in dev, same-origin for real in
+  // production), so no extra fetch option is needed for the demo cookie to
+  // round-trip correctly.
+  getDemoStatus: () => request("/demo/status"),
+  enterDemoMode: () => request("/demo/enter", { method: "POST" }),
+  exitDemoMode: () => request("/demo/exit", { method: "POST" }),
+
   // SKUs
   getSkus: () => request("/skus"),
   getSku: (id) => request(`/skus/${id}`),
@@ -66,6 +74,16 @@ export const api = {
   restockSku: (skuId, quantity) =>
     request("/inventory/restock", { method: "POST", body: { sku_id: skuId, quantity } }),
   getSkuProjection: (id) => request(`/skus/${id}/projection`),
+
+  // Forecasting (MVP2 Day 5). getSkuForecast returns { history, forecast } -
+  // history is always present, forecast is null until Recompute has run once.
+  getSkuForecast: (id) => request(`/skus/${id}/forecast`),
+  getSkuInventoryHistory: (id, months = 12) => request(`/skus/${id}/inventory-history?months=${months}`),
+  getForecastModels: () => request("/forecast/models"),
+  setForecastConfig: (id, body) => request(`/skus/${id}/forecast-config`, { method: "PUT", body }),
+  recomputeForecast: (skuId) => request("/forecast/recompute", { method: "POST", body: { sku_id: skuId } }),
+  // Preview: recomputes King's formula with hypothetical inputs, saves nothing.
+  previewForecast: (id, body) => request(`/skus/${id}/forecast/preview`, { method: "POST", body }),
 
   // Bulk edit (TASK-60). Export bypasses request() because the response is
   // text/csv, not the { success, data } envelope everything else returns.
@@ -80,6 +98,9 @@ export const api = {
     return res.text();
   },
   importSkusCsv: (csv, apply) => request("/skus/import", { method: "POST", body: { csv, apply } }),
+  // Update-only (sku_id is the key). For CREATING new SKUs from a spreadsheet
+  // — onboarding's empty-catalog case — see importNewSkusCsv below.
+  importNewSkusCsv: (csv, apply) => request("/skus/import-new", { method: "POST", body: { csv, apply } }),
 
   // Monthly history (TASK-85). A separate file from the SKU export because it
   // has a different grain: one row per SKU per month, not one per SKU.
@@ -94,6 +115,21 @@ export const api = {
     return res.text();
   },
   importHistoryCsv: (csv, apply) => request("/skus/history/import", { method: "POST", body: { csv, apply } }),
+
+  // Sales history onboarding upload (MVP2 step 1). Append-only, unlike the
+  // history import above, so the response shape is a "what would be added"
+  // summary rather than a field-by-field diff.
+  exportSalesHistoryCsv: async (days = 180) => {
+    let res;
+    try {
+      res = await fetch(`${BASE}/skus/history/export-sales?days=${days}`);
+    } catch {
+      throw new Error(UNREACHABLE);
+    }
+    if (!res.ok) throw new Error("Could not export sales history. Check the backend log.");
+    return res.text();
+  },
+  importSalesHistoryCsv: (csv, apply) => request("/skus/history/import-sales", { method: "POST", body: { csv, apply } }),
 
   // Dashboard
   getDashboardStats: () => request("/dashboard/stats"),

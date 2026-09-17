@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Settings, Cpu, Calculator, Cloud, AlertTriangle, Sun, Moon, Monitor, Check, KeyRound } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Settings, Cpu, Calculator, Cloud, AlertTriangle, Sun, Moon, Monitor, Check, KeyRound, PlayCircle } from "lucide-react";
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { api } from "../api/inventory";
 import { useLlmTier, effectiveTier, setTierChoice, setPass, clearPass } from "../lib/llmTier";
@@ -30,6 +31,7 @@ const MODE_ICON = { rules: Calculator, local: Cpu, cloud: Cloud };
 const THEME_ICON = { auto: Monitor, light: Sun, dark: Moon };
 
 export default function SettingsMenu({ align = "up", compact = false }) {
+  const navigate = useNavigate();
   const { theme, resolved, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(null);      // { mode, modes } from the server
@@ -357,7 +359,22 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                 </button>
               );
             })}
-        </div>
+          </div>
+
+          {/* Reachable regardless of the live SKU count, so the onboarding
+              journey can be demoed on demand without emptying the database
+              first. Home itself still shows it automatically for a genuinely
+              empty catalog. */}
+          <div style={{ borderTop: "1px solid var(--border)", marginTop: 14, paddingTop: 10 }}>
+            <button onClick={() => { setOpen(false); navigate("/onboarding"); }} style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%",
+              padding: "7px 2px", background: "none", border: "none", cursor: "pointer",
+              fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
+            }}>
+              <PlayCircle size={14} style={{ flexShrink: 0 }} />
+              Preview the onboarding journey
+            </button>
+          </div>
       </div>
     );
 

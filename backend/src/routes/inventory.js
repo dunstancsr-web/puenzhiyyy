@@ -227,6 +227,25 @@ const SKU_TABLE_FIELDS = [
 ];
 const POSITION_TABLE_FIELDS = ["reserved_qty", "quality_hold_qty"];
 
+// Shared by PUT /api/skus/:id below and POST /api/decisions' policy-approval
+// branch, so a human typing into the SKU form and an approved AI suggestion
+// go through exactly one write path, not two that could drift apart.
+function applySkuUpdate(db, skuId, fields) {
+  const skuUpdates = SKU_TABLE_FIELDS.filter((k) => fields[k] !== undefined);
+  const posUpdates = POSITION_TABLE_FIELDS.filter((k) => fields[k] !== undefined);
+  const run = db.transaction(() => {
+    if (skuUpdates.length) {
+      const setClause = skuUpdates.map((k) => `${k} = @${k}`).join(", ");
+      db.prepare(`UPDATE skus SET ${setClause} WHERE sku_id = @sku_id`).run({ ...fields, sku_id: skuId });
+    }
+    if (posUpdates.length) {
+      const setClause = posUpdates.map((k) => `${k} = @${k}`).join(", ");
+      db.prepare(`UPDATE inventory_positions SET ${setClause} WHERE sku_id = @sku_id`).run({ ...fields, sku_id: skuId });
+    }
+  });
+  run();
+}
+
 router.put("/skus/:id", (req, res) => {
   const b = req.body || {};
   const numericError = validateNumericFields(b);
@@ -243,20 +262,7 @@ router.put("/skus/:id", (req, res) => {
        WHERE s.sku_id = ?`).get(req.params.id);
     if (!existing) return res.status(404).json({ success: false, message: "SKU not found" });
 
-    const skuUpdates = SKU_TABLE_FIELDS.filter((k) => b[k] !== undefined);
-    const posUpdates = POSITION_TABLE_FIELDS.filter((k) => b[k] !== undefined);
-
-    const run = db.transaction(() => {
-      if (skuUpdates.length) {
-        const setClause = skuUpdates.map((k) => `${k} = @${k}`).join(", ");
-        db.prepare(`UPDATE skus SET ${setClause} WHERE sku_id = @sku_id`).run({ ...b, sku_id: req.params.id });
-      }
-      if (posUpdates.length) {
-        const setClause = posUpdates.map((k) => `${k} = @${k}`).join(", ");
-        db.prepare(`UPDATE inventory_positions SET ${setClause} WHERE sku_id = @sku_id`).run({ ...b, sku_id: req.params.id });
-      }
-    });
-    run();
+    applySkuUpdate(db, req.params.id, b);
 
     const { skus } = getAnalytics();
     const updated = skus.find((s) => s.sku_id === req.params.id);
@@ -619,6 +625,156 @@ router.post("/skus/history/import", (req, res) => {
   }
 });
 
+// ── Sales history onboarding upload (MVP2, step 1) ───────────────────────────
+//
+// APPEND-only, unlike the history import above: a sale has no natural unique
+// key, so there is nothing to diff against. The preview reports what would be
+// ADDED, not what would CHANGE — new rows, their date range, a per-SKU
+// breakdown, and any unknown SKUs, which are rejected and reported rather than
+// silently skipped or auto-created (same rule as the history import's
+// knownSku check). This shape is also what makes the import trivially
+// replaceable later by a live feed connector appending to the same table: no
+// schema change, just a different source for the same rows.
+const SALES_KEY = ["sku_id", "quantity_mt", "sale_date"];
+const SALES_OPTIONAL = ["customer", "channel", "status"];
+const SALES_COLUMNS = [...SALES_KEY, ...SALES_OPTIONAL];
+const SALES_STATUSES = ["fulfilled", "lost"];
+
+// GET /api/skus/history/export-sales?days=N — raw sales_transactions rows,
+// newest first. Same "download, edit, re-upload" shape as every other export
+// here, so onboarding a first dataset and correcting one later are the same
+// workflow, not two.
+router.get("/skus/history/export-sales", (req, res) => {
+  const days = Math.min(1000, Math.max(1, Number(req.query.days) || 180));
+  try {
+    const db = getDb();
+    const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    const rows = db.prepare(`
+      SELECT sku_id, quantity_mt, sale_date, customer, channel, status
+        FROM sales_transactions
+       WHERE sale_date >= ?
+       ORDER BY sale_date DESC, sku_id`).all(since);
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition",
+      `attachment; filename="stocksense-sales-history-${today()}.csv"`);
+    res.send(toCsv(SALES_COLUMNS, rows));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to export sales history" });
+  }
+});
+
+router.post("/skus/history/import-sales", (req, res) => {
+  const { csv, apply = false } = req.body || {};
+  if (typeof csv !== "string" || !csv.trim()) {
+    return res.status(400).json({ success: false, message: "No CSV content was received" });
+  }
+
+  let parsed;
+  try {
+    parsed = parseCsv(csv);
+  } catch (err) {
+    return res.status(400).json({ success: false, message: `Could not read the file: ${err.message}` });
+  }
+  for (const k of SALES_KEY) {
+    if (!parsed.columns.includes(k)) {
+      return res.status(400).json({
+        success: false,
+        message: `The file has no ${k} column, so there is no way to record each sale.`,
+      });
+    }
+  }
+
+  try {
+    const db = getDb();
+    const skuNames = new Map(
+      db.prepare(`SELECT sku_id, product_name FROM skus`).all().map((r) => [r.sku_id, r.product_name])
+    );
+    const ignored = parsed.columns.filter((c) => !SALES_COLUMNS.includes(c));
+
+    const toInsert = [];
+    const errors = [];
+    const unknownSkus = new Set();
+    const bySku = new Map(); // sku_id -> { name, count, qty_total }
+
+    for (const row of parsed.rows) {
+      const line = row.__line;
+      const sku = row.sku_id;
+      if (!sku) { errors.push({ line, message: `Row ${line} is missing sku_id` }); continue; }
+      if (!skuNames.has(sku)) { unknownSkus.add(sku); errors.push({ line, message: `${sku} is not a known SKU (line ${line})` }); continue; }
+
+      const qty = Number(row.quantity_mt);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        errors.push({ line, message: `${sku}: quantity_mt must be a positive number (line ${line})` });
+        continue;
+      }
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.sale_date || "")) {
+        errors.push({ line, message: `${sku}: sale_date must look like 2026-04-15 (line ${line})` });
+        continue;
+      }
+
+      const status = (row.status || "fulfilled").trim();
+      if (!SALES_STATUSES.includes(status)) {
+        errors.push({ line, message: `${sku}: status must be "fulfilled" or "lost", not "${status}" (line ${line})` });
+        continue;
+      }
+
+      const record = {
+        sku_id: sku,
+        quantity_mt: qty,
+        sale_date: row.sale_date,
+        customer: row.customer || null,
+        channel: (row.channel || "direct").trim(),
+        status,
+      };
+      toInsert.push({ line, record });
+
+      const agg = bySku.get(sku) || { sku_id: sku, name: skuNames.get(sku), count: 0, qty_total: 0 };
+      agg.count += 1;
+      agg.qty_total = Math.round((agg.qty_total + qty) * 10) / 10;
+      bySku.set(sku, agg);
+    }
+
+    const dates = toInsert.map((r) => r.record.sale_date).sort();
+    const summary = {
+      rows: parsed.rows.length,
+      changed: toInsert.length, // reused for BulkEdit.jsx's shared blocked/apply-button logic
+      unchanged: 0,             // append-only: there is no "already matches" case
+      errors,
+      warnings: [],
+      ignoredColumns: ignored,
+      unknownSkus: [...unknownSkus],
+      dateRange: dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null,
+      skuBreakdown: [...bySku.values()].sort((a, b) => b.qty_total - a.qty_total),
+      applied: false,
+    };
+
+    if (!apply || errors.length || !toInsert.length) {
+      return res.json({ success: true, data: summary });
+    }
+
+    const insSale = db.prepare(`
+      INSERT INTO sales_transactions (sku_id, quantity_mt, sale_date, customer, channel, status)
+      VALUES (@sku_id, @quantity_mt, @sale_date, @customer, @channel, @status)`);
+    const run = db.transaction(() => {
+      for (const { record } of toInsert) insSale.run(record);
+    });
+    run();
+
+    logEvent(EVENTS.SALES_HISTORY_IMPORTED, {
+      input: { row_count: toInsert.length, date_range: summary.dateRange, sku_count: bySku.size },
+      output: { inserted: toInsert.length },
+    });
+
+    res.json({ success: true, data: { ...summary, applied: true } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to import sales history" });
+  }
+});
+
 // ── Bulk edit: CSV out, CSV back in (TASK-60) ────────────────────────────────
 //
 // The workflow this exists for is "export everything, fix fifty rows in a
@@ -801,6 +957,398 @@ router.post("/skus/import", (req, res) => {
   }
 });
 
+// ── Forecast (MVP2 Day 3) ─────────────────────────────────────────────────────
+const { runForecast, backtest, monthlySeries, getActiveForecast, MODEL_IDS } = require("../engines/forecast");
+const { computeSafetyStock } = require("../engines/safetystock");
+const { computeRiskBuffer } = require("../engines/riskbuffer");
+
+// GET /api/forecast/models — the shortlist + auto, shaped like GET /api/llm/mode
+// so the frontend picker follows the same convention as the explanation tiers.
+router.get("/forecast/models", (req, res) => {
+  const detail = {
+    naive_seasonal: "Same calendar month, averaged across every prior year in the history. No parameters, the floor every other model has to beat.",
+    linear_trend: "A straight trend line fit under the seasonal pattern. Easiest to explain in plain English: demand trending up or down by a fixed amount a month.",
+    holt_winters: "Trend plus seasonality, weighted toward recent months. The standard method when there is enough history to support it.",
+    // Ported from a teammate's branch (Tawmo, feature/demand-forecast-engine) — see forecast.js.
+    holt_damped_seasonal: "A damped trend blended evenly with last year's season, so a long-horizon forecast can't run away. Built independently by a teammate; worth comparing against the other three on a given SKU.",
+  };
+  const models = MODEL_IDS.map((id) => ({ id, label: MODEL_LABEL[id], detail: detail[id], available: true }));
+  models.push({
+    id: "auto",
+    label: "Auto",
+    detail: "Backtests every model on this SKU's own history and picks whichever scores lowest error. Deterministic — never a model call.",
+    available: true,
+  });
+  res.json({ success: true, data: { models } });
+});
+const MODEL_LABEL = {
+  naive_seasonal: "Naive seasonal", linear_trend: "Linear trend", holt_winters: "Holt-Winters",
+  holt_damped_seasonal: "Holt damped + seasonal",
+};
+
+// PUT /api/skus/:id/forecast-config — { forecast_model, use_forecast }
+//
+// Separate from PUT /api/skus/:id on purpose: picking a model is a distinct,
+// smaller action from every other policy edit, and keeping it out of
+// SKU_TABLE_FIELDS means forecast_model/use_forecast can never be set as a
+// side effect of an unrelated Save.
+const FORECAST_MODEL_VALUES = [...MODEL_IDS, "auto", null];
+router.put("/skus/:id/forecast-config", (req, res) => {
+  const b = req.body || {};
+  if (b.forecast_model !== undefined && !FORECAST_MODEL_VALUES.includes(b.forecast_model)) {
+    return res.status(400).json({ success: false, message: `forecast_model must be one of ${MODEL_IDS.join(", ")}, auto, or null` });
+  }
+  try {
+    const db = getDb();
+    const existing = db.prepare(`SELECT sku_id, forecast_model, use_forecast FROM skus WHERE sku_id = ?`).get(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    const fields = {};
+    if (b.forecast_model !== undefined) fields.forecast_model = b.forecast_model;
+    if (b.use_forecast !== undefined) fields.use_forecast = b.use_forecast ? 1 : 0;
+    if (Object.keys(fields).length) {
+      const setClause = Object.keys(fields).map((k) => `${k} = @${k}`).join(", ");
+      db.prepare(`UPDATE skus SET ${setClause} WHERE sku_id = @sku_id`).run({ ...fields, sku_id: req.params.id });
+
+      logEvent(EVENTS.SKU_UPDATED, {
+        skuId: req.params.id,
+        input: { source: "forecast_config", changed_fields: Object.keys(fields) },
+        output: { forecast_model: fields.forecast_model ?? existing.forecast_model, use_forecast: fields.use_forecast ?? existing.use_forecast },
+      });
+    }
+
+    const { skus } = getAnalytics();
+    res.json({ success: true, data: skus.find((s) => s.sku_id === req.params.id) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to update forecast config" });
+  }
+});
+
+// POST /api/forecast/recompute — { sku_id? }
+//
+// Runs for every SKU with a forecast_model set (not gated on use_forecast:
+// picking a model is intent to forecast, use_forecast is the separate switch
+// that activates it in safetystock.js — see engines/index.js). 'auto' runs
+// the real backtest and writes its winner; a pinned model runs without one.
+// This is the lazy-cache write side: engines/index.js only ever READS the
+// active row here, never recomputes inline (see the MVP2 plan's "Recompute
+// mechanism" — no scheduler, no job queue, an explicit trigger instead).
+router.post("/forecast/recompute", (req, res) => {
+  const { sku_id } = req.body || {};
+  try {
+    const db = getDb();
+    const targets = db.prepare(
+      `SELECT sku_id, forecast_model FROM skus WHERE active = 1 AND forecast_model IS NOT NULL${sku_id ? " AND sku_id = ?" : ""}`
+    ).all(...(sku_id ? [sku_id] : []));
+
+    if (sku_id && !targets.length) {
+      return res.status(404).json({ success: false, message: `${sku_id} has no forecast_model set` });
+    }
+
+    const results = [];
+    const run = db.transaction(() => {
+      for (const t of targets) {
+        let model = t.forecast_model;
+        let bt = null;
+        if (model === "auto") {
+          bt = backtest(db, t.sku_id, MODEL_IDS);
+          model = bt.winner;
+        }
+        const f = runForecast(db, t.sku_id, model, 6);
+
+        db.prepare(`UPDATE forecasts SET is_active = 0 WHERE sku_id = ? AND is_active = 1`).run(t.sku_id);
+        db.prepare(`
+          INSERT INTO forecasts (
+            sku_id, model, horizon_months, avg_daily_demand_forecast, demand_cv_forecast,
+            monthly_forecast_json, backtest_metric, backtest_score, candidate_scores_json, low_confidence, is_active
+          ) VALUES (@sku_id, @model, @horizon_months, @avg_daily_demand_forecast, @demand_cv_forecast,
+            @monthly_forecast_json, @backtest_metric, @backtest_score, @candidate_scores_json, @low_confidence, 1)`
+        ).run({
+          sku_id: t.sku_id, model, horizon_months: f.horizon_months,
+          avg_daily_demand_forecast: f.avg_daily_demand_forecast, demand_cv_forecast: f.demand_cv_forecast,
+          monthly_forecast_json: JSON.stringify(f.monthly),
+          backtest_metric: bt ? bt.metric : null,
+          backtest_score: bt ? bt.scores[model] : null,
+          candidate_scores_json: bt ? JSON.stringify(bt.scores) : null,
+          low_confidence: bt ? (bt.lowConfidence ? 1 : 0) : 0,
+        });
+        results.push({ sku_id: t.sku_id, model, avg_daily_demand_forecast: f.avg_daily_demand_forecast, backtest: bt });
+      }
+    });
+    run();
+
+    for (const r of results) {
+      logEvent(EVENTS.SKU_UPDATED, {
+        skuId: r.sku_id,
+        input: { source: "forecast_recompute", requested_model: targets.find((t) => t.sku_id === r.sku_id).forecast_model },
+        output: { model: r.model, avg_daily_demand_forecast: r.avg_daily_demand_forecast, backtest_winner: r.backtest?.winner || null },
+      });
+    }
+
+    res.json({ success: true, data: { recomputed: results.length, results } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to recompute forecasts" });
+  }
+});
+
+// GET /api/skus/:id/forecast — real sales history (always present, possibly
+// empty) plus the active forecast row if one has been generated yet. Two
+// separate things in one response because the "Why This Forecast" page's
+// sales chart needs history even before any model has ever been run.
+router.get("/skus/:id/forecast", (req, res) => {
+  try {
+    const db = getDb();
+    const known = db.prepare(`SELECT 1 FROM skus WHERE sku_id = ?`).get(req.params.id);
+    if (!known) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    const history = monthlySeries(db, req.params.id);
+
+    const row = db.prepare(`
+      SELECT model, generated_at, horizon_months, avg_daily_demand_forecast, demand_cv_forecast,
+             monthly_forecast_json, backtest_metric, backtest_score, candidate_scores_json, low_confidence
+        FROM forecasts WHERE sku_id = ? AND is_active = 1`).get(req.params.id);
+
+    res.json({
+      success: true,
+      data: {
+        history,
+        forecast: !row ? null : {
+          model: row.model,
+          generated_at: row.generated_at,
+          horizon_months: row.horizon_months,
+          avg_daily_demand_forecast: row.avg_daily_demand_forecast,
+          demand_cv_forecast: row.demand_cv_forecast,
+          monthly: JSON.parse(row.monthly_forecast_json),
+          backtest_metric: row.backtest_metric,
+          backtest_score: row.backtest_score,
+          candidate_scores: row.candidate_scores_json ? JSON.parse(row.candidate_scores_json) : null,
+          low_confidence: !!row.low_confidence,
+        },
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load forecast" });
+  }
+});
+
+// GET /api/skus/:id/inventory-history?months=12 — real monthly on-hand
+// balance for the position chart's actual line, and the receipts/issues
+// split for the inflow/outflow chart. Same inventory_history rows the
+// portfolio-wide GET /dashboard/history reads, filtered to one SKU.
+router.get("/skus/:id/inventory-history", (req, res) => {
+  const months = Math.min(36, Math.max(1, Number(req.query.months) || 12));
+  try {
+    const db = getDb();
+    const known = db.prepare(`SELECT 1 FROM skus WHERE sku_id = ?`).get(req.params.id);
+    if (!known) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    const rows = db.prepare(`
+      SELECT period, opening_qty, receipts_qty, issues_qty, closing_qty
+        FROM inventory_history WHERE sku_id = ? ORDER BY period`).all(req.params.id);
+
+    res.json({ success: true, data: rows.slice(-months) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load inventory history" });
+  }
+});
+
+// POST /api/skus/:id/forecast/preview — { lead_time_days, lead_time_std_days,
+// target_service_level, target_stock }
+//
+// The "what if" sandbox's one and only source of truth for the formula:
+// re-runs computeSafetyStock() (safetystock.js, King's formula, unmodified)
+// and computeRiskBuffer() with hypothetical inputs, against the SKU's real
+// active forecast demand. Nothing is written to the database — this is a
+// preview, not a save. Requires an active forecast (Recompute first): this
+// page's whole premise is "what would forecast-driven policy look like,"
+// which has no answer before a forecast exists.
+const REVIEW_PERIOD_DAYS = 30; // assumed periodic review cycle; not yet tracked per SKU by this app
+router.post("/skus/:id/forecast/preview", (req, res) => {
+  const b = req.body || {};
+  try {
+    const db = getDb();
+    const sku = db.prepare(`SELECT * FROM skus WHERE sku_id = ?`).get(req.params.id);
+    if (!sku) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    const active = getActiveForecast(db, req.params.id);
+    if (!active) {
+      return res.status(400).json({ success: false, message: "No forecast yet — run Recompute first." });
+    }
+
+    const leadTimeDays = Number(b.lead_time_days ?? sku.lead_time_days);
+    const leadTimeStdDays = Number(b.lead_time_std_days ?? sku.lead_time_std_days);
+    const targetServiceLevel = Number(b.target_service_level ?? sku.target_service_level);
+    const targetStock = Number(b.target_stock ?? sku.target_stock);
+
+    const ss = computeSafetyStock({
+      avgDailyDemand: active.avg_daily_demand_forecast,
+      demandCv: active.demand_cv_forecast,
+      leadTimeDays,
+      leadTimeStdDays,
+      serviceLevel: targetServiceLevel,
+    });
+    const risk = computeRiskBuffer(db, sku);
+    const risk_buffer_mt = round1(risk.days * active.avg_daily_demand_forecast);
+    const reorder_point_suggested_with_risk = round1(ss.reorder_point_suggested + risk_buffer_mt);
+    const target_stock_suggested = round1(
+      active.avg_daily_demand_forecast * (REVIEW_PERIOD_DAYS + leadTimeDays) + ss.safety_stock_mt
+    );
+
+    res.json({
+      success: true,
+      data: {
+        forecast_avg_daily_demand: active.avg_daily_demand_forecast,
+        forecast_model: active.model,
+        lead_time_demand_mt: ss.lead_time_demand_mt,
+        safety_stock_mt: ss.safety_stock_mt,
+        risk_buffer_mt,
+        risk_buffer_reason: risk.reason,
+        reorder_point_suggested_with_risk,
+        target_stock_suggested,
+        inputs: { leadTimeDays, leadTimeStdDays, targetServiceLevel, targetStock },
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to compute preview" });
+  }
+});
+const round1 = (n) => Math.round(n * 10) / 10;
+
+// POST /api/skus/import-new — CREATE SKUs from a spreadsheet (MVP2 onboarding)
+//
+// /skus/import above is UPDATE-only by design (sku_id is the key and import
+// "cannot create or delete SKUs") — exactly right for correcting an existing
+// catalog, and exactly wrong for a first-run upload into an EMPTY one, where
+// every row would hit "is not a known SKU" and the whole file would refuse to
+// apply. This is the create-shaped counterpart, same 3-step preview/apply
+// contract, same field set POST /skus accepts for a single SKU. A sku_id that
+// already exists is an error here, not silently skipped or overwritten —
+// creating and updating stay two different, explicit actions.
+const CREATE_KEY = "sku_id";
+const CREATE_REQUIRED = ["sku_id", "product_name"];
+const CREATE_TEXT = ["rice_variety", "grade", "country_of_origin", "brand", "packaging_size", "supplier"];
+const CREATE_NUMERIC = [
+  "min_order_qty", "reorder_point_policy", "min_stock", "target_stock", "max_stock",
+  "safety_stock_pct", "lead_time_days", "unit_cost_sgd", "unit_price_sgd",
+];
+const CREATE_COLUMNS = [...CREATE_REQUIRED.filter((f) => f !== CREATE_KEY), ...CREATE_TEXT, ...CREATE_NUMERIC, CREATE_KEY];
+
+router.post("/skus/import-new", (req, res) => {
+  const { csv, apply = false } = req.body || {};
+  if (typeof csv !== "string" || !csv.trim()) {
+    return res.status(400).json({ success: false, message: "No CSV content was received" });
+  }
+
+  let parsed;
+  try {
+    parsed = parseCsv(csv);
+  } catch (err) {
+    return res.status(400).json({ success: false, message: `Could not read the file: ${err.message}` });
+  }
+  for (const k of ["sku_id", "product_name"]) {
+    if (!parsed.columns.includes(k)) {
+      return res.status(400).json({
+        success: false,
+        message: `The file has no ${k} column, which every new product needs.`,
+      });
+    }
+  }
+
+  try {
+    const db = getDb();
+    const known = new Set(db.prepare(`SELECT sku_id FROM skus`).all().map((r) => r.sku_id));
+    const ignored = parsed.columns.filter((c) => !CREATE_COLUMNS.includes(c));
+
+    const toCreate = [];
+    const errors = [];
+    const seen = new Set();
+
+    for (const row of parsed.rows) {
+      const line = row.__line;
+      const id = row.sku_id;
+      if (!id) { errors.push({ line, message: `Row ${line} has no sku_id` }); continue; }
+      if (seen.has(id)) { errors.push({ line, message: `${id} appears more than once (line ${line})` }); continue; }
+      seen.add(id);
+      if (known.has(id)) { errors.push({ line, message: `${id} already exists (line ${line}) — use Upload SKUs to edit it instead` }); continue; }
+      if (!row.product_name) { errors.push({ line, message: `${id}: product_name is required (line ${line})` }); continue; }
+
+      const record = { sku_id: id, product_name: row.product_name };
+      let rowFailed = false;
+      for (const f of CREATE_TEXT) record[f] = row[f] || null;
+      for (const f of CREATE_NUMERIC) {
+        const raw = row[f];
+        if (raw === undefined || raw === "") { record[f] = 0; continue; }
+        const n = Number(raw);
+        if (!Number.isFinite(n) || n < 0) {
+          errors.push({ line, message: `${id}: ${f} must be a number >= 0 (line ${line})` });
+          rowFailed = true;
+          break;
+        }
+        record[f] = n;
+      }
+      if (rowFailed) continue;
+      toCreate.push({ line, record });
+    }
+
+    const summary = {
+      rows: parsed.rows.length,
+      changed: toCreate.length, // reused for BulkEdit.jsx/Onboarding.jsx's shared blocked/apply-button logic
+      unchanged: 0,
+      errors,
+      warnings: [],
+      ignoredColumns: ignored,
+      changes: toCreate.map(({ record }) => ({ sku_id: record.sku_id, name: record.product_name, fields: {} })),
+      applied: false,
+    };
+
+    if (!apply || errors.length || !toCreate.length) {
+      return res.json({ success: true, data: summary });
+    }
+
+    const insertSku = db.prepare(`
+      INSERT INTO skus (
+        sku_id, product_name, rice_variety, grade, country_of_origin, brand, packaging_size, uom, supplier,
+        min_order_qty, reorder_point_policy, min_stock, target_stock, max_stock, safety_stock_pct,
+        lead_time_days, unit_cost_sgd, unit_price_sgd, active
+      ) VALUES (
+        @sku_id, @product_name, @rice_variety, @grade, @country_of_origin, @brand, @packaging_size, 'MT', @supplier,
+        @min_order_qty, @reorder_point_policy, @min_stock, @target_stock, @max_stock, @safety_stock_pct,
+        @lead_time_days, @unit_cost_sgd, @unit_price_sgd, 1
+      )`);
+    const insertPos = db.prepare(`
+      INSERT INTO inventory_positions (sku_id, on_hand_qty, reserved_qty, quality_hold_qty, last_received_date)
+      VALUES (?, 0, 0, 0, ?)`);
+
+    const run = db.transaction(() => {
+      for (const { record } of toCreate) { insertSku.run(record); insertPos.run(record.sku_id, today()); }
+    });
+    run();
+
+    const { skus: after } = getAnalytics();
+    const afterIndex = new Map(after.map((s) => [s.sku_id, s]));
+    for (const { record } of toCreate) {
+      const created = afterIndex.get(record.sku_id);
+      logEvent(EVENTS.SKU_CREATED, {
+        skuId: record.sku_id,
+        input: { source: "csv_import", product_name: record.product_name, supplier: record.supplier },
+        output: created
+          ? { abc_class: created.abc_class, reorder_point_suggested: created.reorder_point_suggested, health_status: created.health_status }
+          : null,
+      });
+    }
+
+    res.json({ success: true, data: { ...summary, applied: true } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to create SKUs" });
+  }
+});
+
 // ── Inventory ────────────────────────────────────────────────────────────────
 
 // POST /api/inventory/restock — add on-hand quantity, reset the receipt clock
@@ -965,19 +1513,52 @@ router.post("/decisions", (req, res) => {
 
   try {
     const db = getDb();
-    const info = db.prepare(`
-      INSERT INTO decisions (sku_id, trigger_type, ai_recommendation, ai_quantity, manager_action, manager_quantity, manager_reason, decided_by)
-      VALUES (@sku_id, @trigger_type, @ai_recommendation, @ai_quantity, @manager_action, @manager_quantity, @manager_reason, @decided_by)
-    `).run({
-      sku_id: b.sku_id,
-      trigger_type: b.alert_type || b.trigger_type || null,
-      ai_recommendation: b.ai_recommendation ?? null,
-      ai_quantity: b.ai_quantity ?? null,
-      manager_action: b.manager_action,
-      manager_quantity: b.manager_quantity ?? null,
-      manager_reason: b.manager_reason || null,
-      decided_by: b.decided_by || "manager",
-    });
+
+    // The frontend sends this field as `alert_type` (Alerts.jsx's
+    // handleDecision), never `trigger_type` — resolved ONCE here and reused
+    // for both the insert and the apply-policy check below, rather than each
+    // reading the raw body separately, which is exactly the kind of drift
+    // that let a real approval silently apply nothing the first time this
+    // was tested through the actual UI instead of a hand-built curl request.
+    const triggerType = b.alert_type || b.trigger_type || null;
+
+    // A POLICY_CHANGE_SUGGESTED approval or amendment applies the new
+    // reorder_point_policy in the SAME transaction as recording the
+    // decision, via the exact function PUT /api/skus/:id uses — so this is
+    // one write path with two doors in, not a second one to keep in sync.
+    // Reject applies nothing. No new "pending" state on decisions: the
+    // suggestion lived as an alert until this moment, exactly like every
+    // other alert type's decision.
+    const applyPolicy =
+      triggerType === "POLICY_CHANGE_SUGGESTED" &&
+      b.manager_action !== "rejected" &&
+      b.manager_quantity != null;
+
+    // applySkuUpdate is also reachable straight from PUT /api/skus/:id, which
+    // validates first — this is the other door in, so it needs the same check
+    // rather than trusting manager_quantity as already-safe.
+    if (applyPolicy) {
+      const numericError = validateNumericFields({ reorder_point_policy: b.manager_quantity });
+      if (numericError) return res.status(400).json({ success: false, message: numericError });
+    }
+
+    const info = db.transaction(() => {
+      const result = db.prepare(`
+        INSERT INTO decisions (sku_id, trigger_type, ai_recommendation, ai_quantity, manager_action, manager_quantity, manager_reason, decided_by)
+        VALUES (@sku_id, @trigger_type, @ai_recommendation, @ai_quantity, @manager_action, @manager_quantity, @manager_reason, @decided_by)
+      `).run({
+        sku_id: b.sku_id,
+        trigger_type: triggerType,
+        ai_recommendation: b.ai_recommendation ?? null,
+        ai_quantity: b.ai_quantity ?? null,
+        manager_action: b.manager_action,
+        manager_quantity: b.manager_quantity ?? null,
+        manager_reason: b.manager_reason || null,
+        decided_by: b.decided_by || "manager",
+      });
+      if (applyPolicy) applySkuUpdate(db, b.sku_id, { reorder_point_policy: b.manager_quantity });
+      return result;
+    })();
 
     const created = db.prepare(`
       SELECT d.*, s.product_name AS sku_name FROM decisions d
@@ -1004,6 +1585,7 @@ router.post("/decisions", (req, res) => {
           created.ai_quantity != null && created.manager_quantity != null
             ? +(created.manager_quantity - created.ai_quantity).toFixed(2)
             : null,
+        policy_applied: applyPolicy ? { reorder_point_policy: b.manager_quantity } : null,
       },
     });
 

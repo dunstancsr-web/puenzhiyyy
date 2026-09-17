@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
-import { Table2, Download, Upload, CalendarRange, AlertTriangle, Check, ChevronRight } from "lucide-react";
+import { Table2, Download, Upload, CalendarRange, History } from "lucide-react";
 import Modal, { ModalBtn } from "./Modal";
 import { api } from "../api/inventory";
+import { ImportPreview, Toast } from "./ImportPreview";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BULK EDIT (TASK-60)
@@ -42,6 +42,17 @@ const DATASETS = {
     file: () => `stocksense-history-${new Date().toISOString().slice(0, 10)}.csv`,
     export: () => api.exportHistoryCsv(24),
     import: (csv, apply) => api.importHistoryCsv(csv, apply),
+  },
+  // MVP2 step 1: one-off historical sales onboarding. Append-only, so its
+  // preview is a different shape (what would be ADDED, not a field diff) —
+  // see the dataset === "salesHistory" branch in ImportPreview below.
+  salesHistory: {
+    label: "sales history",
+    downloadNote: "Individual sales transactions, most recent first",
+    uploadNote: "New rows are added; nothing existing is changed",
+    file: () => `stocksense-sales-history-${new Date().toISOString().slice(0, 10)}.csv`,
+    export: () => api.exportSalesHistoryCsv(180),
+    import: (csv, apply) => api.importSalesHistoryCsv(csv, apply),
   },
 };
 
@@ -113,10 +124,11 @@ export default function BulkEdit({ onImported }) {
   const applyImport = useCallback(async () => {
     setBusy("apply"); setError(null);
     try {
-      const result = await DATASETS[preview?.dataset || "skus"].import(csv, true);
+      const which = preview?.dataset || "skus";
+      const result = await DATASETS[which].import(csv, true);
       setPreview(null);
       setCsv(null);
-      setDone(result);
+      setDone({ ...result, dataset: which });
       onImported?.();
     } catch (err) {
       setError(err.message);
@@ -168,6 +180,15 @@ export default function BulkEdit({ onImported }) {
           <MenuItem icon={Upload} title="Upload history"
             note={DATASETS.history.uploadNote}
             onClick={() => { setMenuOpen(false); datasetRef.current = "history"; fileRef.current?.click(); }} />
+
+          <div style={{ height: 1, background: "var(--border)", margin: "5px 8px" }} />
+
+          <MenuItem icon={History} title="Download sales history"
+            note={DATASETS.salesHistory.downloadNote}
+            onClick={() => doExport("salesHistory")} />
+          <MenuItem icon={Upload} title="Upload sales history"
+            note={DATASETS.salesHistory.uploadNote}
+            onClick={() => { setMenuOpen(false); datasetRef.current = "salesHistory"; fileRef.current?.click(); }} />
         </div>
       )}
 
@@ -176,7 +197,9 @@ export default function BulkEdit({ onImported }) {
       {error && <Toast tone="bad" message={error} onDismiss={() => setError(null)} />}
       {done && (
         <Toast tone="good" onDismiss={() => setDone(null)}
-          message={`${done.changed} SKU${done.changed === 1 ? "" : "s"} updated from the spreadsheet.`} />
+          message={done.dataset === "salesHistory"
+            ? `${done.changed} sale${done.changed === 1 ? "" : "s"} added from the spreadsheet.`
+            : `${done.changed} SKU${done.changed === 1 ? "" : "s"} updated from the spreadsheet.`} />
       )}
 
       {preview && (
@@ -185,7 +208,9 @@ export default function BulkEdit({ onImported }) {
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
             <ModalBtn label="Cancel" onClick={() => { setPreview(null); setCsv(null); }} />
             <ModalBtn primary disabled={blocked || busy === "apply"}
-              label={busy === "apply" ? "Applying..." : `Apply ${preview.changed} change${preview.changed === 1 ? "" : "s"}`}
+              label={busy === "apply" ? "Applying..." : preview.dataset === "salesHistory"
+                ? `Add ${preview.changed} sale${preview.changed === 1 ? "" : "s"}`
+                : `Apply ${preview.changed} change${preview.changed === 1 ? "" : "s"}`}
               onClick={applyImport} />
           </div>
         </Modal>
@@ -210,147 +235,5 @@ function MenuItem({ icon: Icon, title, note, onClick }) {
   );
 }
 
-// The review step. Errors first and in full, because they are the reason to
-// stop; changes second, grouped by SKU so the unit of review is "this product"
-// rather than "this cell".
-function ImportPreview({ preview }) {
-  const { fileName, rows, changed, unchanged, errors, warnings, ignoredColumns } = preview;
-  const halt = errors.length > 0;
-
-  return (
-    <div>
-      <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 16 }}>
-        <b style={{ color: "var(--text-primary)" }}>{fileName}</b> · {rows} row{rows === 1 ? "" : "s"} read
-      </div>
-
-      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
-        <Stat n={changed} label="to change" tone={changed ? "blue" : "muted"} />
-        <Stat n={unchanged} label="unchanged" tone="muted" />
-        <Stat n={errors.length} label={errors.length === 1 ? "problem" : "problems"} tone={halt ? "bad" : "muted"} />
-      </div>
-
-      {halt && (
-        <Panel tone="bad" icon={AlertTriangle}
-          title={`Nothing will be saved until ${errors.length === 1 ? "this is" : "these are"} fixed`}
-          body="An import is all or nothing on purpose. Applying the good rows and skipping the rest would leave the spreadsheet and the database disagreeing, with no record of which rows made it.">
-          <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: "var(--text-sm)", lineHeight: 1.6 }}>
-            {errors.slice(0, 12).map((e, i) => <li key={i}>{e.message}</li>)}
-          </ul>
-          {errors.length > 12 && (
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 8 }}>
-              and {errors.length - 12} more
-            </div>
-          )}
-        </Panel>
-      )}
-
-      {warnings?.length > 0 && (
-        <Panel tone="warn" icon={AlertTriangle} title="Worth checking, but not blocking"
-          body="These rows can be saved. The newest month no longer matches the stock recorded as being on hand today, which is expected if you are correcting the months first and the position afterwards.">
-          <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: "var(--text-sm)", lineHeight: 1.6 }}>
-            {warnings.slice(0, 8).map((w, i) => <li key={i}>{w}</li>)}
-          </ul>
-        </Panel>
-      )}
-
-      {!halt && changed === 0 && (
-        <Panel tone="muted" icon={Check} title="Nothing to apply"
-          body="Every row in this file matches what is already stored, so there is no change to make." />
-      )}
-
-      {changed > 0 && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-          {preview.changes.map((c) => (
-            <div key={c.sku_id} style={{ padding: "11px 13px", borderBottom: "1px solid var(--border)" }}>
-              <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginBottom: 6 }}>
-                {c.name}
-                <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> · {c.sku_id}</span>
-                {/* History rows are identified by SKU AND period, so the period
-                    has to appear or two edited months look like one row edited
-                    twice. */}
-                {c.period && <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> · {c.period}</span>}
-              </div>
-              {Object.entries(c.fields).map(([field, d]) => (
-                <div key={field} style={{
-                  display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
-                  fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 3,
-                }}>
-                  <code style={{ fontFamily: "ui-monospace, Menlo, monospace", color: "var(--text-muted)" }}>{field}</code>
-                  <span style={{ textDecoration: "line-through", opacity: 0.7 }}>{String(d.from) || "empty"}</span>
-                  <ChevronRight size={12} style={{ color: "var(--text-muted)" }} />
-                  <b style={{ color: "var(--blue)" }}>{String(d.to)}</b>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {ignoredColumns?.length > 0 && (
-        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>
-          Ignored, because these are calculated rather than stored:{" "}
-          {ignoredColumns.join(", ")}.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Stat({ n, label, tone }) {
-  const color = tone === "bad" ? "var(--red)" : tone === "blue" ? "var(--blue)" : "var(--text-muted)";
-  return (
-    <div style={{
-      flex: "1 1 110px", padding: "10px 12px", borderRadius: "var(--radius)",
-      border: "1px solid var(--border)", background: "var(--surface-2)",
-    }}>
-      <div style={{ fontSize: "var(--text-lg)", fontWeight: 700, color, lineHeight: 1.1 }}>{n}</div>
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>{label}</div>
-    </div>
-  );
-}
-
-function Panel({ tone, icon: Icon, title, body, children }) {
-  const color = tone === "bad" ? "var(--red)" : tone === "warn" ? "var(--yellow)" : "var(--text-muted)";
-  const edge = tone === "bad" ? "var(--red)" : tone === "warn" ? "var(--yellow)" : "var(--border)";
-  const fill = tone === "bad" ? "var(--red-light)" : tone === "warn" ? "var(--yellow-light)" : "var(--surface-2)";
-  return (
-    <div style={{
-      padding: "13px 15px", borderRadius: "var(--radius)", marginBottom: 16,
-      border: `1px solid ${edge}`,
-      background: fill,
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "var(--text-sm)", color }}>
-        <Icon size={15} /> {title}
-      </div>
-      {body && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 6, lineHeight: 1.55 }}>{body}</div>}
-      {children}
-    </div>
-  );
-}
-
-// Portaled to the body so it is not clipped by the header's own stacking
-// context, and so it reads as page-level feedback rather than a footnote to
-// the button that triggered it.
-function Toast({ tone, message, onDismiss }) {
-  useEffect(() => {
-    const t = setTimeout(onDismiss, tone === "bad" ? 9000 : 5000);
-    return () => clearTimeout(t);
-  }, [onDismiss, tone]);
-
-  return createPortal(
-    <div role="status" onClick={onDismiss} style={{
-      position: "fixed", bottom: 22, left: "50%", transform: "translateX(-50%)",
-      zIndex: 1200, cursor: "pointer", maxWidth: "92vw",
-      display: "flex", alignItems: "center", gap: 9,
-      padding: "12px 18px", borderRadius: 99,
-      background: "var(--card-bg)", border: `1px solid ${tone === "bad" ? "var(--red)" : "var(--green)"}`,
-      boxShadow: "var(--shadow-md)",
-      fontSize: "var(--text-sm)", fontWeight: 600,
-      color: tone === "bad" ? "var(--red)" : "var(--text-primary)",
-    }}>
-      {tone === "bad" ? <AlertTriangle size={15} /> : <Check size={15} style={{ color: "var(--green)" }} />}
-      {message}
-    </div>,
-    document.body
-  );
-}
+// ImportPreview, SalesHistoryPreview, Stat, Panel and Toast all live in
+// ./ImportPreview.jsx now, shared with the onboarding flow (MVP2 step 1).

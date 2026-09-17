@@ -693,7 +693,8 @@ export default function Dashboard() {
       <KpiGroup label="Working capital" note="Is cash tied up in the right stock?" />
       <div className="kpi-grid">
         <StatCard label="Times Stock Sold a Year" value={`${s.turnover.toFixed(1)}×`} icon={Repeat} hint={HINTS.turnover}
-          status={s.turnover < 2.5 ? "bad" : s.turnover < 4.0 ? "warn" : "ok"} sub={`${s.dio}d of supply`} />
+          status={s.turnover < 2.5 ? "bad" : s.turnover < 4.0 ? "warn" : "ok"}
+          sub={s.dio != null ? `${s.dio}d of supply` : "no turnover yet"} />
         <StatCard label="Profit per $1 of Stock" value={`$${s.gmroi.toFixed(2)}`} icon={Target} hint={HINTS.gmroi}
           status={s.gmroi < 1.0 ? "bad" : s.gmroi < 1.5 ? "warn" : "ok"} sub="per $1 of stock" />
         <StatCard label="Overstock" value={`SGD ${fmt$(s.overstockValue)}`} icon={TrendingUp} hint={HINTS.overstock}

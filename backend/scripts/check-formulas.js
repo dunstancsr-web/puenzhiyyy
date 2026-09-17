@@ -29,6 +29,7 @@ const fs = require("fs");
 const path = require("path");
 const { getDb } = require("../src/db/init");
 const { buildAnalytics } = require("../src/engines");
+const { runForecast, backtest, MODEL_IDS } = require("../src/engines/forecast");
 
 const REPORT = process.argv.includes("--report");
 const DECISIONS_FILE = path.join(__dirname, "formula-decisions.json");
@@ -191,10 +192,20 @@ check("xyz_class", "Supporting Formulas", "X if demand_cv < 0.25, Y if <= 0.5, e
   compare: same,
   perSku: (s, r) => { const cv = specDemandCv(s, r); return [cv < 0.25 ? "X" : cv <= 0.5 ? "Y" : "Z", s.xyz_class]; },
 });
+// MVP2 Day 5: use_forecast is now a real, live-toggleable switch on the
+// Forecast Detail page, not a default-off field nobody flips - the "regression
+// that matters" comment above (Day 3) no longer covers the whole surface, so
+// this branches the demand rate the same way engines/index.js and the
+// risk_buffer_mt check below already do, rather than leaving forecast-driven
+// SKUs unchecked.
 check("safety_stock_mt", "Supporting Formulas", "z * sqrt(LT * (cv * d)^2 + d^2 * LT_sd^2)", {
   tol: 0.05,
   perSku: (s, r) => {
-    const d = Math.round(specAvg30(r) * 100) / 100, sd = specDemandCv(s, r) * d;
+    const d = s.use_forecast && s.forecast_avg_daily_demand != null
+      ? s.forecast_avg_daily_demand
+      : Math.round(specAvg30(r) * 100) / 100;
+    const cv = s.use_forecast && s.forecast_demand_cv != null ? s.forecast_demand_cv : specDemandCv(s, r);
+    const sd = cv * d;
     return [specZ(s.target_service_level) * Math.sqrt(s.lead_time_days * sd * sd + d * d * s.lead_time_std_days ** 2), s.safety_stock_mt];
   },
 });
@@ -253,6 +264,136 @@ check("turnover", "Supporting Formulas", "SUM(annual_cogs) / SUM(inventory_value
 check("gmroi", "Supporting Formulas", "SUM(annual_gross_margin) / SUM(inventory_value)", { tol: 0.005, portfolio: () => [specPortfolio().gmroi, stats.gmroi] });
 check("fill_rate", "Supporting Formulas", "(demand_30d - lost_30d) / demand_30d * 100", { tol: 0.05, portfolio: () => [specPortfolio().fill, stats.fillRate] });
 
+// ── MVP2: forecast engine + risk buffer (Day 3) ─────────────────────────────
+// Independently re-derived from raw sales_transactions, the same discipline as
+// every other check here — engines/forecast.js is never called on the "spec"
+// side, only on the "code" side via runForecast()/backtest(). King's formula
+// (safetystock.js) itself needs no new check: it is unchanged, so the
+// existing safety_stock_mt check above (now forecast-aware, see Day 5) covers
+// it for every SKU whether use_forecast is on or off.
+const round1 = (n) => Math.round(n * 10) / 10;
+function periodIdx(p) { const [y, m] = p.split("-").map(Number); return y * 12 + (m - 1); }
+function idxPeriod(i) { const y = Math.floor(i / 12), m = (i % 12) + 1; return `${y}-${String(m).padStart(2, "0")}`; }
+function specMonthlyFilled(r) {
+  const byPeriod = new Map();
+  for (const x of r.sales) {
+    if (x.status !== "fulfilled") continue;
+    const p = x.sale_date.slice(0, 7);
+    byPeriod.set(p, (byPeriod.get(p) || 0) + x.quantity_mt);
+  }
+  if (!byPeriod.size) return [];
+  const periods = [...byPeriod.keys()].sort();
+  const first = periodIdx(periods[0]), last = periodIdx(periods[periods.length - 1]);
+  const series = [];
+  for (let i = first; i <= last; i++) series.push({ period: idxPeriod(i), qty: byPeriod.get(idxPeriod(i)) || 0 });
+  return series;
+}
+
+check("forecast_naive_seasonal", "MVP2 forecast engine", "same calendar month, averaged across every prior year in history", {
+  tol: 0.15,
+  perSku: (s, r) => {
+    const series = specMonthlyFilled(r);
+    if (!series.length) return [null, null];
+    const targetPeriod = idxPeriod(periodIdx(series[series.length - 1].period) + 1);
+    const targetMonth = Number(targetPeriod.slice(5, 7));
+    const sameMonth = series.filter((x) => Number(x.period.slice(5, 7)) === targetMonth).map((x) => x.qty);
+    const expected = sameMonth.length
+      ? sameMonth.reduce((a, b) => a + b, 0) / sameMonth.length
+      : series.reduce((a, x) => a + x.qty, 0) / series.length;
+    const { monthly } = runForecast(db, s.sku_id, "naive_seasonal", 1);
+    return [round1(expected), monthly[0]?.qty ?? null];
+  },
+});
+
+check("forecast_linear_trend", "MVP2 forecast engine", "deseasonalize by calendar month, fit OLS, reseasonalize", {
+  tol: 0.15,
+  perSku: (s, r) => {
+    const series = specMonthlyFilled(r);
+    if (series.length < 2) return [null, null];
+    const byMonth = new Map();
+    for (const x of series) {
+      const m = Number(x.period.slice(5, 7));
+      if (!byMonth.has(m)) byMonth.set(m, []);
+      byMonth.get(m).push(x.qty);
+    }
+    const baseline = (m) => { const vs = byMonth.get(m); const avg = vs.reduce((a, b) => a + b, 0) / vs.length; return avg > 0 ? avg : 1; };
+    const points = series.map((x, i) => ({ x: i, y: x.qty / baseline(Number(x.period.slice(5, 7))) }));
+    const n = points.length;
+    const sumX = points.reduce((a, p) => a + p.x, 0), sumY = points.reduce((a, p) => a + p.y, 0);
+    const sumXY = points.reduce((a, p) => a + p.x * p.y, 0), sumXX = points.reduce((a, p) => a + p.x * p.x, 0);
+    const denom = n * sumXX - sumX * sumX;
+    const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+    const intercept = (sumY - slope * sumX) / n;
+    const targetIdx = series.length;
+    const targetMonth = Number(idxPeriod(periodIdx(series[series.length - 1].period) + 1).slice(5, 7));
+    const ratio = Math.max(0, intercept + slope * targetIdx);
+    const expected = Math.max(0, ratio * baseline(targetMonth));
+    const { monthly } = runForecast(db, s.sku_id, "linear_trend", 1);
+    return [round1(expected), monthly[0]?.qty ?? null];
+  },
+});
+
+// Holt-Winters is not re-derived line-by-line (re-implementing exponential
+// smoothing a second time would mostly test whether the same bug was made
+// twice). A property check instead: every forecast month stays within a sane
+// envelope of the SKU's own history. Catches sign errors and blow-ups, the
+// realistic failure modes for a smoothing/grid-search bug, without a second
+// implementation to maintain.
+check("forecast_holt_winters_bounds", "MVP2 forecast engine", "every forecast month in [0, 3x max historical monthly demand]", {
+  compare: same,
+  perSku: (s, r) => {
+    const series = specMonthlyFilled(r);
+    if (series.length < 24) return ["skip: needs 24mo history", "skip: needs 24mo history"];
+    const maxHist = Math.max(...series.map((x) => x.qty), 0);
+    const { monthly } = runForecast(db, s.sku_id, "holt_winters", 6);
+    return [true, monthly.every((m) => m.qty >= 0 && m.qty <= maxHist * 3)];
+  },
+});
+
+// Same reasoning as Holt-Winters above: a property check, not a second
+// implementation of the damped-trend math. Ported from a teammate's branch
+// (Tawmo, feature/demand-forecast-engine) — the bound proves this repo's copy
+// wasn't damaged in porting, it doesn't re-validate their original design.
+check("forecast_holt_damped_seasonal_bounds", "MVP2 forecast engine", "every forecast month in [0, 3x max historical monthly demand]", {
+  compare: same,
+  perSku: (s, r) => {
+    const series = specMonthlyFilled(r);
+    if (series.length < 2) return ["skip: needs 2mo history", "skip: needs 2mo history"];
+    const maxHist = Math.max(...series.map((x) => x.qty), 0);
+    const { monthly } = runForecast(db, s.sku_id, "holt_damped_seasonal", 6);
+    return [true, monthly.every((m) => m.qty >= 0 && m.qty <= maxHist * 3)];
+  },
+});
+
+check("risk_buffer_mt", "MVP2 risk buffer", "SUM(matching risk_events.buffer_days_add), capped at 30 days, x the demand rate in force", {
+  tol: 0.1,
+  perSku: (s) => {
+    const events = db.prepare(`
+      SELECT buffer_days_add FROM risk_events
+       WHERE active = 1 AND ((country_of_origin IS NOT NULL AND country_of_origin = @o) OR (supplier IS NOT NULL AND supplier = @sup))`
+    ).all({ o: s.country_of_origin || null, sup: s.supplier || null });
+    const days = Math.min(30, events.reduce((a, e) => a + e.buffer_days_add, 0));
+    const rate = s.forecast_avg_daily_demand ?? s.avg_daily_usage_30d;
+    return [round1(days * rate), s.risk_buffer_mt];
+  },
+});
+check("reorder_point_suggested_with_risk", "MVP2 risk buffer", "reorder_point_suggested + risk_buffer_mt", {
+  tol: 0.05,
+  perSku: (s) => [round1(s.reorder_point_suggested + s.risk_buffer_mt), s.reorder_point_suggested_with_risk],
+});
+
+// The one check guarding the property this whole feature's legitimacy rests
+// on: auto-mode is a real calculation, not an LLM call, so it has to be
+// exactly reproducible on the same data.
+check("backtest_determinism", "MVP2 auto-mode", "backtest() run twice on identical data returns byte-identical WMAPE", {
+  compare: same,
+  perSku: (s) => {
+    const a = JSON.stringify(backtest(db, s.sku_id, MODEL_IDS).scores);
+    const b = JSON.stringify(backtest(db, s.sku_id, MODEL_IDS).scores);
+    return [a, b];
+  },
+});
+
 // Alert rules, requirements.md REQ-09, on the engine's inputs.
 check("alerts", "requirements.md REQ-09", "the six alert rules", {
   compare: same,
@@ -265,6 +406,11 @@ check("alerts", "requirements.md REQ-09", "the six alert rules", {
     if (s.movement_class === "Idle" && s.available_qty > 0) want.push("IDLE");
     if (s.movement_class === "Slow Moving" && s.days_of_cover != null && s.days_of_cover > 120) want.push("SLOW_MOVING");
     if (s.ageing_status === "Ageing" || s.ageing_status === "At Risk") want.push("AGEING");
+    if (s.use_forecast && s.reorder_point_suggested_with_risk != null) {
+      const gap = Math.abs(s.reorder_point_suggested_with_risk - s.reorder_point_policy);
+      const gapPct = s.reorder_point_policy > 0 ? gap / s.reorder_point_policy : (s.reorder_point_suggested_with_risk > 0 ? 1 : 0);
+      if (gapPct > 0.10) want.push("POLICY_CHANGE_SUGGESTED");
+    }
     const got = alerts.filter((a) => a.sku_id === s.sku_id).map((a) => a.alert_type);
     return [want.sort().join(",") || "none", [...new Set(got)].sort().join(",") || "none"];
   },
