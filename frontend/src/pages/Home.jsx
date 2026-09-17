@@ -10,6 +10,7 @@ import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 import { api } from "../api/inventory";
 import Onboarding from "./Onboarding";
 import LoadingState from "../components/LoadingState";
+import { isMinimized } from "../lib/onboardingResume";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME (TASK-47, renamed TASK-48 and TASK-50, rebuilt TASK-74 and TASK-78)
@@ -206,7 +207,10 @@ export default function Home() {
   }, []);
 
   if (skuCount === null) return <LoadingState label="Loading…" />;
-  if (skuCount === 0) return <Onboarding />;
+  // Minimizing onboarding writes this flag specifically so a still-empty
+  // catalog doesn't loop straight back into the wizard the moment Home
+  // renders — the whole point of minimizing is being able to leave.
+  if (skuCount === 0 && !isMinimized()) return <Onboarding />;
 
   return (
     <div style={{

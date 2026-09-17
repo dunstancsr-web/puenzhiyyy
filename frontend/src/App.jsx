@@ -11,6 +11,7 @@ import ForecastDetail from "./pages/ForecastDetail";
 import ForecastList from "./pages/ForecastList";
 import Inbound from "./warehouse/Inbound";
 import DemoModeBadge from "./components/DemoModeBadge";
+import OnboardingResumeChip from "./components/OnboardingResumeChip";
 
 // The Control Tower pages share a sidebar; the warehouse floor screens
 // deliberately do not. A handheld has no room for navigation, and an operator
@@ -21,14 +22,14 @@ import DemoModeBadge from "./components/DemoModeBadge";
 // the handheld — the same reasoning that keeps the handheld chrome-free applies
 // here: an operator at a dock has one job on screen, not a demo toggle.
 function ControlTower() {
-  return <Layout><DemoModeBadge /><Outlet /></Layout>;
+  return <Layout><DemoModeBadge /><OnboardingResumeChip /><Outlet /></Layout>;
 }
 
 export default function App() {
   return (
     <Routes>
       {/* Home is the front door: goods in, goods out, or the tower. */}
-      <Route path="/" element={<><DemoModeBadge /><Home /></>} />
+      <Route path="/" element={<><DemoModeBadge /><OnboardingResumeChip /><Home /></>} />
 
       {/* Reachable on demand regardless of real data, for demoing the
           onboarding journey without actually emptying the database. Home

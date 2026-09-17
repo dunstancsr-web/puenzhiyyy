@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Upload, TrendingUp, Sparkles } from "lucide-react";
+import { Package, Upload, TrendingUp, Sparkles, Minus } from "lucide-react";
 import { api } from "../api/inventory";
 import { ImportPreview, Toast } from "../components/ImportPreview";
 import Modal, { ModalBtn } from "../components/Modal";
 import { Seal, CLIENT_EN } from "../components/Tenant";
+import { getSavedStep, saveMinimized, clearMinimized } from "../lib/onboardingResume";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ONBOARDING (MVP2 step 1), the real build of the "Day Zero" mockup Stan
@@ -39,7 +40,14 @@ const IMPORTERS = {
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1 = catalog, 2 = sales history
+  // Resumes wherever a previous "minimize" left off, so hopping out to
+  // explore and back in doesn't restart the wizard from step 1.
+  const [step, setStep] = useState(() => Math.min(getSavedStep(), 2)); // 1 = catalog, 2 = sales history
+  // A full reload, not navigate("/"): reachable from Home's OWN inline render
+  // of this component when the catalog is empty, so we're already at "/" and
+  // a client-side navigate to the same path never re-renders Home to notice
+  // the new isMinimized() value (same reasoning as trySampleData above).
+  const minimize = useCallback(() => { saveMinimized(step); window.location.href = "/"; }, [step]);
   const [skuCount, setSkuCount] = useState(null);
   const [addedSkus, setAddedSkus] = useState(null); // { count, names } after a catalog upload this session
 
@@ -103,6 +111,7 @@ export default function Onboarding() {
         loadCount();
         setStep(2);
       } else {
+        clearMinimized();
         navigate("/");
       }
     } catch (err) {
@@ -139,12 +148,19 @@ export default function Onboarding() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 36 }}>
           <Seal size={30} />
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, lineHeight: 1.1 }}>{CLIENT_EN}</div>
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)" }}>
               Set up your catalog
             </div>
           </div>
+          <button onClick={minimize} title="Explore the app now, come back to setup later" style={{
+            display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid var(--border)",
+            borderRadius: 99, padding: "5px 11px", cursor: "pointer", color: "var(--text-muted)",
+            fontSize: "var(--text-xs)", fontWeight: 600,
+          }}>
+            <Minus size={12} /> Explore first
+          </button>
         </div>
 
         {step === 1 && (
@@ -222,7 +238,7 @@ export default function Onboarding() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <BigButton primary icon={Upload} label="Upload sales history"
                   busy={busy === "read"} onClick={() => openPicker("salesHistory")} />
-                <BigButton label="Skip for now" onClick={() => navigate("/")} />
+                <BigButton label="Skip for now" onClick={() => { clearMinimized(); navigate("/"); }} />
               </div>
 
               <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.6, borderTop: "1px solid var(--border)", paddingTop: 16, marginTop: 24 }}>
