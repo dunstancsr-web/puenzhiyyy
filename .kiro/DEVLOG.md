@@ -1009,3 +1009,12 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
   5. `ForecastList.jsx`'s sortable column headers were a `<th onClick>` with no keyboard path — mouse-only sorting. Replaced the onClick div-in-a-th pattern with a real `<button>` inside the `<th>` (native focus and Enter/Space handling for free) and added `aria-sort` on the `<th>` itself.
 
   Verified: `check-formulas.js` showed the same 2 pre-existing date-drift failures (BR-10KG) as before touching anything, confirmed unrelated by reseeding (`npm run seed`) and re-running clean — none of these five fixes touch dates, velocity, or cover math. `npx vite build` passes. No paid calls.
+
+  Pushed the fix commit to the PR branch, then Stan merged PR #2 into `main` (commit `df20e4c`). Confirmed the merge triggered a real (non-manual) Container Actions run for the first time — Container #30, on `main`, succeeded in 1m28s, matching manual run #29's timing, good soft evidence the push-triggered and workflow_dispatch paths run the identical job. Synced local `main` to match.
+
+## Session: 2026-09-17 (submission tracker brought current after the MVP2 merge)
+- **Branch:** main
+- **Files changed:** docs/(Stan) 1 Reference/(Stan) SUBMISSION TRACKER.md
+- **Notes:** The tracker was still dated 15 Sep and had no mention of MVP2 (forecasting, the risk buffer, demo mode, the 4th model, onboarding) anywhere — deliverable statuses, the video script, and the write-up were all silently stale against what's now on `main`. Updated: deliverable #1 (repo) notes the merge; #2 (deployment) now flags that the last-published image predates MVP2, so the live URL isn't provably current until redeployed and rechecked with `check-deploy.js`; #3 and #4 (video, write-up) flagged as still MVP1-scoped.
+
+  Asked Stan whether the video/write-up should get an MVP2 beat before recording/exporting, or stay MVP1-scoped. Decided: stay MVP1-scoped for now, no beat added. Logged as a dated decision in "Decisions already made" rather than leaving it as an open question that would otherwise look unresolved to a future reader. No paid calls.

@@ -2,14 +2,14 @@
 
 AWS NUS-ISS SMYA 2026 Hackathon. **Shortlisting deadline: 28 September 2026, 9:00am. Finale: 10 October.**
 
-Four deliverables. Status as of 15 Sep.
+Four deliverables. Status as of 17 Sep.
 
 | # | Deliverable | Status | Next step, and who |
 |---|---|---|---|
-| 1 | GitHub repo | done, kept current | nothing |
-| 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Deploy now (Stan, 15 Sep: the lease can be extended, so there is no reason to wait): follow `(Stan) DEPLOY-LIGHTSAIL.md` in this folder |
-| 3 | YouTube demo video | script below, updated 15 Sep; `npm run demo:reset` checks the app is ready | Stan records, near the end, with the final paid check |
-| 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 15 Sep, all three screenshots current | fill in the URL, PIN and spend figure **in the PDF only**, then export |
+| 1 | GitHub repo | done, kept current. **MVP2 merged to main 17 Sep** (PR #2): forecasting (4 models incl. a teammate's, Tawmo), a portfolio-wide Forecast overview page, a risk buffer, demo mode, and the Day Zero onboarding flow | nothing |
+| 2 | Deployment URL | image built, tested and published by GitHub Actions **as of the pre-MVP2 code**; **not yet redeployed with MVP2, and Lightsail service still not created as of 15 Sep** | Deploy now: follow `(Stan) DEPLOY-LIGHTSAIL.md` in this folder. Since main moved substantially, `check-deploy.js` should be re-run against whatever's live before trusting the URL again |
+| 3 | YouTube demo video | script below is still the pre-MVP2 (15 Sep) version, MVP1-scoped only. **Decided 17 Sep: staying MVP1-scoped, not adding an MVP2 beat for now** | Stan records, near the end, with the final paid check |
+| 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 15 Sep, all three screenshots current, MVP1-scoped only. **Decided 17 Sep: staying MVP1-scoped for now** | fill in the URL, PIN and spend figure **in the PDF only**, then export |
 
 ## Before submitting, in this order
 
@@ -48,6 +48,7 @@ Four deliverables. Status as of 15 Sep.
 | Formulas where the spec and the code disagreed | lost sales are not sales; Slow Moving means over 120 days of cover; one demand rate, the 30 day moving average, across the whole app (15 Sep) | each conflict, choice and reason: design.md, "Formula decisions" |
 | Urgency in model summaries | removed by a rule after the model answers, not by retries (15 Sep) | free and predictable; design.md, "Explanation Layer", Tone |
 | How documents and rules are kept | filed by reader, listed in `docs/DIRECTORY.md`, every rule in `.kiro/steering/rules.md`, one owner per fact (15 Sep) | `.kiro/steering/rules.md` |
+| Demo video and PDF write-up scope, after MVP2 merged | stay MVP1-scoped for now, no forecasting/demo-mode beat added (17 Sep) | revisit only if Stan raises it again |
 
 ## Judging criteria
 
