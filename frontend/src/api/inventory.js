@@ -65,6 +65,7 @@ export const api = {
   getDemoStatus: () => request("/demo/status"),
   enterDemoMode: () => request("/demo/enter", { method: "POST" }),
   exitDemoMode: () => request("/demo/exit", { method: "POST" }),
+  seedSampleData: () => request("/demo/seed-sample", { method: "POST" }),
 
   // SKUs
   getSkus: () => request("/skus"),

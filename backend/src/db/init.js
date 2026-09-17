@@ -44,6 +44,15 @@ function isDemoModeActive() {
   return demoDb != null;
 }
 
+// Whether THIS request is currently running inside the demo context — not
+// just whether demo mode is active for someone else. The one thing allowed
+// to check this is a route that would otherwise be destructive if it ever
+// ran against the real database (see /demo/seed-sample) — it refuses instead
+// of trusting the caller's cookie alone.
+function isInDemoContext() {
+  return demoContext.getStore() != null;
+}
+
 // Wraps one request's handling in the demo database's async context. Called by
 // the middleware in index.js for any request carrying the demo cookie. If the
 // shared instance was dropped (someone else exited) since this cookie was set,
@@ -430,5 +439,5 @@ function initDb(targetDb) {
 
 module.exports = {
   getDb, initDb, ensureColumn, DB_PATH,
-  enterDemoMode, exitDemoMode, isDemoModeActive, runInDemoContext,
+  enterDemoMode, exitDemoMode, isDemoModeActive, isInDemoContext, runInDemoContext,
 };

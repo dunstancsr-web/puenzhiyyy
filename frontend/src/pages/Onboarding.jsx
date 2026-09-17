@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Upload, TrendingUp } from "lucide-react";
+import { Package, Upload, TrendingUp, Sparkles } from "lucide-react";
 import { api } from "../api/inventory";
 import { ImportPreview, Toast } from "../components/ImportPreview";
 import Modal, { ModalBtn } from "../components/Modal";
@@ -22,11 +22,10 @@ import { Seal, CLIENT_EN } from "../components/Tenant";
 // without actually emptying the database — in that case the real, current SKU
 // count is shown honestly rather than pretending the catalog is empty.
 //
-// Deliberately NOT built: the mockup's "skip setup, explore with sample data"
-// shortcut. That would need a "reseed demo data" action wired to a button, and
-// reseeding wipes decisions and the audit trail (see rules.md) — a real,
-// destructive action a stray click shouldn't be able to trigger. Cut, not
-// half-built.
+// "Skip setup, explore with sample data" is offered ONLY in demo mode (see
+// trySampleData below) — against the real database this is still cut, since
+// reseeding wipes decisions and the audit trail (see rules.md), a real
+// destructive action a stray click shouldn't trigger there.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // importNewSkusCsv, not importSkusCsv: the catalog is empty (or being added
@@ -44,12 +43,28 @@ export default function Onboarding() {
   const [skuCount, setSkuCount] = useState(null);
   const [addedSkus, setAddedSkus] = useState(null); // { count, names } after a catalog upload this session
 
-  const [busy, setBusy] = useState(null); // "read" | "apply" | "export"
+  const [busy, setBusy] = useState(null); // "read" | "apply" | "export" | "sample"
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
   const [csv, setCsv] = useState(null);
   const datasetRef = useRef("skus");
   const fileRef = useRef(null);
+
+  // "Try with sample data" is demo-mode-only: seeding is a full wipe-and-fill,
+  // safe against the disposable in-memory sandbox but never something to
+  // offer against the real database (see the module comment above).
+  const [isDemo, setIsDemo] = useState(false);
+  useEffect(() => { api.getDemoStatus().then((d) => setIsDemo(d.active)).catch(() => {}); }, []);
+  const trySampleData = useCallback(async () => {
+    setError(null); setBusy("sample");
+    try {
+      await api.seedSampleData();
+      window.location.href = "/"; // whole database changed under us; reload, don't navigate
+    } catch (err) {
+      setError(err.message);
+      setBusy(null);
+    }
+  }, []);
 
   const loadCount = useCallback(() => {
     api.getSkus().then((list) => setSkuCount(list.length)).catch(() => setSkuCount(0));
@@ -156,6 +171,10 @@ export default function Onboarding() {
                 busy={busy === "read"} onClick={() => openPicker("skus")} />
               <BigButton label="Add one product by hand"
                 onClick={() => navigate("/inventory?add=1")} />
+              {isDemo && !skuCount && (
+                <BigButton icon={Sparkles} label={busy === "sample" ? "Loading sample data…" : "Try with sample data"}
+                  disabled={busy === "sample"} onClick={trySampleData} />
+              )}
             </div>
 
             <div style={{ textAlign: "center", marginTop: 16 }}>
@@ -257,17 +276,18 @@ function EmptyPanel({ icon: Icon, children }) {
   );
 }
 
-function BigButton({ primary, icon: Icon, label, busy, onClick, style }) {
+function BigButton({ primary, icon: Icon, label, busy, disabled, onClick, style }) {
+  const inert = busy || disabled;
   return (
-    <button onClick={onClick} disabled={busy} style={{
+    <button onClick={onClick} disabled={inert} style={{
       font: "inherit", fontSize: "var(--text-base)", fontWeight: 700,
-      padding: "13px 20px", borderRadius: "var(--radius)", cursor: busy ? "default" : "pointer",
+      padding: "13px 20px", borderRadius: "var(--radius)", cursor: inert ? "default" : "pointer",
       display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
       border: primary ? "none" : "1px solid var(--border)",
       background: primary ? "var(--blue)" : "var(--surface-2)",
       color: primary ? "#fff" : "var(--text-secondary)",
       boxShadow: primary ? "var(--shadow)" : "none",
-      opacity: busy ? 0.7 : 1,
+      opacity: inert ? 0.7 : 1,
       ...style,
     }}>
       {Icon && <Icon size={17} />}

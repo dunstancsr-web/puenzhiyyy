@@ -161,6 +161,7 @@ const stockAxisMax = (form, physicalStock = 0) =>
   );
 
 export default function Inventory() {
+  const navigate = useNavigate();
   const [skus, setSkus] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState("");
@@ -186,6 +187,16 @@ export default function Inventory() {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+
+  // Cancelling on an empty catalog would otherwise strand a manager here with
+  // a bare table and no way back — this is exactly the state onboarding's own
+  // "Add one product by hand" hands off into. Home already renders Onboarding
+  // itself when the live count is 0, so returning there re-enters the flow
+  // instead of duplicating that check here.
+  const closeAddModal = useCallback(() => {
+    setShowAddModal(false);
+    if (skus && skus.length === 0) navigate("/");
+  }, [skus, navigate]);
 
   const loadSkus = useCallback(() => {
     setLoadError(null);
@@ -548,8 +559,8 @@ export default function Inventory() {
 
       {/* ── Add SKU modal ── */}
       {showAddModal && (
-        <Modal title="Add New Rice SKU" onClose={() => setShowAddModal(false)} wide>
-          <AddSkuForm onSave={handleAddSku} onCancel={() => setShowAddModal(false)} />
+        <Modal title="Add New Rice SKU" onClose={closeAddModal} wide>
+          <AddSkuForm onSave={handleAddSku} onCancel={closeAddModal} />
         </Modal>
       )}
     </div>
