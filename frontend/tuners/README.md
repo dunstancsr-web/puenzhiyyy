@@ -10,6 +10,7 @@ rather than approximated.
 | [`type-scale.html`](type-scale.html) | How big every piece of text is | `--text-*` in `frontend/src/index.css` |
 | [`glass-tooltip.html`](glass-tooltip.html) | How the frosted panels look | `--hint-*` and `.hint-panel` in `frontend/src/index.css` |
 | [`table-density.html`](table-density.html) | Every gap in the Needs Attention card | the density constants in `frontend/src/pages/Dashboard.jsx` |
+| [`demo-glow.html`](demo-glow.html) | How diffused, thick and breathing the demo-mode screen glow is | the glow `<div>` in `frontend/src/components/DemoModeBadge.jsx` |
 
 Published copies, for looking at on a phone or sending to someone:
 
