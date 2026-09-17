@@ -87,6 +87,13 @@ export default function ForecastDetail() {
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState(null);
   const debounceRef = useRef(null);
+
+  // Scroll targets for DataStory's "see how" buttons, same
+  // scrollIntoView(prefers-reduced-motion) pattern Dashboard.jsx uses for its
+  // Needs Attention jump.
+  const modelRef = useRef(null);
+  const sandboxRef = useRef(null);
+  const simRef = useRef(null);
   useEffect(() => {
     if (!inputs) return;
     clearTimeout(debounceRef.current);
@@ -106,7 +113,13 @@ export default function ForecastDetail() {
       }
     }, 200);
     return () => clearTimeout(debounceRef.current);
-  }, [inputs, skuId]);
+    // forecastData?.forecast?.generated_at: Recompute changes the ACTIVE
+    // forecast without changing `inputs` at all, so without this the preview
+    // stayed on its pre-recompute result (often the "No forecast yet" error
+    // from before one existed) until a full page reload. Found live: the new
+    // DataStory panel above stuck on "Computing…" right after clicking the
+    // page's own primary Recompute button.
+  }, [inputs, skuId, forecastData?.forecast?.generated_at]);
 
   const setInput = (key) => (value) => setInputs((s) => ({ ...s, [key]: Number(value) }));
   const resetInputs = () => setInputs(savedInputs);
@@ -158,23 +171,31 @@ export default function ForecastDetail() {
     <div>
       <ForecastHeader sku={sku} forecast={forecast} onBack={() => navigate("/inventory")} onRecompute={() => recompute()} recomputing={recomputing} />
 
-      <ModelPicker
-        mode={mode} setMode={setMode_} activeModel={activeModel} scores={scores} bestScore={bestScore}
-        models={models} onPick={(id) => { if (mode === "manual") recompute(id); }} lowConfidence={forecast?.low_confidence}
-      />
+      <DataStory sku={sku} preview={preview} hasForecast={!!forecast} modelRef={modelRef} simRef={simRef} sandboxRef={sandboxRef} />
+
+      <div ref={modelRef}>
+        <ModelPicker
+          mode={mode} setMode={setMode_} activeModel={activeModel} scores={scores} bestScore={bestScore}
+          models={models} onPick={(id) => { if (mode === "manual") recompute(id); }} lowConfidence={forecast?.low_confidence}
+        />
+      </div>
 
       <SalesChart history={history} forecast={forecast} activeModel={activeModel} />
 
-      <WhatIfSandbox
-        sku={sku} inputs={inputs} setInput={setInput} onReset={resetInputs}
-        preview={preview} previewError={previewError} hasForecast={!!forecast}
-      />
+      <div ref={sandboxRef}>
+        <WhatIfSandbox
+          sku={sku} inputs={inputs} setInput={setInput} onReset={resetInputs}
+          preview={preview} previewError={previewError} hasForecast={!!forecast}
+        />
+      </div>
 
       <ReasoningChain sku={sku} preview={preview} hasForecast={!!forecast} onUseForecast={toggleUseForecast} />
 
       {forecast && preview && (
         <>
-          <ReorderSimulation invHistory={invHistory} preview={preview} inputs={inputs} sku={sku} />
+          <div ref={simRef}>
+            <ReorderSimulation invHistory={invHistory} preview={preview} inputs={inputs} sku={sku} />
+          </div>
           <FlowChart invHistory={invHistory} />
         </>
       )}
@@ -256,6 +277,88 @@ function Stat({ label, value, color }) {
   );
 }
 
+// ── Data story ───────────────────────────────────────────────────────────────
+// The plain-English front door to everything below it (Stan's ask, 17 Sep):
+// state what was found, what it suggests, and how that compares to what's
+// approved today, in sentences rather than a chain diagram, before handing
+// off to the model picker / sandbox / simulation for anyone who wants to look
+// closer. Reads `preview`, the SAME object ReasoningChain and
+// ReorderSimulation already use, rather than recomputing anything, so this
+// can never disagree with the numbers below it (rules.md, "derived values
+// computed twice eventually disagree").
+function scrollToRef(ref) {
+  return () => {
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    ref.current?.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+  };
+}
+
+function DataStory({ sku, preview, hasForecast, modelRef, simRef, sandboxRef }) {
+  if (!hasForecast) return null; // nothing to narrate before a forecast exists
+  if (!preview) {
+    return (
+      <div className="card" style={{ padding: "18px 20px", marginBottom: 16 }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Computing…</div>
+      </div>
+    );
+  }
+
+  const approved = sku.reorder_point_policy;
+  const suggested = preview.reorder_point_suggested_with_risk;
+  const gapPct = approved > 0 ? Math.round(((suggested - approved) / approved) * 100) : null;
+
+  return (
+    <div className="card" style={{
+      padding: "20px 22px", marginBottom: 16,
+      background: "var(--blue-light)", border: "1px solid var(--blue)",
+    }}>
+      <div style={{
+        fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em",
+        textTransform: "uppercase", color: "var(--blue)", marginBottom: 10,
+      }}>
+        What your data tells us
+      </div>
+
+      <p style={{ fontSize: "var(--text-base)", lineHeight: 1.65, color: "var(--text-primary)", margin: 0 }}>
+        From {sku.product_name}'s sales history, the <b>{preview.forecast_model?.replace("_", " ")}</b> model
+        (a statistical forecast, traditional/predictive AI, not generative) forecasts average demand of
+        {" "}<b>{preview.forecast_avg_daily_demand} MT/day</b>. Using this product's
+        saved lead time of <b>{preview.inputs.leadTimeDays} days</b> (variability <b>±{preview.inputs.leadTimeStdDays} days</b>)
+        and a target service level of <b>{Math.round(preview.inputs.targetServiceLevel * 100)}%</b>, we suggest
+        reordering at <b>{Math.round(suggested)} MT</b> and stocking up to <b>{Math.round(preview.target_stock_suggested)} MT</b>.
+      </p>
+
+      <p style={{ fontSize: "var(--text-base)", lineHeight: 1.65, color: "var(--text-secondary)", marginTop: 10 }}>
+        {gapPct === null ? (
+          "This product has no approved reorder point yet, so there's nothing to compare the suggestion against."
+        ) : gapPct === 0 ? (
+          <>Your approved reorder point, <b style={{ color: "var(--text-primary)" }}>{Math.round(approved)} MT</b>, already matches this.</>
+        ) : (
+          <>
+            You're currently approved to reorder at <b style={{ color: "var(--text-primary)" }}>{Math.round(approved)} MT</b>,
+            {" "}{Math.abs(gapPct)}% {gapPct > 0 ? "lower" : "higher"} than what we're suggesting.
+          </>
+        )}
+        {" "}Don't just take these numbers: the lead time and its variability came from what's saved for
+        this product, not from the sales data itself, so they're only as good as what you (or your supplier)
+        told us. See how the suggestion was built, and how it plays out over time, before approving anything.
+      </p>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+        <button type="button" onClick={scrollToRef(modelRef)} style={STORY_LINK_STYLE}>See the model behind this ↓</button>
+        <button type="button" onClick={scrollToRef(sandboxRef)} style={STORY_LINK_STYLE}>Try different assumptions ↓</button>
+        <button type="button" onClick={scrollToRef(simRef)} style={STORY_LINK_STYLE}>Explore the simulation ↓</button>
+      </div>
+    </div>
+  );
+}
+
+const STORY_LINK_STYLE = {
+  font: "inherit", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue)",
+  background: "var(--card-bg)", border: "1px solid var(--blue)", borderRadius: 99,
+  padding: "7px 14px", cursor: "pointer",
+};
+
 // ── Model picker ─────────────────────────────────────────────────────────────
 const MODEL_HINT = {
   naive_seasonal: {
@@ -279,9 +382,20 @@ const MODEL_HINT = {
 function ModelPicker({ mode, setMode, activeModel, scores, bestScore, models, onPick, lowConfidence }) {
   return (
     <div className="card" style={{ padding: "16px 20px", marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 8 }}>
           Model selection
+          {/* The bracketed form Stan asked for: "statistical forecast" alone
+              didn't land for him, but pairing it against the AI framing he
+              already knows made it click immediately. Placed here, not in
+              ChainStep's tiny badge, since this heading has room for it and
+              names all four models at once, not one reasoning-chain step. */}
+          <span style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.02em", textTransform: "uppercase",
+            border: "1px dashed var(--purple)", color: "var(--purple)", padding: "1.5px 7px", borderRadius: 5,
+          }}>
+            Statistical forecast (traditional / predictive AI)
+          </span>
         </span>
         <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 99, padding: 2, background: "var(--surface-2)" }}>
           {["auto", "manual"].map((m) => (
@@ -432,22 +546,42 @@ function WhatIfSandbox({ sku, inputs, setInput, onReset, preview, previewError, 
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "4px 28px" }}>
             <div>
-              <SliderField label="Lead time" suffix="days" value={inputs.leadTimeDays} onChange={setInput("leadTimeDays")} min={20} max={90} step={1} />
+              <SliderField
+                label={<SandboxLabel text="Lead time" hint={{
+                  what: "How many days after you place an order with this supplier before it arrives. A characteristic of this product's supplier, not something read off your sales data.",
+                  how: "Feeds King's formula directly: Lead-Time Demand = average daily demand × lead time. Set on the SKU's Policy tab, not calculated here.",
+                }} />}
+                suffix="days" value={inputs.leadTimeDays} onChange={setInput("leadTimeDays")} min={20} max={90} step={1} />
               <SandboxNote text="No suggestion yet — needs receiving history (this app has no closed purchase-order data to measure a real average from)." />
             </div>
             <div>
-              <SliderField label="Lead time variability (σ)" suffix="days" value={inputs.leadTimeStdDays} onChange={setInput("leadTimeStdDays")} min={0} max={15} step={0.5} />
+              <SliderField
+                label={<SandboxLabel text="Lead time variability (σ)" hint={{
+                  what: "How much that lead time actually swings, delivery to delivery. A wider spread means a less predictable supplier, also set on the Policy tab, not derived from sales.",
+                  how: "Widens the safety stock King's formula asks for: a bigger σ means more stock held just in case a delivery runs late.",
+                }} />}
+                suffix="days" value={inputs.leadTimeStdDays} onChange={setInput("leadTimeStdDays")} min={0} max={15} step={0.5} />
               <SandboxNote text="No suggestion yet — same reason as lead time above." />
             </div>
             <div>
-              <SliderField label="Target service level" suffix="%" value={inputs.serviceLevelPct} onChange={setInput("serviceLevelPct")} min={80} max={99} step={1} />
+              <SliderField
+                label={<SandboxLabel text="Target service level" hint={{
+                  what: "How often you're willing to risk running out before the next delivery lands. 98% means roughly a 2% chance of a stockout in a typical cycle: a business choice, not a measurement.",
+                  how: "Converts to a Z-score in King's formula: a higher service level asks for more safety stock for the same demand and lead time.",
+                }} />}
+                suffix="%" value={inputs.serviceLevelPct} onChange={setInput("serviceLevelPct")} min={80} max={99} step={1} />
               <SandboxNote
                 text={`Suggested (${sku.abc_class}-tier default): ${TIER_SERVICE_LEVEL[sku.abc_class] || 95}%`}
                 onUse={() => setInput("serviceLevelPct")(TIER_SERVICE_LEVEL[sku.abc_class] || 95)}
               />
             </div>
             <div>
-              <SliderField label="Target stock (order-up-to)" suffix="MT" value={inputs.targetStock} onChange={setInput("targetStock")} min={60} max={300} step={5} />
+              <SliderField
+                label={<SandboxLabel text="Target stock (order-up-to)" hint={{
+                  what: "How much stock you want on hand right after a delivery arrives: the level a reorder tries to bring you back up to.",
+                  how: "The one figure here with a live formula behind it: forecast demand × (a 30-day review cycle + lead time) + safety stock. Hit “Use” below to apply it.",
+                }} />}
+                suffix="MT" value={inputs.targetStock} onChange={setInput("targetStock")} min={60} max={300} step={5} />
               {preview && (
                 <SandboxNote
                   text={`Suggested (formula-derived): ${Math.round(preview.target_stock_suggested)} MT`}
@@ -472,6 +606,20 @@ function WhatIfSandbox({ sku, inputs, setInput, onReset, preview, previewError, 
   );
 }
 
+// A slider's label, plus the ⓘ this page already uses elsewhere (SalesChart,
+// ReorderSimulation). SliderField renders whatever `label` it's given inside
+// a plain, un-`htmlFor`'d <label> tag, so nesting ColHint's own button here
+// is safe: nothing tries to steal focus back to the range input the way a
+// real form-control association would.
+function SandboxLabel({ text, hint }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+      {text}
+      <ColHint label={text} what={hint.what} how={hint.how} />
+    </span>
+  );
+}
+
 function SandboxNote({ text, onUse }) {
   return (
     <div style={{ fontSize: 10.5, marginTop: 3, display: "flex", alignItems: "center", gap: 6, color: onUse ? "var(--blue)" : "var(--text-muted)" }}>
@@ -492,7 +640,12 @@ function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
   return (
     <div className="card" style={{ padding: "18px 20px", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-        <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700 }}>How this becomes the suggested reorder point</h2>
+        <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+          How this becomes the suggested reorder point
+          <ColHint label="How this becomes the suggested reorder point"
+            what="None of this is generative AI. Forecast demand comes from a statistical forecast model (Naive seasonal, Linear trend, Holt-Winters, or Holt damped + seasonal) - traditional or predictive AI, backtested against real sales history, always producing the same output for the same inputs. Everything after it is a fixed formula (King's formula) applied on top."
+            how="The three tags below say which is which: YOUR INPUT is something you (or your supplier) told the system, STATISTICAL FORECAST is the model's own output, and no tag means fixed arithmetic on top of those two. AI only appears elsewhere in this app, on Alerts's Why? button, and only to explain a number, never to calculate one." />
+        </h2>
         {hasForecast && (
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer" }}>
             <input type="checkbox" checked={!!sku.use_forecast} onChange={onUseForecast} />
@@ -509,13 +662,13 @@ function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <ChainStep label="Forecast demand" value={`${preview.forecast_avg_daily_demand} MT/day`} tag="derived" />
+          <ChainStep label="Forecast demand" value={`${preview.forecast_avg_daily_demand} MT/day`} tag="statistical forecast" />
           <ChainOp>&times;</ChainOp>
           <ChainStep label="Lead time" value={`${preview.inputs.leadTimeDays} days`} tag="your input" />
           <ChainOp>+</ChainOp>
-          <ChainStep label="Safety stock" value={`${preview.safety_stock_mt} MT`} tag="derived" />
+          <ChainStep label="Safety stock" value={`${preview.safety_stock_mt} MT`} tag="formula" />
           <ChainOp>+</ChainOp>
-          <ChainStep label="Risk buffer" value={`+${preview.risk_buffer_mt} MT`} accent="var(--orange)" tag="derived" />
+          <ChainStep label="Risk buffer" value={`+${preview.risk_buffer_mt} MT`} accent="var(--orange)" tag="formula" />
           <ChainOp>=</ChainOp>
           <ChainStep label="Suggested" value={`${Math.round(preview.reorder_point_suggested_with_risk)} MT`} accent="var(--blue)" total />
         </div>
@@ -530,7 +683,20 @@ function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
   );
 }
 
+// Three tags, three honest answers to "where did this come from": a person
+// typed it in, a statistical forecast model computed it from sales history,
+// or it's fixed arithmetic applied to one of those two. None of them is
+// generative AI - see the note in ReasoningChain's header. "formula" gets no
+// colour of its own on purpose: it's the default, unremarkable case, and
+// giving it a tint would spend the same visual weight as the two things
+// actually worth flagging.
+const CHAIN_TAG_STYLE = {
+  "your input": { bg: "var(--blue-light)", fg: "var(--blue)" },
+  "statistical forecast": { bg: "var(--purple-light)", fg: "var(--purple)" },
+};
+
 function ChainStep({ label, value, accent, tag, total }) {
+  const tagStyle = CHAIN_TAG_STYLE[tag];
   return (
     <div style={{
       background: total ? "var(--blue-light)" : accent === "var(--orange)" ? "var(--orange-light)" : "var(--surface-2)",
@@ -542,8 +708,8 @@ function ChainStep({ label, value, accent, tag, total }) {
         {tag && (
           <span style={{
             fontSize: 9.5, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
-            background: tag === "your input" ? "var(--blue-light)" : "var(--surface-2)",
-            color: tag === "your input" ? "var(--blue)" : "var(--text-muted)",
+            background: tagStyle?.bg || "var(--surface-2)",
+            color: tagStyle?.fg || "var(--text-muted)",
           }}>{tag}</span>
         )}
       </div>

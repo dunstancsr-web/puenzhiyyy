@@ -33,7 +33,7 @@ function getAnalytics() {
 // as-is with no error.
 const NONNEGATIVE_NUMERIC_FIELDS = [
   "min_order_qty", "reorder_point_policy", "min_stock", "target_stock", "max_stock",
-  "safety_stock_pct", "lead_time_days", "target_service_level", "unit_cost_sgd",
+  "safety_stock_pct", "lead_time_days", "lead_time_std_days", "target_service_level", "unit_cost_sgd",
   "unit_price_sgd", "reserved_qty", "quality_hold_qty",
 ];
 
@@ -223,7 +223,7 @@ router.post("/skus", (req, res) => {
 const SKU_TABLE_FIELDS = [
   "product_name", "rice_variety", "grade", "country_of_origin", "brand", "supplier", "packaging_size",
   "min_order_qty", "reorder_point_policy", "min_stock", "target_stock", "max_stock", "safety_stock_pct",
-  "lead_time_days", "target_service_level", "unit_cost_sgd", "unit_price_sgd",
+  "lead_time_days", "lead_time_std_days", "target_service_level", "unit_cost_sgd", "unit_price_sgd",
 ];
 const POSITION_TABLE_FIELDS = ["reserved_qty", "quality_hold_qty"];
 
@@ -665,8 +665,19 @@ router.get("/skus/history/export-sales", (req, res) => {
   }
 });
 
+// pendingSkus: onboarding's combined "attach sales while reviewing the
+// catalog upload" step (Onboarding.jsx). Those SKUs aren't in the table yet
+// at PREVIEW time (they're rows in a CSV the user hasn't clicked Apply on),
+// so without this every one of them would preview as "not a known SKU".
+// {sku_id, product_name} pairs, not bare IDs, so the breakdown below can
+// still show a real name instead of a placeholder. Only ever honoured on a
+// preview (apply=false): the real insert below always re-checks the live
+// table regardless of what this array claims, since by the time sales
+// actually apply, the frontend has already applied the catalog for real, and
+// pretending a request-supplied ID exists at APPLY time would let a sale
+// reference a product that was never actually created.
 router.post("/skus/history/import-sales", (req, res) => {
-  const { csv, apply = false } = req.body || {};
+  const { csv, apply = false, pendingSkus = [] } = req.body || {};
   if (typeof csv !== "string" || !csv.trim()) {
     return res.status(400).json({ success: false, message: "No CSV content was received" });
   }
@@ -691,6 +702,11 @@ router.post("/skus/history/import-sales", (req, res) => {
     const skuNames = new Map(
       db.prepare(`SELECT sku_id, product_name FROM skus`).all().map((r) => [r.sku_id, r.product_name])
     );
+    if (!apply) {
+      for (const p of pendingSkus) {
+        if (p?.sku_id && !skuNames.has(p.sku_id)) skuNames.set(p.sku_id, p.product_name || "(new product)");
+      }
+    }
     const ignored = parsed.columns.filter((c) => !SALES_COLUMNS.includes(c));
 
     const toInsert = [];

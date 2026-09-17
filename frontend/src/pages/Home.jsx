@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, ArrowUpFromLine, ArrowRight } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, ArrowRight, PlayCircle } from "lucide-react";
 import EventCredit from "../components/EventCredit";
 import AppMark from "../components/AppMark";
 import ColHint from "../components/ColHint";
@@ -10,7 +10,7 @@ import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 import { api } from "../api/inventory";
 import Onboarding from "./Onboarding";
 import LoadingState from "../components/LoadingState";
-import { isMinimized } from "../lib/onboardingResume";
+import { isDismissed } from "../lib/onboardingResume";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME (TASK-47, renamed TASK-48 and TASK-50, rebuilt TASK-74 and TASK-78)
@@ -206,11 +206,22 @@ export default function Home() {
     return () => { cancelled = true; };
   }, []);
 
+  // Demo-only: previewing onboarding used to take Home to Control Tower to
+  // Settings to "Preview the onboarding journey", three screens deep, and
+  // only reachable at all once inside the Control Tower. This puts the same
+  // link where a demoing manager already is. Real (non-demo) visitors don't
+  // get it: against the live database, emptying the catalog just to see the
+  // wizard again is the destructive action rules.md already cuts elsewhere.
+  const [isDemo, setIsDemo] = useState(false);
+  useEffect(() => { api.getDemoStatus().then((d) => setIsDemo(d.active)).catch(() => {}); }, []);
+
   if (skuCount === null) return <LoadingState label="Loading…" />;
-  // Minimizing onboarding writes this flag specifically so a still-empty
-  // catalog doesn't loop straight back into the wizard the moment Home
-  // renders — the whole point of minimizing is being able to leave.
-  if (skuCount === 0 && !isMinimized()) return <Onboarding />;
+  // Closing or finishing onboarding writes this flag specifically so a
+  // still-empty catalog doesn't loop straight back into the wizard the
+  // moment Home renders: the whole point of closing it is being able to
+  // leave and set the catalog up later, the normal way, from Inventory or
+  // Bulk edit.
+  if (skuCount === 0 && !isDismissed()) return <Onboarding />;
 
   return (
     <div style={{
@@ -288,6 +299,17 @@ export default function Home() {
             </span>
           </div>
           <EventCredit align="center" inline />
+          {isDemo && (
+            <div style={{ textAlign: "center", marginTop: "var(--space-3)" }}>
+              <Link to="/onboarding" style={{
+                display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none",
+                fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
+              }}>
+                <PlayCircle size={14} />
+                Preview the onboarding journey
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

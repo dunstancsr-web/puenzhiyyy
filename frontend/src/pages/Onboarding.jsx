@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Upload, TrendingUp, Sparkles, Minus } from "lucide-react";
+import { Package, Upload, TrendingUp, Sparkles, X, ChevronLeft } from "lucide-react";
 import { api } from "../api/inventory";
 import { ImportPreview, Toast } from "../components/ImportPreview";
 import Modal, { ModalBtn } from "../components/Modal";
 import { Seal, CLIENT_EN } from "../components/Tenant";
-import { getSavedStep, saveMinimized, clearMinimized } from "../lib/onboardingResume";
+import { dismissOnboarding, clearDismissal } from "../lib/onboardingResume";
+import { armForecastNudge } from "../lib/forecastNudge";
+
+const TOTAL_STEPS = 2;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ONBOARDING (MVP2 step 1), the real build of the "Day Zero" mockup Stan
@@ -23,10 +26,33 @@ import { getSavedStep, saveMinimized, clearMinimized } from "../lib/onboardingRe
 // without actually emptying the database — in that case the real, current SKU
 // count is shown honestly rather than pretending the catalog is empty.
 //
+// Sequential and story-like on purpose (Stan's call, after trying a "minimize
+// and hop back in from anywhere" version): a segmented progress bar up top
+// shows how many steps are left, Back returns to the previous one, and Skip
+// moves forward exactly like a story's skip, closing the whole thing on the
+// last step rather than dangling. Nothing here is mandatory: every step has
+// its own way out, and a manager who skips everything can still add products
+// and sales history exactly like any other data entry, from Inventory or Bulk
+// edit, once inside the app. What's gone is a floating "resume setup" control
+// following you around the app; skip and close both just go to Home.
+//
 // "Skip setup, explore with sample data" is offered ONLY in demo mode (see
 // trySampleData below) — against the real database this is still cut, since
 // reseeding wipes decisions and the audit trail (see rules.md), a real
 // destructive action a stray click shouldn't trigger there.
+//
+// Someone with BOTH files ready doesn't have to visit step 2 at all: the
+// catalog upload's own review modal offers "Also add sales history now"
+// (salesPreview/salesCsv below), previewed against the SKUs that upload is
+// about to create rather than the live table, which doesn't have them yet
+// (pendingSkus, backend/src/routes/inventory.js). Deliberately NOT one
+// combined CSV format: a sales row has no product_name, rice_variety,
+// country_of_origin, packaging_size or supplier to offer, so there is
+// nothing in a sale to build a catalog row FROM; the two files stay their
+// own shapes, and only the onboarding SCREEN combines them. The two applies
+// are still two separate requests, not one transaction: if the catalog goes
+// in but sales fails, the products stay (they're already real) and the flow
+// drops into the ordinary step 2 rather than losing that progress.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // importNewSkusCsv, not importSkusCsv: the catalog is empty (or being added
@@ -40,14 +66,19 @@ const IMPORTERS = {
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  // Resumes wherever a previous "minimize" left off, so hopping out to
-  // explore and back in doesn't restart the wizard from step 1.
-  const [step, setStep] = useState(() => Math.min(getSavedStep(), 2)); // 1 = catalog, 2 = sales history
+  const [step, setStep] = useState(1); // 1 = catalog, 2 = sales history
   // A full reload, not navigate("/"): reachable from Home's OWN inline render
   // of this component when the catalog is empty, so we're already at "/" and
   // a client-side navigate to the same path never re-renders Home to notice
-  // the new isMinimized() value (same reasoning as trySampleData above).
-  const minimize = useCallback(() => { saveMinimized(step); window.location.href = "/"; }, [step]);
+  // the new isDismissed() value (same reasoning as trySampleData below).
+  const exitOnboarding = useCallback(() => { dismissOnboarding(); window.location.href = "/"; }, []);
+  // Story-style: Skip moves to the next step, and on the last one there's
+  // nowhere further to go, so it means the same thing as closing.
+  const skipStep = useCallback(() => {
+    if (step < TOTAL_STEPS) setStep(step + 1);
+    else exitOnboarding();
+  }, [step, exitOnboarding]);
+  const backStep = useCallback(() => setStep((s) => Math.max(1, s - 1)), []);
   const [skuCount, setSkuCount] = useState(null);
   const [addedSkus, setAddedSkus] = useState(null); // { count, names } after a catalog upload this session
 
@@ -58,6 +89,16 @@ export default function Onboarding() {
   const datasetRef = useRef("skus");
   const fileRef = useRef(null);
 
+  // A second, optional file attached to the SAME catalog review, so someone
+  // with both spreadsheets ready doesn't have to sit through two separate
+  // upload-preview-apply rounds. Only offered alongside a "skus" preview
+  // (see the modal below): sales history on its own still goes through
+  // step 2 exactly as before.
+  const [salesPreview, setSalesPreview] = useState(null);
+  const [salesCsv, setSalesCsv] = useState(null);
+  const salesFileRef = useRef(null);
+  const clearSalesAttachment = useCallback(() => { setSalesPreview(null); setSalesCsv(null); }, []);
+
   // "Try with sample data" is demo-mode-only: seeding is a full wipe-and-fill,
   // safe against the disposable in-memory sandbox but never something to
   // offer against the real database (see the module comment above).
@@ -67,6 +108,7 @@ export default function Onboarding() {
     setError(null); setBusy("sample");
     try {
       await api.seedSampleData();
+      armForecastNudge();
       window.location.href = "/"; // whole database changed under us; reload, don't navigate
     } catch (err) {
       setError(err.message);
@@ -99,27 +141,73 @@ export default function Onboarding() {
     }
   }, []);
 
-  const applyImport = useCallback(async () => {
-    setBusy("apply"); setError(null);
+  // Reads the second file straight from the modal that's already reviewing
+  // the catalog upload, previewing it against the SKUs that upload is about
+  // to create (pendingSkus) rather than the live table, which doesn't have
+  // them yet.
+  const onSalesAttachment = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError(null); setBusy("read");
     try {
-      const which = preview?.dataset || "skus";
-      const result = await IMPORTERS[which](csv, true);
-      setPreview(null);
-      setCsv(null);
-      if (which === "skus") {
-        setAddedSkus({ count: result.changed, names: (result.changes || []).slice(0, 3).map((c) => c.name) });
-        loadCount();
-        setStep(2);
-      } else {
-        clearMinimized();
-        navigate("/");
-      }
+      const text = await file.text();
+      const pendingSkus = (preview?.changes || []).map((c) => ({ sku_id: c.sku_id, product_name: c.name }));
+      const result = await api.importSalesHistoryCsv(text, false, pendingSkus);
+      setSalesCsv(text);
+      setSalesPreview({ ...result, fileName: file.name, dataset: "salesHistory" });
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy(null);
     }
-  }, [csv, preview, loadCount, navigate]);
+  }, [preview]);
+
+  const applyImport = useCallback(async () => {
+    setBusy("apply"); setError(null);
+    try {
+      const which = preview?.dataset || "skus";
+      const result = await IMPORTERS[which](csv, true);
+
+      if (which !== "skus") {
+        // The standalone step 2 upload: sales on their own, catalog already done.
+        setPreview(null); setCsv(null);
+        clearDismissal();
+        armForecastNudge();
+        navigate("/");
+        return;
+      }
+
+      setAddedSkus({ count: result.changed, names: (result.changes || []).slice(0, 3).map((c) => c.name) });
+      loadCount();
+      armForecastNudge();
+
+      if (salesCsv) {
+        // Products are real now, so this insert validates against the real
+        // table: no pendingSkus needed, same as any other sales import.
+        try {
+          await api.importSalesHistoryCsv(salesCsv, true);
+          setPreview(null); setCsv(null); clearSalesAttachment();
+          clearDismissal();
+          navigate("/");
+          return;
+        } catch (err) {
+          // The catalog half already succeeded and stays. Surface the sales
+          // problem and drop into the normal step 2, which has its own
+          // upload/preview/retry, rather than losing what just went in.
+          setError(`Products were added, but sales history didn't go through: ${err.message}`);
+          clearSalesAttachment();
+        }
+      }
+
+      setPreview(null); setCsv(null);
+      setStep(2);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }, [csv, salesCsv, preview, loadCount, navigate, clearSalesAttachment]);
 
   const downloadTemplate = useCallback(async () => {
     setError(null); setBusy("export");
@@ -141,12 +229,24 @@ export default function Onboarding() {
   }, [skuCount]);
 
   const blocked = preview ? preview.errors.length > 0 || preview.changed === 0 : false;
+  const salesBlocked = salesPreview ? salesPreview.errors.length > 0 : false;
+
+  const applyLabel = () => {
+    if (busy === "apply") return "Applying…";
+    if (preview.dataset === "salesHistory") {
+      return `Add ${preview.changed} sale${preview.changed === 1 ? "" : "s"}`;
+    }
+    if (salesPreview) {
+      return `Add ${preview.changed} product${preview.changed === 1 ? "" : "s"} and ${salesPreview.changed} sale${salesPreview.changed === 1 ? "" : "s"}`;
+    }
+    return `Add ${preview.changed} product${preview.changed === 1 ? "" : "s"}`;
+  };
 
   return (
     <div style={{ minHeight: "calc(100vh - var(--demo-banner-height))", background: "var(--bg)", display: "flex", justifyContent: "center", padding: "clamp(32px, 8vh, 80px) 20px 48px" }}>
       <div style={{ width: "100%", maxWidth: 620 }}>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 36 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
           <Seal size={30} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, lineHeight: 1.1 }}>{CLIENT_EN}</div>
@@ -154,12 +254,42 @@ export default function Onboarding() {
               Set up your catalog
             </div>
           </div>
-          <button onClick={minimize} title="Explore the app now, come back to setup later" style={{
-            display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid var(--border)",
-            borderRadius: 99, padding: "5px 11px", cursor: "pointer", color: "var(--text-muted)",
+          <button onClick={exitOnboarding} title="Close setup, add products later from Inventory or Bulk edit" style={{
+            display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30,
+            background: "none", border: "none", borderRadius: 99, cursor: "pointer", color: "var(--text-muted)",
+          }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Story-style progress: filled segments show how far in you are,
+            Back returns to the previous step, Skip moves to the next one (or
+            closes, on the last step), same place either way, the way
+            Instagram's stories keep their own controls in one spot. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
+          <button onClick={backStep} disabled={step === 1} style={{
+            display: "flex", alignItems: "center", gap: 2, background: "none", border: "none",
+            padding: "4px 2px 4px 0", cursor: step === 1 ? "default" : "pointer", flexShrink: 0,
+            color: step === 1 ? "var(--border)" : "var(--text-muted)",
             fontSize: "var(--text-xs)", fontWeight: 600,
           }}>
-            <Minus size={12} /> Explore first
+            <ChevronLeft size={15} /> Back
+          </button>
+
+          <div style={{ display: "flex", gap: 6, flex: 1 }}>
+            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+              <div key={i} style={{
+                flex: 1, height: 4, borderRadius: 99,
+                background: i < step ? "var(--blue)" : "var(--border)",
+              }} />
+            ))}
+          </div>
+
+          <button onClick={skipStep} style={{
+            background: "none", border: "none", padding: "4px 0 4px 2px", cursor: "pointer", flexShrink: 0,
+            color: "var(--text-muted)", fontSize: "var(--text-xs)", fontWeight: 600,
+          }}>
+            {step < TOTAL_STEPS ? "Skip" : "Skip for now"}
           </button>
         </div>
 
@@ -238,7 +368,6 @@ export default function Onboarding() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <BigButton primary icon={Upload} label="Upload sales history"
                   busy={busy === "read"} onClick={() => openPicker("salesHistory")} />
-                <BigButton label="Skip for now" onClick={() => { clearMinimized(); navigate("/"); }} />
               </div>
 
               <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.6, borderTop: "1px solid var(--border)", paddingTop: 16, marginTop: 24 }}>
@@ -249,18 +378,52 @@ export default function Onboarding() {
         )}
 
         <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} style={{ display: "none" }} />
+        <input ref={salesFileRef} type="file" accept=".csv,text/csv" onChange={onSalesAttachment} style={{ display: "none" }} />
 
         {error && <Toast tone="bad" message={error} onDismiss={() => setError(null)} />}
 
         {preview && (
-          <Modal wide title="Review changes" onClose={() => { setPreview(null); setCsv(null); }}>
+          <Modal wide title="Review changes" onClose={() => { setPreview(null); setCsv(null); clearSalesAttachment(); }}>
             <ImportPreview preview={preview} />
+
+            {/* Only offered alongside a fresh catalog preview: someone who
+                already has both files ready shouldn't have to sit through
+                step 2 separately to finish sales history too. */}
+            {preview.dataset === "skus" && !blocked && (
+              <div style={{ borderTop: "1px solid var(--border)", marginTop: 20, paddingTop: 18 }}>
+                {salesPreview ? (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+                        Also adding: sales history
+                      </div>
+                      <button onClick={clearSalesAttachment} style={{
+                        background: "none", border: "none", cursor: "pointer", padding: 0,
+                        fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)", textDecoration: "underline",
+                      }}>
+                        Remove
+                      </button>
+                    </div>
+                    <ImportPreview preview={salesPreview} />
+                  </>
+                ) : (
+                  <button onClick={() => salesFileRef.current?.click()} disabled={busy === "read"} style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%",
+                    background: "none", border: "1.5px dashed var(--border)", borderRadius: "var(--radius)",
+                    padding: "12px 14px", cursor: busy === "read" ? "default" : "pointer",
+                    color: "var(--text-secondary)", fontSize: "var(--text-sm)", fontWeight: 600,
+                  }}>
+                    <Upload size={15} />
+                    {busy === "read" ? "Reading…" : "Also add sales history now (optional)"}
+                  </button>
+                )}
+              </div>
+            )}
+
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-              <ModalBtn label="Cancel" onClick={() => { setPreview(null); setCsv(null); }} />
-              <ModalBtn primary disabled={blocked || busy === "apply"}
-                label={busy === "apply" ? "Applying…" : preview.dataset === "salesHistory"
-                  ? `Add ${preview.changed} sale${preview.changed === 1 ? "" : "s"}`
-                  : `Add ${preview.changed} product${preview.changed === 1 ? "" : "s"}`}
+              <ModalBtn label="Cancel" onClick={() => { setPreview(null); setCsv(null); clearSalesAttachment(); }} />
+              <ModalBtn primary disabled={blocked || busy === "apply" || salesBlocked}
+                label={applyLabel()}
                 onClick={applyImport} />
             </div>
           </Modal>

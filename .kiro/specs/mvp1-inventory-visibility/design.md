@@ -760,23 +760,49 @@ Modify, Reject, Why? and Dismiss.
 The audit trail in plain-English sentences, filterable by event type, each with the stored input and
 output one click away.
 
-### Forecast Detail Page (MVP2 Day 5)
+### Forecast Detail Page (MVP2 Day 5, Data Story added 17 Sep)
 `frontend/src/pages/ForecastDetail.jsx`, at `/inventory/:skuId/forecast` — the one exception to "no
-separate SKU detail page" (see Projected Inventory above). Model picker (Auto/Manual, WMAPE per model,
-real backtest on pick), the sales history + forecast chart, the what-if sandbox (four sliders, debounced
-live calls to `POST .../forecast/preview`, never a client-side formula), the reasoning chain
+separate SKU detail page" (see Projected Inventory above). A plain-English "What your data tells us"
+panel opens the page (Stan's ask, 17 Sep): what the forecast found, what's suggested, and how that
+compares to what's approved, built from the exact same `preview` object every section below it reads,
+never a second telling of the same numbers, with three buttons scrolling to the sections that back
+each claim. Below it: the model picker (Auto/Manual, WMAPE per model, real backtest on pick), the sales
+history + forecast chart, the what-if sandbox (four sliders, debounced live calls to
+`POST .../forecast/preview`, never a client-side formula: each slider now carries a ColHint explaining
+what it feeds and whether it's "your input" or something the formula suggests), the reasoning chain
 (forecast demand × lead time + safety stock + risk buffer = suggested), a reorder-cycle simulation
 (client-side geometry over the preview's real numbers, not a second formula), and the monthly
 inflows/outflows chart. A recompute-freshness nudge (Day 6) turns the Recompute button's border yellow
 past 14 days since the active forecast's `generated_at`.
 
-### Forecast Overview Page (MVP2 Day 6)
+Two of the sandbox's four inputs, lead time and its variability (σ), are supplier characteristics
+this app has no way to derive from sales data (no closed purchase-order history to measure a real
+average or spread from); the Data Story panel and the sandbox's own notes say so plainly rather than
+implying a formula behind numbers that are really just what's saved for the SKU. Lead time itself was
+always editable (`PUT /api/skus/:id`); its variability was not: set only at seed time, with no save
+path anywhere in the app, until 17 Sep added `lead_time_std_days` to `SkuEditForm`'s Policy tab and
+the same route's field whitelist, closing that gap so the Data Story's claim about it is actually
+something a real user supplied, not always the column's `0` default.
+
+Nothing on this page is generative AI, and the reasoning chain says so explicitly now (18 Sep): a
+ColHint on its header names the three honest categories a figure can fall into, and `ChainStep`'s three
+tags carry the same distinction visually. YOUR INPUT is something a person (or their supplier) told the
+system. STATISTICAL FORECAST is Naive seasonal, Linear trend, Holt-Winters or Holt damped + seasonal
+output, backtested against real sales history: a model in the statistics sense, not a generative one.
+No tag means fixed arithmetic (King's formula) applied on top of those two. Stan's original ask was to
+label the page's suggestions as "AI generated"; the correction, and what shipped instead, is recorded in
+the submission tracker's decisions table.
+
+### Forecast Overview Page (MVP2 Day 6, promoted to permanent nav 17 Sep)
 `frontend/src/pages/ForecastList.jsx`, at `/forecast` — a portfolio-wide table (every SKU, forecast
 status, active model + WMAPE, Approved → Suggested with the gap %, last-recomputed freshness), sortable,
-linking into each SKU's Forecast Detail page. Reachable from a "Forecast overview" link on the Inventory
-page header, deliberately **not** added to `Sidebar.jsx`'s permanent nav — MVP2 is still a feature
-branch, and Stan's call was to keep it reachable rather than commit to a 5th permanent destination before
-it ships to main.
+linking into each SKU's Forecast Detail page. Held link-only from Inventory's header for months while
+MVP2 was a feature branch; Stan promoted it to `Sidebar.jsx`'s permanent nav (between Dashboard and
+Inventory) on 17 Sep, alongside confirming the accept/modify/reject decision for a suggested reorder
+point stays on Alerts only: Forecast explains and simulates, it does not also duplicate the decision.
+Still also reachable from the Inventory header link. A one-time nudge on Dashboard (`lib/forecastNudge.js`,
+armed by `Onboarding.jsx` and "Try with sample data") points a manager here right after real data goes
+in, then never reappears once dismissed or followed.
 
 ---
 

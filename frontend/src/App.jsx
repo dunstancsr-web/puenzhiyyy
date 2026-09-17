@@ -11,7 +11,6 @@ import ForecastDetail from "./pages/ForecastDetail";
 import ForecastList from "./pages/ForecastList";
 import Inbound from "./warehouse/Inbound";
 import DemoModeBadge from "./components/DemoModeBadge";
-import OnboardingResumeChip from "./components/OnboardingResumeChip";
 
 // The Control Tower pages share a sidebar; the warehouse floor screens
 // deliberately do not. A handheld has no room for navigation, and an operator
@@ -27,23 +26,21 @@ import OnboardingResumeChip from "./components/OnboardingResumeChip";
 // adding a new route, so it doesn't silently miss the banner the way
 // /onboarding originally did.
 function ControlTower() {
-  return <Layout><DemoModeBadge /><OnboardingResumeChip /><Outlet /></Layout>;
+  return <Layout><DemoModeBadge /><Outlet /></Layout>;
 }
 
 export default function App() {
   return (
     <Routes>
       {/* Home is the front door: goods in, goods out, or the tower. */}
-      <Route path="/" element={<><DemoModeBadge /><OnboardingResumeChip /><Home /></>} />
+      <Route path="/" element={<><DemoModeBadge /><Home /></>} />
 
       {/* Reachable on demand regardless of real data, for demoing the
           onboarding journey without actually emptying the database. Home
           itself renders this automatically when the catalog is empty.
-          DemoModeBadge here too, not just on Home: this route is also where
-          the "Continue setup" resume chip sends you from ANY other page, and
-          without it a manager landing here while still in demo mode saw no
-          banner, no Exit, at all - found by actually testing the combination
-          of two features built separately this session, not by inspection. */}
+          DemoModeBadge here too, not just on Home, so a manager landing here
+          straight from the "Preview the onboarding journey" settings link
+          while still in demo mode still sees the banner and Exit. */}
       <Route path="/onboarding" element={<><DemoModeBadge /><Onboarding /></>} />
 
       {/* Warehouse floor, no chrome. */}
@@ -54,8 +51,9 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/inventory/:skuId/forecast" element={<ForecastDetail />} />
-        {/* Reachable via a link from Inventory's header, not in Sidebar's
-            permanent nav — MVP2 is still a feature branch (Stan's call). */}
+        {/* Promoted to Sidebar's permanent nav 17 Sep (Stan's call, held open
+            since design.md first shipped this page); still also reachable
+            from Inventory's header link. */}
         <Route path="/forecast" element={<ForecastList />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/activity" element={<Activity />} />

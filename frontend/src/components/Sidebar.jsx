@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Bell, History, Home as HomeIcon } from "lucide-react";
+import { LayoutDashboard, TrendingUp, PackageSearch, Bell, History, Home as HomeIcon } from "lucide-react";
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 import EventCredit from "./EventCredit";
@@ -11,8 +11,17 @@ import AppMark from "./AppMark";
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTROL TOWER NAVIGATION (TASK-49)
 //
-// Two presentations of the same four destinations.
+// Two presentations of the same five destinations.
 //
+// Forecast was a fifth destination reachable only from a link on Inventory's
+// header for months: design.md called that deliberate, "MVP2 is still a
+// feature branch," pending Stan's own sign-off before committing to a
+// permanent 5th tab. He gave it (17 Sep), specifically alongside a decision
+// to route the actual approve/modify/reject action through Alerts only, not
+// duplicate it here: Forecast stays a place to SEE the recommendation and
+// its reasoning, Alerts stays the one place a policy value gets changed.
+//
+
 // DESKTOP, a left panel carrying navigation and nothing else. The settings that
 // used to sit expanded below the links (three explanation tiers, a caption, two
 // theme buttons) now live behind one entry at the bottom, which is where
@@ -46,6 +55,10 @@ export default function Sidebar() {
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
+    // Between Dashboard and Inventory: right after "how are we doing", right
+    // before "what do we hold". Matches the order a manager actually reasons
+    // in, decide-then-inspect rather than the other way round.
+    { to: "/forecast", label: "Forecast", icon: TrendingUp, badge: null },
     { to: "/inventory", label: "Inventory", icon: PackageSearch, badge: null },
     { to: "/alerts", label: "Alerts", icon: Bell, badge: alertCount },
     // Last on purpose: Activity is a record to consult, not a queue to work.

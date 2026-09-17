@@ -130,7 +130,12 @@ export const api = {
     if (!res.ok) throw new Error("Could not export sales history. Check the backend log.");
     return res.text();
   },
-  importSalesHistoryCsv: (csv, apply) => request("/skus/history/import-sales", { method: "POST", body: { csv, apply } }),
+  // pendingSkus (optional, [{sku_id, product_name}]): onboarding's combined
+  // catalog + sales preview (Onboarding.jsx). SKUs about to be created in
+  // the same action, not yet real, so the preview shouldn't flag them as
+  // unknown or show a placeholder where the real name is already known. See
+  // the route.
+  importSalesHistoryCsv: (csv, apply, pendingSkus) => request("/skus/history/import-sales", { method: "POST", body: { csv, apply, pendingSkus } }),
 
   // Dashboard
   getDashboardStats: () => request("/dashboard/stats"),

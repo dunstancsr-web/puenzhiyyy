@@ -93,6 +93,7 @@ const EDIT_GROUPS = [
       ["max_stock", "num", "Max stock", false, "MT"],
       ["reorder_point_policy", "num", "Reorder point", false, "MT"],
       ["lead_time_days", "num", "Lead time", false, "days"],
+      ["lead_time_std_days", "num", "Lead time variability (σ)", false, "days"],
       ["target_service_level_pct", "num", "Target service level", false, "%"],
       ["safety_stock_pct", "num", "Safety stock", false, "%"],
       ["min_order_qty", "num", "Min order qty", false, "MT"],
@@ -145,6 +146,9 @@ const SLIDER_SPECS = {
   target_service_level_pct: { min: 50, max: 99.9, step: 0.5 },
   safety_stock_pct: { min: 0, max: 50, step: 1 },
   lead_time_days: { min: 1, max: 120, step: 1 },
+  // Same range as the ForecastDetail "what if" sandbox's own slider for this
+  // field, so a value that looks sane in one place looks sane in the other.
+  lead_time_std_days: { min: 0, max: 15, step: 0.5 },
 };
 
 function resolveSpec(spec, { axisMax, physicalStock }) {

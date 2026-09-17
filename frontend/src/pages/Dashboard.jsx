@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList, ReferenceLine,
 } from "recharts";
@@ -13,6 +14,7 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
+import { isNudgePending, dismissForecastNudge } from "../lib/forecastNudge";
 
 // The hand-set PRIOR baseline that used to live here is GONE (TASK-85). It was
 // eight constants driving every trend arrow on this page, and the dashboard now
@@ -478,6 +480,14 @@ export default function Dashboard() {
   // ones. Same reasoning as showAllAttention above.
   const [attentionScope, setAttentionScope] = useState("exceptions");
 
+  // One-time nudge, armed by Onboarding.jsx (and "Try with sample data") the
+  // moment real data actually goes in. Read once on mount, not on every
+  // render, so dismissing it doesn't need to fight a value that recomputes
+  // from the same now-cleared flag a second later.
+  const [showNudge, setShowNudge] = useState(false);
+  useEffect(() => { setShowNudge(isNudgePending()); }, []);
+  const hideNudge = useCallback(() => { dismissForecastNudge(); setShowNudge(false); }, []);
+
   // Needs Attention now sits ABOVE the charts that filter it, so clicking a
   // health colour or a matrix cell changes something off screen. Scrolling the
   // table back into view is what keeps that feedback visible, and it is the
@@ -566,6 +576,35 @@ export default function Dashboard() {
         title="Inventory Dashboard"
         subtitle={`${new Date().toLocaleDateString("en-SG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} · ${s.totalSkus} active SKUs · data as of ${new Date(s.asOf).toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}`}
       />
+
+      {showNudge && (
+        <div className="card" style={{
+          display: "flex", alignItems: "center", gap: 14, padding: "16px 20px",
+          marginBottom: "var(--space-4)", borderLeft: "3px solid var(--blue)",
+        }}>
+          <TrendingUp size={22} color="var(--blue)" style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "var(--text-base)", fontWeight: 700 }}>
+              Your data is in: see what it's telling us
+            </div>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 2 }}>
+              Forecast Overview shows the demand pattern found in what you just added, and what it suggests for reorder points.
+            </div>
+          </div>
+          <Link to="/forecast" onClick={hideNudge} style={{
+            fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue)",
+            textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
+          }}>
+            View Forecast →
+          </Link>
+          <button onClick={hideNudge} aria-label="Dismiss" style={{
+            background: "none", border: "none", cursor: "pointer", padding: 2,
+            color: "var(--text-muted)", flexShrink: 0, display: "flex",
+          }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* ── KEY METRICS ────────────────────────────────────────────────────
           Stan's name for this block, and the one to use when talking about it:
