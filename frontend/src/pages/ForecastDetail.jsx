@@ -300,7 +300,13 @@ function ModelPicker({ mode, setMode, activeModel, scores, bestScore, models, on
           // and only one of them is the real winner backtest() picked.
           // forecast.model / activeModel already carries that exact answer.
           const isWinner = mode === "auto" && id === activeModel;
-          const barPct = score != null && bestScore != null ? Math.max(6, Math.round((bestScore / score) * 100)) : 0;
+          // score === 0 (a perfect backtest - every fold predicted exactly right)
+          // divides 0/0 into NaN, which renders as an invalid "NaN%" CSS width and
+          // breaks the bar entirely. bestScore is a min(), so score === 0 implies
+          // bestScore === 0 too - full bar, not a division.
+          const barPct = score == null || bestScore == null ? 0
+            : score === 0 ? 100
+            : Math.max(6, Math.round((bestScore / score) * 100));
           // A <div> with role="button", not a real <button>: the info hint
           // below needs its own focusable trigger, and a <button> can't
           // contain another interactive control (invalid HTML, and the two

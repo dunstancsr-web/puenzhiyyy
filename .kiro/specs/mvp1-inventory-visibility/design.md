@@ -397,16 +397,22 @@ its own"). Built to the same architectural rule as the rest of this app: **deter
 every figure, a human approves every action, a language model narrates and never computes.** No LLM call
 anywhere in this section.
 
-**The three forecast models** (`engines/forecast.js`), over the monthly-bucketed sales history
+**The four forecast models** (`engines/forecast.js`), over the monthly-bucketed sales history
 (`sales_transactions`, `status='fulfilled'`, same filter `velocity.js` already uses):
 ```
-naive_seasonal   forecast(month) = average of that same calendar month across every prior year
-                                    in history — zero parameters, the floor every other model must beat
-linear_trend     deseasonalize each month by its own seasonal-naive baseline, fit OLS on the
-                 deseasonalized series, project forward, reseasonalize
-holt_winters     additive triple exponential smoothing, 12-month season; alpha/beta/gamma fit by grid
-                 search minimizing in-sample SSE (never hand-set); degrades to naive_seasonal below two
-                 full seasonal cycles of history rather than fit unstable parameters on too little data
+naive_seasonal        forecast(month) = average of that same calendar month across every prior year
+                                         in history — zero parameters, the floor every other model must beat
+linear_trend          deseasonalize each month by its own seasonal-naive baseline, fit OLS on the
+                       deseasonalized series, project forward, reseasonalize
+holt_winters           additive triple exponential smoothing, 12-month season; alpha/beta/gamma fit by grid
+                       search minimizing in-sample SSE (never hand-set); degrades to naive_seasonal below two
+                       full seasonal cycles of history rather than fit unstable parameters on too little data
+holt_damped_seasonal   damped Holt level+trend (fixed alpha/beta/phi — ~24 points would overfit a fitted
+                       3-parameter model) blended 50/50 with a seasonal-naive term scaled to the current
+                       level. Ported from a teammate's independent branch (Tawmo,
+                       feature/demand-forecast-engine), credited in forecast.js's comments; adapted to
+                       read this same monthly series (their original read inventory_history.issues_qty
+                       directly) so all four models compare on one definition of demand
 avg_daily_demand_forecast = mean(next horizon_months' forecast qty) / 30   -- /30, not calendar-exact,
                                                                             to stay comparable with
                                                                             avg_daily_30d (velocity.js)
