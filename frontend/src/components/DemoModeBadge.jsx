@@ -69,14 +69,14 @@ export default function DemoModeBadge() {
         <>
           <style>{`
             @keyframes demoGlowBreathe {
-              0%, 100% { opacity: 0.07; }
-              50% { opacity: 0.42; }
+              0%, 100% { opacity: 0.17; }
+              50% { opacity: 0.38; }
             }
           `}</style>
           <div aria-hidden="true" style={{
             position: "fixed", inset: 0, zIndex: 199, pointerEvents: "none",
-            boxShadow: `inset 0 0 0 1px rgba(${GLOW_RGB[resolved]},1), inset 0 0 34px 6px rgba(${GLOW_RGB[resolved]},1)`,
-            animation: "demoGlowBreathe 3.6s ease-in-out infinite",
+            boxShadow: `inset 0 0 0 1.5px rgba(${GLOW_RGB[resolved]},1), inset 0 0 55px 22px rgba(${GLOW_RGB[resolved]},1)`,
+            animation: "demoGlowBreathe 4.2s ease-in-out infinite",
           }} />
         </>
       )}
