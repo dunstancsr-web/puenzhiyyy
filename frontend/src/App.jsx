@@ -18,9 +18,14 @@ import OnboardingResumeChip from "./components/OnboardingResumeChip";
 // standing at a dock has exactly one job on screen at a time. Wrapping only the
 // office routes in Layout is what keeps those two worlds apart.
 //
-// DemoModeBadge (MVP2 Day 7) mounts on Home and every Control Tower page, not
-// the handheld — the same reasoning that keeps the handheld chrome-free applies
-// here: an operator at a dock has one job on screen, not a demo toggle.
+// DemoModeBadge (MVP2 Day 7) mounts on Home, /onboarding, and every Control
+// Tower page, not the handheld — the same reasoning that keeps the handheld
+// chrome-free applies here: an operator at a dock has one job on screen, not
+// a demo toggle. Every OTHER route must mount it explicitly (React Router
+// doesn't share chrome across route elements the way Layout.jsx does for the
+// Control Tower's own pages) - this list is the single place to check when
+// adding a new route, so it doesn't silently miss the banner the way
+// /onboarding originally did.
 function ControlTower() {
   return <Layout><DemoModeBadge /><OnboardingResumeChip /><Outlet /></Layout>;
 }
@@ -33,8 +38,13 @@ export default function App() {
 
       {/* Reachable on demand regardless of real data, for demoing the
           onboarding journey without actually emptying the database. Home
-          itself renders this automatically when the catalog is empty. */}
-      <Route path="/onboarding" element={<Onboarding />} />
+          itself renders this automatically when the catalog is empty.
+          DemoModeBadge here too, not just on Home: this route is also where
+          the "Continue setup" resume chip sends you from ANY other page, and
+          without it a manager landing here while still in demo mode saw no
+          banner, no Exit, at all - found by actually testing the combination
+          of two features built separately this session, not by inspection. */}
+      <Route path="/onboarding" element={<><DemoModeBadge /><Onboarding /></>} />
 
       {/* Warehouse floor, no chrome. */}
       <Route path="/warehouse/inbound" element={<Inbound />} />

@@ -1135,3 +1135,14 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
   Verified the fix is sound by construction, not just at one window size: banner height plus `calc(100vh - banner height)` always equals exactly `100vh` regardless of the actual viewport, so it isn't a magic number tuned to one screen. Confirmed live anyway: read `--demo-banner-height` and `body`'s computed `padding-top` directly (both `40px` while active, both `0px` after Exit, no leftover state), and confirmed via `getBoundingClientRect()` that the sidebar's real last line of text sits comfortably inside the window rather than past its edge. Noted one separate, pre-existing cosmetic overlap while testing: the onboarding "Continue setup" resume chip (bottom-left, unrelated fixed element from an earlier session) visually sits on top of the sidebar's own footer text at a small window height - flagged to Stan, not fixed here, since it's a different bug from the one asked about.
 
   `check-formulas.js` and `npx vite build` both pass. No paid calls.
+
+## Session: 2026-09-17 (a real gap: the banner was missing on /onboarding entirely)
+- **Branch:** feature/onboarding-demo-ux (same branch, pushed after the previous entry)
+- **Files changed:** frontend/src/App.jsx
+- **Notes:** Stan asked, plainly, whether the previous fix actually covers every part of the demo app - a fair question after several rounds of "fixed it" that turned out to need another pass. Checked rather than reassured: `App.jsx`'s routes showed `/onboarding` mounted `<Onboarding />` alone, with no `<DemoModeBadge />` alongside it, unlike Home and every Control Tower page.
+
+  Reproduced it live before touching code: entered demo mode, navigated straight to `/onboarding`, and confirmed no banner, no "DEMO MODE" text, no Exit button anywhere on the page, despite `/api/demo/status` still reporting active. This route matters more than it looks: it's not just a direct-URL edge case, it's also exactly where this session's own "Continue setup" resume chip sends a manager from *any other page* in the app - so the combination of two features built separately earlier today had a real gap where combining them mattered, found only by testing them together, not by re-reading either one in isolation.
+
+  Added `<DemoModeBadge />` to the `/onboarding` route and expanded the comment above `ControlTower()` into the one place to check when adding a future route, naming all three current mount points (Home, `/onboarding`, Control Tower) rather than leaving a reader to rediscover this gap the same way. Verified live: banner now shows correctly on `/onboarding`, content pushed down as expected, Exit works.
+
+  `check-formulas.js` and `npx vite build` both pass. No paid calls.
