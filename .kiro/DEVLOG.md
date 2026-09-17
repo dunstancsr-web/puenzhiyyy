@@ -1055,3 +1055,8 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
   Also hit, mid-testing: this browser tab returned "0 products in your catalog" on Onboarding despite the backend correctly reporting 10 — traced to a lingering `stocksense_demo=1` cookie from earlier testing plus a since-restarted backend, so the demo-mode middleware self-healed into a fresh *empty* in-memory database exactly as `db/init.js` documents it should. Not a bug; confirmed by calling `/api/demo/exit` from the page console, which fixed it immediately.
 
   `check-formulas.js` and `npx vite build` both pass on `feature/mvp2-onboarding-day8`. No paid calls. Both PRs pushed; nothing merged, per Stan's holding pattern pending teammate alignment.
+
+## Session: 2026-09-17 (handover check ahead of a new session: flagged this branch's stale tracker)
+- **Branch:** feature/mvp2-onboarding-day8
+- **Files changed:** docs/(Stan) 1 Reference/(Stan) SUBMISSION TRACKER.md
+- **Notes:** Stan asked for a handover check before starting a fresh Claude session. Found: all open branches (`docs/mvp2-tracker-update`, `feature/mvp2-onboarding-day8`, `feature/onboarding-demo-ux`) are fully pushed with nothing stranded locally, but the submission tracker is only current on `docs/mvp2-tracker-update` / PR #3 - this branch and `feature/onboarding-demo-ux` both forked before that update landed, so they still show 15 Sep status. Added a pointer note at the top of this branch's copy so a fresh session starting here doesn't silently trust stale status; same fix applied to `feature/onboarding-demo-ux`. `main` has the same staleness but couldn't be patched directly (branch protection), so PR #3 merging is what actually resolves it, not a workaround.
