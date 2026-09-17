@@ -15,7 +15,7 @@
 ```
                 SQLite (backend/data/stocksense.db, WAL mode)
                                |
-              nine deterministic engines (engines/index.js)
+              eleven deterministic engines (engines/index.js)
                                |
           Express, port 4000 in development, one origin in production
       /api/... Control Tower (routes/inventory.js)

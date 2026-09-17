@@ -61,8 +61,10 @@ One owner per fact. Read it there, change it there, and link to it from anywhere
 
 ```
 backend/src/
-  engines/     nine deterministic engines, index.js orchestrates. The source of truth for EVERY
-               figure. Never recompute what they emit elsewhere.
+  engines/     eleven deterministic engines, index.js orchestrates (MVP2 added forecast.js and
+               riskbuffer.js). The source of truth for EVERY figure. Never recompute what they emit
+               elsewhere. onboardingSuggestions.js lives here too, called directly by routes/ rather
+               than orchestrated through index.js, since it only runs during onboarding.
   llm/         the explanation layer (see "The model layer" below); tone.js cleans the model's wording
   routes/      inventory.js is the Control Tower API, warehouse.js the handheld floor API
   db/          SQLite schema, deterministic seed, audit log

@@ -8,7 +8,7 @@ Four deliverables. Status as of 17 Sep.
 |---|---|---|---|
 | 1 | GitHub repo | done, kept current. **MVP2 merged to main 17 Sep** (PR #2): forecasting (4 models incl. a teammate's, Tawmo), a portfolio-wide Forecast overview page, a risk buffer, demo mode, and the Day Zero onboarding flow | nothing |
 | 2 | Deployment URL | image built, tested and published by GitHub Actions **as of the pre-MVP2 code**; **not yet redeployed with MVP2, and Lightsail service still not created as of 15 Sep** | Deploy now: follow `(Stan) DEPLOY-LIGHTSAIL.md` in this folder. Since main moved substantially, `check-deploy.js` should be re-run against whatever's live before trusting the URL again |
-| 3 | YouTube demo video | script below is still the pre-MVP2 (15 Sep) version, MVP1-scoped only. **Decided 17 Sep: staying MVP1-scoped, not adding an MVP2 beat for now** | Stan records, near the end, with the final paid check |
+| 3 | YouTube demo video | **the scripted version below is archived, 17 Sep — Stan does not intend to use it**; no replacement plan recorded yet | Stan records, near the end, with the final paid check; approach is his own call |
 | 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 15 Sep, all three screenshots current, MVP1-scoped only. **Decided 17 Sep: staying MVP1-scoped for now** | fill in the URL, PIN and spend figure **in the PDF only**, then export |
 
 ## Before submitting, in this order
@@ -17,7 +17,8 @@ Four deliverables. Status as of 17 Sep.
 2. **Final paid check**: run `node backend/scripts/sonnet-check.js` first, which prints the alerts and
    the estimated cost, then again with `--confirm-spend`. Add the rows to `(Stan) MODEL SPEND.md` in
    this folder.
-3. **Record the video**, following the recording checklist below.
+3. **Record the video**, Stan's own approach (the archived script/checklist below is reference only, not
+   current instructions).
 4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `docs/Submission/WRITEUP.md`.
 5. **Submit**, then capture evidence of the live service before the lease ends.
 
@@ -48,17 +49,18 @@ Four deliverables. Status as of 17 Sep.
 | Formulas where the spec and the code disagreed | lost sales are not sales; Slow Moving means over 120 days of cover; one demand rate, the 30 day moving average, across the whole app (15 Sep) | each conflict, choice and reason: design.md, "Formula decisions" |
 | Urgency in model summaries | removed by a rule after the model answers, not by retries (15 Sep) | free and predictable; design.md, "Explanation Layer", Tone |
 | How documents and rules are kept | filed by reader, listed in `docs/DIRECTORY.md`, every rule in `.kiro/steering/rules.md`, one owner per fact (15 Sep) | `.kiro/steering/rules.md` |
-| Demo video and PDF write-up scope, after MVP2 merged | stay MVP1-scoped for now, no forecasting/demo-mode beat added (17 Sep) | revisit only if Stan raises it again |
+| PDF write-up scope, after MVP2 merged | stay MVP1-scoped for now, no forecasting/demo-mode section added (17 Sep) | revisit only if Stan raises it again |
+| Scripted demo video (Beat 1-7 table below) | archived, not used (17 Sep) — Stan will record his own way; no fixed script | the archived table is kept for reference only, not as instructions |
 
 ## Judging criteria
 
 From the steering doc: **Architecture & Reasoning Loop, Tool Use & Integration, Autonomy &
 Human-in-the-Loop, Observability**, plus the organizers' rubric item 7, **Platform & Tooling Usage**.
 
-- **Architecture & Reasoning Loop.** Strong on both halves now. Nine deterministic engines, and a live
-  model layer that narrates without computing: placeholders make an invented figure unwritable, the
-  system writes the opening sentence and guarantees the action, and every answer is checked before it
-  is shown, with the rule-based explanation as the fallback.
+- **Architecture & Reasoning Loop.** Strong on both halves now. Eleven deterministic engines (MVP2 added
+  forecasting and a risk buffer), and a live model layer that narrates without computing: placeholders
+  make an invented figure unwritable, the system writes the opening sentence and guarantees the action,
+  and every answer is checked before it is shown, with the rule-based explanation as the fallback.
 - **Tool Use & Integration.** SQLite, a REST API for the Control Tower and another for the warehouse
   floor, three model tiers behind one call, a CI pipeline that builds, smoke tests and secret scans
   the image.
@@ -81,7 +83,14 @@ family."* That is where a judge hears the name was derived rather than decorated
 
 ---
 
-## Demo video script
+## Demo video script (ARCHIVED, 17 Sep — not in use)
+
+**Stan does not intend to use this script.** Kept below for reference only, not as recording
+instructions; do not treat its beats as a current plan, and do not "fix" it for internal consistency
+against later decisions (that's exactly the trap this note prevents). If a fixed script is wanted again,
+write a new one against MVP2 as it stands rather than patching this one.
+
+<details><summary>Original script, written for MVP1</summary>
 
 Built around the reasoning loop rather than a tour of the pages. A tour shows what was built; the loop
 shows what it is *for*, and it covers every judging criterion in one take. **Target: 3 to 4 minutes.**
@@ -133,6 +142,8 @@ happened in this project:
    A plain `npm run seed` only warns; the reset refuses unless you confirm the calls are in the ledger.
 5. **It checks the app, not just the data.** Both servers answering, and the alerts the script needs,
    as the browser will see them.
+
+</details>
 
 ---
 
