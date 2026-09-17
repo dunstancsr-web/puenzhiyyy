@@ -1146,3 +1146,14 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
   Added `<DemoModeBadge />` to the `/onboarding` route and expanded the comment above `ControlTower()` into the one place to check when adding a future route, naming all three current mount points (Home, `/onboarding`, Control Tower) rather than leaving a reader to rediscover this gap the same way. Verified live: banner now shows correctly on `/onboarding`, content pushed down as expected, Exit works.
 
   `check-formulas.js` and `npx vite build` both pass. No paid calls.
+
+---
+
+## Session: 2026-09-17 (handover check for a new remote session)
+- **Branch:** feature/onboarding-demo-ux
+- **Files changed:** docs/(Stan) 1 Reference/(Stan) SUBMISSION TRACKER.md
+- **Notes:** Stan asked for a handover check before starting a fresh remote Claude session. Confirmed all five tracked branches (`main`, `docs/mvp2-tracker-update`, `feature/mvp2-onboarding-day8`, `feature/onboarding-demo-ux`, `feature/mvp2-forecast-day1`) are pushed with nothing stranded locally, and `feature/mvp2-onboarding` is a harmless stale local-only branch already merged via PR #2.
+
+  Found the tracker had fragmented across branches: only `docs/mvp2-tracker-update` (PR #3, not yet merged) carries the current 17 Sep status; `main`, `feature/mvp2-onboarding-day8` and this branch all still show 15 Sep, since they forked before PR #3 landed. `main` cannot be patched directly (branch protection, PR-only), so added a stale-copy pointer note to the top of the tracker on this branch and on `feature/mvp2-onboarding-day8`, pointing a cold read at PR #3 instead. Also confirmed `feature/onboarding-demo-ux` has no PR open yet, unlike `docs/mvp2-tracker-update` (PR #3) and `feature/mvp2-onboarding-day8` (PR #4); `gh` is still unauthenticated in this sandbox, so gave Stan the compare URL to open it by hand.
+
+  Docs-only change. `check-formulas.js` unaffected. No paid calls.
