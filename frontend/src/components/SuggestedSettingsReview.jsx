@@ -3,25 +3,36 @@ import { ChevronRight, Info } from "lucide-react";
 import { Stat, Panel } from "./ImportPreview";
 import HoverHint from "./HoverHint";
 
-// IEEE-style reference. [1]'s actual finding is a caveat, not an endorsement:
-// it shows fixed per-tier service levels (the practice below) leave real
-// savings on the table versus full cost-based optimization — cited here for
-// that honesty, not because it proves 98/95/90 is the right split.
+// Progressive disclosure, not a full paragraph up front: the short claim
+// reads on hover, the IEEE citation stays collapsed behind a native
+// <details> toggle until someone actually wants to fact-check it. [1]'s
+// actual finding is a caveat, not an endorsement — it shows fixed per-tier
+// service levels (the practice below) leave real savings on the table
+// versus full cost-based optimization, cited for that honesty, not because
+// it proves 98/95/90 is the right split.
 const ServiceLevelHint = () => (
   <div style={{ fontSize: "var(--text-xs)", lineHeight: 1.5 }}>
-    <p style={{ margin: "0 0 8px" }}>
+    <p style={{ margin: "0 0 6px" }}>
       A widely used starting point in FMCG practice (roughly A 97&ndash;99%, B 93&ndash;96%, C 88&ndash;92%), not a
-      cost-optimal calculation. Peer-reviewed research [1] shows fixed per-tier service levels leave real savings on
-      the table versus full cost-based optimization, which is out of scope here.
+      cost-optimal calculation<sup>[1]</sup>.
     </p>
-    <p style={{ margin: 0, color: "var(--text-muted)" }}>
-      [1] R. H. Teunter, M. Z. Babai, and A. A. Syntetos, &ldquo;ABC classification: Service levels and inventory
-      costs,&rdquo; <i>Production and Operations Management</i>, vol. 19, no. 3, pp. 343&ndash;352, 2010, doi:{" "}
-      <a href="https://doi.org/10.1111/j.1937-5956.2009.01098.x" target="_blank" rel="noopener noreferrer"
-        style={{ color: "var(--blue)", textDecoration: "underline" }}>
-        10.1111/j.1937-5956.2009.01098.x
-      </a>.
-    </p>
+    <details>
+      <summary style={{ cursor: "pointer", color: "var(--blue)", fontWeight: 600, listStyle: "none" }}>
+        Show source
+      </summary>
+      <p style={{ margin: "6px 0 0", color: "var(--text-muted)" }}>
+        Peer-reviewed research shows fixed per-tier service levels leave real savings on the table versus full
+        cost-based optimization, which is out of scope here.
+      </p>
+      <p style={{ margin: "6px 0 0", color: "var(--text-muted)" }}>
+        [1] R. H. Teunter, M. Z. Babai, and A. A. Syntetos, &ldquo;ABC classification: Service levels and inventory
+        costs,&rdquo; <i>Production and Operations Management</i>, vol. 19, no. 3, pp. 343&ndash;352, 2010, doi:{" "}
+        <a href="https://doi.org/10.1111/j.1937-5956.2009.01098.x" target="_blank" rel="noopener noreferrer"
+          style={{ color: "var(--blue)", textDecoration: "underline" }}>
+          10.1111/j.1937-5956.2009.01098.x
+        </a>.
+      </p>
+    </details>
   </div>
 );
 
