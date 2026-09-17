@@ -98,6 +98,9 @@ export const api = {
     return res.text();
   },
   importSkusCsv: (csv, apply) => request("/skus/import", { method: "POST", body: { csv, apply } }),
+  // Update-only (sku_id is the key). For CREATING new SKUs from a spreadsheet
+  // — onboarding's empty-catalog case — see importNewSkusCsv below.
+  importNewSkusCsv: (csv, apply) => request("/skus/import-new", { method: "POST", body: { csv, apply } }),
 
   // Monthly history (TASK-85). A separate file from the SKU export because it
   // has a different grain: one row per SKU per month, not one per SKU.

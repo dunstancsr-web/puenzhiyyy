@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDownToLine, ArrowUpFromLine, ArrowRight } from "lucide-react";
 import EventCredit from "../components/EventCredit";
@@ -7,6 +7,9 @@ import ColHint from "../components/ColHint";
 import TowerIcon from "../components/TowerIcon";
 import useDeviceClass from "../hooks/useDeviceClass";
 import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
+import { api } from "../api/inventory";
+import Onboarding from "./Onboarding";
+import LoadingState from "../components/LoadingState";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME (TASK-47, renamed TASK-48 and TASK-50, rebuilt TASK-74 and TASK-78)
@@ -188,6 +191,22 @@ export default function Home() {
   const primary = handheld ? FLOOR : OFFICE;
   const secondary = handheld ? OFFICE : FLOOR;
   const secondaryLabel = handheld ? "In the office" : "On the warehouse floor";
+
+  // MVP2: a genuinely empty catalog gets the onboarding journey instead of
+  // the workspace launcher, since there is nothing here yet to launch into.
+  // null = still checking, so the launcher never flashes before the count is
+  // known. Reachable on demand regardless of real data at /onboarding
+  // (App.jsx), for demoing the flow without emptying the database.
+  const [skuCount, setSkuCount] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.getSkus().then((list) => { if (!cancelled) setSkuCount(list.length); })
+      .catch(() => { if (!cancelled) setSkuCount(-1); }); // -1: couldn't check, don't block the launcher on it
+    return () => { cancelled = true; };
+  }, []);
+
+  if (skuCount === null) return <LoadingState label="Loading…" />;
+  if (skuCount === 0) return <Onboarding />;
 
   return (
     <div style={{

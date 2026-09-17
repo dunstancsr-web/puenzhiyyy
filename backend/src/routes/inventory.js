@@ -1214,6 +1214,136 @@ router.post("/skus/:id/forecast/preview", (req, res) => {
 });
 const round1 = (n) => Math.round(n * 10) / 10;
 
+// POST /api/skus/import-new — CREATE SKUs from a spreadsheet (MVP2 onboarding)
+//
+// /skus/import above is UPDATE-only by design (sku_id is the key and import
+// "cannot create or delete SKUs") — exactly right for correcting an existing
+// catalog, and exactly wrong for a first-run upload into an EMPTY one, where
+// every row would hit "is not a known SKU" and the whole file would refuse to
+// apply. This is the create-shaped counterpart, same 3-step preview/apply
+// contract, same field set POST /skus accepts for a single SKU. A sku_id that
+// already exists is an error here, not silently skipped or overwritten —
+// creating and updating stay two different, explicit actions.
+const CREATE_KEY = "sku_id";
+const CREATE_REQUIRED = ["sku_id", "product_name"];
+const CREATE_TEXT = ["rice_variety", "grade", "country_of_origin", "brand", "packaging_size", "supplier"];
+const CREATE_NUMERIC = [
+  "min_order_qty", "reorder_point_policy", "min_stock", "target_stock", "max_stock",
+  "safety_stock_pct", "lead_time_days", "unit_cost_sgd", "unit_price_sgd",
+];
+const CREATE_COLUMNS = [...CREATE_REQUIRED.filter((f) => f !== CREATE_KEY), ...CREATE_TEXT, ...CREATE_NUMERIC, CREATE_KEY];
+
+router.post("/skus/import-new", (req, res) => {
+  const { csv, apply = false } = req.body || {};
+  if (typeof csv !== "string" || !csv.trim()) {
+    return res.status(400).json({ success: false, message: "No CSV content was received" });
+  }
+
+  let parsed;
+  try {
+    parsed = parseCsv(csv);
+  } catch (err) {
+    return res.status(400).json({ success: false, message: `Could not read the file: ${err.message}` });
+  }
+  for (const k of ["sku_id", "product_name"]) {
+    if (!parsed.columns.includes(k)) {
+      return res.status(400).json({
+        success: false,
+        message: `The file has no ${k} column, which every new product needs.`,
+      });
+    }
+  }
+
+  try {
+    const db = getDb();
+    const known = new Set(db.prepare(`SELECT sku_id FROM skus`).all().map((r) => r.sku_id));
+    const ignored = parsed.columns.filter((c) => !CREATE_COLUMNS.includes(c));
+
+    const toCreate = [];
+    const errors = [];
+    const seen = new Set();
+
+    for (const row of parsed.rows) {
+      const line = row.__line;
+      const id = row.sku_id;
+      if (!id) { errors.push({ line, message: `Row ${line} has no sku_id` }); continue; }
+      if (seen.has(id)) { errors.push({ line, message: `${id} appears more than once (line ${line})` }); continue; }
+      seen.add(id);
+      if (known.has(id)) { errors.push({ line, message: `${id} already exists (line ${line}) — use Upload SKUs to edit it instead` }); continue; }
+      if (!row.product_name) { errors.push({ line, message: `${id}: product_name is required (line ${line})` }); continue; }
+
+      const record = { sku_id: id, product_name: row.product_name };
+      let rowFailed = false;
+      for (const f of CREATE_TEXT) record[f] = row[f] || null;
+      for (const f of CREATE_NUMERIC) {
+        const raw = row[f];
+        if (raw === undefined || raw === "") { record[f] = 0; continue; }
+        const n = Number(raw);
+        if (!Number.isFinite(n) || n < 0) {
+          errors.push({ line, message: `${id}: ${f} must be a number >= 0 (line ${line})` });
+          rowFailed = true;
+          break;
+        }
+        record[f] = n;
+      }
+      if (rowFailed) continue;
+      toCreate.push({ line, record });
+    }
+
+    const summary = {
+      rows: parsed.rows.length,
+      changed: toCreate.length, // reused for BulkEdit.jsx/Onboarding.jsx's shared blocked/apply-button logic
+      unchanged: 0,
+      errors,
+      warnings: [],
+      ignoredColumns: ignored,
+      changes: toCreate.map(({ record }) => ({ sku_id: record.sku_id, name: record.product_name, fields: {} })),
+      applied: false,
+    };
+
+    if (!apply || errors.length || !toCreate.length) {
+      return res.json({ success: true, data: summary });
+    }
+
+    const insertSku = db.prepare(`
+      INSERT INTO skus (
+        sku_id, product_name, rice_variety, grade, country_of_origin, brand, packaging_size, uom, supplier,
+        min_order_qty, reorder_point_policy, min_stock, target_stock, max_stock, safety_stock_pct,
+        lead_time_days, unit_cost_sgd, unit_price_sgd, active
+      ) VALUES (
+        @sku_id, @product_name, @rice_variety, @grade, @country_of_origin, @brand, @packaging_size, 'MT', @supplier,
+        @min_order_qty, @reorder_point_policy, @min_stock, @target_stock, @max_stock, @safety_stock_pct,
+        @lead_time_days, @unit_cost_sgd, @unit_price_sgd, 1
+      )`);
+    const insertPos = db.prepare(`
+      INSERT INTO inventory_positions (sku_id, on_hand_qty, reserved_qty, quality_hold_qty, last_received_date)
+      VALUES (?, 0, 0, 0, ?)`);
+
+    const run = db.transaction(() => {
+      for (const { record } of toCreate) { insertSku.run(record); insertPos.run(record.sku_id, today()); }
+    });
+    run();
+
+    const { skus: after } = getAnalytics();
+    const afterIndex = new Map(after.map((s) => [s.sku_id, s]));
+    for (const { record } of toCreate) {
+      const created = afterIndex.get(record.sku_id);
+      logEvent(EVENTS.SKU_CREATED, {
+        skuId: record.sku_id,
+        input: { source: "csv_import", product_name: record.product_name, supplier: record.supplier },
+        output: created
+          ? { abc_class: created.abc_class, reorder_point_suggested: created.reorder_point_suggested, health_status: created.health_status }
+          : null,
+      });
+    }
+
+    res.json({ success: true, data: { ...summary, applied: true } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to create SKUs" });
+  }
+});
+
 // ── Inventory ────────────────────────────────────────────────────────────────
 
 // POST /api/inventory/restock — add on-hand quantity, reset the receipt clock

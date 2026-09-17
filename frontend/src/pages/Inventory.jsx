@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { createPortal } from "react-dom";
-import { useNavigate, Link } from "react-router-dom";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
@@ -173,6 +173,19 @@ export default function Inventory() {
   const [restockQty, setRestockQty] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSku, setSelectedSku] = useState(null);
+
+  // Onboarding's "Add one product by hand" hands off here rather than
+  // duplicating this form: /inventory?add=1 opens the same Add SKU modal a
+  // manual click on the header button would.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("add") === "1") {
+      setShowAddModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("add");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const loadSkus = useCallback(() => {
     setLoadError(null);

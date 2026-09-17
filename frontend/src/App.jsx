@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route, Outlet } from "react-router-dom";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
+import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Alerts from "./pages/Alerts";
@@ -28,6 +29,11 @@ export default function App() {
     <Routes>
       {/* Home is the front door: goods in, goods out, or the tower. */}
       <Route path="/" element={<><DemoModeBadge /><Home /></>} />
+
+      {/* Reachable on demand regardless of real data, for demoing the
+          onboarding journey without actually emptying the database. Home
+          itself renders this automatically when the catalog is empty. */}
+      <Route path="/onboarding" element={<Onboarding />} />
 
       {/* Warehouse floor, no chrome. */}
       <Route path="/warehouse/inbound" element={<Inbound />} />
