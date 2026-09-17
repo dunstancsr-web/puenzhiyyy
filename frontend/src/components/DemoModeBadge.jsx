@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PlayCircle, LogOut } from "lucide-react";
 import { api } from "../api/inventory";
+import { useTheme } from "../context/ThemeContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEMO MODE (MVP2 Day 7). A fixed top-right control, visible on every page
@@ -15,7 +16,13 @@ import { api } from "../api/inventory";
 // stale state from the one that was just swapped out from under it.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// `resolved`, not `theme` — theme can be "auto", and a colour decision has to
+// pick a real appearance rather than silently taking the light branch on a
+// dark page (see rules.md's own note on this exact trap).
+const GLOW_RGB = { light: "37, 99, 235", dark: "255, 255, 255" };
+
 export default function DemoModeBadge() {
+  const { resolved } = useTheme();
   const [active, setActive] = useState(null); // null = not checked yet
   const [busy, setBusy] = useState(false);
 
@@ -51,14 +58,27 @@ export default function DemoModeBadge() {
         // A screen-edge frame, the same idea as a Zoom screen-share border: a
         // constant, peripheral cue that survives navigating anywhere in the
         // app, so a manager can't lose track of being in the sandbox and
-        // mistake a demo action for a real one. Static, not pulsing —
-        // restraint over a distracting animation while this is being shown
-        // to someone. Non-interactive and behind the badge itself (z-index),
-        // so it never intercepts a click.
-        <div aria-hidden="true" style={{
-          position: "fixed", inset: 0, zIndex: 199, pointerEvents: "none",
-          boxShadow: "inset 0 0 0 3px var(--blue), inset 0 0 28px 2px rgba(37, 99, 235, 0.35)",
-        }} />
+        // mistake a demo action for a real one. Diffused and breathing
+        // rather than a hard strip, tuned in frontend/tuners/demo-glow.html
+        // (blue on light, white on dark, since blue reads as barely-there
+        // against a dark page). The shape (ring/blur/spread) is fixed and
+        // only opacity animates - the compositor-only property a browser
+        // can animate with no repaint, so this costs nothing per frame.
+        // Non-interactive and behind the badge itself (z-index), so it
+        // never intercepts a click.
+        <>
+          <style>{`
+            @keyframes demoGlowBreathe {
+              0%, 100% { opacity: 0.07; }
+              50% { opacity: 0.42; }
+            }
+          `}</style>
+          <div aria-hidden="true" style={{
+            position: "fixed", inset: 0, zIndex: 199, pointerEvents: "none",
+            boxShadow: `inset 0 0 0 1px rgba(${GLOW_RGB[resolved]},1), inset 0 0 34px 6px rgba(${GLOW_RGB[resolved]},1)`,
+            animation: "demoGlowBreathe 3.6s ease-in-out infinite",
+          }} />
+        </>
       )}
       <div style={{ position: "fixed", top: 14, right: 14, zIndex: 200 }}>
       {active ? (
