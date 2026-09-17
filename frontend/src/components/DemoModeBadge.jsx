@@ -46,7 +46,21 @@ export default function DemoModeBadge() {
   if (active === null) return null; // avoid a flash of the wrong button before the first check resolves
 
   return (
-    <div style={{ position: "fixed", top: 14, right: 14, zIndex: 200 }}>
+    <>
+      {active && (
+        // A screen-edge frame, the same idea as a Zoom screen-share border: a
+        // constant, peripheral cue that survives navigating anywhere in the
+        // app, so a manager can't lose track of being in the sandbox and
+        // mistake a demo action for a real one. Static, not pulsing —
+        // restraint over a distracting animation while this is being shown
+        // to someone. Non-interactive and behind the badge itself (z-index),
+        // so it never intercepts a click.
+        <div aria-hidden="true" style={{
+          position: "fixed", inset: 0, zIndex: 199, pointerEvents: "none",
+          boxShadow: "inset 0 0 0 3px var(--blue), inset 0 0 28px 2px rgba(37, 99, 235, 0.35)",
+        }} />
+      )}
+      <div style={{ position: "fixed", top: 14, right: 14, zIndex: 200 }}>
       {active ? (
         <button onClick={exit} disabled={busy} title="Exit demo mode: drops the sandbox, returns to the real data" style={{
           display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 99,
@@ -65,6 +79,7 @@ export default function DemoModeBadge() {
           <PlayCircle size={14} /> {busy ? "Entering…" : "Enter demo mode"}
         </button>
       )}
-    </div>
+      </div>
+    </>
   );
 }
