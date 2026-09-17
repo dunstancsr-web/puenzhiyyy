@@ -1041,3 +1041,16 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
   Verified live end-to-end: minimize at step 1 (empty catalog) → lands on Home's real workspace picker with the chip showing → chip resumes at step 1. Minimize at step 2 (simulated via localStorage) → resumes at step 2 correctly. "Skip for now" at step 2 clears both keys and correctly falls through to Onboarding again, since the catalog is still genuinely empty at that point — not a bug, the honest outcome when there's truly nothing to explore yet.
 
   `check-formulas.js` and `npx vite build` both pass. No paid calls.
+
+## Session: 2026-09-17 (a design tuner for the demo-mode glow)
+- **Branch:** feature/onboarding-demo-ux (same branch, pushed after the previous entry)
+- **Files changed:** frontend/tuners/demo-glow.html (new), frontend/tuners/README.md
+- **Notes:** Stan wanted the demo-mode glow (added earlier this session) more diffused and breathing rather than a static blue strip, and asked for a tuner in the same style as `type-scale.html`/`glass-tooltip.html` rather than describing the look in words, plus a straight answer on whether animating it costs anything on the hosting side.
+
+  Built `demo-glow.html` following the existing tuners' exact conventions (no `<!doctype>`/`<html>`/`<body>`, Google Fonts preconnect, light/dark token blocks, versioned localStorage key, a real mock Control Tower behind the glow rather than an empty box, Copy CSS button). Controls: ring (the thin solid edge), diffusion (blur), thickness (spread), opacity min/max and cycle length for the breathe, plus four presets from "As shipped (static)" to "Unmissable."
+
+  Answered the cost question directly rather than just building the tool: zero hosting cost either way, since this is pure client-side CSS that never touches the API, database, or the Lightsail container. The real (client-side) cost is kept near-zero by animating opacity only, one of the few CSS properties a browser animates on the compositor thread with no repaint or layout, rather than animating the shadow's blur/spread values directly, which would force a full-viewport repaint every frame. Built the tuner's own apply() function to actually work this way (fixed box-shadow, only opacity/animation change), not just claim it in the note text, so the generated CSS block is honest about what it hands back.
+
+  Caught two writing-rule violations before shipping, not after: several literal em dashes in the file's own prose and JS comments (this repo's rules.md bans em/en dashes everywhere, including code comments) rendered as mojibake once served without a charset meta, exactly the failure mode the tuners' own README already warns about for non-ASCII characters. Replaced all seven with commas, colons or parentheses per house style, then re-verified rendering clean in a real browser (served locally via python3 -m http.server, since the browser tool can't navigate file:// URLs directly) rather than trusting the fix by inspection.
+
+  Not yet applied to DemoModeBadge.jsx itself: Stan is tuning it first and will send back the generated CSS block. No paid calls.
