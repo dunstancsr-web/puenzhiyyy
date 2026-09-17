@@ -1105,3 +1105,22 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
   `demo-glow.html` now describes a component that no longer exists in the shipped app. Flagged this honestly in the tuners README (superseded, kept for reference) rather than leaving it silently stale, which is the exact "recapture stale screenshots" failure mode `rules.md` already warns about for the features guide.
 
   Verified live: banner shows correctly on Home and on Dashboard (sidebar and main content both pushed down, no overlap); Exit correctly removes the banner, restores the padding, and returns the "Enter demo mode" pill. `check-formulas.js` and `npx vite build` both pass. No paid calls.
+
+## Session: 2026-09-17 (a real layout bug in the new banner, and a tuner for what to do about it)
+- **Branch:** feature/onboarding-demo-ux (same branch, pushed after the previous entry)
+- **Files changed:** frontend/tuners/demo-frame.html (new), frontend/tuners/README.md
+- **Notes:** Stan sent a screenshot of the just-shipped banner and found two real problems: the sidebar's bottom items (workspace switcher, "Running on StockSense" footer) were clipped by the browser window, and he asked for an interactive mockup to choose the layout rather than another round of chat description.
+
+  Diagnosed the clip: `Layout.jsx`'s sidebar and main both size themselves to `100vh` independently, and the banner's `padding-top` on `<body>` adds height on top of that without either child knowing, so the total content is taller than the actual visible window and the bottom of the sidebar runs off-screen. A real bug, not a one-off - any layout claiming a full viewport height stacks badly under a banner that reserves its own space at the top.
+
+  Stan proposed the actual fix himself: instead of overlaying a strip and accounting for it everywhere, shrink the app's own content area so the indicator is structural (a frame around the window) rather than an overlay competing for space. Built `demo-frame.html` to compare that against the current banner and a third option (a minimized strip that expands on hover) side by side, using a fixed-height mock browser window so the clipping bug reproduces in the tool exactly like it did in the real screenshot, rather than an infinitely-tall page that would hide it. Controls: which approach, its thickness, label alignment, and which side the Exit button sits on.
+
+  All three modes confirmed what the diagnosis predicted: full banner clips whenever content is tall enough to already fill the window; the minimized strip only reserves a negligible 10px so it barely clips but leaves Exit unreachable without hovering first; the frame clips nothing by construction, since the app's content area is inset by the frame's thickness on every side rather than sized independently.
+
+  `emit()` here hands back a plain text description (mode, thickness, alignment, exit side) rather than paste-in CSS, since the three approaches need different code shapes - the frame's fix specifically touches `Layout.jsx`'s sizing, not just `DemoModeBadge.jsx`, so building it needs to happen in code, not by pasting a style block.
+
+  Caught the exact charset bug the tuners README already documents before it shipped: the mock sidebar's Chinese brand text rendered as mojibake once served without a charset meta, the same failure `brand.html`'s own build script exists to prevent. Fixed by escaping it as numeric HTML entities, matching that established convention, and reverified rendering clean in a real browser.
+
+  Also hit a tooling artifact worth recording so it is not mistaken for a real bug later: the browser automation tool's hover coordinates twice landed on the wrong element (a scroll-position mismatch between the screenshot and the page's actual layout), making the minimized strip look unresponsive to hover. Verified the underlying interaction logic directly instead (calling the element's own `onmouseenter`/`onmouseleave` handlers), confirmed it expands and collapses correctly, and did not chase a bug that was not there.
+
+  No code shipped yet for the actual fix - waiting on Stan to pick a mode from the tuner. `check-formulas.js` unaffected (docs-only change). No paid calls.
