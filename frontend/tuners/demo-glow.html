@@ -78,9 +78,12 @@
   .stage-row { display: flex; gap: 10px; }
   .stage-row > div { flex: 1; }
 
-  /* The glow layer under test: fixed shape, animated opacity only. See the
-     Performance panel for why this split matters. */
-  .glow { position: absolute; inset: 0; pointer-events: none; }
+  /* The glow layer under test. Flat mode paints boxShadow directly on .glow
+     with opacity/animation; gradient mode masks .glow to a ring and rotates
+     .glow-inner underneath it. Either way only transform/opacity animate -
+     see the Performance panel for why that split matters. */
+  .glow { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .glow-inner { position: absolute; inset: -50%; }
 
   .verdict-row { display: flex; gap: 10px; flex-wrap: wrap; }
   .vbox { flex: 1; min-width: 120px; border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
@@ -96,6 +99,11 @@
   .preset { appearance: none; cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 500; background: var(--chrome); color: var(--ink); border: 1px solid var(--line); padding: 5px 11px; border-radius: 99px; }
   .preset:hover { border-color: var(--accent); color: var(--accent-ink); }
   .preset:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .seg { display: flex; gap: 4px; background: var(--chrome); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+  .seg button { appearance: none; border: 0; background: transparent; cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink-2); padding: 5px 12px; border-radius: 6px; flex: 1; }
+  .seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); font-weight: 600; }
+  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
   .grp { margin-top: 4px; }
   .grp + .grp { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
@@ -126,8 +134,11 @@
   .switch input:checked ~ .track { background: var(--accent); }
   .switch input:checked ~ .thumb { transform: translateX(16px); }
 
+  .stops { display: flex; gap: 5px; margin-bottom: 4px; }
+  .stops span { flex: 1; height: 18px; border-radius: 4px; border: 1px solid var(--line-soft); }
+
   .outwrap { margin-top: 20px; }
-  pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12px; line-height: 1.7; tab-size: 2; color: var(--ink); background: var(--chrome); border-top: 1px solid var(--line-soft); }
+  pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12px; line-height: 1.7; tab-size: 2; color: var(--ink); background: var(--chrome); border-top: 1px solid var(--line-soft); white-space: pre; }
   .btn { appearance: none; cursor: pointer; border: 1px solid transparent; background: var(--accent); color: #fff; font-family: var(--sans); font-size: 12px; font-weight: 600; padding: 6px 13px; border-radius: 8px; }
   .btn.ghost { background: transparent; color: var(--ink-2); border-color: var(--line); }
   .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -142,8 +153,9 @@
     <h1>Demo Glow Tuner</h1>
     <p class="sub">
       Tunes the demo-mode screen-edge glow (<code>DemoModeBadge.jsx</code> in <code>frontend/src/components/</code>),
-      a diffused, breathing frame rather than a hard blue line, without needing to describe "a bit more
-      spread" in words. Move things, then copy the block at the bottom back into the chat.
+      a diffused frame around the whole app rather than a hard blue line, without needing to describe "a bit more
+      spread" in words. Two looks: a flat breathing ring, or an Apple Intelligence-style rotating gradient. Move
+      things, then copy the block at the bottom back into the chat.
     </p>
   </header>
 
@@ -162,7 +174,7 @@
             </div>
             <div class="stage-card" id="c3" style="height:120px"></div>
           </div>
-          <div class="glow" id="glow"></div>
+          <div class="glow" id="glow"><div class="glow-inner" id="glowInner"></div></div>
         </div>
       </section>
 
@@ -186,30 +198,51 @@
 
     <!-- ══ RIGHT: controls ══ -->
     <section class="card">
-      <div class="hd"><h2>Controls</h2></div>
+      <div class="hd">
+        <h2>Controls</h2>
+        <div class="seg" id="styleSeg" role="group" aria-label="Glow style" style="width:160px"></div>
+      </div>
       <div class="bd">
         <div class="grp">
           <div class="grp-t">Presets</div>
           <div class="presets" id="presets"></div>
         </div>
 
-        <div class="grp">
+        <div class="grp" id="flatShapeGrp">
           <div class="grp-t">Shape, the fixed glow before any animation</div>
           <div id="shapeRows"></div>
         </div>
+        <div class="grp" id="gradShapeGrp" hidden>
+          <div class="grp-t">Shape, the fixed ring and gradient before rotation</div>
+          <div id="gradShapeRows"></div>
+        </div>
 
         <div class="grp">
-          <div class="grp-t">Breathing</div>
-          <div class="toggle-row">
+          <div class="grp-t" id="breatheGrpT">Breathing</div>
+          <div class="toggle-row" id="animOnRow">
             <label for="animOn">animate</label>
             <span class="switch"><input type="checkbox" id="animOn" checked><span class="track"></span><span class="thumb"></span></span>
           </div>
           <div id="animRows"></div>
+          <div id="gradAnimRows" hidden></div>
         </div>
 
-        <div class="grp">
+        <div class="grp" id="colorGrp">
           <div class="grp-t">Colour &amp; theme</div>
           <div id="colorRows"></div>
+        </div>
+        <div class="grp" id="stopsGrp" hidden>
+          <div class="grp-t">Colour &amp; theme</div>
+          <p class="note" style="margin-top:0">
+            Fixed to iOS's own system colour set for each mode, not an invented rainbow, so it reads as genuinely
+            Apple's rather than approximate.
+          </p>
+          <div class="stops" id="stopsLight"></div>
+          <div class="stops" id="stopsDark"></div>
+          <div class="toggle-row">
+            <label for="themeOnGrad">preview dark ground</label>
+            <span class="switch"><input type="checkbox" id="themeOnGrad"><span class="track"></span><span class="thumb"></span></span>
+          </div>
         </div>
       </div>
     </section>
@@ -227,8 +260,8 @@
     <pre id="out"></pre>
     <div class="bd" style="padding-top:0">
       <div class="handoff">
-        <strong>Handing it back:</strong> paste this block into the chat. It's the exact <code>style</code> object
-        and <code>@keyframes</code> to drop into <code>DemoModeBadge.jsx</code>'s glow <code>&lt;div&gt;</code>.
+        <strong>Handing it back:</strong> paste this block into the chat. It's the exact JSX to drop into
+        <code>DemoModeBadge.jsx</code>'s glow section.
       </div>
     </div>
   </section>
@@ -238,25 +271,37 @@
 (function () {
   "use strict";
 
-  var KEY = "stocksense-demo-glow-tuner-v1";
+  var KEY = "stocksense-demo-glow-tuner-v2";
+
+  // iOS's own system colour sets, matching what's actually shipped in
+  // DemoModeBadge.jsx - not exposed as pickers, since the point is these are
+  // Apple's real palette, not a designer's guess at "rainbow."
+  var GLOW_STOPS = {
+    light: ["#007AFF", "#AF52DE", "#FF2D55", "#FF9500", "#FFCC00", "#34C759", "#5AC8FA", "#007AFF"],
+    dark:  ["#0A84FF", "#BF5AF2", "#FF375F", "#FF9F0A", "#FFD60A", "#32D74B", "#64D2FF", "#0A84FF"]
+  };
 
   var DEFAULTS = {
     theme: "light",
+    style: "gradient", // "flat" | "gradient" - which look is on top
     color: "#2563eb",
-    ring: 3,       // px, the thin solid core right at the edge
-    blur: 34,      // px, how diffused the light reading is
-    spread: 6,     // px, how far the visible colour extends before it fades
-    baseA: 0.16,   // opacity trough of the breathe (or the constant value if animation is off)
-    peakA: 0.42,   // opacity peak of the breathe
-    duration: 3.6, // seconds per full in-out cycle
-    animate: true
+    ring: 3, blur: 34, spread: 6, baseA: 0.16, peakA: 0.42, duration: 3.6, animate: true,
+    gRing: 1.5, gBlur: 18, gRotate: 9, gBaseA: 0.55, gPeakA: 0.9, gBreathe: 5
   };
 
   var PRESETS = {
-    "As shipped (static)": { ring: 3, blur: 28, spread: 2, baseA: 0.35, peakA: 0.35, duration: 3.6, animate: false },
-    "Diffused, breathing": { ring: 2, blur: 34, spread: 6, baseA: 0.16, peakA: 0.42, duration: 3.6, animate: true },
-    "Barely there":        { ring: 1, blur: 46, spread: 10, baseA: 0.08, peakA: 0.20, duration: 5.5, animate: true },
-    "Unmissable":          { ring: 4, blur: 40, spread: 14, baseA: 0.30, peakA: 0.60, duration: 2.4, animate: true }
+    flat: {
+      "As shipped (static)": { ring: 3, blur: 28, spread: 2, baseA: 0.35, peakA: 0.35, duration: 3.6, animate: false },
+      "Diffused, breathing": { ring: 2, blur: 34, spread: 6, baseA: 0.16, peakA: 0.42, duration: 3.6, animate: true },
+      "Barely there":        { ring: 1, blur: 46, spread: 10, baseA: 0.08, peakA: 0.20, duration: 5.5, animate: true },
+      "Unmissable":          { ring: 4, blur: 40, spread: 14, baseA: 0.30, peakA: 0.60, duration: 2.4, animate: true }
+    },
+    gradient: {
+      "As shipped":         { gRing: 1.5, gBlur: 18, gRotate: 9, gBaseA: 0.55, gPeakA: 0.9, gBreathe: 5 },
+      "Slower, subtler":    { gRing: 1,   gBlur: 26, gRotate: 16, gBaseA: 0.3, gPeakA: 0.55, gBreathe: 8 },
+      "Fast, vivid":        { gRing: 2.5, gBlur: 12, gRotate: 5, gBaseA: 0.7, gPeakA: 1, gBreathe: 3 },
+      "Barely there":       { gRing: 1,   gBlur: 30, gRotate: 20, gBaseA: 0.15, gPeakA: 0.35, gBreathe: 9 }
+    }
   };
 
   var state = load();
@@ -300,7 +345,7 @@
     return { range: rng, out: out };
   }
 
-  var shapeRefs = {}, animRefs = {};
+  var shapeRefs = {}, animRefs = {}, gradShapeRefs = {}, gradAnimRefs = {};
 
   shapeRefs.ring = sliderRow($("shapeRows"), { id: "ring", label: "ring", min: 0, max: 8, step: 0.5, onValue: function (v) { state.ring = v; apply(); } });
   shapeRefs.blur = sliderRow($("shapeRows"), { id: "blur", label: "diffusion", min: 0, max: 90, step: 1, onValue: function (v) { state.blur = v; apply(); } });
@@ -309,6 +354,14 @@
   animRefs.baseA = sliderRow($("animRows"), { id: "baseA", label: "opacity min", min: 0, max: 1, step: 0.01, onValue: function (v) { state.baseA = v; apply(); } });
   animRefs.peakA = sliderRow($("animRows"), { id: "peakA", label: "opacity max", min: 0, max: 1, step: 0.01, onValue: function (v) { state.peakA = v; apply(); } });
   animRefs.duration = sliderRow($("animRows"), { id: "duration", label: "cycle length", min: 1, max: 8, step: 0.1, onValue: function (v) { state.duration = v; apply(); } });
+
+  gradShapeRefs.ring = sliderRow($("gradShapeRows"), { id: "gRing", label: "ring", min: 0, max: 6, step: 0.5, onValue: function (v) { state.gRing = v; apply(); } });
+  gradShapeRefs.blur = sliderRow($("gradShapeRows"), { id: "gBlur", label: "diffusion", min: 0, max: 60, step: 1, onValue: function (v) { state.gBlur = v; apply(); } });
+  gradShapeRefs.rotate = sliderRow($("gradShapeRows"), { id: "gRotate", label: "rotation speed", min: 2, max: 30, step: 0.5, onValue: function (v) { state.gRotate = v; apply(); } });
+
+  gradAnimRefs.baseA = sliderRow($("gradAnimRows"), { id: "gBaseA", label: "opacity min", min: 0, max: 1, step: 0.01, onValue: function (v) { state.gBaseA = v; apply(); } });
+  gradAnimRefs.peakA = sliderRow($("gradAnimRows"), { id: "gPeakA", label: "opacity max", min: 0, max: 1, step: 0.01, onValue: function (v) { state.gPeakA = v; apply(); } });
+  gradAnimRefs.breathe = sliderRow($("gradAnimRows"), { id: "gBreathe", label: "breathe length", min: 1, max: 12, step: 0.1, onValue: function (v) { state.gBreathe = v; apply(); } });
 
   $("animOn").addEventListener("change", function () { state.animate = $("animOn").checked; apply(); });
 
@@ -333,19 +386,46 @@
   themeRow.appendChild(themeSwitch);
   $("colorRows").appendChild(themeRow);
   $("themeOn").addEventListener("change", function () { state.theme = $("themeOn").checked ? "dark" : "light"; apply(); });
+  $("themeOnGrad").addEventListener("change", function () { state.theme = $("themeOnGrad").checked ? "dark" : "light"; apply(); });
 
-  Object.keys(PRESETS).forEach(function (name) {
-    var b = document.createElement("button");
-    b.type = "button"; b.className = "preset"; b.textContent = name;
-    b.addEventListener("click", function () {
-      var p = PRESETS[name];
-      Object.keys(p).forEach(function (k) { state[k] = p[k]; });
-      apply();
-    });
-    $("presets").appendChild(b);
+  GLOW_STOPS.light.slice(0, -1).forEach(function (c) {
+    var s = document.createElement("span"); s.style.background = c; $("stopsLight").appendChild(s);
+  });
+  GLOW_STOPS.dark.slice(0, -1).forEach(function (c) {
+    var s = document.createElement("span"); s.style.background = c; $("stopsDark").appendChild(s);
   });
 
-  $("resetBtn").addEventListener("click", function () { state = clone(DEFAULTS); apply(); });
+  function buildSeg(host, items, getActive, onPick) {
+    host.innerHTML = "";
+    items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = it.label;
+      b.setAttribute("aria-pressed", String(getActive() === it.id));
+      b.addEventListener("click", function () { onPick(it.id); });
+      host.appendChild(b);
+    });
+  }
+  function refreshStyleSeg() {
+    buildSeg($("styleSeg"), [{ id: "flat", label: "Flat" }, { id: "gradient", label: "Gradient" }],
+      function () { return state.style; },
+      function (id) { state.style = id; apply(); });
+  }
+
+  function renderPresets() {
+    var host = $("presets"); host.innerHTML = "";
+    Object.keys(PRESETS[state.style]).forEach(function (name) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "preset"; b.textContent = name;
+      b.addEventListener("click", function () {
+        var p = PRESETS[state.style][name];
+        Object.keys(p).forEach(function (k) { state[k] = p[k]; });
+        apply();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  $("resetBtn").addEventListener("click", function () { var s = state.style; state = clone(DEFAULTS); state.style = s; apply(); });
 
   $("copyBtn").addEventListener("click", function () {
     var text = $("out").textContent;
@@ -368,7 +448,12 @@
   document.head.appendChild(styleTag);
 
   function apply() {
+    refreshStyleSeg();
+    renderPresets();
+
     var dark = state.theme === "dark";
+    var gradient = state.style === "gradient";
+
     var stage = $("stage");
     stage.style.background = dark ? "#0d1117" : "#f3f4f6";
     $("stageSide").style.borderColor = dark ? "#2a3340" : "#e5e7eb";
@@ -379,32 +464,60 @@
     });
     $("stageH1").style.color = dark ? "#eef1f6" : "#111827";
     var side = $("stageSide"); side.innerHTML = "";
+    var sideAccent = gradient ? GLOW_STOPS[state.theme][0] : state.color;
     for (var i = 0; i < 5; i++) {
       var sw = document.createElement("div");
       sw.className = "sw" + (i === 0 ? " active" : "");
-      sw.style.background = i === 0 ? state.color : (dark ? "#2a3340" : "#e5e7eb");
+      sw.style.background = i === 0 ? sideAccent : (dark ? "#2a3340" : "#e5e7eb");
       side.appendChild(sw);
     }
 
-    // Fixed shape: ring + spread + blur never change once the animation
-    // starts. Only opacity moves, and only opacity is what's animated below,
-    // the whole reason this is cheap. See the note under the preview.
-    var shapeShadow = "inset 0 0 0 " + state.ring + "px COLOR, inset 0 0 " + state.blur + "px " + state.spread + "px COLOR";
-    var glow = $("glow");
-    glow.style.boxShadow = shapeShadow.split("COLOR").join(rgba(state.color, 1));
-    // The shadow's own colour is opaque; opacity is carried on the element
-    // itself so a single CSS property (compositor-only) drives the whole
-    // breathe, rather than re-evaluating two rgba() shadows every frame.
-    glow.style.opacity = state.animate ? "" : String(state.peakA);
-    glow.style.animation = state.animate ? "demoGlowBreathe " + state.duration + "s ease-in-out infinite" : "none";
+    var glow = $("glow"), glowInner = $("glowInner");
+    var keyframes = "";
 
-    styleTag.textContent =
-      "@keyframes demoGlowBreathe {\n" +
-      "  0%, 100% { opacity: " + state.baseA + "; }\n" +
-      "  50% { opacity: " + state.peakA + "; }\n" +
-      "}";
+    if (gradient) {
+      glow.style.padding = state.gRing + "px";
+      glow.style.WebkitMask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)";
+      glow.style.webkitMaskComposite = "xor";
+      glow.style.mask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)";
+      glow.style.maskComposite = "exclude";
+      glow.style.boxShadow = "none";
+      glow.style.opacity = "";
+      glow.style.animation = "demoGlowBreatheG " + state.gBreathe + "s ease-in-out infinite";
 
-    // controls
+      glowInner.style.display = "block";
+      glowInner.style.background = "conic-gradient(from 0deg, " + GLOW_STOPS[state.theme].join(", ") + ")";
+      glowInner.style.filter = "blur(" + state.gBlur + "px)";
+      glowInner.style.animation = "demoGlowRotate " + state.gRotate + "s linear infinite";
+
+      keyframes =
+        "@keyframes demoGlowRotate { to { transform: rotate(360deg); } }\n" +
+        "@keyframes demoGlowBreatheG { 0%, 100% { opacity: " + state.gBaseA + "; } 50% { opacity: " + state.gPeakA + "; } }";
+    } else {
+      glow.style.padding = "0";
+      glow.style.WebkitMask = "none"; glow.style.mask = "none";
+      glowInner.style.display = "none"; glowInner.style.animation = "none";
+
+      var shapeShadow = "inset 0 0 0 " + state.ring + "px COLOR, inset 0 0 " + state.blur + "px " + state.spread + "px COLOR";
+      glow.style.boxShadow = shapeShadow.split("COLOR").join(rgba(state.color, 1));
+      glow.style.opacity = state.animate ? "" : String(state.peakA);
+      glow.style.animation = state.animate ? "demoGlowBreathe " + state.duration + "s ease-in-out infinite" : "none";
+
+      keyframes = "@keyframes demoGlowBreathe { 0%, 100% { opacity: " + state.baseA + "; } 50% { opacity: " + state.peakA + "; } }";
+    }
+    styleTag.textContent = keyframes;
+
+    // group visibility
+    $("flatShapeGrp").hidden = gradient;
+    $("gradShapeGrp").hidden = !gradient;
+    $("colorGrp").hidden = gradient;
+    $("stopsGrp").hidden = !gradient;
+    $("animRows").hidden = gradient;
+    $("animOnRow").hidden = gradient;
+    $("gradAnimRows").hidden = !gradient;
+    $("breatheGrpT").textContent = gradient ? "Breathing (rotation is always on)" : "Breathing";
+
+    // sync controls
     shapeRefs.ring.range.value = state.ring; shapeRefs.ring.out.textContent = state.ring + "px";
     shapeRefs.blur.range.value = state.blur; shapeRefs.blur.out.textContent = state.blur + "px";
     shapeRefs.spread.range.value = state.spread; shapeRefs.spread.out.textContent = state.spread + "px";
@@ -414,23 +527,69 @@
     $("animOn").checked = state.animate;
     colorPick.value = state.color; colorOut.textContent = state.color;
     $("themeOn").checked = dark;
-    $("animTarget").textContent = state.animate ? "opacity (cheap)" : "nothing (static)";
+    $("themeOnGrad").checked = dark;
 
-    $("perfNote").innerHTML =
-      "<strong>Zero hosting cost</strong>: this is pure client-side CSS on an element already in the page; " +
-      "it never calls the API, the database, or the Lightsail container, so it can't add server load no matter " +
-      "how it's tuned. The only real cost is on the visitor's own device, and it's kept near-zero by animating " +
-      "<strong>opacity only</strong>: the diffused shape (ring, diffusion, thickness) is fixed once drawn, and " +
-      "opacity is one of the few CSS properties a browser can animate on the compositor thread (no repaint, " +
-      "no layout, GPU-composited every frame). Animating the blur or spread values directly instead would force a " +
-      "repaint of the whole viewport-sized shadow on every frame, which is the actual industry line between a " +
-      "\"free\" pulsing indicator and a laggy one.";
+    gradShapeRefs.ring.range.value = state.gRing; gradShapeRefs.ring.out.textContent = state.gRing + "px";
+    gradShapeRefs.blur.range.value = state.gBlur; gradShapeRefs.blur.out.textContent = state.gBlur + "px";
+    gradShapeRefs.rotate.range.value = state.gRotate; gradShapeRefs.rotate.out.textContent = state.gRotate.toFixed(1) + "s";
+    gradAnimRefs.baseA.range.value = state.gBaseA; gradAnimRefs.baseA.out.textContent = round2(state.gBaseA).toFixed(2);
+    gradAnimRefs.peakA.range.value = state.gPeakA; gradAnimRefs.peakA.out.textContent = round2(state.gPeakA).toFixed(2);
+    gradAnimRefs.breathe.range.value = state.gBreathe; gradAnimRefs.breathe.out.textContent = state.gBreathe.toFixed(1) + "s";
+
+    $("animTarget").textContent = gradient ? "transform + opacity (cheap)" : (state.animate ? "opacity (cheap)" : "nothing (static)");
+
+    $("perfNote").innerHTML = gradient
+      ? "<strong>Zero hosting cost</strong>: pure client-side CSS, never touches the API, database or the Lightsail " +
+        "container. The rotating gradient, the mask and the blur are all static once drawn; only <strong>transform</strong> " +
+        "(the rotation) and <strong>opacity</strong> (the breathe) animate, the two properties a browser composites on the " +
+        "GPU with no repaint or layout, so this costs the same per frame as the flat version despite looking more " +
+        "elaborate. The mask itself (two gradient layers, XOR'd) is the standard \"gradient border\" CSS trick, not " +
+        "something bespoke or expensive."
+      : "<strong>Zero hosting cost</strong>: this is pure client-side CSS on an element already in the page; " +
+        "it never calls the API, the database, or the Lightsail container, so it can't add server load no matter " +
+        "how it's tuned. The only real cost is on the visitor's own device, and it's kept near-zero by animating " +
+        "<strong>opacity only</strong>: the diffused shape (ring, diffusion, thickness) is fixed once drawn, and " +
+        "opacity is one of the few CSS properties a browser can animate on the compositor thread (no repaint, " +
+        "no layout, GPU-composited every frame). Animating the blur or spread values directly instead would force a " +
+        "repaint of the whole viewport-sized shadow on every frame, which is the actual industry line between a " +
+        "\"free\" pulsing indicator and a laggy one.";
 
     $("out").textContent = emit();
     save();
   }
 
   function emit() {
+    if (state.style === "gradient") {
+      return (
+        "// Paste into DemoModeBadge.jsx, replacing the existing glow section.\n" +
+        "// GLOW_STOPS goes at module scope (once), the rest replaces the {active && (...)} block.\n" +
+        "const GLOW_STOPS = {\n" +
+        "  light: \"" + GLOW_STOPS.light.join(", ") + "\",\n" +
+        "  dark:  \"" + GLOW_STOPS.dark.join(", ") + "\",\n" +
+        "};\n\n" +
+        "<style>{`\n" +
+        "  @keyframes demoGlowRotate { to { transform: rotate(360deg); } }\n" +
+        "  @keyframes demoGlowBreathe { 0%, 100% { opacity: " + state.gBaseA + "; } 50% { opacity: " + state.gPeakA + "; } }\n" +
+        "`}</style>\n" +
+        "<div aria-hidden=\"true\" style={{\n" +
+        "  position: \"fixed\", inset: 0, zIndex: 199, pointerEvents: \"none\",\n" +
+        "  padding: " + state.gRing + ",\n" +
+        "  WebkitMask: \"linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)\",\n" +
+        "  WebkitMaskComposite: \"xor\",\n" +
+        "  mask: \"linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)\",\n" +
+        "  maskComposite: \"exclude\",\n" +
+        "  overflow: \"hidden\",\n" +
+        "  animation: \"demoGlowBreathe " + state.gBreathe + "s ease-in-out infinite\",\n" +
+        "}}>\n" +
+        "  <div style={{\n" +
+        "    position: \"absolute\", inset: \"-50%\",\n" +
+        "    background: `conic-gradient(from 0deg, ${GLOW_STOPS[resolved]})`,\n" +
+        "    filter: \"blur(" + state.gBlur + "px)\",\n" +
+        "    animation: \"demoGlowRotate " + state.gRotate + "s linear infinite\",\n" +
+        "  }} />\n" +
+        "</div>"
+      );
+    }
     var shapeShadow = "inset 0 0 0 " + state.ring + "px " + rgba(state.color, 1) + ", inset 0 0 " + state.blur + "px " + state.spread + "px " + rgba(state.color, 1);
     return (
       "// Paste into DemoModeBadge.jsx, replacing the existing glow <div>'s style\n" +
