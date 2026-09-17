@@ -1239,12 +1239,20 @@ router.post("/onboarding/suggested-settings/apply", (req, res) => {
   if (!skuUpdates.length) return res.status(400).json({ success: false, message: "skus must be a non-empty array" });
 
   for (const u of skuUpdates) {
+    if (!u.sku_id) return res.status(400).json({ success: false, message: "Each sku update must include sku_id" });
     const numericError = validateNumericFields(u);
     if (numericError) return res.status(400).json({ success: false, message: `${u.sku_id}: ${numericError}` });
   }
 
   try {
     const db = getDb();
+    // Checked before the transaction starts, not inside it: applySkuUpdate silently
+    // updates 0 rows for an unknown sku_id, which would otherwise report success
+    // for a SKU that was never touched (client/server state mismatch).
+    for (const u of skuUpdates) {
+      const known = db.prepare(`SELECT 1 FROM skus WHERE sku_id = ? AND active = 1`).get(u.sku_id);
+      if (!known) return res.status(404).json({ success: false, message: `SKU not found: ${u.sku_id}` });
+    }
     db.transaction(() => {
       for (const u of skuUpdates) {
         const { sku_id, ...fields } = u;

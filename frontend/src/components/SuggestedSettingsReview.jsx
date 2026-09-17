@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { ChevronRight, Info } from "lucide-react";
 import { Stat, Panel } from "./ImportPreview";
 import HoverHint from "./HoverHint";
