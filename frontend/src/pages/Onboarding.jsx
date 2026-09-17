@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Upload, TrendingUp } from "lucide-react";
+import { Package, Upload, TrendingUp, Settings2, Check } from "lucide-react";
 import { api } from "../api/inventory";
 import { ImportPreview, Toast } from "../components/ImportPreview";
+import { SuggestedSettingsReview } from "../components/SuggestedSettingsReview";
 import Modal, { ModalBtn } from "../components/Modal";
 import { Seal, CLIENT_EN } from "../components/Tenant";
 
@@ -40,16 +41,58 @@ const IMPORTERS = {
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1 = catalog, 2 = sales history
+  const [step, setStep] = useState(1); // 1 = catalog, 2 = sales history, 3 = review suggested settings
   const [skuCount, setSkuCount] = useState(null);
   const [addedSkus, setAddedSkus] = useState(null); // { count, names } after a catalog upload this session
 
-  const [busy, setBusy] = useState(null); // "read" | "apply" | "export"
+  const [busy, setBusy] = useState(null); // "read" | "apply" | "export" | "suggestions"
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
   const [csv, setCsv] = useState(null);
   const datasetRef = useRef("skus");
   const fileRef = useRef(null);
+
+  // Step 3 state, loaded once on entering the step (not eagerly, since it's
+  // a real query over the whole portfolio via getAnalytics()).
+  const [suggestions, setSuggestions] = useState(null);
+  const [included, setIncluded] = useState(new Set());
+  const enterReviewStep = useCallback(() => {
+    setStep(3);
+    setBusy("suggestions"); setError(null);
+    api.getSuggestedSettings()
+      .then((data) => {
+        setSuggestions(data);
+        setIncluded(new Set(data.map((s) => s.sku_id)));
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setBusy(null));
+  }, []);
+  const toggleIncluded = useCallback((skuId) => {
+    setIncluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(skuId)) next.delete(skuId); else next.add(skuId);
+      return next;
+    });
+  }, []);
+  const applySuggestions = useCallback(async () => {
+    setBusy("apply"); setError(null);
+    try {
+      const payload = suggestions
+        .filter((s) => included.has(s.sku_id))
+        .map((s) => ({
+          sku_id: s.sku_id,
+          target_service_level: s.target_service_level.suggested,
+          target_stock: s.target_stock.suggested,
+          lead_time_days: s.lead_time_days.suggested,
+        }));
+      if (payload.length) await api.applySuggestedSettings(payload);
+      navigate("/");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }, [suggestions, included, navigate]);
 
   const loadCount = useCallback(() => {
     api.getSkus().then((list) => setSkuCount(list.length)).catch(() => setSkuCount(0));
@@ -88,14 +131,14 @@ export default function Onboarding() {
         loadCount();
         setStep(2);
       } else {
-        navigate("/");
+        enterReviewStep();
       }
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy(null);
     }
-  }, [csv, preview, loadCount, navigate]);
+  }, [csv, preview, loadCount, enterReviewStep]);
 
   const downloadTemplate = useCallback(async () => {
     setError(null); setBusy("export");
@@ -120,7 +163,7 @@ export default function Onboarding() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", justifyContent: "center", padding: "clamp(32px, 8vh, 80px) 20px 48px" }}>
-      <div style={{ width: "100%", maxWidth: 620 }}>
+      <div style={{ width: "100%", maxWidth: step === 3 ? 760 : 620 }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 36 }}>
           <Seal size={30} />
@@ -203,12 +246,40 @@ export default function Onboarding() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <BigButton primary icon={Upload} label="Upload sales history"
                   busy={busy === "read"} onClick={() => openPicker("salesHistory")} />
-                <BigButton label="Skip for now" onClick={() => navigate("/")} />
+                <BigButton label="Skip for now" onClick={enterReviewStep} />
               </div>
 
               <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.6, borderTop: "1px solid var(--border)", paddingTop: 16, marginTop: 24 }}>
                 You can always come back to this from <Code>Bulk edit → Upload sales history</Code> once you're inside the app.
               </div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="card" style={{ padding: 36 }}>
+            <StepIcon icon={Settings2} bg="var(--blue-light)" fg="var(--blue)" />
+            <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, lineHeight: 1.2, margin: "0 0 10px" }}>
+              Start from sensible settings, not blank defaults.
+            </h1>
+            <p style={{ fontSize: "var(--text-base)", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 26px", maxWidth: "60ch" }}>
+              Every product below is suggested a target service level and target stock from its own data, instead of the raw defaults every new product starts with. Uncheck anything you'd rather set by hand later.
+            </p>
+
+            {busy === "suggestions" && (
+              <div style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)", padding: "20px 0" }}>Computing suggestions…</div>
+            )}
+
+            {suggestions && (
+              <SuggestedSettingsReview suggestions={suggestions} included={included} onToggle={toggleIncluded} />
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
+              <BigButton primary icon={Check}
+                label={busy === "apply" ? "Applying…" : `Apply to ${included.size} product${included.size === 1 ? "" : "s"}`}
+                disabled={busy === "apply" || !suggestions || included.size === 0}
+                onClick={applySuggestions} />
+              <BigButton label="Skip for now" onClick={() => navigate("/")} />
             </div>
           </div>
         )}
@@ -257,17 +328,18 @@ function EmptyPanel({ icon: Icon, children }) {
   );
 }
 
-function BigButton({ primary, icon: Icon, label, busy, onClick, style }) {
+function BigButton({ primary, icon: Icon, label, busy, disabled, onClick, style }) {
+  const inert = busy || disabled;
   return (
-    <button onClick={onClick} disabled={busy} style={{
+    <button onClick={onClick} disabled={inert} style={{
       font: "inherit", fontSize: "var(--text-base)", fontWeight: 700,
-      padding: "13px 20px", borderRadius: "var(--radius)", cursor: busy ? "default" : "pointer",
+      padding: "13px 20px", borderRadius: "var(--radius)", cursor: inert ? "default" : "pointer",
       display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
       border: primary ? "none" : "1px solid var(--border)",
       background: primary ? "var(--blue)" : "var(--surface-2)",
       color: primary ? "#fff" : "var(--text-secondary)",
       boxShadow: primary ? "var(--shadow)" : "none",
-      opacity: busy ? 0.7 : 1,
+      opacity: inert ? 0.7 : 1,
       ...style,
     }}>
       {Icon && <Icon size={17} />}

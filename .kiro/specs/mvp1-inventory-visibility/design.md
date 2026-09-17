@@ -489,6 +489,45 @@ target_stock_suggested = avg_daily_demand_forecast * (review_period_days + lead_
                           -- assumption, not a derived number
 ```
 
+### Onboarding Suggested Settings (MVP2 Day 8)
+
+`GET /api/onboarding/suggested-settings` (`engines/onboardingSuggestions.js`), a per-SKU suggestion
+review step inserted into the onboarding flow after the catalog/sales upload, before landing on the
+dashboard. Never writes; `POST /api/onboarding/suggested-settings/apply` applies only the SKUs a manager
+kept, through `applySkuUpdate` — the same function `PUT /api/skus/:id` uses, so a batch accept and a hand
+edit go through one path.
+
+Reads `getAnalytics()`'s own fields throughout (`avg_daily_usage_30d`, `safety_stock_mt`, `abc_class`,
+`lead_time_days`) rather than recomputing any of them.
+
+```
+target_service_level_suggested = SERVICE_LEVEL_BY_TIER[abc_class]   -- A: 0.98, B: 0.95, C: 0.90
+                                  -- a tier-default heuristic (Stan's decision, 2026-09-17), not a
+                                  -- cost-optimal calculation. Sits mid-range of common FMCG practice
+                                  -- (roughly A 97-99%, B 93-96%, C 88-92%); peer-reviewed research
+                                  -- (Teunter, Babai & Syntetos, "ABC Classification: Service Levels and
+                                  -- Inventory Costs", Production and Operations Management, 2010,
+                                  -- doi:10.1111/j.1937-5956.2009.01098.x) shows fixed per-tier service
+                                  -- levels leave real savings on the table versus full cost-based
+                                  -- optimization, which is out of scope here. The onboarding tooltip
+                                  -- carries this same citation and caveat.
+
+target_stock_suggested = avg_daily_usage_30d * (review_period_days + lead_time_days) + safety_stock_mt
+                          -- same review_period_days = 30 assumption as the forecast preview's version
+                          -- above (one shared constant, not two), but reads avg_daily_usage_30d, not a
+                          -- forecast — a freshly onboarded SKU has no active forecast yet to read.
+                          -- Capped at avg_daily_usage_30d * max_holding_days when that is lower AND
+                          -- there is a real demand rate to cap against (capping a zero-demand
+                          -- suggestion at zero would hide the review-period+lead-time floor a brand new
+                          -- SKU still needs).
+
+lead_time_days_suggested = lead_time_days   -- honestly NOT suggested from data: purchase_orders has an
+                          -- actual_arrival column but no import path ever populates it with closed
+                          -- orders (only open future POs are seeded), so there is nothing to measure a
+                          -- real average from yet. Shown at its current default, flagged low confidence,
+                          -- with that reason stated plainly rather than inventing a number.
+```
+
 ### Health Status (glossary Appendix A / spec Step 13 triggers; evaluated top to bottom, first match wins)
 
 > **2026-09-12 correction**: the backend engine and the frontend mock had silently diverged. This is

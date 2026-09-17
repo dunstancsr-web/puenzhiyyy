@@ -33,6 +33,9 @@ Four deliverables. Status as of 15 Sep.
   (the table before the Edit button fix) and `16-why.jpg` (the summary before urgency wording was
   removed). Then rebuild the PDF: `python3 docs/Guide/build-pdf.py`.
 - **Goods Out screens** (optional before submission): the API exists; Home shows the card as "Coming soon".
+- **MVP2 Day 8 ("Review suggested settings" onboarding step) is built and verified**, on its own branch
+  `feature/mvp2-onboarding-day8`, not yet a PR. Stan is holding all merges pending alignment with his
+  teammate on the forecast-engine branch (`feature/demand-forecast-engine`).
 
 ## Decisions already made
 

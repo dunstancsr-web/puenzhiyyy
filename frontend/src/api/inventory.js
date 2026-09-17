@@ -85,6 +85,10 @@ export const api = {
   // Preview: recomputes King's formula with hypothetical inputs, saves nothing.
   previewForecast: (id, body) => request(`/skus/${id}/forecast/preview`, { method: "POST", body }),
 
+  // Onboarding suggested settings (MVP2 Day 8). GET never writes; apply does.
+  getSuggestedSettings: () => request("/onboarding/suggested-settings"),
+  applySuggestedSettings: (skus) => request("/onboarding/suggested-settings/apply", { method: "POST", body: { skus } }),
+
   // Bulk edit (TASK-60). Export bypasses request() because the response is
   // text/csv, not the { success, data } envelope everything else returns.
   exportSkusCsv: async () => {
