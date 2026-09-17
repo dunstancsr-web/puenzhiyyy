@@ -188,10 +188,70 @@ function holtWintersForecast(series, targetPeriods, seasonPeriod = 12) {
   });
 }
 
+// ── Model 4: Holt damped trend + seasonal-naive blend ───────────────────────
+// Ported from a teammate's independent branch (Tawmo, feature/demand-forecast-
+// engine, origin/feature/demand-forecast-engine) rather than written fresh —
+// the math below is theirs, credited, not reinvented. Two adaptations made
+// porting it in: (1) it originally read inventory_history.issues_qty directly;
+// here it takes the same monthlySeries() series every other model already
+// gets, so all four models compare on one demand definition, not two (the
+// exact "two definitions of demand" bug class design.md already documents a
+// real incident from) — the underlying data (fulfilled sales, monthly-bucketed)
+// is the same either way, only the plumbing changed. (2) their daily-rate
+// conversion divided by 30.44 (calendar-exact); runForecast() below already
+// divides by 30 for every model to stay comparable with avg_daily_usage_30d,
+// so this model needed no rate conversion of its own — the shared /30 already
+// covers it. alpha/beta/phi are fixed, not fitted per SKU, in their original
+// design: ~24 points would overfit a 3-parameter fit, and fixed values keep
+// the model explainable and deterministic.
+const HDS_ALPHA = 0.4; // level smoothing
+const HDS_BETA = 0.2;  // trend smoothing
+const HDS_PHI = 0.9;   // trend damping (keeps a long horizon from running away)
+const HDS_SEASON = 12; // monthly data, yearly season
+
+function holtDampedFit(y) {
+  let level = y[0];
+  let trend = y[1] - y[0];
+  for (let i = 1; i < y.length; i++) {
+    const prevLevel = level;
+    level = HDS_ALPHA * y[i] + (1 - HDS_ALPHA) * (prevLevel + HDS_PHI * trend);
+    trend = HDS_BETA * (level - prevLevel) + (1 - HDS_BETA) * HDS_PHI * trend;
+  }
+  return { level, trend };
+}
+function holtDampedStep(fit, h) {
+  let damp = 0;
+  for (let i = 1; i <= h; i++) damp += Math.pow(HDS_PHI, i);
+  return Math.max(0, fit.level + damp * fit.trend);
+}
+
+function holtDampedSeasonalForecast(series, targetPeriods) {
+  const y = series.map((r) => r.qty);
+  if (y.length < 2) return naiveSeasonalForecast(series, targetPeriods); // same degrade-gracefully convention as the other three models
+  const fit = holtDampedFit(y);
+  const hasSeason = y.length >= HDS_SEASON + 1;
+
+  return targetPeriods.map((period, k) => {
+    const h = k + 1;
+    const trendPart = holtDampedStep(fit, h);
+    if (!hasSeason) return { period, qty: round1(trendPart) };
+
+    // Seasonal-naive term, scaled by how much the current level has moved
+    // from a year ago, so a growing or shrinking SKU's season scales with it
+    // rather than repeating last year's absolute figure.
+    const lastYear = y[y.length - HDS_SEASON + ((h - 1) % HDS_SEASON)];
+    const yearAgoLevel = y[y.length - HDS_SEASON] || 0;
+    const scale = yearAgoLevel > 0 ? fit.level / yearAgoLevel : 1;
+    const seasonalPart = Math.max(0, lastYear * scale);
+    return { period, qty: round1(0.5 * trendPart + 0.5 * seasonalPart) };
+  });
+}
+
 const MODELS = [
   { id: "naive_seasonal", label: "Naive seasonal", fn: naiveSeasonalForecast },
   { id: "linear_trend", label: "Linear trend", fn: linearTrendForecast },
   { id: "holt_winters", label: "Holt-Winters", fn: holtWintersForecast },
+  { id: "holt_damped_seasonal", label: "Holt damped + seasonal", fn: holtDampedSeasonalForecast },
 ];
 const MODEL_IDS = MODELS.map((m) => m.id);
 

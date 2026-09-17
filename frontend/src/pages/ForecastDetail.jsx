@@ -30,8 +30,11 @@ import { api } from "../api/inventory";
 // documents a real 257 MT incident from.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MODEL_ORDER = ["naive_seasonal", "linear_trend", "holt_winters"];
-const MODEL_COLOR = { naive_seasonal: "var(--blue)", linear_trend: "var(--orange)", holt_winters: "var(--green)" };
+const MODEL_ORDER = ["naive_seasonal", "linear_trend", "holt_winters", "holt_damped_seasonal"];
+const MODEL_COLOR = {
+  naive_seasonal: "var(--blue)", linear_trend: "var(--orange)", holt_winters: "var(--green)",
+  holt_damped_seasonal: "var(--purple)",
+};
 const TIER_SERVICE_LEVEL = { A: 98, B: 95, C: 90 }; // midpoints of proposed ABC-tier default bands
 const DAY_MS = 86_400_000;
 
@@ -258,6 +261,10 @@ const MODEL_HINT = {
   holt_winters: {
     what: "A more adaptive version of naive seasonal: automatically learns how much to trust recent months over old ones, and how much is trend versus season.",
     how: "Good for demand that's gradually shifting, where a fixed rule would react too slowly.",
+  },
+  holt_damped_seasonal: {
+    what: "A trend that's damped so it can't run away over a long horizon, blended evenly with last year's same-month figure scaled to today's level.",
+    how: "Built independently by a teammate on their own branch, ported in here. Worth comparing against the other three rather than assuming it's better or worse.",
   },
 };
 

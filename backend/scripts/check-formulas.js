@@ -350,6 +350,21 @@ check("forecast_holt_winters_bounds", "MVP2 forecast engine", "every forecast mo
   },
 });
 
+// Same reasoning as Holt-Winters above: a property check, not a second
+// implementation of the damped-trend math. Ported from a teammate's branch
+// (Tawmo, feature/demand-forecast-engine) — the bound proves this repo's copy
+// wasn't damaged in porting, it doesn't re-validate their original design.
+check("forecast_holt_damped_seasonal_bounds", "MVP2 forecast engine", "every forecast month in [0, 3x max historical monthly demand]", {
+  compare: same,
+  perSku: (s, r) => {
+    const series = specMonthlyFilled(r);
+    if (series.length < 2) return ["skip: needs 2mo history", "skip: needs 2mo history"];
+    const maxHist = Math.max(...series.map((x) => x.qty), 0);
+    const { monthly } = runForecast(db, s.sku_id, "holt_damped_seasonal", 6);
+    return [true, monthly.every((m) => m.qty >= 0 && m.qty <= maxHist * 3)];
+  },
+});
+
 check("risk_buffer_mt", "MVP2 risk buffer", "SUM(matching risk_events.buffer_days_add), capped at 30 days, x the demand rate in force", {
   tol: 0.1,
   perSku: (s) => {

@@ -969,17 +969,22 @@ router.get("/forecast/models", (req, res) => {
     naive_seasonal: "Same calendar month, averaged across every prior year in the history. No parameters, the floor every other model has to beat.",
     linear_trend: "A straight trend line fit under the seasonal pattern. Easiest to explain in plain English: demand trending up or down by a fixed amount a month.",
     holt_winters: "Trend plus seasonality, weighted toward recent months. The standard method when there is enough history to support it.",
+    // Ported from a teammate's branch (Tawmo, feature/demand-forecast-engine) — see forecast.js.
+    holt_damped_seasonal: "A damped trend blended evenly with last year's season, so a long-horizon forecast can't run away. Built independently by a teammate; worth comparing against the other three on a given SKU.",
   };
   const models = MODEL_IDS.map((id) => ({ id, label: MODEL_LABEL[id], detail: detail[id], available: true }));
   models.push({
     id: "auto",
     label: "Auto",
-    detail: "Backtests all three models on this SKU's own history and picks whichever scores lowest error. Deterministic — never a model call.",
+    detail: "Backtests every model on this SKU's own history and picks whichever scores lowest error. Deterministic — never a model call.",
     available: true,
   });
   res.json({ success: true, data: { models } });
 });
-const MODEL_LABEL = { naive_seasonal: "Naive seasonal", linear_trend: "Linear trend", holt_winters: "Holt-Winters" };
+const MODEL_LABEL = {
+  naive_seasonal: "Naive seasonal", linear_trend: "Linear trend", holt_winters: "Holt-Winters",
+  holt_damped_seasonal: "Holt damped + seasonal",
+};
 
 // PUT /api/skus/:id/forecast-config — { forecast_model, use_forecast }
 //
