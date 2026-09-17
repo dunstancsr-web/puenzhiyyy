@@ -11,7 +11,7 @@ rather than approximated.
 | [`glass-tooltip.html`](glass-tooltip.html) | How the frosted panels look | `--hint-*` and `.hint-panel` in `frontend/src/index.css` |
 | [`table-density.html`](table-density.html) | Every gap in the Needs Attention card | the density constants in `frontend/src/pages/Dashboard.jsx` |
 | [`demo-glow.html`](demo-glow.html) | **Superseded, 17 Sep**: a screen-edge glow (flat, then rotating rainbow) was replaced with a labelled top banner, the industry-standard pattern for this, since a colour cue only works once someone has learned what it means. Kept for reference; does not describe current `DemoModeBadge.jsx`. | nothing, currently |
-| [`demo-frame.html`](demo-frame.html) | Which shape the demo-mode indicator takes: a full top banner, a minimized strip that expands on hover, or a frame around the whole window (no overlap to account for, since the app's own content area is simply smaller) | not wired to code yet, hands back a plain description for whichever gets built |
+| [`demo-frame.html`](demo-frame.html) | Compared a full top banner, a minimized hover strip, and a top-edge-only structural frame; Stan picked the frame. Shape confirmed here, actual fix lives in `DemoModeBadge.jsx`, `index.css` and every full-height layout | nothing, describes a decision already shipped |
 
 Published copies, for looking at on a phone or sending to someone:
 

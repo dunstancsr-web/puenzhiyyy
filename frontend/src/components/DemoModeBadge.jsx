@@ -18,6 +18,18 @@ import { api } from "../api/inventory";
 // demoing this for the first time has. A banner with the word "DEMO" on it is
 // the industry-standard pattern for exactly this (Stripe's test mode, most
 // staging environments) because it's recognised on sight, not associated.
+//
+// Top edge only, and structural rather than an overlay: setting the
+// --demo-banner-height CSS variable (declared in index.css) does two things
+// at once - body's own padding-top shifts every page's content below the
+// fixed banner, AND every full-height layout (Layout.jsx, Sidebar.jsx,
+// Onboarding.jsx, Home.jsx) subtracts the same variable from its own 100vh,
+// so the app's usable area actually shrinks to fit rather than overflowing
+// past the visible window. That overflow was a real bug in the first version
+// of this banner: the sidebar's own bottom items ran off-screen because
+// Layout.jsx assumed the full viewport height independently of the banner
+// reserving space above it. Left, right and bottom edges are untouched on
+// purpose, so nothing outside the top strip needs any of this accounted for.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BANNER_HEIGHT = 40;
@@ -30,14 +42,10 @@ export default function DemoModeBadge() {
     api.getDemoStatus().then((d) => setActive(d.active)).catch(() => setActive(false));
   }, []);
 
-  // Reserves space at the top of the page for the fixed banner so it never
-  // covers real content - set on <body> rather than in Layout.jsx, so every
-  // page (including ones outside the Control Tower's own layout) gets it for
-  // free without each one needing to know demo mode exists.
   useEffect(() => {
     if (active) {
-      document.body.style.paddingTop = BANNER_HEIGHT + "px";
-      return () => { document.body.style.paddingTop = ""; };
+      document.documentElement.style.setProperty("--demo-banner-height", BANNER_HEIGHT + "px");
+      return () => document.documentElement.style.removeProperty("--demo-banner-height");
     }
   }, [active]);
 

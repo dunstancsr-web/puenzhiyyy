@@ -4,6 +4,16 @@
   padding: 0;
 }
 
+/* A layout dimension, not a theme colour, so it lives outside the light/dark
+   token blocks below rather than getting redefined per theme. Set by
+   DemoModeBadge.jsx while the top banner is showing; every full-height
+   layout (Layout.jsx, Sidebar.jsx, Onboarding.jsx, Home.jsx) subtracts it
+   from 100vh instead of assuming the whole viewport, so content actually
+   resizes into the smaller space rather than overflowing past it. */
+:root {
+  --demo-banner-height: 0px;
+}
+
 /* ── DEFAULT (Light) theme ───────────────────────────────────────────────── */
 :root {
   --bg:             #f0f2f5;
@@ -293,6 +303,7 @@ body {
   color: var(--text-primary);
   font-size: var(--text-base); /* the scale is the single source, not a literal */
   line-height: 1.5;
+  padding-top: var(--demo-banner-height); /* shifts content below the fixed top banner; see :root above */
   -webkit-font-smoothing: antialiased;
   transition: background 0.3s ease, color 0.3s ease;
 }

@@ -214,7 +214,7 @@ export default function Home() {
 
   return (
     <div style={{
-      minHeight: "100vh", background: "var(--bg)",
+      minHeight: "calc(100vh - var(--demo-banner-height))", background: "var(--bg)",
       // flex-start, not centre. Centring a short page in a tall viewport put
       // 214px of nothing above the first pixel of content, so the eye landed
       // on empty space. clamp anchors it without crowding the top edge.

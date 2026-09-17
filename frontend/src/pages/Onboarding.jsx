@@ -143,7 +143,7 @@ export default function Onboarding() {
   const blocked = preview ? preview.errors.length > 0 || preview.changed === 0 : false;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", justifyContent: "center", padding: "clamp(32px, 8vh, 80px) 20px 48px" }}>
+    <div style={{ minHeight: "calc(100vh - var(--demo-banner-height))", background: "var(--bg)", display: "flex", justifyContent: "center", padding: "clamp(32px, 8vh, 80px) 20px 48px" }}>
       <div style={{ width: "100%", maxWidth: 620 }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 36 }}>

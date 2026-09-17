@@ -69,7 +69,7 @@ export default function Sidebar() {
           flexShrink: 0,
           position: "sticky",
           top: 0,
-          height: "100vh",
+          height: "calc(100vh - var(--demo-banner-height))", // see index.css's :root note on this token
           // The panel gained a masthead, a section header and a larger exit
           // control, so it is taller than it was. It fits a 929px viewport
           // with room to spare, but a 13 inch laptop in landscape is nearer
