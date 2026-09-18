@@ -162,12 +162,23 @@ do not rely on a summary of them.
 
 ## Keeping this in sync
 
-At the end of a session in which you changed the project:
+At the end of a session in which you changed the project, **or the moment the user says "prepare for
+handover" (to Claude, Kiro, or any agent, in those words or close to them)**, run this checklist right
+away rather than waiting to be asked twice:
 
-1. Add a `.kiro/DEVLOG.md` entry in the existing format.
+1. Add a `.kiro/DEVLOG.md` entry in the existing format, if the session's changes aren't already logged
+   there. Newest entry at the bottom is what a fresh agent reads first (see "Reading order" above).
 2. If status, next steps or a decision changed, update the **submission tracker**, not this file.
 3. If a paid model call was made, add it to the **spend ledger**.
 4. Update this file only if something it describes changed: the architecture, a rule, the reading
    order, or where a fact lives.
+5. Run `git status`. If there is meaningful uncommitted work, say so plainly and ask whether to commit
+   it now, don't commit or push on your own initiative (rules.md, "Working rules": commit only when
+   asked). If the branch is ahead of `origin`, mention that too: a new session on a different machine or
+   a cloud session only sees what's pushed.
+6. Close with a short, plain-English summary in chat: what changed, what's next, what (if anything) is
+   blocked or waiting on a decision. This is for the human as much as the next agent; don't skip it just
+   because the documents above already say the same thing.
 
-A hook checks step 1 automatically; see `rules.md`, "Tooling".
+A hook checks step 1 automatically; see `rules.md`, "Tooling". The trigger phrase in this section is
+the one place that behavior is defined, for every tool, so it never needs restating elsewhere.

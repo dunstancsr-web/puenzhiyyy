@@ -181,6 +181,9 @@ Read before making UI changes.
 
 ## 8. Tooling
 
+- **"Prepare for handover"**, said to any agent, means run the checklist in `handoff.md`, "Keeping
+  this in sync", right then rather than at the natural end of a session. Defined once there, not
+  repeated here.
 - `.kiro/hooks/*.json` fire only in Kiro; `.claude/settings.json` fires only in Claude Code. Kiro
   trigger names are PascalCase (`AgentStop`, `PostTaskExecution`).
 - The one check both share is `.kiro/hooks/docs-check.sh`: when an agent finishes responding with

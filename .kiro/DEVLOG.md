@@ -1256,3 +1256,14 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
   Verified live: confirmed the new pill renders beside "Model selection" and the Data Story's first sentence now reads "...the holt winters model (a statistical forecast, traditional/predictive AI, not generative) forecasts...". Checked the new sentences against `rules.md`'s em dash rule before calling this done, given the previous entry's own mistake - none slipped in this time.
 
   `npx vite build` passes. `check-formulas.js` unaffected (copy only). No paid calls.
+
+## Session: 2026-09-18 (a trigger phrase for handover, defined once in handoff.md)
+- **Branch:** feature/onboarding-demo-ux
+- **Files changed:** .kiro/steering/handoff.md, .kiro/steering/rules.md
+- **Notes:** Stan asked for a way to say "prepare for handover" to Claude, Kiro, or any future agent, and have it actually run the doc-sync checklist right then, rather than depending on the agent to remember at a natural stopping point. The checklist already existed (handoff.md, "Keeping this in sync"); the only gap was that it only fired at session end, by convention, not on request.
+
+  Added the trigger phrase directly into that section, plus two new steps that were previously left to instinct: check `git status` and say plainly if there's meaningful uncommitted work (asking before committing or pushing, never doing either unasked, per rules.md's own "Working rules"), and close with a short plain-English summary of session state for the human, not just the documents. Cross-referenced from `rules.md`'s Tooling section with one line rather than restating the checklist there, so there is exactly one place this behavior is defined, per this repo's own "one source of truth" rule. Since both Kiro and Claude Code load everything under `.kiro/steering/` automatically, this works identically for either tool from the next session onward, with no hook or slash-command plumbing needed.
+
+  Ran the checklist against itself as the first real test: this entry is step 1, this session's git status (clean before this change, now just these two doc files) is step 5, and the closing chat summary is step 6.
+
+  Docs-only change. `check-formulas.js` unaffected. No paid calls.
