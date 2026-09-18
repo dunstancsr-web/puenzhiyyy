@@ -3,12 +3,15 @@ import { Routes, Route, Outlet } from "react-router-dom";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Onboarding from "./pages/Onboarding";
+import CatalogFields from "./pages/CatalogFields";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Alerts from "./pages/Alerts";
 import Activity from "./pages/Activity";
 import ForecastDetail from "./pages/ForecastDetail";
 import ForecastList from "./pages/ForecastList";
+import AuditTable from "./pages/AuditTable";
+import ActionItems from "./pages/ActionItems";
 import Inbound from "./warehouse/Inbound";
 import DemoModeBadge from "./components/DemoModeBadge";
 
@@ -43,6 +46,12 @@ export default function App() {
           while still in demo mode still sees the banner and Exit. */}
       <Route path="/onboarding" element={<><DemoModeBadge /><Onboarding /></>} />
 
+      {/* Reference for the catalog spreadsheet's columns, linked from
+          Onboarding step 1. Its own page rather than a modal, since it's
+          the kind of thing someone leaves open in a second tab while
+          filling in the spreadsheet in Excel. */}
+      <Route path="/onboarding/catalog-fields" element={<><DemoModeBadge /><CatalogFields /></>} />
+
       {/* Warehouse floor, no chrome. */}
       <Route path="/warehouse/inbound" element={<Inbound />} />
 
@@ -57,6 +66,13 @@ export default function App() {
         <Route path="/forecast" element={<ForecastList />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/activity" element={<Activity />} />
+        {/* On Sidebar's permanent nav as "Table" (Stan's call, 19 Sep) - a
+            plain audit view built to check whether onboarding's basic
+            columns are enough to feed the top-5 formulas. */}
+        <Route path="/audit" element={<AuditTable />} />
+        {/* Additive, not a replacement for Alerts/Activity (Stan's ask, 19
+            Sep, explicit: "no deleting anything, just create a new tab"). */}
+        <Route path="/action-items" element={<ActionItems />} />
       </Route>
     </Routes>
   );

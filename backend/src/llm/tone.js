@@ -100,4 +100,46 @@ function calmTone(text, alert = {}, slots = {}) {
   return { text: out, changes };
 }
 
-module.exports = { calmTone };
+// Three artifacts, all caught live against real llama3 runs on
+// explainActionItem.js and askDatabase.js (19 Sep), fixed the same way as
+// everything else in this file: by rule after the fact, not by asking more
+// firmly in the prompt. Shared here rather than duplicated in each of those
+// two files, since both hit the same small-model habits.
+//
+//   1. "Note: I've used only placeholders..." - narrating its own rule
+//      compliance, no use to an SME reader.
+//   2. "Here's my attempt at explaining the inventory number in simple
+//      terms:" - a leading preamble. stripPreamble in slots.js has a
+//      near-identical rule for explain.js's own prompts, but caps the
+//      trailing clause at 50 characters and this one ran slightly over, so
+//      it slipped through there - a real gap found by testing.
+//   3. "Let me know if that's okay!" - a chatty sign-off with nothing to
+//      approve; these are one-way explanations, not a conversation turn.
+function stripSelfCommentary(text) {
+  return text
+    // A retry apology, seen live (19 Sep) after askDatabase.js's own
+    // correction message: "I apologize for the previous mistake. Here's a
+    // rewritten answer that follows the rules: It has 95 MT on hand." The
+    // leading apology sentence sat in front of "Here's...", so the very
+    // next rule below (which only matches at the START of the text) missed
+    // it entirely. Stripped first, so "Here's..." is then back at the start
+    // for that rule to catch.
+    .replace(/^\s*I apologi[sz]e for[^\n]*?\.\s*/i, "")
+    // Whack-a-mole by design: a small local model varies its preamble
+    // wording every run ("my attempt at...", "the instructions:", "my
+    // response:", "Based on the facts available, here is the final
+    // answer:"), so this is a broad catch-all for a leading clause ending
+    // in "here is/'s/are (the/a/my ...) answer/explanation/response:", not
+    // one more specific phrase chased at a time.
+    .replace(/^\s*(?:[^\n]{0,60}?,\s*)?Here(?:'s|\s+is|\s+are)\b[^\n]{0,80}?:\s*/i, "")
+    // Same broadening for the trailing "Note" commentary: the narrow
+    // version only matched "I've used placeholders"-style phrasing, and
+    // missed "Note that I did not include any dates or numbers in the
+    // answer, as per the rules." Anything starting "Note" and mentioning
+    // its own rule-following is the same artifact, worded differently.
+    .replace(/\n*\s*Note(?::| that)\s*(?:I(?:'ve| have|\s+did(?:\s+not|n't))?\s+\w+|(?:this|the above)\s+(?:answer|explanation))[^\n]*$/i, "")
+    .replace(/\n*\s*(?:Let me know if[^\n]*|Hope (?:this|that) helps!?|That'?s it!?)\s*$/i, "")
+    .trim();
+}
+
+module.exports = { calmTone, stripSelfCommentary };

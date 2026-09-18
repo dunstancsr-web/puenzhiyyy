@@ -14,6 +14,8 @@ const { getDb } = require("../db/init");
 const { EVENTS, logEvent, readEvents, eventCounts, diffFields } = require("../db/audit");
 const { buildAnalytics } = require("../engines/index");
 const { explainAlert, providerInfo, LlmUnavailable } = require("../llm/explain");
+const { explainActionItem } = require("../llm/explainActionItem");
+const { askDatabase } = require("../llm/askDatabase");
 const { listModes, getDefaultMode, resolveTier } = require("../llm/provider");
 const demoAccess = require("../llm/demoAccess");
 const { projectInventory } = require("../engines/projection");
@@ -84,7 +86,9 @@ router.get("/skus/export", (req, res) => {
       return { ...r, ...Object.fromEntries(EXPORT_CONTEXT.map((k) => [k, c[k]])) };
     });
 
-    const csv = toCsv([...IMPORT_COLUMNS, ...EXPORT_CONTEXT], merged);
+    const csv = merged.length
+      ? toCsv([...IMPORT_COLUMNS, ...EXPORT_CONTEXT], merged)
+      : toCsv(MINIMAL_TEMPLATE_COLUMNS, [EXAMPLE_ROW]);
     const stamp = today();
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="stocksense-inventory-${stamp}.csv"`);
@@ -92,6 +96,41 @@ router.get("/skus/export", (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to export SKUs" });
+  }
+});
+
+// GET /api/skus/opening-balance-suggestions — one plain sum per SKU (receipts
+// in minus fulfilled sales out, all time), offered on onboarding's opening
+// balance step as an opt-in starting point someone clicks to accept, never
+// pre-filled (Stan's call, 18 Sep: this is exactly the "sum the history"
+// derivation onboarding deliberately does NOT trust as a real count, so it
+// stays a labelled suggestion, not the value itself). One query, one owner:
+// nothing else should re-derive this from row-level history (rules.md,
+// "Derived values computed twice"). Fulfilled sales only, matching Stan's
+// formula decision (see formula-decisions.json) used everywhere else demand
+// is summed. Must be registered BEFORE /skus/:id below, or Express reads
+// "opening-balance-suggestions" as a sku_id and this 404s as "SKU not found" -
+// caught by actually curling it, not just reading the route table.
+router.get("/skus/opening-balance-suggestions", (req, res) => {
+  try {
+    const db = getDb();
+    const received = db.prepare(`
+      SELECT sku_id, SUM(actual_qty) AS qty FROM goods_movements
+       WHERE movement_type = 'RECEIPT' GROUP BY sku_id`).all();
+    const sold = db.prepare(`
+      SELECT sku_id, SUM(quantity_mt) AS qty FROM sales_transactions
+       WHERE status = 'fulfilled' GROUP BY sku_id`).all();
+    const net = {};
+    for (const r of received) net[r.sku_id] = (net[r.sku_id] || 0) + r.qty;
+    for (const s of sold) net[s.sku_id] = (net[s.sku_id] || 0) - s.qty;
+    const suggestions = {};
+    for (const [sku_id, qty] of Object.entries(net)) {
+      suggestions[sku_id] = Math.round(Math.max(0, qty) * 10) / 10;
+    }
+    res.json({ success: true, data: suggestions });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to compute opening balance suggestions" });
   }
 });
 
@@ -754,6 +793,17 @@ router.post("/skus/history/import-sales", (req, res) => {
     }
 
     const dates = toInsert.map((r) => r.record.sale_date).sort();
+
+    // Actual rows, not just the aggregated skuBreakdown below - so "300 sales
+    // across 3 SKUs" is something you can also SEE, not just take on faith.
+    // Earliest and latest 5 by date (not file order, which is whatever the
+    // CSV happened to list first) rather than all of them: readable at a
+    // glance for the 4-row case and the 4,000-row one alike.
+    const byDate = [...toInsert].sort((a, b) => a.record.sale_date.localeCompare(b.record.sale_date));
+    const sampleRows = byDate.length <= 10
+      ? byDate.map((r) => r.record)
+      : [...byDate.slice(0, 5), ...byDate.slice(-5)].map((r) => r.record);
+
     const summary = {
       rows: parsed.rows.length,
       changed: toInsert.length, // reused for BulkEdit.jsx's shared blocked/apply-button logic
@@ -764,6 +814,8 @@ router.post("/skus/history/import-sales", (req, res) => {
       unknownSkus: [...unknownSkus],
       dateRange: dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null,
       skuBreakdown: [...bySku.values()].sort((a, b) => b.qty_total - a.qty_total),
+      sampleRows,
+      sampleRowsTruncated: byDate.length > 10,
       applied: false,
     };
 
@@ -817,6 +869,32 @@ const IMPORT_COLUMNS = [IMPORT_KEY, ...IMPORT_EDITABLE];
 // Read-only context columns. Exported so the spreadsheet is worth looking at on
 // its own, and ignored on the way back in, since they are computed.
 const EXPORT_CONTEXT = ["available_qty", "health_status", "days_of_cover", "abc_class"];
+
+// A blank template (no SKUs yet) ships one filled-in example row instead of
+// bare headers, so a first-time uploader sees realistic values, not columns
+// with no sense of what belongs in them. The sku_id carries the "delete me"
+// instruction because it is the leftmost, most-read cell in a spreadsheet.
+// /skus/import-new below refuses to create a real SKU from it, in case someone
+// uploads the template without deleting the row.
+//
+// Deliberately narrower than IMPORT_COLUMNS below (Stan's call, 18 Sep, after
+// the domain expert's own source document turned out to list a much shorter
+// "minimum fields" set than requirements.md's REQ-02 had grown into - see
+// reference/rice-inventory-technical-spec.md, Step 1): sku_id and
+// product_name are the only two the database actually requires, and of
+// everything else, lead_time_days/reorder_point_policy/target_stock are the
+// three that make the reorder math mean something real rather than resting
+// entirely on defaults. Every other column (variety, grade, origin, brand,
+// packaging, supplier, costs, min/max stock, safety stock %, MOQ) still
+// exists in the schema and is still editable from Inventory or Bulk edit
+// afterward - narrower here on purpose, not deleted from the app.
+const MINIMAL_TEMPLATE_COLUMNS = ["sku_id", "product_name", "lead_time_days", "reorder_point_policy", "target_stock"];
+const EXAMPLE_ROW_SKU_ID = "EXAMPLE-DELETE-ME";
+const EXAMPLE_ROW = {
+  sku_id: EXAMPLE_ROW_SKU_ID,
+  product_name: "Delete this row — Thai Jasmine 25KG shown as an example",
+  lead_time_days: 45, reorder_point_policy: 300, target_stock: 500,
+};
 
 // Every column either import treats as a non-negative number. The history
 // quantities join the set so cellChange validates and compares them the same
@@ -1254,6 +1332,21 @@ const CREATE_NUMERIC = [
 ];
 const CREATE_COLUMNS = [...CREATE_REQUIRED.filter((f) => f !== CREATE_KEY), ...CREATE_TEXT, ...CREATE_NUMERIC, CREATE_KEY];
 
+// A blank cell means "use the default", not "use zero" — matching db/init.js's
+// own column defaults and POST /skus above. Only these two need a non-zero
+// fallback: a 0-day lead time or 0% safety stock feeds straight into
+// reorder_point_suggested and reads as GREEN (nothing needed), which is the
+// opposite of "not yet configured".
+const CREATE_NUMERIC_DEFAULTS = { safety_stock_pct: 20, lead_time_days: 45 };
+
+// Labels for the "assumed" badges the import preview shows per row (Onboarding
+// step 1's review screen), one source of truth with CREATE_NUMERIC_DEFAULTS
+// above so the number shown to the uploader can never drift from the number
+// actually written. Only these two fields get a badge — every other blank
+// numeric column defaults to a genuinely unremarkable 0 (see CatalogFields.jsx),
+// not a standing assumption worth flagging.
+const ASSUMPTION_LABELS = { safety_stock_pct: "20% safety stock", lead_time_days: "45-day lead time" };
+
 router.post("/skus/import-new", (req, res) => {
   const { csv, apply = false } = req.body || {};
   if (typeof csv !== "string" || !csv.trim()) {
@@ -1282,23 +1375,30 @@ router.post("/skus/import-new", (req, res) => {
 
     const toCreate = [];
     const errors = [];
+    const warnings = [];
     const seen = new Set();
 
     for (const row of parsed.rows) {
       const line = row.__line;
       const id = row.sku_id;
       if (!id) { errors.push({ line, message: `Row ${line} has no sku_id` }); continue; }
+      if (id === EXAMPLE_ROW_SKU_ID) { warnings.push(`Line ${line}: the example row was skipped, not added.`); continue; }
       if (seen.has(id)) { errors.push({ line, message: `${id} appears more than once (line ${line})` }); continue; }
       seen.add(id);
       if (known.has(id)) { errors.push({ line, message: `${id} already exists (line ${line}) — use Upload SKUs to edit it instead` }); continue; }
       if (!row.product_name) { errors.push({ line, message: `${id}: product_name is required (line ${line})` }); continue; }
 
       const record = { sku_id: id, product_name: row.product_name };
+      const assumed = [];
       let rowFailed = false;
       for (const f of CREATE_TEXT) record[f] = row[f] || null;
       for (const f of CREATE_NUMERIC) {
         const raw = row[f];
-        if (raw === undefined || raw === "") { record[f] = 0; continue; }
+        if (raw === undefined || raw === "") {
+          record[f] = CREATE_NUMERIC_DEFAULTS[f] ?? 0;
+          if (ASSUMPTION_LABELS[f]) assumed.push(ASSUMPTION_LABELS[f]);
+          continue;
+        }
         const n = Number(raw);
         if (!Number.isFinite(n) || n < 0) {
           errors.push({ line, message: `${id}: ${f} must be a number >= 0 (line ${line})` });
@@ -1308,7 +1408,7 @@ router.post("/skus/import-new", (req, res) => {
         record[f] = n;
       }
       if (rowFailed) continue;
-      toCreate.push({ line, record });
+      toCreate.push({ line, record, assumed });
     }
 
     const summary = {
@@ -1316,9 +1416,10 @@ router.post("/skus/import-new", (req, res) => {
       changed: toCreate.length, // reused for BulkEdit.jsx/Onboarding.jsx's shared blocked/apply-button logic
       unchanged: 0,
       errors,
-      warnings: [],
+      warnings,
+      warningBody: "Nothing else needs fixing here; this is just a note about a row that was left out.",
       ignoredColumns: ignored,
-      changes: toCreate.map(({ record }) => ({ sku_id: record.sku_id, name: record.product_name, fields: {} })),
+      changes: toCreate.map(({ record, assumed }) => ({ sku_id: record.sku_id, name: record.product_name, fields: {}, assumed })),
       applied: false,
     };
 
@@ -1705,6 +1806,141 @@ router.post("/alerts/explain", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to build explanation" });
+  }
+});
+
+// Same three-branch decision tree as frontend/src/pages/ActionItems.jsx's own
+// blindSpotReason() - kept deliberately duplicated rather than shared, since
+// the alternative (a shared module reachable from both a Node backend and a
+// Vite frontend bundle) is real infrastructure for three `if` statements. If
+// this grows past a handful of branches, unify it; for now the risk of the
+// two silently disagreeing is small and worth watching, not worth building
+// around yet.
+function blindSpotReasonServer(sku) {
+  if (!sku.avg_daily_usage_30d) {
+    return { whatsMissing: "No sales history yet", why: "Can't project a stockout date without a demand rate to project forward.", fix: "Nothing to do - resolves itself once this product has sold a few times." };
+  }
+  if (!sku.target_stock) {
+    return { whatsMissing: "Target stock was never set (0)", why: "Suggested order quantity is target stock minus projected position - with no target, it can't mean anything.", fix: "Set it on Table" };
+  }
+  if (!sku.reorder_point_policy) {
+    return { whatsMissing: "Reorder point was never set (0)", why: "Figures that compare against the approved reorder point aren't meaningful yet.", fix: "Set it on Table" };
+  }
+  return null;
+}
+
+// POST /api/action-items/explain  { sku_id, kind: "stockout" | "blindspot", tier? }
+//
+// Same shape as /alerts/explain just above: re-derives everything live from
+// analytics rather than trusting anything the client sends about WHY a row
+// is on the page, for the same reason - a stale tab must never hand the
+// model outdated evidence. See backend/src/llm/explainActionItem.js for the
+// explanation pipeline itself.
+router.post("/action-items/explain", async (req, res) => {
+  const { sku_id, kind } = req.body || {};
+  if (!sku_id || !["stockout", "blindspot"].includes(kind)) {
+    return res.status(400).json({ success: false, message: "sku_id and a valid kind (stockout or blindspot) are required" });
+  }
+  const tier = resolveTier(req.body?.tier || getDefaultMode());
+
+  if (tier === "cloud" && !demoAccess.passValid(req.get("X-Demo-Unlock"))) {
+    const gate = demoAccess.gateStatus();
+    return res.json({
+      success: true,
+      data: {
+        available: false,
+        locked: gate.ok,
+        reason: gate.ok ? "Paid explanations are locked. Enter the demo PIN in Settings to unlock them." : gate.reason,
+        ...providerInfo(tier),
+      },
+    });
+  }
+
+  try {
+    const { skus } = getAnalytics();
+    const sku = skus.find((s) => s.sku_id === sku_id);
+    if (!sku) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    let item;
+    if (kind === "stockout") {
+      const proj = projectInventory({
+        availableQty: sku.available_qty, dailyDemand: sku.avg_daily_usage_30d,
+        openPos: sku.open_pos, safetyStockMt: sku.safety_stock_mt,
+        reorderPoint: sku.reorder_point_policy, days: 90,
+      });
+      const daysUntil = (iso) => (iso ? Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 86_400_000)) : null);
+      const stockoutDays = daysUntil(proj.first_stockout_date);
+      const breachDays = daysUntil(proj.first_safety_breach_date);
+      const days = stockoutDays != null ? stockoutDays : breachDays;
+      if (days == null) {
+        return res.status(404).json({ success: false, message: "Nothing projected to run out or breach safety stock for this SKU right now" });
+      }
+      item = { nearest: { days }, isStockout: stockoutDays != null };
+    } else {
+      const reason = blindSpotReasonServer(sku);
+      if (!reason) return res.status(404).json({ success: false, message: "No blind spot found for this SKU right now" });
+      item = { reason };
+    }
+
+    try {
+      const out = await explainActionItem({ kind, sku, item, tier });
+      res.json({
+        success: true,
+        data: { available: true, explanation: out.text, provider: out.provider, model: out.model, cached: out.cached },
+      });
+    } catch (err) {
+      if (err instanceof LlmUnavailable) {
+        return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo(tier) } });
+      }
+      throw err;
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to build explanation" });
+  }
+});
+
+// POST /api/ask-database  { question, tier? }
+//
+// The tier past Action Items' fixed "Why?" (19 Sep): an open-ended question,
+// answered by a model that can call a small set of read-only tools
+// (backend/src/llm/tools.js) to fetch facts it wasn't pre-loaded with -
+// never raw SQL, never a write. See askDatabase.js for the full reasoning.
+// Same never-500-on-a-model-problem contract as /alerts/explain and
+// /action-items/explain above.
+router.post("/ask-database", async (req, res) => {
+  const { question } = req.body || {};
+  if (!question || typeof question !== "string" || !question.trim()) {
+    return res.status(400).json({ success: false, message: "question is required" });
+  }
+  const tier = resolveTier(req.body?.tier || getDefaultMode());
+
+  if (tier === "cloud" && !demoAccess.passValid(req.get("X-Demo-Unlock"))) {
+    const gate = demoAccess.gateStatus();
+    return res.json({
+      success: true,
+      data: {
+        available: false,
+        locked: gate.ok,
+        reason: gate.ok ? "Paid explanations are locked. Enter the demo PIN in Settings to unlock them." : gate.reason,
+        ...providerInfo(tier),
+      },
+    });
+  }
+
+  try {
+    const analytics = getAnalytics();
+    const out = await askDatabase({ question: question.trim(), db: getDb(), analytics, tier });
+    res.json({
+      success: true,
+      data: { available: true, answer: out.text, provider: out.provider, model: out.model, toolCalls: out.toolCalls },
+    });
+  } catch (err) {
+    if (err instanceof LlmUnavailable) {
+      return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo(tier) } });
+    }
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to answer the question" });
   }
 });
 

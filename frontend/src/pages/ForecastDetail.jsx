@@ -189,7 +189,7 @@ export default function ForecastDetail() {
         />
       </div>
 
-      <ReasoningChain sku={sku} preview={preview} hasForecast={!!forecast} onUseForecast={toggleUseForecast} />
+      <ReasoningChain sku={sku} preview={preview} hasForecast={!!forecast} onUseForecast={toggleUseForecast} modelRef={modelRef} />
 
       {forecast && preview && (
         <>
@@ -242,9 +242,23 @@ function ForecastHeader({ sku, forecast, onBack, onRecompute, recomputing }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Stat label="Approved" value={`${Math.round(sku.reorder_point_policy)} MT`} />
+          <Stat label="Current reorder pt" tip={{
+            what: "The approved reorder point - the value alerts and health status actually key off today.",
+            how: "Changed on Alerts, by approving a policy-change suggestion, or from Inventory directly. Never changes just from looking at this page.",
+          }} value={`${Math.round(sku.reorder_point_policy)} MT`} />
           <span style={{ color: "var(--text-muted)", fontSize: 20 }}>&rarr;</span>
-          <Stat label="Suggested" value={`${Math.round(sku.reorder_point_suggested_with_risk)} MT`} color="var(--blue)" />
+          <Stat
+            label="Suggested reorder pt"
+            tip={{
+              what: "What the safety-stock formula would set the reorder point to, from this SKU's demand rate, lead time and target service level.",
+              how: "The badge underneath says which demand rate fed it - the plain 30-day average by default, or a statistical model once you switch one on. See the full breakdown below.",
+            }}
+            value={`${Math.round(sku.reorder_point_suggested_with_risk)} MT`}
+            color="var(--blue)"
+            badge={sku.use_forecast
+              ? { text: `Model · ${(sku.forecast_active_model || sku.demand_source || "").replace(/_/g, " ")}`, tone: "model" }
+              : { text: "Baseline · 30-day average", tone: "baseline" }}
+          />
         </div>
         <div style={{ textAlign: "right" }}>
           {forecast && (
@@ -268,11 +282,29 @@ function ForecastHeader({ sku, forecast, onBack, onRecompute, recomputing }) {
   );
 }
 
-function Stat({ label, value, color }) {
+const STAT_BADGE_STYLE = {
+  baseline: { bg: "var(--surface-2)", fg: "var(--text-secondary)" },
+  model: { bg: "var(--blue-light)", fg: "var(--blue)" },
+};
+
+function Stat({ label, value, color, tip, badge }) {
+  const badgeStyle = badge && STAT_BADGE_STYLE[badge.tone];
   return (
     <div style={{ textAlign: "right" }}>
-      <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)" }}>{label}</div>
+      <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3 }}>
+        {label}
+        {tip && <ColHint label={label} what={tip.what} how={tip.how} />}
+      </div>
       <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: color || "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      {badge && (
+        <div style={{
+          display: "inline-block", marginTop: 3, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase",
+          letterSpacing: "0.03em", padding: "2px 7px", borderRadius: 99,
+          background: badgeStyle?.bg, color: badgeStyle?.fg,
+        }}>
+          {badge.text}
+        </div>
+      )}
     </div>
   );
 }
@@ -294,7 +326,36 @@ function scrollToRef(ref) {
 }
 
 function DataStory({ sku, preview, hasForecast, modelRef, simRef, sandboxRef }) {
-  if (!hasForecast) return null; // nothing to narrate before a forecast exists
+  // Previously returned null here before a forecast existed - meaning most
+  // SKUs (nobody has run Recompute for them yet) landed on this page with NO
+  // explanation at all between the header and the model picker. Found from
+  // Stan asking, as a new user, why the page didn't feel like it was telling
+  // him "you're on a default, here are 4 better options" - because for the
+  // majority of SKUs it genuinely wasn't saying that anywhere.
+  if (!hasForecast) {
+    return (
+      <div className="card" style={{
+        padding: "20px 22px", marginBottom: 16,
+        background: "var(--surface-2)", border: "1px solid var(--border)",
+      }}>
+        <div style={{
+          fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em",
+          textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 10,
+        }}>
+          What your data tells us
+        </div>
+        <p style={{ fontSize: "var(--text-base)", lineHeight: 1.65, color: "var(--text-primary)", margin: 0 }}>
+          No forecast has been run for {sku.product_name} yet, so the <b>{Math.round(sku.reorder_point_suggested_with_risk)} MT</b> suggested
+          above is today's <b>default</b>: a plain 30-day average of actual sales ({sku.avg_daily_usage_30d} MT/day), no trend or
+          seasonality. That's a reasonable starting point, but four statistical models below can often do
+          better, especially if this product sells more in some months than others.
+        </p>
+        <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+          <button type="button" onClick={scrollToRef(modelRef)} style={STORY_LINK_STYLE}>Try the 4 models &darr;</button>
+        </div>
+      </div>
+    );
+  }
   if (!preview) {
     return (
       <div className="card" style={{ padding: "18px 20px", marginBottom: 16 }}>
@@ -343,6 +404,22 @@ function DataStory({ sku, preview, hasForecast, modelRef, simRef, sandboxRef }) 
         this product, not from the sales data itself, so they're only as good as what you (or your supplier)
         told us. See how the suggestion was built, and how it plays out over time, before approving anything.
       </p>
+
+      {/* Only when the two CAN legitimately disagree: engines/index.js only
+          feeds the forecast's demand rate into the live SUGGESTED figure
+          above when use_forecast is on (the sandbox here always uses it,
+          regardless - see the comment on POST /skus/:id/forecast/preview).
+          Found live: a SKU with use_forecast off showed 185 MT up top and
+          113 MT here, same lead time, no explanation - this is that
+          explanation. */}
+      {!sku.use_forecast && (
+        <p style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "var(--text-secondary)", marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--border)" }}>
+          This won't match the <b style={{ color: "var(--text-primary)" }}>SUGGESTED</b> figure above: {sku.product_name} isn't
+          set to use the forecast yet, so that one is still built on the 30-day sales average
+          ({" "}{sku.avg_daily_usage_30d} MT/day), not this model's {preview.forecast_avg_daily_demand} MT/day. Switch it
+          over in "See the model behind this" below to bring the two in line.
+        </p>
+      )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <button type="button" onClick={scrollToRef(modelRef)} style={STORY_LINK_STYLE}>See the model behind this ↓</button>
@@ -635,7 +712,7 @@ function SandboxNote({ text, onUse }) {
 }
 
 // ── Reasoning chain ──────────────────────────────────────────────────────────
-function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
+function ReasoningChain({ sku, preview, hasForecast, onUseForecast, modelRef }) {
   const demandLabel = sku.use_forecast ? `forecast (${sku.demand_source?.replace("_", " ") || sku.forecast_model})` : "30-day average";
   return (
     <div className="card" style={{ padding: "18px 20px", marginBottom: 16 }}>
@@ -644,7 +721,7 @@ function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
           How this becomes the suggested reorder point
           <ColHint label="How this becomes the suggested reorder point"
             what="None of this is generative AI. Forecast demand comes from a statistical forecast model (Naive seasonal, Linear trend, Holt-Winters, or Holt damped + seasonal) - traditional or predictive AI, backtested against real sales history, always producing the same output for the same inputs. Everything after it is a fixed formula (King's formula) applied on top."
-            how="The three tags below say which is which: YOUR INPUT is something you (or your supplier) told the system, STATISTICAL FORECAST is the model's own output, and no tag means fixed arithmetic on top of those two. AI only appears elsewhere in this app, on Alerts's Why? button, and only to explain a number, never to calculate one." />
+            how="The tags below say which is which: SALES HISTORY is a plain historical average (no model behind it yet), YOUR INPUT is something you (or your supplier) told the system, STATISTICAL FORECAST is a model's own output, and no tag means fixed arithmetic on top of those. AI only appears elsewhere in this app, on Alerts's Why? button, and only to explain a number, never to calculate one." />
         </h2>
         {hasForecast && (
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer" }}>
@@ -656,10 +733,42 @@ function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 12 }}>
         Currently operating on the <b style={{ color: "var(--text-secondary)" }}>{demandLabel}</b>.
       </div>
-      {!preview ? (
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-          {hasForecast ? "Computing…" : "Generate a forecast to see the reasoning chain."}
-        </div>
+      {!hasForecast ? (
+        // Real numbers, not a placeholder: everything here is already on
+        // `sku` from GET /skus (engines/index.js), computed off the 30-day
+        // average whether or not anyone has ever clicked Recompute. Someone
+        // landing on a SKU that's never been forecast used to see one line of
+        // muted text here and nothing else - this is the actual math behind
+        // today's SUGGESTED figure, not a promise of what a forecast would add.
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <ChainStep label="Avg daily sales (30d)" value={`${sku.avg_daily_usage_30d} MT/day`} tag="sales history" />
+            <ChainOp>&times;</ChainOp>
+            <ChainStep label="Lead time" value={`${sku.lead_time_days} days`} tag="your input" />
+            <ChainOp>=</ChainOp>
+            <ChainStep label="Lead time demand" value={`${sku.lead_time_demand_mt} MT`} />
+            <ChainOp>+</ChainOp>
+            <ChainStep label="Safety stock" value={`${sku.safety_stock_mt} MT`} tag="formula" />
+            <ChainOp>+</ChainOp>
+            <ChainStep label="Risk buffer" value={`+${sku.risk_buffer_mt} MT`} accent="var(--orange)" tag="formula" />
+            <ChainOp>=</ChainOp>
+            <ChainStep label="Suggested (baseline)" value={`${Math.round(sku.reorder_point_suggested_with_risk)} MT`} accent="var(--blue)" total />
+          </div>
+          <div style={{
+            marginTop: 14, padding: "10px 14px", display: "flex", alignItems: "center",
+            justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+            background: "var(--purple-light)", border: "1px solid var(--purple)", borderRadius: "var(--radius)",
+          }}>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+              This is the default calculation - no trend, no seasonality, just a plain average of recent sales.
+            </span>
+            <button type="button" onClick={scrollToRef(modelRef)} style={STORY_LINK_STYLE}>
+              Try the 4 models &darr;
+            </button>
+          </div>
+        </>
+      ) : !preview ? (
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Computing…</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <ChainStep label="Forecast demand" value={`${preview.forecast_avg_daily_demand} MT/day`} tag="statistical forecast" />
@@ -693,6 +802,7 @@ function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
 const CHAIN_TAG_STYLE = {
   "your input": { bg: "var(--blue-light)", fg: "var(--blue)" },
   "statistical forecast": { bg: "var(--purple-light)", fg: "var(--purple)" },
+  "sales history": { bg: "var(--surface-2)", fg: "var(--text-secondary)" },
 };
 
 function ChainStep({ label, value, accent, tag, total }) {

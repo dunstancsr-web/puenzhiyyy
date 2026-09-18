@@ -74,6 +74,7 @@ export const api = {
   updateSku: (id, body) => request(`/skus/${id}`, { method: "PUT", body }),
   restockSku: (skuId, quantity) =>
     request("/inventory/restock", { method: "POST", body: { sku_id: skuId, quantity } }),
+  getOpeningBalanceSuggestions: () => request("/skus/opening-balance-suggestions"),
   getSkuProjection: (id) => request(`/skus/${id}/projection`),
 
   // Forecasting (MVP2 Day 5). getSkuForecast returns { history, forecast } -
@@ -161,6 +162,26 @@ export const api = {
       method: "POST",
       headers: pass ? { "X-Demo-Unlock": pass } : undefined,
       body: { sku_id: skuId, alert_type: alertType, tier },
+    }),
+
+  // Action Items' own "Why?" (19 Sep) - same shape as explainAlert above,
+  // separate endpoint because it explains a different kind of thing
+  // (nearest-stockout / blind-spot rows, not the six alert types).
+  explainActionItem: (skuId, kind, { tier, pass } = {}) =>
+    request("/action-items/explain", {
+      method: "POST",
+      headers: pass ? { "X-Demo-Unlock": pass } : undefined,
+      body: { sku_id: skuId, kind, tier },
+    }),
+
+  // Open-ended follow-up questions (19 Sep) - the model can call a small set
+  // of read-only tools (backend/src/llm/tools.js) to fetch facts about any
+  // SKU, not just the one row a fixed "Why?" already knew about.
+  askDatabase: (question, { tier, pass } = {}) =>
+    request("/ask-database", {
+      method: "POST",
+      headers: pass ? { "X-Demo-Unlock": pass } : undefined,
+      body: { question, tier },
     }),
 
   // Model tier (TASK-42). What this server can offer. There is no setter since

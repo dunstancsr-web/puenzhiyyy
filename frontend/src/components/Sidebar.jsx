@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, TrendingUp, PackageSearch, Bell, History, Home as HomeIcon } from "lucide-react";
+import { LayoutDashboard, TrendingUp, PackageSearch, Bell, History, Home as HomeIcon, Table2, Flame } from "lucide-react";
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 import EventCredit from "./EventCredit";
@@ -55,6 +55,12 @@ export default function Sidebar() {
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
+    // Right after Dashboard, first guess at placement (19 Sep, additive -
+    // Alerts/Activity untouched): "what needs a decision from me, soonest
+    // first" reads as the natural next step after "how are we doing
+    // overall," ahead of the deeper Forecast/Inventory screens. Reorder
+    // freely once it's been used for real.
+    { to: "/action-items", label: "Action Items", icon: Flame, badge: null },
     // Between Dashboard and Inventory: right after "how are we doing", right
     // before "what do we hold". Matches the order a manager actually reasons
     // in, decide-then-inspect rather than the other way round.
@@ -63,6 +69,11 @@ export default function Sidebar() {
     { to: "/alerts", label: "Alerts", icon: Bell, badge: alertCount },
     // Last on purpose: Activity is a record to consult, not a queue to work.
     { to: "/activity", label: "Activity", icon: History, badge: null },
+    // Table (AuditTable.jsx, 19 Sep): Stan asked for this in the sidebar
+    // directly, not held open pending sign-off the way Forecast was - one row
+    // per SKU, uploaded columns beside what the top-5 formulas produce, built
+    // to check whether onboarding's basic columns are actually enough.
+    { to: "/audit", label: "Table", icon: Table2, badge: null },
   ];
 
   return (
