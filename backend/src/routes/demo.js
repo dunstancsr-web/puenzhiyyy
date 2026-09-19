@@ -96,6 +96,7 @@ function trimSampleCatalog(db) {
   const tables = [
     "inventory_positions", "sales_transactions", "purchase_orders", "alerts_log",
     "decisions", "forecasts", "sales_orders", "goods_movements", "inventory_history",
+    "order_requests",
   ];
   for (const t of tables) {
     db.prepare(`DELETE FROM ${t} WHERE sku_id NOT IN (${placeholders})`).run(...keep);
