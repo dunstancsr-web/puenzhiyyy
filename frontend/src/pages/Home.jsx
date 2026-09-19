@@ -66,8 +66,7 @@ const FLOOR = [
     help: "Check a delivery against its purchase order, count what actually arrived, and record any shortfall.",
   },
   {
-    to: null,
-    soon: true,
+    to: "/warehouse/outbound",
     icon: ArrowUpFromLine,
     tint: "var(--blue)",
     bg: "var(--blue-light)",

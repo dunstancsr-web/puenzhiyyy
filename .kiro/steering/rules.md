@@ -135,7 +135,7 @@ Read before making UI changes.
 - **Prove a new check can fail.** Before trusting a check, give it a case it must catch. On 15 Sep the
   formula check was proven by breaking a health rule on purpose, and the directory check turned out to
   pass everything under `docs/` until a deliberately unlisted file slipped through it.
-- **Describe what the running app does, not what the backend supports.** Goods Out has an API but no
+- **Describe what the running app does, not what the backend supports.** Goods Out once had an API but no
   screens, and five documents called it a working flow until someone clicked through the app. Check a
   feature on screen before writing that it exists.
 - **Never point a prompt brief at a figure that has no placeholder.** An ageing brief saying "the
@@ -152,10 +152,11 @@ Read before making UI changes.
 
 - **Home**: the screen at `/` with the three workspaces (`frontend/src/pages/Home.jsx`). Briefly
   called the Launchpad; Stan renamed it because everyone already knows what Home means.
-- **The Control Tower**: the desktop side, Dashboard, Inventory, Alerts, Activity. The only part with
-  the sidebar.
-- **Goods In** and **Goods Out**: the handheld warehouse floor flows (Goods Out has an API but no screens
-  yet). Industry terms: inbound / goods
+- **The Control Tower**: the desktop side. The sidebar's own order (`Sidebar.jsx`): Dashboard, Action
+  Items, Forecast, Inventory, Alerts, Activity, Table. The only part with the sidebar. Action Items
+  and Table (both 19 Sep) are additive - Alerts keeps the approve/modify/reject workflow, Activity
+  keeps the audit record, neither was replaced.
+- **Goods In** and **Goods Out**: the handheld warehouse floor flows. Industry terms: inbound / goods
   receipt, outbound / goods issue.
 - **Key Metrics**: the top card on the Dashboard (hero value, baseline comparison, the Service &
   availability and Working capital groups). The Dashboard's sections after it, in order: **Needs

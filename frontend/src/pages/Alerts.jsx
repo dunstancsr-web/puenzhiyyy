@@ -9,6 +9,7 @@ import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { api } from "../api/inventory";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { buildExplanation } from "../lib/explain";
 import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier";
 
@@ -136,6 +137,16 @@ export default function Alerts() {
   }, []);
 
   useEffect(() => { loadAlerts(); }, [loadAlerts]);
+
+  // A receipt can clear an alert and a pick can raise one. Alert ids are stable
+  // database ids, so an open Why? panel keeps its place across a refresh.
+  useLiveRefresh(() => {
+    Promise.all([api.getAlerts(), api.getDecisions(), api.getSkus()])
+      .then(([alertsData, decisionsData, skuData]) => {
+        setAlerts(alertsData); setDecisions(decisionsData); setSkus(skuData || []);
+      })
+      .catch(() => {});
+  });
 
   // Which tiers this server can offer, so a choice it cannot honour (an
   // expired pass, a local model that does not exist on a host) falls back

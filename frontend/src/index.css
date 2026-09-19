@@ -780,7 +780,7 @@ input[type="range"].sf-range:disabled {
 .hh-screen {
   max-width: 460px;
   margin: 0 auto;
-  min-height: 100vh;
+  min-height: calc(100vh - var(--demo-banner-height));
   display: flex;
   flex-direction: column;
   background: var(--card-bg);

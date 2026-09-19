@@ -82,8 +82,8 @@ rather than one navigation:
 - **Goods In**, on a handheld at the dock. Receive against a purchase order in four steps (pick the
   delivery, verify the SKU, count it, confirm), so the system records "195 MT arrived against 200
   expected, five short, damaged in transit" rather than "someone typed a number".
-- **Goods Out**, on the same handheld: picking against an open sales order works in the API, and its
-  handheld screens are the next thing to build (shown as "Coming soon" on Home).
+- **Goods Out**, on the same handheld: pick a customer order, verify the SKU, count what leaves and
+  confirm. Shipping more than is on hand is refused, and a short pick must carry a reason.
 - **The Control Tower**, on a desktop, for the manager: Dashboard, Inventory, Alerts and Activity.
 
 Floor operators sign in with a four digit PIN, because a shared rugged terminal on a charging cradle is

@@ -1,83 +1,78 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
-  ScanLine, PackageCheck, CheckCircle2, AlertTriangle, Truck, ChevronRight,
+  ScanLine, PackageCheck, CheckCircle2, AlertTriangle, ClipboardList, ChevronRight,
 } from "lucide-react";
 import { api } from "../api/inventory";
 import Login from "./Login";
 import { HandheldHeader, Instruction, Keypad, Fact, HowThisWorks, FloorError, JoinDemo } from "./Handheld";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GOODS IN: RECEIVING (TASK-47)
+// GOODS OUT: PICKING (mirrors Goods In, TASK-47)
 //
-// Four steps, one decision each, against an expected delivery.
+// Four steps, one decision each, against an open customer order.
 //
-//   1  pick the delivery       which purchase order is on the dock
-//   2  verify the SKU          scan or key the code, checked against the PO
-//   3  count it                how many MT actually arrived
-//   4  confirm                 review, explain any variance, commit
+//   1  pick the order          which sales order is being loaded
+//   2  verify the SKU          scan or key the code, checked against the order
+//   3  count it                how many MT actually go on the truck
+//   4  confirm                 review, explain any short pick, commit
 //
-// Receiving against a purchase order rather than free form is the whole point.
-// It gives the system an expected quantity to compare against, which is what
-// turns "someone typed a number" into "195 arrived against 200 expected, five
-// short, damaged in transit" and closes the PO so the tonnes are not counted
-// twice, once on hand and once as expected incoming.
+// The asymmetry with receiving is the reason this is its own file rather than a
+// mode of Inbound. A delivery can arrive over or under and both are facts. A pick
+// cannot exceed the order or the stock physically on hand, so the keypad refuses
+// to go past either limit and only a SHORT pick asks for a reason. Confirming
+// releases the reservation the order held, which is what lets available stock
+// recover instead of reserving tonnes that have already left the building.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STEPS = 4;
 
 const HOW = [
-  "Pick the delivery that is in front of you from the list of what is expected today.",
-  "Scan the SKU code on the pallet, or key it in. The app checks it matches the delivery.",
-  "Count the stock and key in how many MT actually arrived.",
-  "Check the summary, explain any difference from what was expected, and confirm.",
+  "Pick the customer order you are loading from the list of open orders.",
+  "Scan the SKU code on the pallet, or key it in. The app checks it matches the order.",
+  "Count the stock and key in how many MT are leaving.",
+  "Check the summary, explain any short pick, and confirm.",
 ];
 
-// Split by direction. Offering "Over shipped by supplier" as an explanation for
-// a SHORT receipt is offering an answer that cannot be true, and a list where
-// some options are impossible is a list the operator has to think about.
+// A pick can only be short, never over, so there is a single list. Every option
+// is a thing that can be true of a short pick.
 const SHORT_REASONS = [
-  "Damaged in transit",
-  "Short shipped by supplier",
-  "Partial delivery, balance to follow",
-  "Counting correction",
-];
-const OVER_REASONS = [
-  "Over shipped by supplier",
-  "Earlier shortfall made up",
+  "Not enough stock on the shelf",
+  "Damaged stock set aside",
+  "Customer accepted a partial delivery",
   "Counting correction",
 ];
 
 const fmt = (n) => Number(n).toLocaleString("en-SG", { maximumFractionDigits: 2 });
 
-export default function Inbound() {
+export default function Outbound() {
   const [operator, setOperator] = useState(null);
   const [step, setStep] = useState(1);
 
-  const [deliveries, setDeliveries] = useState(null);
+  const [orders, setOrders] = useState(null);
   const [loadError, setLoadError] = useState(null);
 
-  const [po, setPo] = useState(null);
+  const [order, setOrder] = useState(null);
   const [scan, setScan] = useState("");
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [needsDemo, setNeedsDemo] = useState(false);
-  const [receipt, setReceipt] = useState(null);
+  const [note, setNote] = useState(null);
 
-  const loadDeliveries = useCallback(() => {
+  const loadOrders = useCallback(() => {
     setLoadError(null);
-    api.getInbound().then(setDeliveries).catch((e) => setLoadError(e.message));
+    api.getOutbound().then(setOrders).catch((e) => setLoadError(e.message));
   }, []);
 
-  useEffect(() => { if (operator) loadDeliveries(); }, [operator, loadDeliveries]);
+  useEffect(() => { if (operator) loadOrders(); }, [operator, loadOrders]);
 
-  if (!operator) return <Login purpose="receiving" onSignedIn={setOperator} />;
+  if (!operator) return <Login purpose="picking" onSignedIn={setOperator} />;
 
   const reset = () => {
-    setPo(null); setScan(""); setQty(""); setReason(""); setError(null); setReceipt(null); setStep(1);
-    loadDeliveries();
+    setOrder(null); setScan(""); setQty(""); setReason(""); setError(null); setNote(null); setStep(1);
+    loadOrders();
   };
 
   const back = () => {
@@ -86,20 +81,24 @@ export default function Inbound() {
     setStep((s) => s - 1);
   };
 
-  const variance = po && qty !== "" ? +(Number(qty) - po.ordered_qty).toFixed(2) : 0;
+  // The most this order can ship: what was asked for, or what is physically
+  // there if that is less. Available is not the limit, because this order's own
+  // reservation is already inside the gap between the two.
+  const ceiling = order ? Math.min(order.ordered_qty, order.on_hand_qty ?? 0) : 0;
+  const shortBy = order && qty !== "" ? +(order.ordered_qty - Number(qty)).toFixed(2) : 0;
 
   const confirm = async () => {
     setBusy(true);
     setError(null);
     setNeedsDemo(false);
     try {
-      const out = await api.receiveGoods({
-        po_number: po.po_number,
-        received_qty: Number(qty),
+      const out = await api.pickGoods({
+        so_number: order.so_number,
+        picked_qty: Number(qty),
         operator_id: operator.id,
-        variance_reason: variance !== 0 ? reason : undefined,
+        short_reason: shortBy > 0 ? reason : undefined,
       });
-      setReceipt(out);
+      setNote(out);
     } catch (e) {
       setError(e.message);
       setNeedsDemo(!!e.needsDemo);
@@ -109,12 +108,11 @@ export default function Inbound() {
   };
 
   // ── Done ───────────────────────────────────────────────────────────────────
-  if (receipt) {
-    const short = receipt.variance_qty < 0;
-    const over = receipt.variance_qty > 0;
+  if (note) {
+    const short = note.short_by > 0;
     return (
       <div className="hh-screen">
-        <HandheldHeader title="Goods In" operator={operator} onSignOut={() => setOperator(null)} />
+        <HandheldHeader title="Goods Out" operator={operator} onSignOut={() => setOperator(null)} />
         <div className="hh-body">
           <div style={{ textAlign: "center", padding: "14px 0 4px" }}>
             <div style={{
@@ -123,15 +121,14 @@ export default function Inbound() {
             }}>
               <CheckCircle2 size={31} color="var(--green)" />
             </div>
-            <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700 }}>Stock received</h2>
+            <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700 }}>Stock dispatched</h2>
             <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 5 }}>
               It is live in the system now.
             </p>
           </div>
 
-          {/* Styled as the document it stands in for. A GRN is what the driver
-              waits for and what accounts match the invoice against, so giving it
-              a number and a face makes the step feel finished. */}
+          {/* Styled as the document it stands in for: the delivery note the
+              driver signs, the counterpart of the GRN on the receiving side. */}
           <div style={{
             border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden",
             background: "var(--card-bg)",
@@ -142,32 +139,28 @@ export default function Inbound() {
               display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
               <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
-                GOODS RECEIVED NOTE
+                DELIVERY NOTE
               </span>
               <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, fontFamily: "monospace" }}>
-                {receipt.movement_no}
+                {note.movement_no}
               </span>
             </div>
             <div style={{ padding: "10px 15px 14px" }}>
-              <Fact label="Product" value={receipt.product_name} />
-              <Fact label="Expected" value={`${fmt(receipt.expected_qty)} MT`} />
-              <Fact label="Received" value={`${fmt(receipt.received_qty)} MT`} strong />
-              {receipt.variance_qty !== 0 && (
-                <Fact
-                  label={short ? "Short by" : "Over by"}
-                  value={`${fmt(Math.abs(receipt.variance_qty))} MT`}
-                  tone={short ? "var(--red)" : "var(--purple)"}
-                  strong
-                />
+              <Fact label="Customer" value={note.customer} />
+              <Fact label="Product" value={note.product_name} />
+              <Fact label="Ordered" value={`${fmt(note.ordered_qty)} MT`} />
+              <Fact label="Dispatched" value={`${fmt(note.picked_qty)} MT`} strong />
+              {short && (
+                <Fact label="Short by" value={`${fmt(note.short_by)} MT`} tone="var(--red)" strong />
               )}
               <div style={{ height: 1, background: "var(--border)", margin: "9px 0" }} />
-              <Fact label="Stock on hand" value={`${fmt(receipt.on_hand_before)} to ${fmt(receipt.on_hand_after)} MT`} strong />
-              <Fact label="Available to sell" value={`${fmt(receipt.available_qty)} MT`} />
-              <Fact label="Received by" value={receipt.operator} />
+              <Fact label="Stock on hand" value={`${fmt(note.on_hand_before)} to ${fmt(note.on_hand_after)} MT`} strong />
+              <Fact label="Available to sell" value={`${fmt(note.available_qty)} MT`} />
+              <Fact label="Picked by" value={note.operator} />
             </div>
           </div>
 
-          {(short || over) && (
+          {short && (
             <div style={{
               background: "var(--yellow-light)", border: "1px solid var(--border)",
               borderRadius: 12, padding: "12px 14px", fontSize: "var(--text-sm)", lineHeight: 1.55,
@@ -175,14 +168,14 @@ export default function Inbound() {
             }}>
               <AlertTriangle size={16} color="var(--yellow)" style={{ flexShrink: 0, marginTop: 2 }} />
               <span>
-                The variance is on the record against {receipt.movement_no}. Purchasing will see it
-                when they reconcile this delivery against the supplier invoice.
+                The shortfall is on the record against {note.movement_no}. Sales will see it when they
+                follow up with {note.customer}.
               </span>
             </div>
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
-            <button className="hh-tap hh-tap--primary" onClick={reset}>Receive another delivery</button>
+            <button className="hh-tap hh-tap--primary" onClick={reset}>Pick another order</button>
             <Link to="/" className="hh-tap" style={{
               display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none",
             }}>
@@ -194,61 +187,64 @@ export default function Inbound() {
     );
   }
 
-  // ── Step 1: which delivery ────────────────────────────────────────────────
+  // ── Step 1: which order ───────────────────────────────────────────────────
   if (step === 1) {
     return (
       <div className="hh-screen">
-        <HandheldHeader title="Goods In" operator={operator} onSignOut={() => setOperator(null)}
+        <HandheldHeader title="Goods Out" operator={operator} onSignOut={() => setOperator(null)}
           steps={STEPS} step={1} />
         <div className="hh-body">
-          <Instruction detail="These are the purchase orders still open. Pick the one whose pallets are on the dock.">
-            Which delivery has arrived?
+          <Instruction detail="These are the customer orders still open, earliest due first. Pick the one you are loading.">
+            Which order are you picking?
           </Instruction>
 
           <FloorError message={loadError} />
 
-          {deliveries === null && !loadError && (
+          {orders === null && !loadError && (
             <div style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)", padding: "20px 0" }}>Loading…</div>
           )}
 
-          {deliveries && deliveries.length === 0 && (
+          {orders && orders.length === 0 && (
             <div style={{ textAlign: "center", padding: "34px 10px", color: "var(--text-secondary)" }}>
-              <Truck size={26} color="var(--text-muted)" />
+              <ClipboardList size={26} color="var(--text-muted)" />
               <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginTop: 10, color: "var(--text-primary)" }}>
-                Nothing is expected
+                Nothing to pick
               </div>
               <div style={{ fontSize: "var(--text-sm)", marginTop: 6, lineHeight: 1.5 }}>
-                Every open purchase order has been received. If a delivery turns up anyway, purchasing
-                needs to raise a PO before it can be booked in.
+                Every open order has been dispatched. New orders appear here as sales raises them.
               </div>
             </div>
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {(deliveries || []).map((d) => (
-              <button key={d.po_number} className="hh-tap"
-                onClick={() => { setPo(d); setScan(""); setError(null); setStep(2); }}
+            {(orders || []).map((o) => (
+              <button key={o.so_number} className="hh-tap"
+                onClick={() => { setOrder(o); setScan(""); setError(null); setStep(2); }}
                 style={{ padding: "13px 15px", textAlign: "left", display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-                      {d.po_number}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginTop: 2 }}>{d.product_name}</div>
+                  <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                    {o.so_number}
+                  </span>
+                  <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginTop: 2 }}>{o.product_name}</div>
                   <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 3, fontWeight: 400 }}>
-                    {fmt(d.ordered_qty)} MT expected · due {d.eta}
+                    {fmt(o.ordered_qty)} MT · due {o.required_date}
                   </div>
                   <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2, fontWeight: 400 }}>
-                    {d.supplier}
+                    {o.customer}
                   </div>
+                  {/* Said before the operator walks to the shelf, not after. */}
+                  {!o.can_fulfil && (
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--red)", marginTop: 4, fontWeight: 600 }}>
+                      Only {fmt(o.on_hand_qty ?? 0)} MT on hand, this will be a short pick
+                    </div>
+                  )}
                 </div>
                 <ChevronRight size={18} color="var(--text-muted)" />
               </button>
             ))}
           </div>
 
-          <HowThisWorks title="Receiving a delivery, start to finish" steps={HOW} />
+          <HowThisWorks title="Picking an order, start to finish" steps={HOW} />
         </div>
       </div>
     );
@@ -257,15 +253,15 @@ export default function Inbound() {
   // ── Step 2: verify the SKU ────────────────────────────────────────────────
   if (step === 2) {
     const typed = scan.trim().toUpperCase();
-    const matches = typed === po.sku_id;
+    const matches = typed === order.sku_id;
     const wrong = typed.length > 0 && !matches;
 
     return (
       <div className="hh-screen">
-        <HandheldHeader title="Goods In" operator={operator} onBack={back}
+        <HandheldHeader title="Goods Out" operator={operator} onBack={back}
           onSignOut={() => setOperator(null)} steps={STEPS} step={2} />
         <div className="hh-body">
-          <Instruction detail="Scan the code on the pallet label, or key it in. This is the check that stops the right quantity being booked against the wrong product.">
+          <Instruction detail="Scan the code on the pallet label, or key it in. This is the check that stops the right quantity leaving as the wrong product.">
             Confirm what you are holding
           </Instruction>
 
@@ -274,11 +270,11 @@ export default function Inbound() {
             background: "var(--surface-2)",
           }}>
             <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 3 }}>
-              {po.po_number} should be
+              {order.so_number} for {order.customer} should be
             </div>
-            <div style={{ fontSize: "var(--text-base)", fontWeight: 700 }}>{po.product_name}</div>
+            <div style={{ fontSize: "var(--text-base)", fontWeight: 700 }}>{order.product_name}</div>
             <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 3 }}>
-              {po.rice_variety} · {po.packaging_size} · {po.country_of_origin}
+              {order.packaging_size}
             </div>
           </div>
 
@@ -302,10 +298,6 @@ export default function Inbound() {
                   flex: 1, border: "none", outline: "none", background: "transparent",
                   padding: "17px 0", fontSize: "var(--text-base)", fontWeight: 600, letterSpacing: "0.02em",
                   color: "var(--text-primary)", minWidth: 0,
-                  // Deliberately NOT textTransform: uppercase. That styles the
-                  // placeholder as well, so the hint shouted "SCAN OR TYPE THE
-                  // SKU CODE" at the operator. The value is uppercased on
-                  // comparison instead, which is where it actually matters.
                 }}
               />
               {matches && <CheckCircle2 size={19} color="var(--green)" />}
@@ -313,18 +305,17 @@ export default function Inbound() {
 
             {wrong && (
               <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginTop: 9, lineHeight: 1.5 }}>
-                That code is not {po.sku_id}. If the pallet really is a different product, go back and
-                pick the delivery that matches it.
+                That code is not {order.sku_id}. If the pallet really is a different product, go back
+                and pick the order that matches it.
               </div>
             )}
           </div>
 
-          {/* A real scanner emits the code as keystrokes. There is no scanner
-              here, so tapping the expected code stands in for pulling the
-              trigger. Labelled honestly rather than dressed up as a scan. */}
-          <button className="hh-tap" onClick={() => setScan(po.sku_id)}
+          {/* No scanner here, so tapping the expected code stands in for pulling
+              the trigger. Labelled honestly rather than dressed up as a scan. */}
+          <button className="hh-tap" onClick={() => setScan(order.sku_id)}
             style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-secondary)" }}>
-            No scanner? Tap to enter {po.sku_id}
+            No scanner? Tap to enter {order.sku_id}
           </button>
 
           <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -334,7 +325,7 @@ export default function Inbound() {
             </button>
           </div>
 
-          <HowThisWorks title="Receiving a delivery, start to finish" steps={HOW} />
+          <HowThisWorks title="Picking an order, start to finish" steps={HOW} />
         </div>
       </div>
     );
@@ -342,59 +333,84 @@ export default function Inbound() {
 
   // ── Step 3: count it ──────────────────────────────────────────────────────
   if (step === 3) {
-    const entered = qty !== "" && Number(qty) >= 0;
+    const entered = qty !== "" && Number(qty) > 0;
+    const overOrder = entered && Number(qty) > order.ordered_qty;
+    const overStock = entered && Number(qty) > (order.on_hand_qty ?? 0);
+    const valid = entered && !overOrder && !overStock;
+
     return (
       <div className="hh-screen">
-        <HandheldHeader title="Goods In" operator={operator} onBack={back}
+        <HandheldHeader title="Goods Out" operator={operator} onBack={back}
           onSignOut={() => setOperator(null)} steps={STEPS} step={3} />
         <div className="hh-body">
-          <Instruction detail={`Count what is physically there, not what the paperwork says. ${po.product_name} was ordered as ${fmt(po.ordered_qty)} MT.`}>
-            How much actually arrived?
+          <Instruction detail={`Count what is going on the truck. ${order.customer} ordered ${fmt(order.ordered_qty)} MT, and ${fmt(order.on_hand_qty ?? 0)} MT is on hand.`}>
+            How much is leaving?
           </Instruction>
 
-          <Keypad value={qty} onChange={setQty} suffix="MT" max={po.ordered_qty} />
+          <Keypad value={qty} onChange={setQty} suffix="MT" max={order.ordered_qty} />
 
-          {/* Live feedback, framed as information rather than as an error. A
-              short delivery is a fact about the world, not a mistake by the
-              person counting it. */}
-          {entered && variance !== 0 && (
+          {/* Unlike receiving, an over pick is refused, so this one is a real
+              stop and is worded as a limit rather than as information. */}
+          {overOrder && (
+            <div style={{
+              fontSize: "var(--text-sm)", lineHeight: 1.5, padding: "11px 13px", borderRadius: 12,
+              background: "var(--red-light)", border: "1px solid var(--border)",
+            }}>
+              The order is only for <strong>{fmt(order.ordered_qty)} MT</strong>. You cannot send more than the customer ordered.
+            </div>
+          )}
+          {!overOrder && overStock && (
+            <div style={{
+              fontSize: "var(--text-sm)", lineHeight: 1.5, padding: "11px 13px", borderRadius: 12,
+              background: "var(--red-light)", border: "1px solid var(--border)",
+            }}>
+              Only <strong>{fmt(order.on_hand_qty ?? 0)} MT</strong> is on hand. You cannot ship what is not there.
+            </div>
+          )}
+          {valid && shortBy > 0 && (
             <div style={{
               fontSize: "var(--text-sm)", lineHeight: 1.5, padding: "11px 13px", borderRadius: 12,
               background: "var(--yellow-light)", border: "1px solid var(--border)",
             }}>
-              That is <strong>{fmt(Math.abs(variance))} MT {variance < 0 ? "short of" : "more than"}</strong>{" "}
-              the {fmt(po.ordered_qty)} MT expected. You will be asked why on the next screen.
+              That is <strong>{fmt(shortBy)} MT short of</strong> the {fmt(order.ordered_qty)} MT ordered.
+              You will be asked why on the next screen.
             </div>
           )}
-          {entered && variance === 0 && (
+          {valid && shortBy === 0 && (
             <div style={{
               fontSize: "var(--text-sm)", padding: "11px 13px", borderRadius: 12,
               background: "var(--green-light)", border: "1px solid var(--border)",
             }}>
-              Matches the expected quantity exactly.
+              Matches the order exactly.
             </div>
           )}
 
           <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-            <button className="hh-tap hh-tap--primary" disabled={!entered}
+            <button className="hh-tap hh-tap--primary" disabled={!valid}
               onClick={() => { setReason(""); setError(null); setStep(4); }}>
               Continue
             </button>
+            {ceiling < order.ordered_qty && (
+              <button className="hh-tap" onClick={() => setQty(String(ceiling))}
+                style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-secondary)" }}>
+                Pick all that is on hand ({fmt(ceiling)} MT)
+              </button>
+            )}
           </div>
 
-          <HowThisWorks title="Receiving a delivery, start to finish" steps={HOW} />
+          <HowThisWorks title="Picking an order, start to finish" steps={HOW} />
         </div>
       </div>
     );
   }
 
   // ── Step 4: review and confirm ────────────────────────────────────────────
-  const needsReason = variance !== 0;
+  const needsReason = shortBy > 0;
   const canConfirm = !busy && (!needsReason || reason.trim().length > 0);
 
   return (
     <div className="hh-screen">
-      <HandheldHeader title="Goods In" operator={operator} onBack={back}
+      <HandheldHeader title="Goods Out" operator={operator} onBack={back}
         onSignOut={() => setOperator(null)} steps={STEPS} step={4} />
       <div className="hh-body">
         <Instruction detail="Nothing has changed yet. Confirming updates stock for everyone, immediately.">
@@ -402,30 +418,26 @@ export default function Inbound() {
         </Instruction>
 
         <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: "6px 15px 12px" }}>
-          <Fact label="Delivery" value={po.po_number} />
-          <Fact label="Product" value={po.product_name} />
-          <Fact label="Expected" value={`${fmt(po.ordered_qty)} MT`} />
+          <Fact label="Order" value={order.so_number} />
+          <Fact label="Customer" value={order.customer} />
+          <Fact label="Product" value={order.product_name} />
+          <Fact label="Ordered" value={`${fmt(order.ordered_qty)} MT`} />
           <Fact label="You counted" value={`${fmt(qty)} MT`} strong />
           {needsReason && (
-            <Fact
-              label={variance < 0 ? "Short by" : "Over by"}
-              value={`${fmt(Math.abs(variance))} MT`}
-              tone={variance < 0 ? "var(--red)" : "var(--purple)"}
-              strong
-            />
+            <Fact label="Short by" value={`${fmt(shortBy)} MT`} tone="var(--red)" strong />
           )}
           <div style={{ height: 1, background: "var(--border)", margin: "9px 0" }} />
-          <Fact label="Stock after" value={`${fmt(po.on_hand_qty + Number(qty))} MT`} strong />
-          <Fact label="Received by" value={operator.name} />
+          <Fact label="Stock after" value={`${fmt(order.on_hand_qty - Number(qty))} MT`} strong />
+          <Fact label="Picked by" value={operator.name} />
         </div>
 
         {needsReason && (
           <div>
             <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: 9 }}>
-              Why is it {variance < 0 ? "short" : "over"}?
+              Why is it short?
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {(variance < 0 ? SHORT_REASONS : OVER_REASONS).map((r) => (
+              {SHORT_REASONS.map((r) => (
                 <button key={r} className="hh-tap" onClick={() => setReason(r)}
                   style={{
                     minHeight: 48, fontSize: "var(--text-sm)", textAlign: "left", padding: "0 14px",
@@ -438,7 +450,7 @@ export default function Inbound() {
               ))}
             </div>
             <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 9, lineHeight: 1.5 }}>
-              This goes on the record against the delivery, so purchasing can settle it with the supplier.
+              This goes on the record against the order, so sales can follow up with the customer.
             </p>
           </div>
         )}
@@ -450,7 +462,7 @@ export default function Inbound() {
           <button className="hh-tap hh-tap--primary" disabled={!canConfirm} onClick={confirm}>
             {busy ? "Recording…" : (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <PackageCheck size={18} /> Confirm {fmt(qty)} MT received
+                <PackageCheck size={18} /> Confirm {fmt(qty)} MT dispatched
               </span>
             )}
           </button>
@@ -461,7 +473,7 @@ export default function Inbound() {
           )}
         </div>
 
-        <HowThisWorks title="Receiving a delivery, start to finish" steps={HOW} />
+        <HowThisWorks title="Picking an order, start to finish" steps={HOW} />
       </div>
     </div>
   );

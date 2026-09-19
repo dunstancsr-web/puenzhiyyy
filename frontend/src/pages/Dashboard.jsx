@@ -14,6 +14,7 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { isNudgePending, dismissForecastNudge } from "../lib/forecastNudge";
 
 // The hand-set PRIOR baseline that used to live here is GONE (TASK-85). It was
@@ -519,6 +520,16 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Picks up goods in and out from the handheld without a reload. Unlike load(),
+  // it keeps what is on screen and the chart filter.
+  useLiveRefresh(() => {
+    Promise.all([api.getSkus(), api.getDashboardStats(), api.getDashboardHistory(36)])
+      .then(([skusData, statsData, historyData]) => {
+        setSkus(skusData); setStats(statsData); setHistory(historyData);
+      })
+      .catch(() => {});
+  });
 
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!skus || !stats) return <LoadingState label="Loading dashboard…" />;

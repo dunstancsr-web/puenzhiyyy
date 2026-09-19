@@ -22,7 +22,7 @@
 
 const express = require("express");
 const router = express.Router();
-const { getDb } = require("../db/init");
+const { getDb, isInDemoContext } = require("../db/init");
 const { EVENTS, logEvent } = require("../db/audit");
 const { buildAnalytics } = require("../engines/index");
 
@@ -37,6 +37,26 @@ function nextMovementNo(db, type) {
   ).get(type);
   const n = row ? Number(String(row.movement_no).split("-")[1]) + 1 : 1;
   return `${prefix}-${String(n).padStart(4, "0")}`;
+}
+
+// On a public deployment the handheld's login PINs are printed on the login
+// screen and any visitor can use them, so an unguarded receive or pick would let a
+// judge change the one real database every other judge is looking at, with nothing
+// but a manual reseed to undo it. In production these two writes are therefore
+// accepted only inside the demo sandbox. Reads stay open, and so does a development
+// machine. ALLOW_LIVE_WAREHOUSE_WRITES=1 lifts it for the owner's own recording
+// session on the live data. `needs_demo` lets the handheld offer to join the
+// sandbox instead of showing a dead end.
+function sandboxOnlyWhenPublic(req, res, next) {
+  const isPublic = process.env.NODE_ENV === "production" && process.env.ALLOW_LIVE_WAREHOUSE_WRITES !== "1";
+  if (isPublic && !isInDemoContext()) {
+    return res.status(403).json({
+      success: false,
+      needs_demo: true,
+      message: "Stock movements on this server are recorded in the demo sandbox only, so they cannot disturb the shared data. Join the demo to continue.",
+    });
+  }
+  next();
 }
 
 // ── Authentication ───────────────────────────────────────────────────────────
@@ -93,7 +113,7 @@ router.get("/warehouse/inbound", (req, res) => {
 // Over and under receipt are both allowed, because both happen: a short
 // container and an over-shipped pallet are facts, not input errors. What the
 // system insists on is that a variance is explained.
-router.post("/warehouse/inbound/receive", (req, res) => {
+router.post("/warehouse/inbound/receive", sandboxOnlyWhenPublic, (req, res) => {
   const { po_number, received_qty, operator_id, variance_reason } = req.body || {};
   const qty = Number(received_qty);
 
@@ -230,7 +250,7 @@ router.get("/warehouse/outbound", (req, res) => {
 // The asymmetry with receiving: you cannot ship stock that is not there, so an
 // over pick is refused outright rather than recorded as a variance. A short
 // pick is allowed but must be explained.
-router.post("/warehouse/outbound/pick", (req, res) => {
+router.post("/warehouse/outbound/pick", sandboxOnlyWhenPublic, (req, res) => {
   const { so_number, picked_qty, operator_id, short_reason } = req.body || {};
   const qty = Number(picked_qty);
 

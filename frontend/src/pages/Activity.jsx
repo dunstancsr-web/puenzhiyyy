@@ -8,6 +8,7 @@ import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { api } from "../api/inventory";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ACTIVITY (TASK-31) - the read side of the audit log.
@@ -388,6 +389,13 @@ export default function Activity() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Same server-side filter as load(), without the loading state.
+  useLiveRefresh(() => {
+    api.getAuditLog({ eventType: filter === "ALL" ? undefined : filter, limit: 200 })
+      .then((res) => { setEvents(res?.events || []); setCounts(res?.counts || {}); })
+      .catch(() => {});
+  });
 
   const total = useMemo(
     () => Object.values(counts).reduce((a, b) => a + b, 0),

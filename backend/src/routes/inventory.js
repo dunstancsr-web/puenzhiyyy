@@ -1507,6 +1507,32 @@ router.post("/inventory/restock", (req, res) => {
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 // GET /api/dashboard/stats — portfolio KPI roll-up + as-of timestamp
+// GET /api/data-version - a cheap fingerprint of "has anything the Control Tower
+// shows changed". It exists so a page can ask "is what I loaded still current"
+// without recomputing the analytics (the Dashboard endpoints run every engine).
+// Five indexed MAX lookups: the audit log and the goods movement book (which
+// every stock change writes to), decisions, alerts, and the stock table's own
+// last_updated as a catch-all for any path that edits a position without an
+// audit row. Opaque to callers: only "same or different" means anything.
+router.get("/data-version", (req, res) => {
+  try {
+    const db = getDb();
+    const one = (sql) => db.prepare(sql).get().v;
+    const version = [
+      one("SELECT COALESCE(MAX(id), 0) AS v FROM audit_log"),
+      one("SELECT COALESCE(MAX(id), 0) AS v FROM goods_movements"),
+      one("SELECT COALESCE(MAX(id), 0) AS v FROM decisions"),
+      one("SELECT COALESCE(MAX(id), 0) AS v FROM alerts_log"),
+      one("SELECT COALESCE(MAX(last_updated), '') AS v FROM inventory_positions"),
+      one("SELECT COUNT(*) AS v FROM inventory_positions"),
+    ].join(":");
+    res.json({ success: true, data: { version } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to read data version" });
+  }
+});
+
 router.get("/dashboard/stats", (req, res) => {
   try {
     const { stats, asOf, primaryExceptions } = getAnalytics();

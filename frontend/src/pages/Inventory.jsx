@@ -12,6 +12,7 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { TextField, NumberField, SliderField, niceCeil } from "../components/FormField";
 import { api } from "../api/inventory";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 // Used only for the SkuEditForm's instant live-preview strip while dragging sliders
 // (no round-trip per keystroke) - the actual Save always persists via the real API
 // below. Formulas are identical post the domain-alignment rename, so the preview
@@ -209,6 +210,9 @@ export default function Inventory() {
   }, []);
 
   useEffect(() => { loadSkus(); }, [loadSkus]);
+
+  // Silent, so an open edit or sort survives; see hooks/useLiveRefresh.js.
+  useLiveRefresh(() => { api.getSkus().then(setSkus).catch(() => {}); });
 
   const ORIGINS = useMemo(
     () => ["All", ...new Set((skus || []).map((s) => s.country_of_origin)).values()],

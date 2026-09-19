@@ -350,7 +350,7 @@ Receiving and picking on a handheld, attributed to a named operator.
   as a prototype affordance)
 - **Goods In**: receive against an open purchase order in four steps (pick the delivery, verify the
   SKU, count, confirm). Adds to `on_hand_qty` and closes the PO
-- **Goods Out** (API built; handheld screens not yet, shown as "Coming soon" on Home): pick against
+- **Goods Out** (handheld: pick order, verify SKU, count, confirm; a short pick needs a reason): pick against
   an open sales order. Removes from `on_hand_qty` and `reserved_qty`;
   cannot ship more than is physically on hand
 - A quantity different from the expected one is allowed (short and over deliveries happen) but must

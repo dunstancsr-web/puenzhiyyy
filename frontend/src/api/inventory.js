@@ -52,7 +52,11 @@ async function request(path, options = {}) {
   }
 
   if (!res.ok || body.success === false) {
-    throw new Error(body.message || `Request failed (${res.status})`);
+    const err = new Error(body.message || `Request failed (${res.status})`);
+    // The server refused a write because this visitor is not in the demo sandbox;
+    // the handheld uses this to offer a one tap join (see JoinDemo).
+    if (body.needs_demo) err.needsDemo = true;
+    throw err;
   }
   return body.data;
 }
@@ -63,6 +67,7 @@ export const api = {
   // production), so no extra fetch option is needed for the demo cookie to
   // round-trip correctly.
   getDemoStatus: () => request("/demo/status"),
+  getDataVersion: () => request("/data-version"),
   enterDemoMode: () => request("/demo/enter", { method: "POST" }),
   exitDemoMode: () => request("/demo/exit", { method: "POST" }),
   seedSampleData: () => request("/demo/seed-sample", { method: "POST" }),

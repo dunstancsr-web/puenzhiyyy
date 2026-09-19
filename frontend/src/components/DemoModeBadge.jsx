@@ -34,9 +34,40 @@ import { api } from "../api/inventory";
 
 const BANNER_HEIGHT = 40;
 
-export default function DemoModeBadge() {
+// `compact` and `bannerOnly` are for the handheld screens. A phone has no room for
+// the long sentence, and no room for a floating "Enter demo mode" button over the
+// header, so there the badge is a short banner shown only while in demo mode.
+// Its absence then reads as "on the real database", which is what makes a phone
+// and a desktop that disagree about the mode obvious at a glance.
+export default function DemoModeBadge({ compact = false, bannerOnly = false }) {
   const [active, setActive] = useState(null); // null = not checked yet
   const [busy, setBusy] = useState(false);
+
+  // The join link. Opening any page that carries this badge with ?demo=1 puts
+  // THIS browser into the demo sandbox, which is what a second device needs: the
+  // sandbox is one shared database, but each browser has to opt in with its own
+  // cookie. Open the link on the phone (or scan it) and it lands in the same
+  // sandbox as the desktop. The param is stripped on the way out so a reload or
+  // a bookmark does not re-enter after someone presses Exit.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("demo") !== "1") return;
+    // &sample=1 (added by the handheld's own "Join the demo" prompt) also fills an
+    // EMPTY sandbox with the sample catalog, so the phone has purchase and sales
+    // orders to work against. Plain ?demo=1 never seeds: a presenter who wants the
+    // empty-portfolio onboarding story must not have it spoilt by someone joining.
+    const wantSample = url.searchParams.get("sample") === "1";
+    url.searchParams.delete("demo");
+    url.searchParams.delete("sample");
+    api.enterDemoMode()
+      .then(async () => {
+        if (!wantSample) return;
+        const skus = await api.getSkus();
+        if (!skus || skus.length === 0) await api.seedSampleData();
+      })
+      .catch(() => {})
+      .finally(() => window.location.replace(url.pathname + url.search + url.hash));
+  }, []);
 
   useEffect(() => {
     api.getDemoStatus().then((d) => setActive(d.active)).catch(() => setActive(false));
@@ -81,7 +112,11 @@ export default function DemoModeBadge() {
         boxShadow: "var(--shadow-md)",
       }}>
         <TriangleAlert size={16} />
-        <span>DEMO MODE. Sandbox data only, nothing here is real and nothing you do here touches the live database.</span>
+        <span>
+          {compact
+            ? "DEMO MODE. Sandbox data"
+            : "DEMO MODE. Sandbox data only, nothing here is real and nothing you do here touches the live database."}
+        </span>
         <button onClick={exit} disabled={busy} style={{
           display: "flex", alignItems: "center", gap: 5, marginLeft: 8, padding: "4px 11px", borderRadius: 99,
           border: "1px solid #3d2c00", background: "transparent", color: "#3d2c00",
@@ -92,6 +127,8 @@ export default function DemoModeBadge() {
       </div>
     );
   }
+
+  if (bannerOnly) return null;
 
   return (
     <div style={{ position: "fixed", top: 14, right: 14, zIndex: 200 }}>

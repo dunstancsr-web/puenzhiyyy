@@ -36,7 +36,7 @@ jobs in different places, so each has its own workspace instead of sharing one m
 |---|---|---|
 | **Control Tower** | the manager: analysis and decisions | office desktop |
 | **Goods In** | the receiver: taking in deliveries | handheld at the dock |
-| **Goods Out** | the dispatcher: picking and sending orders | handheld on the floor (coming soon) |
+| **Goods Out** | the dispatcher: picking and sending orders | handheld on the floor |
 
 The Control Tower is listed under "For this device" when you open Home on a computer. Every `?` icon
 opens a short explanation of what you are looking at.
@@ -103,11 +103,20 @@ the supplier. The movement also appears on the manager's Activity page (section 
 
 ## 3. Dispatcher: sending out an order (Goods Out)
 
-**Coming soon.** The Goods Out card on Home is visible but not yet active.
+**Who:** the dispatcher. **Where:** handheld, Goods Out. **Goal:** load the right stock onto the right
+truck and leave a record of what actually went.
 
-What already exists is the logic behind it: picking against an open customer order, refusing to ship
-more than is physically on hand, reducing reserved stock, and recording any shortfall with a reason and
-the operator's name. The handheld screens, built the same way as Goods In, are the next thing to build.
+Sign in with a four digit PIN, then four steps, built the same way as Goods In:
+
+1. **Pick the order.** Open customer orders, earliest due first. An order the shelf cannot fully cover
+   says so before you walk to it.
+2. **Verify the SKU.** Scan the pallet label or key the code; it must match the order.
+3. **Count it.** Key in how many MT are leaving. The keypad refuses more than the customer ordered or
+   more than is physically on hand.
+4. **Confirm.** Review the summary. A short pick asks why, and confirming releases the reserved stock
+   and issues a delivery note (DN number) with the operator's name.
+
+_No screenshot yet; capture one with the other two stale guide screenshots._
 
 ---
 

@@ -23,7 +23,7 @@ export function HandheldHeader({ title, operator, onBack, onSignOut, steps, step
       padding: "14px 16px 12px",
       borderBottom: "1px solid var(--border)",
       background: "var(--card-bg)",
-      position: "sticky", top: 0, zIndex: 5,
+      position: "sticky", top: "var(--demo-banner-height)", zIndex: 5,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: steps ? 12 : 0 }}>
         {onBack ? (
@@ -197,6 +197,19 @@ export function HowThisWorks({ title, steps }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Shown when the server refused a stock movement because this device is not in the
+ *  demo sandbox. One tap joins it and loads sample data if it is empty, then comes
+ *  back to this screen. */
+export function JoinDemo({ show }) {
+  if (!show) return null;
+  return (
+    <a href={`${window.location.pathname}?demo=1&sample=1`} className="hh-tap hh-tap--primary"
+      style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
+      Join the demo and continue
+    </a>
   );
 }
 
