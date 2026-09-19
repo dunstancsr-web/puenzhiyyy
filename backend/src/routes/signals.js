@@ -28,6 +28,7 @@ const crypto = require("crypto");
 const { sandboxOnlyWhenPublic } = require("../middleware/sandboxGuard");
 const { buildQueries, fetchHeadlines } = require("../signals/feed");
 const { contextFrom, readHeadline } = require("../signals/reader");
+const { findSameStory, MAX_DAYS_APART } = require("../signals/twins");
 const { chat, resolveTier } = require("../llm/provider");
 
 // A separate, scoped model choice, like ASK_DATABASE_MODEL: this is a classification
@@ -163,6 +164,11 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
        WHERE origin = 'live' AND status != 'dismissed' AND country_of_origin = ? AND event_type = ? AND direction = ?
          AND ABS(julianday(published_at) - julianday(?)) <= 7
        ORDER BY id LIMIT 1`);
+    // Signals a new headline could be a repeat of: any live signal published within a week, in ANY state. A
+    // dismissed one is included on purpose, so a syndicated copy cannot bring it back as a fresh question.
+    const recentLive = db.prepare(`
+      SELECT id, headline, also_reported_by, country_of_origin, published_at FROM market_signals
+       WHERE origin = 'live' AND ABS(julianday(published_at) - julianday(?)) <= ${MAX_DAYS_APART}`);
     const tally = { fetched: items.length, already_read: 0, not_relevant: 0, merged: 0, added: 0, by_model: 0, by_rules: 0, waiting: 0, errors };
     let modelReads = 0;
     const deps = { chatFn: chat, resolveTierFn: resolveTier, model: SIGNAL_READER_MODEL };
@@ -177,7 +183,14 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
       if (r.status === "signal") {
         // The same story reported by several outlets is ONE signal with several
         // sources, not several cards asking the same question.
-        const twin = findTwin.get(r.read.country_of_origin, r.read.event_type, r.read.direction, it.published_at);
+        // Same story first, by the text of the headline (see signals/twins.js), then the older test by the
+        // reader's reading. The text test comes first because the reader is not consistent: it can read one
+        // headline two ways, and the reading test alone would then keep both.
+        const sameStory = findSameStory(
+          { title: it.title, published_at: it.published_at, country_of_origin: r.read.country_of_origin },
+          recentLive.all(it.published_at).map((x) => ({ ...x, also_reported_by: parseList(x.also_reported_by) || [] })),
+        );
+        const twin = sameStory || findTwin.get(r.read.country_of_origin, r.read.event_type, r.read.direction, it.published_at);
         if (twin) {
           const also = parseList(twin.also_reported_by) || [];
           if (also.length < 6) also.push({ title: it.title, source: it.source, url: it.link });

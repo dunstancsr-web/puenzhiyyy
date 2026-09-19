@@ -623,8 +623,18 @@ fixed shape. Files: `signals/feed.js`, `signals/reader.js`, tests `test-signal-r
   silently falls back to the server default, which could be paid); tested.
 - **Untrusted text.** The headline is passed as quoted data to a model with no tools; only the feed's own
   headline text is ever displayed, never text a model wrote; extra fields a model adds are ignored.
-- **Merging.** The same story from several outlets (same country, event type and direction within 7 days)
-  becomes one signal with an "also reported by" list, not several cards.
+- **Merging (`signals/twins.js`).** The same story from several outlets becomes one signal with an "also
+  reported by" list, not several cards. It is judged by the TEXT of the headline first (word overlap of at
+  least 0.6 when the reader chose the same country, 0.9 whatever the country; within 7 days; against the
+  signal's own headline and every wording already merged into it), and only then by the older test (same
+  country, event type and direction). It compares against every live signal in any state, including
+  dismissed, so a syndicated copy cannot bring a dismissed story back. Two guards must also pass, both
+  leaning toward NOT merging, because a wrong merge hides news and a missed one only costs a card: the
+  headlines must not use opposite direction words (the first one each uses: "bans" against "lifts", "rise"
+  against "fall"), and if both state figures they must share one (10% is not 20%). The reason for the text
+  test: the reader is not consistent, so the same headline could be read two ways and never match on
+  reading. Set on 241 real headlines (20 Sep 2026); the 0.6 line kept every real repeat and let through
+  no pair of different relevant stories. Tests: `test-signal-reader.js`, "same story detection".
 - **Corrections.** `PATCH /api/market-signals/:id` lets a person fix the four fields the reader chose; the
   assessment is arithmetic and recomputes. Logged as SIGNAL_DECIDED (decision "edit").
 - **Bounds.** 45 second cooldown between scans, 16 model reads and 75 seconds per scan (the rest wait, unmarked),
