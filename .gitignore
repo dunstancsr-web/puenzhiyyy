@@ -41,3 +41,6 @@ CLAUDE_CLI_GUIDE.md
 # UI/UX audit output and the temporary in-page harness (never commit either)
 ux-audit-report/
 **/__ux-audit.js
+
+# Personal Claude Code overrides
+.claude/settings.local.json

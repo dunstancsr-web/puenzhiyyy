@@ -1692,3 +1692,7 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Files changed:** backend/src/routes/demo.js
 - **Notes:** Onboarding's "Try with sample data" showed "Failed to seed sample data". Cause: `trimSampleCatalog` deletes rows from a hard-coded list of tables before deleting the 5 dropped SKUs, and `order_requests` (added by the separate-duties merge, foreign key to skus, two seeded rows) was not in the list, so the SKU delete broke the constraint and `/demo/seed-sample` returned 500. Added `order_requests` to the list. Verified by running the real handler inside the demo sandbox: success, 5 SKUs left; the live database was untouched (10 SKUs, 2 order requests).
   Watch for the same failure whenever a new table gets a foreign key to skus: it must join that list. Deriving the list from the schema would remove the risk; not done. No paid calls. Not committed.
+## Session: 2026-09-20 (standing rule: merge only when Stan says so)
+- **Branch:** docs/handover-20-sep
+- **Files changed:** .kiro/steering/rules.md, .gitignore
+- **Notes:** Claude Code's auto mode blocked `gh pr merge` on PR #6 and #7 as a merge without review. Stan asked for merging to be allowed only after his explicit permission, for every agent. Added the rule to rules.md, "Working rules". A permission rule cannot read chat, so in Claude Code it is backed by an `ask` rule for `Bash(gh pr merge *)` in `.claude/settings.local.json` (personal; now gitignored via .gitignore), which prompts on every merge attempt. Kiro and other tools rely on the written rule. No paid calls.

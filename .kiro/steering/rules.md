@@ -20,6 +20,12 @@ These are settled preferences learned from Stan's feedback, not suggestions to r
   (gitignored) and the host's environment settings. To check one exists, print its length, never its
   value.
 - **Commit only when Stan asks.** End commits with the attribution your tool requires.
+- **Merge a pull request only when Stan explicitly says to.** Opening a PR is fine when he asks; merging
+  it (`gh pr merge`, the GitHub button through a tool, or any equivalent) needs his explicit instruction in
+  the current conversation, and an earlier "yes" to something else does not count. Reason: `main` is the
+  branch that gets deployed and judged, and a merge is hard to undo cleanly. In Claude Code an `ask`
+  permission rule for `gh pr merge` in `.claude/settings.local.json` (personal, gitignored) backs this up
+  with a prompt; other tools rely on this rule alone.
 - **Start work on an up to date main, then branch.** `git checkout main && git pull`, then
   `git checkout -b <name>` before editing anything. `main` takes pull requests only: a direct commit
   or push to it is refused by a shared hook (`.githooks/`, wired in by `install:all` via
