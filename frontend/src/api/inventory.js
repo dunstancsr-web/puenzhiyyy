@@ -206,6 +206,14 @@ export const api = {
   pickGoods: (body) => request("/warehouse/outbound/pick", { method: "POST", body }),
   getMovements: () => request("/warehouse/movements"),
 
+  // Market signals: news events assessed against stock. Every call resolves to
+  // { signals, catalog, playbook }, the whole picture after the change.
+  getMarketSignals: () => request("/market-signals"),
+  replaySignal: (fixture_id) => request("/market-signals/replay", { method: "POST", body: { fixture_id } }),
+  decideSignal: (id, decision) => request(`/market-signals/${id}/decision`, { method: "POST", body: { decision } }),
+  scanSignals: () => request("/market-signals/scan", { method: "POST", body: {} }),
+  correctSignal: (id, body) => request(`/market-signals/${id}`, { method: "PATCH", body }),
+
   // Audit log (TASK-31) - every state change the API made, newest first.
   // Resolves to { events, counts }, not a bare array: `counts` is the whole
   // table's totals per event type, which the filter chips need even when the

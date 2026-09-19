@@ -28,12 +28,12 @@ export function HandheldHeader({ title, operator, onBack, onSignOut, steps, step
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: steps ? 12 : 0 }}>
         {onBack ? (
           <button onClick={onBack} aria-label="Back"
-            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", padding: 4, marginLeft: -4 }}>
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", padding: 11, marginLeft: -11, minWidth: 44, minHeight: 44 }}>
             <ChevronLeft size={22} />
           </button>
         ) : (
           <Link to="/" aria-label="All modes"
-            style={{ color: "var(--text-secondary)", display: "flex", padding: 4, marginLeft: -4 }}>
+            style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", justifyContent: "center", padding: 11, marginLeft: -11, minWidth: 44, minHeight: 44 }}>
             <ChevronLeft size={22} />
           </Link>
         )}
@@ -47,7 +47,7 @@ export function HandheldHeader({ title, operator, onBack, onSignOut, steps, step
         </div>
         {onSignOut && (
           <button onClick={onSignOut} aria-label="Sign out"
-            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 6 }}>
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 13, marginRight: -13, minWidth: 44, minHeight: 44 }}>
             <LogOut size={18} />
           </button>
         )}

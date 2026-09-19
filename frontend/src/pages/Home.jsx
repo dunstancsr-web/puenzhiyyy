@@ -8,6 +8,7 @@ import TowerIcon from "../components/TowerIcon";
 import useDeviceClass from "../hooks/useDeviceClass";
 import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 import { api } from "../api/inventory";
+import { enterDemoMode } from "../lib/demoMode";
 import Onboarding from "./Onboarding";
 import LoadingState from "../components/LoadingState";
 import { isDismissed } from "../lib/onboardingResume";
@@ -46,7 +47,7 @@ import { isDismissed } from "../lib/onboardingResume";
 const OFFICE = [{
   to: "/dashboard",
   icon: TowerIcon,
-  tint: "var(--purple)",
+  tint: "var(--purple-text)",
   bg: "var(--purple-light)",
   label: "Control Tower",
   sub: "Analysis and decisions",
@@ -58,7 +59,7 @@ const FLOOR = [
   {
     to: "/warehouse/inbound",
     icon: ArrowDownToLine,
-    tint: "var(--green)",
+    tint: "var(--green-text)",
     bg: "var(--green-light)",
     label: "Goods In",
     sub: "Receiving",
@@ -68,7 +69,7 @@ const FLOOR = [
   {
     to: "/warehouse/outbound",
     icon: ArrowUpFromLine,
-    tint: "var(--blue)",
+    tint: "var(--blue-text)",
     bg: "var(--blue-light)",
     label: "Goods Out",
     sub: "Picking and dispatch",
@@ -211,8 +212,9 @@ export default function Home() {
   // link where a demoing manager already is. Real (non-demo) visitors don't
   // get it: against the live database, emptying the catalog just to see the
   // wizard again is the destructive action rules.md already cuts elsewhere.
-  const [isDemo, setIsDemo] = useState(false);
-  useEffect(() => { api.getDemoStatus().then((d) => setIsDemo(d.active)).catch(() => {}); }, []);
+  // null until known, so neither demo link flashes for the wrong state.
+  const [isDemo, setIsDemo] = useState(null);
+  useEffect(() => { api.getDemoStatus().then((d) => setIsDemo(!!d.active)).catch(() => {}); }, []);
 
   if (skuCount === null) return <LoadingState label="Loading…" />;
   // Closing or finishing onboarding writes this flag specifically so a
@@ -298,10 +300,21 @@ export default function Home() {
             </span>
           </div>
           <EventCredit align="center" inline />
+          {isDemo === false && (
+            <div style={{ textAlign: "center", marginTop: "var(--space-3)" }}>
+              <button type="button" onClick={() => enterDemoMode()} style={{
+                display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", minHeight: 44,
+                fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
+              }}>
+                <PlayCircle size={14} />
+                Enter demo mode
+              </button>
+            </div>
+          )}
           {isDemo && (
             <div style={{ textAlign: "center", marginTop: "var(--space-3)" }}>
               <Link to="/onboarding" style={{
-                display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none",
+                display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", minHeight: 44,
                 fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
               }}>
                 <PlayCircle size={14} />

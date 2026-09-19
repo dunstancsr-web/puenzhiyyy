@@ -59,6 +59,9 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 | every file in `.kiro/specs/mvp1-inventory-visibility/reference/` | The rice industry source documents: the technical specification, the terms glossary, and the map from old field names to the canonical ones | Checking a term or formula against the industry source |
 | every file in `.kiro/hooks/` | Kiro hooks: the docs sync reminder (and `docs-check.sh`, shared with Claude Code), commit reminder, lint on save | A hook misbehaves |
 | `.claude/settings.json` | Claude Code's hook: the docs sync reminder | A hook misbehaves |
+| every file in `.claude/skills/ui-ux-audit/` | The UI/UX audit skill: the procedure (`SKILL.md`), a checklist template, a catalogue of root causes, the in-page detector and the headless runner, and a generic example config | Testing or fixing UI/UX, before a demo or release |
+| [`.kiro/steering/ui-ux-audit.md`](../.kiro/steering/ui-ux-audit.md) | Kiro's pointer to that same skill (loaded on request, holds no copy) | Kiro is asked to test the UI |
+| `frontend/ux-audit.config.json` | This project's audit setup: routes, scripted states, themes, modes, thresholds and the recorded exceptions with their reasons | You change a route or a rule, or add an exception |
 
 ## Scripts (each file's header explains its use)
 
@@ -72,6 +75,10 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 | `backend/scripts/sonnet-check.js` | The one paid model check; spends nothing without `--confirm-spend` |
 | `backend/scripts/spend.js` | Lists paid model calls from the audit trail, for the spend ledger |
 | `backend/scripts/check-deploy.js` | Checks a live deployment without calling the model |
+| `backend/scripts/test-signals.js` | Checks the market signal engine against figures worked out by hand |
+| `backend/scripts/test-signal-reader.js` | Checks the headline reader (feed parsing, keyword filter, strict validator, paid tier unreachable) with no network and no model |
+| `backend/scripts/bench-signal-reader.js` | Measures the headline reader's model stage on labelled headlines, on local llama3.1 only |
+| `.claude/skills/ui-ux-audit/scripts/run-audit.mjs` (`npm run ux:audit`) | Headless UI/UX audit across routes, widths, themes and modes, with a real keyboard test; `npm run ux:selftest` proves each check can fail |
 | `backend/scripts/rehearse-deploy.sh` | Runs the app on this Mac the way the Lightsail container will, then checks it |
 
 ## Design tools and build

@@ -342,11 +342,11 @@ function seed() {
     // leave duplicate ALERT_TRIGGERED rows for conditions that were re-detected
     // on the fresh data, and clearing neither leaves the trail empty after a
     // reseed, because every alert is already materialized.
-    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "forecasts", "risk_events", "skus"]) {
+    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "forecasts", "risk_events", "market_signals", "signal_seen", "skus"]) {
       db.exec(`DELETE FROM ${t}`);
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN
-      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','forecasts','risk_events','skus')`);
+      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','forecasts','risk_events','market_signals','signal_seen','skus')`);
   });
   wipe();
 

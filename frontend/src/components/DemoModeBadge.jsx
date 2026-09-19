@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { PlayCircle, LogOut, TriangleAlert } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { LogOut, TriangleAlert } from "lucide-react";
 import { api } from "../api/inventory";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ import { api } from "../api/inventory";
 // purpose, so nothing outside the top strip needs any of this accounted for.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BANNER_HEIGHT = 40;
+const BANNER_MIN_HEIGHT = 44;
 
 // `compact` and `bannerOnly` are for the handheld screens. A phone has no room for
 // the long sentence, and no room for a floating "Enter demo mode" button over the
@@ -73,22 +73,20 @@ export default function DemoModeBadge({ compact = false, bannerOnly = false }) {
     api.getDemoStatus().then((d) => setActive(d.active)).catch(() => setActive(false));
   }, []);
 
+  // The banner's REAL height, measured, not assumed. It used to be a fixed 40px, and
+  // a sentence that wrapped below ~900px overflowed that box and sat on top of the
+  // navigation. Anything that resizes it (a wrap, a font change) updates the token.
+  const bannerRef = useRef(null);
   useEffect(() => {
-    if (active) {
-      document.documentElement.style.setProperty("--demo-banner-height", BANNER_HEIGHT + "px");
-      return () => document.documentElement.style.removeProperty("--demo-banner-height");
-    }
+    if (!active) return undefined;
+    const el = bannerRef.current;
+    const root = document.documentElement;
+    const set = () => root.style.setProperty("--demo-banner-height", `${el ? el.offsetHeight : BANNER_MIN_HEIGHT}px`);
+    set();
+    const ro = typeof ResizeObserver !== "undefined" && el ? new ResizeObserver(set) : null;
+    if (ro) ro.observe(el);
+    return () => { if (ro) ro.disconnect(); root.style.removeProperty("--demo-banner-height"); };
   }, [active]);
-
-  const enter = async () => {
-    setBusy(true);
-    try {
-      await api.enterDemoMode();
-      window.location.href = "/";
-    } catch {
-      setBusy(false);
-    }
-  };
 
   const exit = async () => {
     setBusy(true);
@@ -104,20 +102,23 @@ export default function DemoModeBadge({ compact = false, bannerOnly = false }) {
 
   if (active) {
     return (
-      <div role="status" style={{
-        position: "fixed", top: 0, left: 0, right: 0, height: BANNER_HEIGHT, zIndex: 300,
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+      <div ref={bannerRef} role="status" style={{
+        position: "fixed", top: 0, left: 0, right: 0, minHeight: BANNER_MIN_HEIGHT, zIndex: 300,
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "4px 12px",
         background: "var(--yellow)", color: "#3d2c00",
         fontSize: "var(--text-sm)", fontWeight: 700, letterSpacing: "0.01em",
         boxShadow: "var(--shadow-md)",
       }}>
         <TriangleAlert size={16} />
-        <span>
-          {compact
-            ? "DEMO MODE. Sandbox data"
-            : "DEMO MODE. Sandbox data only, nothing here is real and nothing you do here touches the live database."}
-        </span>
-        <button onClick={exit} disabled={busy} style={{
+        {compact ? (
+          <span>DEMO MODE. Sandbox data</span>
+        ) : (
+          <>
+            <span className="demo-banner__long">DEMO MODE. Sandbox data only, nothing here is real and nothing you do here touches the live database.</span>
+            <span className="demo-banner__short">DEMO MODE. Sandbox data</span>
+          </>
+        )}
+        <button onClick={exit} disabled={busy} className="hit-44" style={{
           display: "flex", alignItems: "center", gap: 5, marginLeft: 8, padding: "4px 11px", borderRadius: 99,
           border: "1px solid #3d2c00", background: "transparent", color: "#3d2c00",
           fontSize: "var(--text-xs)", fontWeight: 700, cursor: busy ? "default" : "pointer",
@@ -128,17 +129,9 @@ export default function DemoModeBadge({ compact = false, bannerOnly = false }) {
     );
   }
 
-  if (bannerOnly) return null;
-
-  return (
-    <div style={{ position: "fixed", top: 14, right: 14, zIndex: 200 }}>
-      <button onClick={enter} disabled={busy} title="Switch to an empty sandbox database, the real data is never touched" style={{
-        display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 99,
-        border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-secondary)",
-        fontSize: "var(--text-xs)", fontWeight: 700, cursor: busy ? "default" : "pointer", boxShadow: "var(--shadow)",
-      }}>
-        <PlayCircle size={14} /> {busy ? "Entering…" : "Enter demo mode"}
-      </button>
-    </div>
-  );
+  // Not in demo mode: nothing is drawn. The way IN used to be a fixed pill in the top-right
+  // corner, which sat on top of the page's own buttons (Bulk edit, Add SKU) on desktop and on
+  // the phone navigation. A floating control will always cover something, so entry now lives
+  // in the Settings menu and on Home (see enterDemoMode in lib/demoMode.js).
+  return null;
 }

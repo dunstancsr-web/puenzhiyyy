@@ -37,3 +37,7 @@ Thumbs.db
 # A (Stan) PREFIX is tracked on purpose; only the suffix marks a private file.
 CLAUDE_CLI_GUIDE.md
 *(Stan).md
+
+# UI/UX audit output and the temporary in-page harness (never commit either)
+ux-audit-report/
+**/__ux-audit.js

@@ -56,7 +56,7 @@ export function ModalBtn({ label, onClick, primary, type = "button", disabled })
     <button type={type} onClick={onClick} disabled={disabled} style={{
       padding: "8px 20px", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", fontWeight: 600,
       border: "1px solid var(--border)",
-      background: primary ? "var(--blue)" : "var(--surface)",
+      background: primary ? "var(--blue-strong)" : "var(--surface)",
       color: primary ? "#fff" : "var(--text-primary)",
       cursor: disabled ? "not-allowed" : "pointer",
       opacity: disabled ? 0.5 : 1,

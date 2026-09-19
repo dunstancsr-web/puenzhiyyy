@@ -58,7 +58,7 @@ export default function Login({ onSignedIn, purpose }) {
     <div className="hh-screen">
       <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
         <Link to="/" aria-label="All modes"
-          style={{ color: "var(--text-secondary)", display: "inline-flex", padding: 4, marginLeft: -4 }}>
+          style={{ color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 11, marginLeft: -11, minWidth: 44, minHeight: 44 }}>
           <ChevronLeft size={22} />
         </Link>
       </div>
@@ -115,7 +115,7 @@ export default function Login({ onSignedIn, purpose }) {
               <button key={o.id} onClick={() => setPin(o.pin)} disabled={busy}
                 style={{
                   display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center",
-                  background: "none", border: "none", padding: "5px 0", cursor: "pointer",
+                  background: "none", border: "none", padding: "5px 0", minHeight: 44, cursor: "pointer",
                   fontSize: "var(--text-xs)", color: "var(--text-secondary)",
                 }}>
                 <span>{o.name}<span style={{ color: "var(--text-muted)" }}> · {o.role}</span></span>

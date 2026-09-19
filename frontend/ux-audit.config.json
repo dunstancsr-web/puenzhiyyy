@@ -1,0 +1,583 @@
+{
+ "$comment": "StockSense config for the ui-ux-audit skill. Run: npm run ux:audit (dev servers on :5173 and :4000 must be up).",
+ "baseUrl": "http://localhost:5173",
+ "widths": [
+  1440,
+  1024,
+  768,
+  390
+ ],
+ "settleMs": 900,
+ "themes": [
+  {
+   "name": "light",
+   "colorScheme": "light"
+  },
+  {
+   "name": "dark",
+   "colorScheme": "dark",
+   "localStorage": {
+    "theme.v2": "dark"
+   }
+  }
+ ],
+ "modes": [
+  {
+   "name": "live"
+  },
+  {
+   "name": "demo",
+   "requests": [
+    {
+     "method": "POST",
+     "url": "/api/demo/enter"
+    },
+    {
+     "method": "POST",
+     "url": "/api/demo/seed-sample"
+    }
+   ]
+  }
+ ],
+ "routes": [
+  "/",
+  "/dashboard",
+  "/action-items",
+  "/inventory",
+  "/alerts",
+  "/activity",
+  "/forecast",
+  "/audit",
+  "/onboarding",
+  "/onboarding/catalog-fields",
+  "/warehouse/inbound",
+  "/warehouse/outbound"
+ ],
+ "states": [
+  {
+   "name": "goods-in-1-pick-delivery",
+   "route": "/warehouse/inbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='1']",
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']"
+     ]
+    },
+    {
+     "waitFor": "text=Which delivery has arrived?"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ]
+  },
+  {
+   "name": "goods-in-2-verify-sku",
+   "route": "/warehouse/inbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='1']",
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']"
+     ]
+    },
+    {
+     "waitFor": "text=Which delivery has arrived?"
+    },
+    {
+     "click": "button:has-text('PO-')"
+    },
+    {
+     "waitFor": "text=Confirm what you are holding"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ]
+  },
+  {
+   "name": "goods-in-3-count",
+   "route": "/warehouse/inbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='1']",
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']"
+     ]
+    },
+    {
+     "waitFor": "text=Which delivery has arrived?"
+    },
+    {
+     "click": "button:has-text('PO-')"
+    },
+    {
+     "waitFor": "text=Confirm what you are holding"
+    },
+    {
+     "click": "text=No scanner"
+    },
+    {
+     "click": "text=Confirmed, count it"
+    },
+    {
+     "waitFor": "text=How much actually arrived?"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ]
+  },
+  {
+   "name": "goods-in-4-review",
+   "route": "/warehouse/inbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='1']",
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']"
+     ]
+    },
+    {
+     "waitFor": "text=Which delivery has arrived?"
+    },
+    {
+     "click": "button:has-text('PO-')"
+    },
+    {
+     "waitFor": "text=Confirm what you are holding"
+    },
+    {
+     "click": "text=No scanner"
+    },
+    {
+     "click": "text=Confirmed, count it"
+    },
+    {
+     "waitFor": "text=How much actually arrived?"
+    },
+    {
+     "clickEach": [
+      "button[aria-label='5']"
+     ]
+    },
+    {
+     "click": "button:has-text('Continue')"
+    },
+    {
+     "waitFor": "text=Check this before you confirm"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ]
+  },
+  {
+   "name": "goods-in-5-done",
+   "route": "/warehouse/inbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='1']",
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']"
+     ]
+    },
+    {
+     "waitFor": "text=Which delivery has arrived?"
+    },
+    {
+     "click": "button:has-text('PO-')"
+    },
+    {
+     "waitFor": "text=Confirm what you are holding"
+    },
+    {
+     "click": "text=No scanner"
+    },
+    {
+     "click": "text=Confirmed, count it"
+    },
+    {
+     "waitFor": "text=How much actually arrived?"
+    },
+    {
+     "clickEach": [
+      "button[aria-label='5']"
+     ]
+    },
+    {
+     "click": "button:has-text('Continue')"
+    },
+    {
+     "waitFor": "text=Check this before you confirm"
+    },
+    {
+     "click": "button:has-text('Short shipped')"
+    },
+    {
+     "click": "button:has-text('Confirm')"
+    },
+    {
+     "waitFor": "text=Stock received"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ],
+   "modes": [
+    "demo"
+   ],
+   "themes": [
+    "light"
+   ]
+  },
+  {
+   "name": "goods-out-1-pick-order",
+   "route": "/warehouse/outbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']",
+      "button[aria-label='5']"
+     ]
+    },
+    {
+     "waitFor": "text=Which order are you picking?"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ]
+  },
+  {
+   "name": "goods-out-2-verify-sku",
+   "route": "/warehouse/outbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']",
+      "button[aria-label='5']"
+     ]
+    },
+    {
+     "waitFor": "text=Which order are you picking?"
+    },
+    {
+     "click": "button:has-text('SO-')"
+    },
+    {
+     "waitFor": "text=Confirm what you are holding"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ]
+  },
+  {
+   "name": "goods-out-3-count",
+   "route": "/warehouse/outbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']",
+      "button[aria-label='5']"
+     ]
+    },
+    {
+     "waitFor": "text=Which order are you picking?"
+    },
+    {
+     "click": "button:has-text('SO-')"
+    },
+    {
+     "waitFor": "text=Confirm what you are holding"
+    },
+    {
+     "click": "text=No scanner"
+    },
+    {
+     "click": "text=Confirmed, count it"
+    },
+    {
+     "waitFor": "text=How much is leaving?"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ]
+  },
+  {
+   "name": "goods-out-4-review",
+   "route": "/warehouse/outbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']",
+      "button[aria-label='5']"
+     ]
+    },
+    {
+     "waitFor": "text=Which order are you picking?"
+    },
+    {
+     "click": "button:has-text('SO-')"
+    },
+    {
+     "waitFor": "text=Confirm what you are holding"
+    },
+    {
+     "click": "text=No scanner"
+    },
+    {
+     "click": "text=Confirmed, count it"
+    },
+    {
+     "waitFor": "text=How much is leaving?"
+    },
+    {
+     "clickEach": [
+      "button[aria-label='5']"
+     ]
+    },
+    {
+     "click": "button:has-text('Continue')"
+    },
+    {
+     "waitFor": "text=Check this before you confirm"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ]
+  },
+  {
+   "name": "goods-out-5-done",
+   "route": "/warehouse/outbound",
+   "steps": [
+    {
+     "clickEach": [
+      "button[aria-label='2']",
+      "button[aria-label='3']",
+      "button[aria-label='4']",
+      "button[aria-label='5']"
+     ]
+    },
+    {
+     "waitFor": "text=Which order are you picking?"
+    },
+    {
+     "click": "button:has-text('SO-')"
+    },
+    {
+     "waitFor": "text=Confirm what you are holding"
+    },
+    {
+     "click": "text=No scanner"
+    },
+    {
+     "click": "text=Confirmed, count it"
+    },
+    {
+     "waitFor": "text=How much is leaving?"
+    },
+    {
+     "clickEach": [
+      "button[aria-label='5']"
+     ]
+    },
+    {
+     "click": "button:has-text('Continue')"
+    },
+    {
+     "waitFor": "text=Check this before you confirm"
+    },
+    {
+     "click": "button:has-text('Not enough stock')"
+    },
+    {
+     "click": "button:has-text('Confirm')"
+    },
+    {
+     "waitFor": "text=Stock dispatched"
+    }
+   ],
+   "widths": [
+    1440,
+    390
+   ],
+   "modes": [
+    "demo"
+   ],
+   "themes": [
+    "light"
+   ]
+  },
+  {
+   "name": "market-signals-with-data",
+   "route": "/action-items",
+   "modes": [
+    "demo"
+   ],
+   "widths": [
+    1440,
+    768,
+    390
+   ],
+   "setupRequests": [
+    {
+     "url": "/api/market-signals/replay",
+     "data": {
+      "fixture_id": "in-2023-08-basmati-floor"
+     }
+    },
+    {
+     "url": "/api/market-signals/replay",
+     "data": {
+      "fixture_id": "th-2023-07-spillover"
+     }
+    },
+    {
+     "url": "/api/market-signals/replay",
+     "data": {
+      "fixture_id": "in-2024-09-ban-lifted"
+     }
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "text=Market signals"
+    },
+    {
+     "scroll": "text=Market signals"
+    }
+   ]
+  },
+  {
+   "name": "refresh-pill-mobile",
+   "route": "/dashboard",
+   "modes": [
+    "live"
+   ],
+   "themes": [
+    "light"
+   ],
+   "widths": [
+    390
+   ],
+   "keyboard": false,
+   "steps": [
+    {
+     "wait": 3500
+    },
+    {
+     "request": {
+      "url": "/api/warehouse/inbound/receive",
+      "data": {
+       "po_number": "PO-2026-0001",
+       "received_qty": 200,
+       "operator_id": 1
+      }
+     }
+    },
+    {
+     "waitFor": "text=New stock movements"
+    }
+   ]
+  },
+  {
+   "name": "refresh-pill-desktop",
+   "route": "/inventory",
+   "modes": [
+    "live"
+   ],
+   "themes": [
+    "light"
+   ],
+   "widths": [
+    1440
+   ],
+   "keyboard": false,
+   "steps": [
+    {
+     "wait": 3500
+    },
+    {
+     "request": {
+      "url": "/api/warehouse/inbound/receive",
+      "data": {
+       "po_number": "PO-2026-0003",
+       "received_qty": 250,
+       "operator_id": 1
+      }
+     }
+    },
+    {
+     "waitFor": "text=New stock movements"
+    }
+   ]
+  }
+ ],
+ "audit": {
+  "typeScale": [
+   13,
+   15,
+   17,
+   22,
+   30,
+   40
+  ],
+  "minFontPx": 12,
+  "forbidText": [
+   "[\\u2013\\u2014]"
+  ],
+  "relaxedTargetSelector": "nav"
+ },
+ "keyboard": {
+  "enabled": true,
+  "widths": [
+   1440,
+   390
+  ],
+  "maxTabs": 40
+ },
+ "ignore": [
+  {
+   "check": "T1",
+   "match": "e\\.g\\. \"(\\$[\\d.]+[MK]?|[A-Z][a-z]{2})\"",
+   "reason": "chart axis and value labels are 10 to 11px: the type scale's own carve-out (rules.md, type scale)"
+  },
+  {
+   "check": "L2",
+   "match": "^\"New stock movements",
+   "reason": "the refresh pill is a transient bottom overlay by design; it reserves 84px of page space so the last line stays reachable (NewDataPill.jsx)"
+  }
+ ]
+}

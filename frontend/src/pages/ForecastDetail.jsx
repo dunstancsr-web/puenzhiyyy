@@ -202,7 +202,7 @@ export default function ForecastDetail() {
 
       <div style={{ textAlign: "center", fontSize: "var(--text-sm)", color: "var(--text-secondary)", padding: "8px 0 24px" }}>
         A policy-change suggestion for this SKU appears on{" "}
-        <Link to="/alerts" style={{ color: "var(--blue)", fontWeight: 600 }}>Alerts</Link>{" "}
+        <Link to="/alerts" style={{ color: "var(--blue-text)", fontWeight: 600 }}>Alerts</Link>{" "}
         once the gap between approved and suggested is large enough. Approve, amend, or reject it there.
       </div>
     </div>
@@ -263,7 +263,7 @@ function ForecastHeader({ sku, forecast, onBack, onRecompute, recomputing }) {
         <div style={{ textAlign: "right" }}>
           {forecast && (
             <div style={{ fontSize: "var(--text-xs)", fontWeight: isStale ? 700 : 400, color: isStale ? "var(--yellow)" : "var(--text-muted)", marginBottom: 5 }}>
-              {isStale ? `Stale — recomputed ${staleDays} days ago` : `Recomputed ${staleDays === 0 ? "today" : `${staleDays}d ago`}`}
+              {isStale ? `Stale, recomputed ${staleDays} days ago` : `Recomputed ${staleDays === 0 ? "today" : `${staleDays}d ago`}`}
             </div>
           )}
           <button onClick={onRecompute} disabled={recomputing} className="card" style={{
@@ -375,7 +375,7 @@ function DataStory({ sku, preview, hasForecast, modelRef, simRef, sandboxRef }) 
     }}>
       <div style={{
         fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em",
-        textTransform: "uppercase", color: "var(--blue)", marginBottom: 10,
+        textTransform: "uppercase", color: "var(--blue-text)", marginBottom: 10,
       }}>
         What your data tells us
       </div>
@@ -431,7 +431,7 @@ function DataStory({ sku, preview, hasForecast, modelRef, simRef, sandboxRef }) 
 }
 
 const STORY_LINK_STYLE = {
-  font: "inherit", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue)",
+  font: "inherit", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue-text)",
   background: "var(--card-bg)", border: "1px solid var(--blue)", borderRadius: 99,
   padding: "7px 14px", cursor: "pointer",
 };
@@ -469,7 +469,7 @@ function ModelPicker({ mode, setMode, activeModel, scores, bestScore, models, on
               names all four models at once, not one reasoning-chain step. */}
           <span style={{
             fontSize: 10, fontWeight: 700, letterSpacing: "0.02em", textTransform: "uppercase",
-            border: "1px dashed var(--purple)", color: "var(--purple)", padding: "1.5px 7px", borderRadius: 5,
+            border: "1px dashed var(--purple)", color: "var(--purple-text)", padding: "1.5px 7px", borderRadius: 5,
           }}>
             Statistical forecast (traditional / predictive AI)
           </span>
@@ -543,7 +543,7 @@ function ModelPicker({ mode, setMode, activeModel, scores, bestScore, models, on
                   <div style={{ height: "100%", borderRadius: 3, background: MODEL_COLOR[id], width: `${barPct}%` }} />
                 </div>
                 <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                  {score != null ? `WMAPE ${score}` : "—"}
+                  {score != null ? `WMAPE ${score}` : "-"}
                 </span>
               </div>
             </div>
@@ -610,12 +610,12 @@ function WhatIfSandbox({ sku, inputs, setInput, onReset, preview, previewError, 
     <div className="card" style={{ padding: "18px 20px", marginBottom: 16, border: "1.5px solid var(--blue)" }}>
       <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, marginBottom: 2, display: "flex", alignItems: "center", gap: 8 }}>
         What if...
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", border: "1px dashed var(--blue)", color: "var(--blue)", padding: "1.5px 7px", borderRadius: 5 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", border: "1px dashed var(--blue)", color: "var(--blue-text)", padding: "1.5px 7px", borderRadius: 5 }}>
           Sandbox
         </span>
       </h2>
       <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 14 }}>
-        Drag these to see how the suggested reorder point responds. These are this SKU's real settings &mdash; nothing here is saved until you use the SKU edit form.
+        Drag these to see how the suggested reorder point responds. These are this SKU's real settings, nothing here is saved until you use the SKU edit form.
       </p>
       {!hasForecast ? (
         <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Generate a forecast first (Recompute above) to use the sandbox.</div>
@@ -629,7 +629,7 @@ function WhatIfSandbox({ sku, inputs, setInput, onReset, preview, previewError, 
                   how: "Feeds King's formula directly: Lead-Time Demand = average daily demand × lead time. Set on the SKU's Policy tab, not calculated here.",
                 }} />}
                 suffix="days" value={inputs.leadTimeDays} onChange={setInput("leadTimeDays")} min={20} max={90} step={1} />
-              <SandboxNote text="No suggestion yet — needs receiving history (this app has no closed purchase-order data to measure a real average from)." />
+              <SandboxNote text="No suggestion yet: needs receiving history (this app has no closed purchase-order data to measure a real average from)." />
             </div>
             <div>
               <SliderField
@@ -638,7 +638,7 @@ function WhatIfSandbox({ sku, inputs, setInput, onReset, preview, previewError, 
                   how: "Widens the safety stock King's formula asks for: a bigger σ means more stock held just in case a delivery runs late.",
                 }} />}
                 suffix="days" value={inputs.leadTimeStdDays} onChange={setInput("leadTimeStdDays")} min={0} max={15} step={0.5} />
-              <SandboxNote text="No suggestion yet — same reason as lead time above." />
+              <SandboxNote text="No suggestion yet, same reason as lead time above." />
             </div>
             <div>
               <SliderField
@@ -669,14 +669,14 @@ function WhatIfSandbox({ sku, inputs, setInput, onReset, preview, previewError, 
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)", flexWrap: "wrap", gap: 10 }}>
             <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-              Demand variability and the risk buffer stay fixed &mdash; they come from the forecast model and the matched risk event, not a setting.
+              Demand variability and the risk buffer stay fixed, they come from the forecast model and the matched risk event, not a setting.
             </span>
             <button type="button" onClick={onReset} style={{
               font: "inherit", fontWeight: 700, fontSize: "var(--text-xs)", padding: "7px 14px", borderRadius: "var(--radius)",
               border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-secondary)", cursor: "pointer",
             }}>Reset to saved values</button>
           </div>
-          {previewError && <div style={{ marginTop: 10, fontSize: "var(--text-xs)", color: "var(--red)" }}>{previewError}</div>}
+          {previewError && <div style={{ marginTop: 10, fontSize: "var(--text-xs)", color: "var(--red-text)" }}>{previewError}</div>}
         </>
       )}
     </div>
@@ -699,12 +699,12 @@ function SandboxLabel({ text, hint }) {
 
 function SandboxNote({ text, onUse }) {
   return (
-    <div style={{ fontSize: 10.5, marginTop: 3, display: "flex", alignItems: "center", gap: 6, color: onUse ? "var(--blue)" : "var(--text-muted)" }}>
+    <div style={{ fontSize: 10.5, marginTop: 3, display: "flex", alignItems: "center", gap: 6, color: onUse ? "var(--blue-text)" : "var(--text-muted)" }}>
       {text}
       {onUse && (
         <button type="button" onClick={onUse} style={{
           font: "inherit", fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 99, border: "1px solid var(--blue)",
-          background: "var(--blue-light)", color: "var(--blue)", cursor: "pointer", flex: "none",
+          background: "var(--blue-light)", color: "var(--blue-text)", cursor: "pointer", flex: "none",
         }}>Use</button>
       )}
     </div>
@@ -888,7 +888,7 @@ function ReorderSimulation({ invHistory, preview, inputs, sku }) {
         On-hand stock in MT: {invHistory.length} months actual, then a repeating reorder cycle from the sandbox settings above.
       </p>
       <div style={{ fontSize: "var(--text-xs)", background: "var(--blue-light)", border: "1px solid var(--blue)", borderRadius: "var(--radius)", padding: "8px 12px", marginBottom: 12, color: "var(--text-secondary)" }}>
-        &uarr; Demand rate driving this simulation: <b style={{ color: "var(--blue)" }}>{preview.forecast_avg_daily_demand} MT/day</b> &mdash; the {preview.forecast_model?.replace("_", " ")} forecast from the sales chart above.
+        &uarr; Demand rate driving this simulation: <b style={{ color: "var(--blue-text)" }}>{preview.forecast_avg_daily_demand} MT/day</b>, the {preview.forecast_model?.replace("_", " ")} forecast from the sales chart above.
       </div>
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data} margin={{ top: 20, right: 20, bottom: 0, left: -16 }}>

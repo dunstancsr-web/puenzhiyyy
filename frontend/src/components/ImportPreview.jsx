@@ -81,7 +81,7 @@ export function ImportPreview({ preview }) {
                   <code style={{ fontFamily: "ui-monospace, Menlo, monospace", color: "var(--text-muted)" }}>{field}</code>
                   <span style={{ textDecoration: "line-through", opacity: 0.7 }}>{String(d.from) || "empty"}</span>
                   <ChevronRight size={12} style={{ color: "var(--text-muted)" }} />
-                  <b style={{ color: "var(--blue)" }}>{String(d.to)}</b>
+                  <b style={{ color: "var(--blue-text)" }}>{String(d.to)}</b>
                 </div>
               ))}
               {/* New products only (c.assumed is undefined on an update row):
@@ -239,7 +239,7 @@ export function SalesHistoryPreview({ preview }) {
 }
 
 export function Stat({ n, label, tone }) {
-  const color = tone === "bad" ? "var(--red)" : tone === "blue" ? "var(--blue)" : "var(--text-muted)";
+  const color = tone === "bad" ? "var(--red)" : tone === "blue" ? "var(--blue-text)" : "var(--text-muted)";
   return (
     <div style={{
       flex: "1 1 110px", padding: "10px 12px", borderRadius: "var(--radius)",
@@ -290,7 +290,7 @@ export function Toast({ tone, message, onDismiss }) {
       fontSize: "var(--text-sm)", fontWeight: 600,
       color: tone === "bad" ? "var(--red)" : "var(--text-primary)",
     }}>
-      {tone === "bad" ? <AlertTriangle size={15} /> : <Check size={15} style={{ color: "var(--green)" }} />}
+      {tone === "bad" ? <AlertTriangle size={15} /> : <Check size={15} style={{ color: "var(--green-text)" }} />}
       {message}
     </div>,
     document.body

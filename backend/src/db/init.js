@@ -289,6 +289,54 @@ function initDb(targetDb) {
     CREATE INDEX IF NOT EXISTS idx_risk_events_active ON risk_events(active);
 
     -- ================================================================
+    -- MARKET SIGNALS
+    -- A news event read into a fixed shape, waiting for a person to accept
+    -- or dismiss it. Never a figure and never an action: the days it costs
+    -- come from engines/signals.js's playbook, and approving one only adds a
+    -- risk_events row (the buffer the reorder point already knows about).
+    --   origin        replay = a real past event loaded to show what the agent
+    --                 would say; live = read from the news feed
+    --   extracted_by  hand | rules | model:<name>, so a reader can tell how
+    --                 much to trust the classification
+    --   affects/excludes_varieties  JSON arrays; a NON-basmati ban must not
+    --                 flag a basmati SKU
+    --   fixture_id    makes loading the same replay twice a no-op
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS market_signals (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      headline           TEXT NOT NULL,
+      summary            TEXT,
+      source_name        TEXT,
+      source_url         TEXT,
+      published_at       TEXT,
+      country_of_origin  TEXT,
+      supplier           TEXT,
+      event_type         TEXT NOT NULL,
+      severity           TEXT NOT NULL,
+      direction          TEXT NOT NULL DEFAULT 'tightens',
+      affects_varieties  TEXT,
+      excludes_varieties TEXT,
+      origin             TEXT NOT NULL DEFAULT 'replay',
+      extracted_by       TEXT NOT NULL DEFAULT 'hand',
+      status             TEXT NOT NULL DEFAULT 'pending',
+      decided_at         TEXT,
+      decided_by         TEXT,
+      risk_event_id      INTEGER,
+      fixture_id         TEXT,
+      also_reported_by   TEXT,
+      created_at         TEXT DEFAULT (datetime('now'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_market_signals_fixture ON market_signals(fixture_id) WHERE fixture_id IS NOT NULL;
+
+    -- Every headline the news scan has already looked at, kept or not, so the same
+    -- story is never read twice (a model call each time otherwise).
+    CREATE TABLE IF NOT EXISTS signal_seen (
+      url_hash TEXT PRIMARY KEY,
+      verdict  TEXT NOT NULL,
+      seen_at  TEXT DEFAULT (datetime('now'))
+    );
+
+    -- ================================================================
     -- OPERATORS  (warehouse floor staff, for handheld attribution)
     -- A shared rugged device with a short PIN per person is the normal
     -- pattern on a warehouse floor: gloves make passwords impractical, and
@@ -405,6 +453,11 @@ function initDb(targetDb) {
   `);
 
   // Forward migrations for databases created before these columns existed.
+  // Variety scoping for risk events, so an approved market signal about NON-basmati
+  // rice does not buffer a basmati SKU. NULL keeps the old, unscoped behaviour.
+  ensureColumn(db, "market_signals", "also_reported_by", "also_reported_by TEXT");
+  ensureColumn(db, "risk_events", "affects_varieties", "affects_varieties TEXT");
+  ensureColumn(db, "risk_events", "excludes_varieties", "excludes_varieties TEXT");
   ensureColumn(db, "skus", "warehouse", "warehouse TEXT DEFAULT 'MAIN'");
   ensureColumn(db, "skus", "lead_time_std_days", "lead_time_std_days REAL DEFAULT 0");
   ensureColumn(db, "skus", "target_service_level", "target_service_level REAL DEFAULT 0.95");

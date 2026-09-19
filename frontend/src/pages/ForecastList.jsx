@@ -60,7 +60,7 @@ function daysAgo(iso) {
   return Math.floor(ms / 86_400_000);
 }
 function relativeLabel(days) {
-  if (days == null) return "—";
+  if (days == null) return "-";
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 30) return `${days} days ago`;
@@ -153,7 +153,7 @@ export default function ForecastList() {
                           {(s.forecast_active_model || s.forecast_model).replace("_", " ")}
                         </div>
                         {s.use_forecast ? (
-                          <span style={{ fontSize: "var(--text-xs)", color: "var(--green)", fontWeight: 600 }}>Driving reorder point</span>
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--green-text)", fontWeight: 600 }}>Driving reorder point</span>
                         ) : (
                           <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Not enabled</span>
                         )}
@@ -163,12 +163,12 @@ export default function ForecastList() {
                     )}
                   </td>
                   <td style={{ padding: "13px 16px", fontSize: "var(--text-sm)", fontVariantNumeric: "tabular-nums" }}>
-                    {s.forecast_backtest_score != null ? s.forecast_backtest_score : "—"}
+                    {s.forecast_backtest_score != null ? s.forecast_backtest_score : "-"}
                   </td>
                   <td style={{ padding: "13px 16px", fontSize: "var(--text-sm)", fontVariantNumeric: "tabular-nums" }}>
                     {Math.round(s.reorder_point_policy)} MT
                     <span style={{ color: "var(--text-muted)", margin: "0 4px" }}>&rarr;</span>
-                    <span style={{ color: s.use_forecast ? "var(--blue)" : "var(--text-muted)", fontWeight: 600 }}>
+                    <span style={{ color: s.use_forecast ? "var(--blue-text)" : "var(--text-muted)", fontWeight: 600 }}>
                       {Math.round(s.reorder_point_suggested_with_risk)} MT
                     </span>
                   </td>
@@ -185,14 +185,14 @@ export default function ForecastList() {
                         fontWeight: s._staleDays >= STALE_DAYS ? 700 : 400,
                       }}>
                         {relativeLabel(s._staleDays)}
-                        {s._staleDays >= STALE_DAYS && " — recompute?"}
+                        {s._staleDays >= STALE_DAYS && ", recompute?"}
                       </span>
-                    ) : "—"}
+                    ) : "-"}
                   </td>
                   <td style={{ padding: "13px 16px", textAlign: "right" }}>
-                    <Link to={`/inventory/${s.sku_id}/forecast`} style={{
+                    <Link to={`/inventory/${s.sku_id}/forecast`} className="touch-44" style={{
                       display: "inline-flex", alignItems: "center", gap: 4, fontSize: "var(--text-xs)", fontWeight: 700,
-                      color: "var(--blue)", textDecoration: "none",
+                      color: "var(--blue-text)", textDecoration: "none", minHeight: 28, padding: "0 6px",
                     }}>
                       Open <ChevronRight size={13} />
                     </Link>
@@ -219,9 +219,10 @@ function Th({ label, sortKey, active, dir, onClick, tip }) {
       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
         <button
           type="button"
+          className="touch-44 focus-ring"
           onClick={() => onClick(sortKey)}
           style={{
-            all: "unset", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
+            all: "unset", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, minHeight: 28,
           }}
         >
           {label}

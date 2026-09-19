@@ -42,7 +42,18 @@ export default function NewDataPill() {
   }, [flashing, appliedAt]);
 
   const stale = demo === false && isStale();
-  if (!stale && !flashing) return null;
+  const visible = stale || flashing;
+
+  // While the pill is on screen, leave room under the page for it, so the last line of any
+  // page can still be scrolled clear of it instead of sitting underneath.
+  useEffect(() => {
+    if (!visible) return undefined;
+    const prev = document.body.style.paddingBottom;
+    document.body.style.paddingBottom = "84px";
+    return () => { document.body.style.paddingBottom = prev; };
+  }, [visible]);
+
+  if (!visible) return null;
 
   const base = {
     position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: 22, zIndex: 250,
@@ -54,14 +65,14 @@ export default function NewDataPill() {
   if (flashing) {
     return (
       <div role="status" style={{ ...base, background: "var(--green-light)", color: "var(--text-primary)" }}>
-        <CheckCircle2 size={16} color="var(--green)" /> Updated with new stock movements
+        <CheckCircle2 size={16} color="var(--green-text)" /> Updated with new stock movements
       </div>
     );
   }
 
   return (
     <button type="button" onClick={() => window.location.reload()}
-      style={{ ...base, background: "var(--blue)", color: "#fff", cursor: "pointer", borderColor: "var(--blue)" }}>
+      style={{ ...base, background: "var(--blue-strong)", color: "#fff", cursor: "pointer", borderColor: "var(--blue-strong)", minHeight: 44 }}>
       <RefreshCw size={15} /> New stock movements. Refresh
     </button>
   );

@@ -1,10 +1,15 @@
 {
   "name": "stocksense",
   "version": "1.0.0",
-  "description": "Inventory Monitoring System — Hackathon project",
+  "description": "Inventory Monitoring System \u2014 Hackathon project",
   "scripts": {
     "install:all": "npm install --prefix backend && npm install --prefix frontend && git config core.hooksPath .githooks",
     "dev:backend": "npm run dev --prefix backend",
-    "dev:frontend": "npm run dev --prefix frontend"
+    "dev:frontend": "npm run dev --prefix frontend",
+    "ux:audit": "node .claude/skills/ui-ux-audit/scripts/run-audit.mjs --config frontend/ux-audit.config.json --out ux-audit-report",
+    "ux:selftest": "node .claude/skills/ui-ux-audit/scripts/selftest.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0"
   }
 }

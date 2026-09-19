@@ -213,7 +213,9 @@ export default function Sidebar() {
             color: "var(--text-primary)", fontSize: "var(--text-sm)", fontWeight: 600, padding: "0 4px",
           }}>
             <HomeIcon size={19} />
-            Home
+            {/* Hidden on phones by a class (see index.css): the icon and the aria-label
+                carry it, and the 50px it frees is what lets the tabs be tappable. */}
+            <span className="topbar-home-label">Home</span>
           </Link>
         </div>
 
@@ -223,8 +225,8 @@ export default function Sidebar() {
               style={({ isActive }) => ({
                 flex: 1, minWidth: 0,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "9px 6px", borderRadius: 999, textDecoration: "none",
-                background: isActive ? "var(--blue)" : "transparent",
+                padding: "9px 6px", minHeight: 44, borderRadius: 999, textDecoration: "none",
+                background: isActive ? "var(--blue-strong)" : "transparent",
                 color: isActive ? "#fff" : "var(--text-secondary)",
                 transition: "background 0.15s, color 0.15s",
               })}>
@@ -235,7 +237,7 @@ export default function Sidebar() {
                     {badge > 0 && !isActive && (
                       <span style={{
                         position: "absolute", top: -4, right: -6,
-                        background: "var(--red)", color: "#fff",
+                        background: "var(--red-text)", color: "#fff",
                         fontSize: "var(--text-xs)", fontWeight: 700, minWidth: 18, height: 18,
                         borderRadius: 99, display: "flex", alignItems: "center",
                         justifyContent: "center", padding: "0 3px",

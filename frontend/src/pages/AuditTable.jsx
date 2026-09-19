@@ -26,8 +26,8 @@ import { api } from "../api/inventory";
 // without asking the server directly.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const fmt = (v, unit = "") => (v == null ? "–" : `${v}${unit}`);
-const fmtDate = (v) => v || "–";
+const fmt = (v, unit = "") => (v == null ? "-" : `${v}${unit}`);
+const fmtDate = (v) => v || "-";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Two different reasons a cell can be empty, per Stan's ask (19 Sep) - and a
@@ -48,8 +48,8 @@ const fmtDate = (v) => v || "–";
 // GET /skus or GET /skus/:id/projection already returned.
 // ─────────────────────────────────────────────────────────────────────────────
 const TONE_STYLE = {
-  gap: { background: "var(--orange-light)", color: "var(--orange)" },
-  pending: { background: "var(--purple-light)", color: "var(--purple)" },
+  gap: { background: "var(--orange-light)", color: "var(--orange-text)" },
+  pending: { background: "var(--purple-light)", color: "var(--purple-text)" },
 };
 
 function classify(s, key, proj) {
@@ -119,9 +119,9 @@ export default function AuditTable() {
           on the left, what the top-5 formulas produce from it on the right.
         </p>
         <div style={{ display: "flex", gap: 18, marginTop: 12, fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
-          <LegendItem tone="gap" label="Needs setup — an uploaded field was left blank" />
-          <LegendItem tone="pending" label="Not yet — new SKU or an available action not run" />
-          <LegendItem label="No colour — genuinely nothing to flag right now" />
+          <LegendItem tone="gap" label="Needs setup: an uploaded field was left blank" />
+          <LegendItem tone="pending" label="Not yet: new SKU or an available action not run" />
+          <LegendItem label="No colour: genuinely nothing to flag right now" />
         </div>
       </div>
 
@@ -202,19 +202,19 @@ export default function AuditTable() {
                     <Td>{fmt(s.on_hand_qty, " MT")}</Td>
                     <Td>{fmt(s.available_qty, " MT")}</Td>
 
-                    <Td>{s.movement_class || "–"}</Td>
+                    <Td>{s.movement_class || "-"}</Td>
                     <CellFor s={s} proj={proj} colKey="avgDailySales">{fmt(s.avg_daily_usage_30d, " MT")}</CellFor>
 
-                    <Td>{alerts.length ? alerts.join(", ") : "–"}</Td>
-                    <Td>{s.health_status || "–"}</Td>
+                    <Td>{alerts.length ? alerts.join(", ") : "-"}</Td>
+                    <Td>{s.health_status || "-"}</Td>
 
                     <Td>{fmt(s.safety_stock_mt, " MT")}</Td>
                     <Td>{fmt(s.reorder_point_suggested, " MT")}</Td>
-                    <CellFor s={s} proj={proj} colKey="suggestedOrder">{s.suggested_order_qty > 0 ? `${s.suggested_order_qty} MT` : "–"}</CellFor>
+                    <CellFor s={s} proj={proj} colKey="suggestedOrder">{s.suggested_order_qty > 0 ? `${s.suggested_order_qty} MT` : "-"}</CellFor>
 
                     <CellFor s={s} proj={proj} colKey="firstStockout">{fmtDate(proj?.first_stockout_date)}</CellFor>
                     <CellFor s={s} proj={proj} colKey="firstSafetyBreach">{fmtDate(proj?.first_safety_breach_date)}</CellFor>
-                    <Td>{proj ? fmt(proj.lowest_position, " MT") : "–"}</Td>
+                    <Td>{proj ? fmt(proj.lowest_position, " MT") : "-"}</Td>
                     <CellFor s={s} proj={proj} colKey="recoveryDate">{fmtDate(proj?.recovery_date)}</CellFor>
 
                     <CellFor s={s} proj={proj} colKey="model">{s.forecast_active_model || "Not started"}</CellFor>

@@ -121,6 +121,12 @@ and changing it to help one feature would have silently regressed the other. If 
 feature's model or prompt, check the other still matches its own benchmark before assuming a shared
 change is safe.
 
+**Action Items' "Market signals" (19 Sep)** turns a news event into what it does to each SKU's stock and
+what to order, with the days an event costs read from a visible table, never from a model. It is built on the
+replay of real past events and a live news scan (Google News RSS, read by a local model, else a keyword list, never the paid tier; editable by a person). Formulas, matching and
+the open question about a seeded risk event: `design.md`, "Market Signals". Check with
+`node backend/scripts/test-signals.js`.
+
 ## History, in phases
 
 | Dates | Tasks | What happened |
@@ -161,6 +167,7 @@ cd backend && npm run demo:reset     # reset for recording, and check the video 
 cd frontend && npx vite build        # the build must pass before committing
 node backend/scripts/bench-models.js llama3 --repeat 4 --scenario reorder   # after LLM changes
 node backend/scripts/check-formulas.js   # after ANY engine change: do the formulas still match design.md?
+npm run ux:audit                         # after UI changes: overlap, contrast, touch size, keyboard (skill: .claude/skills/ui-ux-audit)
 node backend/scripts/test-tone.js        # after editing backend/src/llm/tone.js
 sh backend/scripts/rehearse-deploy.sh    # run the app like the Lightsail container, then check it
 python3 docs/Guide/build-pdf.py          # rebuild the features guide PDF into ~/Downloads

@@ -341,7 +341,7 @@ export default function Inventory() {
           {/* Outlined, same weight as Bulk edit, so "Add SKU" stays the one
               primary action on this surface. MVP2 (branch-only for now) -
               see the App.jsx route comment for why this isn't in Sidebar yet. */}
-          <Link to="/forecast" style={{
+          <Link to="/forecast" className="touch-44" style={{
             display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: "var(--radius)",
             border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-secondary)",
             fontSize: "var(--text-sm)", fontWeight: 600, textDecoration: "none",
@@ -353,7 +353,7 @@ export default function Inventory() {
             onClick={() => setShowAddModal(true)}
             style={{
               display: "flex", alignItems: "center", gap: 7,
-              background: "var(--blue)", color: "#fff",
+              background: "var(--blue-strong)", color: "#fff",
               padding: "9px 18px", borderRadius: "var(--radius)",
               fontWeight: 600, fontSize: "var(--text-sm)", border: "none",
               cursor: "pointer", flexShrink: 0,
@@ -473,15 +473,15 @@ export default function Inventory() {
                     {/* Coverage vs lead time */}
                     <td style={{ padding: "13px 16px" }}>
                       {sku.days_of_cover === null ? (
-                        <span style={{ fontSize: "var(--text-xs)", color: "var(--red)", fontWeight: 700 }}>No demand</span>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--red-text)", fontWeight: 700 }}>No demand</span>
                       ) : (
                         <div>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                             <span style={{
                               fontSize: "var(--text-sm)", fontWeight: 800,
-                              color: sku.days_of_cover < sku.lead_time_days ? "var(--red)"
-                                : sku.days_of_cover < sku.lead_time_days * 1.5 ? "var(--yellow)"
-                                : "var(--green)",
+                              color: sku.days_of_cover < sku.lead_time_days ? "var(--red-text)"
+                                : sku.days_of_cover < sku.lead_time_days * 1.5 ? "var(--yellow-text)"
+                                : "var(--green-text)",
                             }}>
                               {sku.days_of_cover}d
                             </span>
@@ -549,7 +549,7 @@ export default function Inventory() {
             autoFocus
           />
           {restockError && (
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--red)", marginBottom: 12 }}>⚠ {restockError}</div>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--red-text)", marginBottom: 12 }}>⚠ {restockError}</div>
           )}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <ModalBtn label="Cancel" onClick={() => setRestockTarget(null)} disabled={restockSaving} />
@@ -657,7 +657,7 @@ function ProjectionChart({ skuId }) {
     <div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "var(--text-xs)", marginBottom: 10 }}>
         {first_stockout_date ? (
-          <span style={{ color: "var(--red)", fontWeight: 700 }}>
+          <span style={{ color: "var(--red-text)", fontWeight: 700 }}>
             {/* "Projected" reads oddly for a date of today - that's not a forecast,
                 the SKU is already at/below zero right now. */}
             {first_stockout_date === curve[0]?.date
@@ -665,7 +665,7 @@ function ProjectionChart({ skuId }) {
               : `⚠ Stockout projected ${first_stockout_date}`}
           </span>
         ) : (
-          <span style={{ color: "var(--green)", fontWeight: 700 }}>✓ No stockout projected within 90 days</span>
+          <span style={{ color: "var(--green-text)", fontWeight: 700 }}>✓ No stockout projected within 90 days</span>
         )}
         {first_safety_breach_date && first_safety_breach_date !== first_stockout_date && (
           <span style={{ color: "var(--yellow)" }}>Safety stock breached {first_safety_breach_date}</span>
@@ -852,7 +852,7 @@ function SkuEditForm({ sku, onSave, onCancel }) {
               <button type="button" onClick={() => { onCancel(); navigate(`/inventory/${sku.sku_id}/forecast`); }} style={{
                 display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: "var(--text-sm)",
                 padding: "8px 14px", borderRadius: "var(--radius)", border: "1px solid var(--blue)",
-                background: "var(--blue-light)", color: "var(--blue)", cursor: "pointer", flexShrink: 0,
+                background: "var(--blue-light)", color: "var(--blue-text)", cursor: "pointer", flexShrink: 0,
               }}>
                 View forecast <ChevronRight size={14} />
               </button>
@@ -974,7 +974,7 @@ function SkuEditForm({ sku, onSave, onCancel }) {
       </div>
 
       {saveError && (
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginTop: "var(--space-3)" }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--red-text)", marginTop: "var(--space-3)" }}>
           ⚠ {saveError}
         </div>
       )}
@@ -1070,7 +1070,7 @@ function AddSkuForm({ onSave, onCancel }) {
       </FormSection>
 
       {saveError && (
-        <div style={{ padding: "8px 12px", background: "var(--red-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--red)", marginBottom: 16 }}>
+        <div style={{ padding: "8px 12px", background: "var(--red-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--red-text)", marginBottom: 16 }}>
           ⚠ {saveError}
         </div>
       )}

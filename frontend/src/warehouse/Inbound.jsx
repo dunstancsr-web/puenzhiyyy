@@ -312,7 +312,7 @@ export default function Inbound() {
             </div>
 
             {wrong && (
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginTop: 9, lineHeight: 1.5 }}>
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--red-text)", marginTop: 9, lineHeight: 1.5 }}>
                 That code is not {po.sku_id}. If the pallet really is a different product, go back and
                 pick the delivery that matches it.
               </div>
@@ -431,7 +431,7 @@ export default function Inbound() {
                     minHeight: 48, fontSize: "var(--text-sm)", textAlign: "left", padding: "0 14px",
                     borderColor: reason === r ? "var(--blue)" : "var(--border)",
                     background: reason === r ? "var(--blue-light)" : "var(--card-bg)",
-                    color: reason === r ? "var(--blue)" : "var(--text-primary)",
+                    color: reason === r ? "var(--blue-text)" : "var(--text-primary)",
                   }}>
                   {r}
                 </button>

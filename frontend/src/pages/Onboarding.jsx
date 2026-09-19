@@ -449,11 +449,11 @@ export default function Onboarding() {
           <Seal size={30} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, lineHeight: 1.1 }}>{CLIENT_EN}</div>
-            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+            <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)" }}>
               Set up your catalog
             </div>
           </div>
-          <button onClick={exitOnboarding} title="Close setup, add products later from Inventory or Bulk edit" style={{
+          <button onClick={exitOnboarding} className="hit-44-icon" title="Close setup, add products later from Inventory or Bulk edit" style={{
             display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30,
             background: "none", border: "none", borderRadius: 99, cursor: "pointer", color: "var(--text-muted)",
           }}>
@@ -499,7 +499,7 @@ export default function Onboarding() {
               Before we track anything, tell us what you stock.
             </h1>
             <p style={{ fontSize: "var(--text-base)", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 26px", maxWidth: "46ch" }}>
-              StockSense can't monitor inventory it doesn't know exists. Add your products first &mdash; every reorder point, alert, and forecast builds from this catalog.
+              StockSense can't monitor inventory it doesn't know exists. Add your products first: every reorder point, alert, and forecast builds from this catalog.
             </p>
 
             <EmptyPanel icon={Package}>
@@ -534,14 +534,14 @@ export default function Onboarding() {
                 Or try an example:{" "}
                 <button onClick={() => tryExample("bare")} disabled={busy === "read"} style={{
                   background: "none", border: "none", cursor: "pointer", padding: 0,
-                  fontSize: "inherit", color: "var(--blue)", fontWeight: 600,
+                  fontSize: "inherit", color: "var(--blue-text)", fontWeight: 600,
                 }}>
                   bare minimum
                 </button>
                 {" · "}
                 <button onClick={() => tryExample("full")} disabled={busy === "read"} style={{
                   background: "none", border: "none", cursor: "pointer", padding: 0,
-                  fontSize: "inherit", color: "var(--blue)", fontWeight: 600,
+                  fontSize: "inherit", color: "var(--blue-text)", fontWeight: 600,
                 }}>
                   everything filled in
                 </button>
@@ -575,7 +575,7 @@ export default function Onboarding() {
                 five has a sensible default and is explained on the linked
                 reference page rather than restated here. */}
             <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.6, borderTop: "1px solid var(--border)", paddingTop: 16, marginTop: 24 }}>
-              The template asks for five columns &mdash; <Code>sku_id</Code>, <Code>product_name</Code>, <Code>lead_time_days</Code>, <Code>reorder_point_policy</Code> and <Code>target_stock</Code> &mdash; only the first two are actually required. Everything else can be added later from Inventory.
+              The template asks for five columns: <Code>sku_id</Code>, <Code>product_name</Code>, <Code>lead_time_days</Code>, <Code>reorder_point_policy</Code> and <Code>target_stock</Code>, only the first two are actually required. Everything else can be added later from Inventory.
             </div>
           </div>
         )}
@@ -594,11 +594,11 @@ export default function Onboarding() {
                 Give it something to learn from.
               </h1>
               <p style={{ fontSize: "var(--text-base)", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 26px", maxWidth: "46ch" }}>
-                Upload past sales and StockSense can forecast demand and suggest safety stock from day one, instead of waiting a month to learn your patterns. This step is optional &mdash; skip it and forecasts build up as you go.
+                Upload past sales and StockSense can forecast demand and suggest safety stock from day one, instead of waiting a month to learn your patterns. This step is optional, skip it and forecasts build up as you go.
               </p>
 
               <div style={{
-                fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12, background: "var(--surface-2)",
+                fontFamily: "ui-monospace, Menlo, monospace", fontSize: "var(--text-xs)", background: "var(--surface-2)",
                 border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "12px 14px",
                 marginBottom: 26, color: "var(--text-secondary)", overflowX: "auto", lineHeight: 1.7, whiteSpace: "pre",
               }}>
@@ -620,7 +620,7 @@ export default function Onboarding() {
                   Or{" "}
                   <button onClick={trySalesExample} disabled={busy === "read"} style={{
                     background: "none", border: "none", cursor: "pointer", padding: 0,
-                    fontSize: "inherit", color: "var(--blue)", fontWeight: 600,
+                    fontSize: "inherit", color: "var(--blue-text)", fontWeight: 600,
                   }}>
                     generate example sales for my products
                   </button>
@@ -689,7 +689,7 @@ export default function Onboarding() {
         {samplePreview && (
           <Modal wide title="Review sample data" onClose={cancelSampleData}>
             <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 18 }}>
-              Already added to the sandbox &mdash; {samplePreview.catalogCount} products, {samplePreview.salesCount} sales
+              Already added to the sandbox, {samplePreview.catalogCount} products, {samplePreview.salesCount} sales
               rows (stock out) and {samplePreview.receiptsCount} goods receipts (stock in) across 24 months. Cancel
               resets it back to empty.
             </div>
@@ -752,14 +752,14 @@ export default function Onboarding() {
             <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 18, display: "flex", alignItems: "flex-start", gap: 6 }}>
               <span>
                 The sales and receipts you just saw explain demand, not what's on the shelf today. Enter a
-                current on-hand quantity for any product you know &mdash; leave the rest blank, and we'll
+                current on-hand quantity for any product you know, leave the rest blank, and we'll
                 treat those as unknown for now rather than guess.
               </span>
               <span style={{ marginTop: 3, flexShrink: 0 }}>
                 <ColHint
                   label="opening balance"
-                  what="The amount of a product physically sitting in your warehouse right now, today &mdash; not last month, not what's on order."
-                  how="StockSense never guesses this for you. You type it in once here, and from then on every sale and every delivery you record moves it up or down &mdash; the same way a bank balance changes with each transaction, not by recalculating your whole history every time."
+                  what="The amount of a product physically sitting in your warehouse right now, today, not last month, not what's on order."
+                  how="StockSense never guesses this for you. You type it in once here, and from then on every sale and every delivery you record moves it up or down, the same way a bank balance changes with each transaction, not by recalculating your whole history every time."
                 />
               </span>
             </div>
@@ -781,7 +781,7 @@ export default function Onboarding() {
                           type="button"
                           onClick={() => setBalances((b) => ({ ...b, [s.sku_id]: String(suggestion) }))}
                           style={{
-                            fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--blue)",
+                            fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--blue-text)",
                             background: "var(--blue-light)", border: "none", borderRadius: 99,
                             padding: "4px 10px", cursor: "pointer", whiteSpace: "nowrap",
                           }}
@@ -811,7 +811,7 @@ export default function Onboarding() {
             </div>
             {Object.values(balanceSuggestions).some((v) => v > 0) && (
               <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-                "Use ~X MT" is inferred from the deliveries and sales you just uploaded, not counted &mdash; click
+                "Use ~X MT" is inferred from the deliveries and sales you just uploaded, not counted, click
                 it only where you don't have a more accurate number yourself.
               </div>
             )}
@@ -833,7 +833,7 @@ export default function Onboarding() {
               return (
                 <>
                   <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 18 }}>
-                    Computed the same way as everywhere else in StockSense &mdash; nothing here is a guess.
+                    Computed the same way as everywhere else in StockSense, nothing here is a guess.
                   </div>
                   {attention.length > 0 && (
                     <div style={{ marginBottom: 18 }}>
@@ -853,7 +853,7 @@ export default function Onboarding() {
                   )}
                   {attention.length === 0 && topMovers.length === 0 && (
                     <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-                      Not enough history yet to say anything useful &mdash; check back after a few sales.
+                      Not enough history yet to say anything useful, check back after a few sales.
                     </div>
                   )}
                 </>
@@ -922,7 +922,7 @@ function AnalysisTable({ rows }) {
           <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{s.product_name}</span>
           <span>{s.days_of_cover_text || "Not applicable"}</span>
           <span>{s.health_status}</span>
-          <span>{s.suggested_order_qty > 0 ? `${s.suggested_order_qty} MT` : "–"}</span>
+          <span>{s.suggested_order_qty > 0 ? `${s.suggested_order_qty} MT` : "-"}</span>
         </div>
       ))}
     </div>
@@ -939,7 +939,7 @@ function SampleTable({ title, count, rows, columns }) {
   return (
     <div>
       <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-muted)", marginBottom: 8 }}>
-        {title} &mdash; {truncated ? `first 3 of ${count}` : `all ${count}`}
+        {title}, {truncated ? `first 3 of ${count}` : `all ${count}`}
       </div>
       <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden", fontSize: "var(--text-xs)" }}>
         <div style={{
@@ -1003,7 +1003,7 @@ function BigButton({ primary, icon: Icon, label, busy, disabled, onClick, style 
       padding: "13px 20px", borderRadius: "var(--radius)", cursor: inert ? "default" : "pointer",
       display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
       border: primary ? "none" : "1px solid var(--border)",
-      background: primary ? "var(--blue)" : "var(--surface-2)",
+      background: primary ? "var(--blue-strong)" : "var(--surface-2)",
       color: primary ? "#fff" : "var(--text-secondary)",
       boxShadow: primary ? "var(--shadow)" : "none",
       opacity: inert ? 0.7 : 1,

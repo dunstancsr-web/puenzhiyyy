@@ -126,6 +126,23 @@ Read before making UI changes.
 - **`theme` is a preference, `resolved` is an appearance.** `useTheme()` returns both. `theme` can be
   `"auto"`, so `theme === "light" ? a : b` silently takes the dark branch on a light page. Anything
   picking a COLOUR reads `resolved`; only the settings UI reads `theme`.
+- **Anything `position: fixed` must clear the demo banner.** Body padding moves in-flow content only, so a
+  fixed top bar at `top: 0` sits UNDER the banner. Offset it by `var(--demo-banner-height)`. That token is
+  MEASURED by `DemoModeBadge` (a `ResizeObserver`), never a constant: a fixed 40px banner overflowed the day
+  its sentence wrapped, and covered the phone navigation.
+- **A floating control always covers something.** The "Enter demo mode" pill sat on top of Bulk edit and Add
+  SKU on desktop. Entry points to a mode live in a menu or in the flow of a page (Settings, Home), never as a
+  permanent fixed button.
+- **Accent colours are for fills; use the `*-text` tokens for words.** `--red`, `--blue`, `--green`,
+  `--yellow`, `--orange` and `--purple` fail 4.5:1 as small text on a light surface. Use
+  `--red-text`, `--blue-text`, `--green-text`, `--yellow-text`, `--orange-text`, `--purple-text` for text, and
+  `--blue-strong` behind white text. The dark theme maps them back to the bright accents.
+- **Touch targets are 44px on phones.** Global rules in `index.css` set it for buttons, selects and inputs
+  under 769px; `.hit-44` and `.hit-44-icon` grow the hit area of a small visible control without changing its
+  size, and `.touch-44` beats inline styles (`all: unset`, fixed padding). Inline `min-height` defeats the
+  global rule, so do not set one.
+- **A hidden browser tab freezes CSS transitions**, so a colour that inherits from `body` (mid 0.3s transition)
+  can look wrong in an automated screenshot. Disable transitions in the frame before judging contrast.
 - **Never put a `//` comment inside a JSX opening tag.** esbuild tolerates it and the build passes,
   but it is not valid JSX and other toolchains reject it. Put `{/* ... */}` above the element.
 - **Verify against the real cascade, not a mock of it.** Injecting `!important` to force a breakpoint
@@ -191,6 +208,9 @@ Read before making UI changes.
   files changed since the last devlog entry, it asks for the entry. Claude Code blocks the stop once;
   Kiro, which cannot block, prints a reminder. If you are only pausing to ask Stan a question, say so
   and stop.
+- **UI changes are checked with the UI/UX audit skill** (`.claude/skills/ui-ux-audit/`, or `#ui-ux-audit` in
+  Kiro; `npm run ux:audit`). It is the shared procedure for both tools and holds no rules of its own: the
+  rules it enforces (type scale, no dashes, one primary action, contrast tokens) are in this file.
 - A second shared check, same pattern: `.kiro/hooks/branch-check.sh`, run as a Claude Code
   `SessionStart` hook and a Kiro `PostTaskExecution` hook. It only reminds; it never blocks. The
   actual enforcement of the branch workflow (see "Working rules") is `.githooks/pre-commit` and

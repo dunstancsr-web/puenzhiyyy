@@ -5,6 +5,7 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import ColHint from "../components/ColHint";
 import Modal from "../components/Modal";
+import MarketSignals from "../components/MarketSignals";
 import { api } from "../api/inventory";
 import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier";
 
@@ -52,14 +53,14 @@ function blindSpotReason(sku) {
     return {
       whatsMissing: "No sales history yet",
       why: "Can't project a stockout date without a demand rate to project forward.",
-      fix: "Nothing to do — resolves itself once this product has sold a few times.",
+      fix: "Nothing to do. This resolves itself once the product has sold a few times.",
       fixLink: null,
     };
   }
   if (!sku.target_stock) {
     return {
       whatsMissing: "Target stock was never set (0)",
-      why: "Suggested order quantity is target stock minus projected position — with no target, it can't mean anything.",
+      why: "Suggested order quantity is target stock minus projected position, so with no target it can't mean anything.",
       fix: "Set it on Table",
       fixLink: "/audit",
     };
@@ -182,7 +183,7 @@ export default function ActionItems() {
         <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>Action Items</h1>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4, maxWidth: "72ch" }}>
           What needs a decision from you, soonest first. Overstock and policy gaps still live on{" "}
-          <Link to="/alerts" style={{ color: "var(--blue)", fontWeight: 600 }}>Alerts</Link> for now — this page is
+          <Link to="/alerts" style={{ color: "var(--blue-text)", fontWeight: 600 }}>Alerts</Link> for now. This page is
           fulfilment risk, and how much you can trust the numbers below it.
         </p>
       </div>
@@ -202,7 +203,7 @@ export default function ActionItems() {
             }}
           />
           <button type="button" onClick={askDatabase} disabled={askState?.loading} style={{
-            fontSize: "var(--text-sm)", fontWeight: 700, color: "#fff", background: "var(--blue)",
+            fontSize: "var(--text-sm)", fontWeight: 700, color: "#fff", background: "var(--blue-strong)",
             border: "none", borderRadius: "var(--radius)", padding: "8px 16px", cursor: "pointer",
           }}>
             {askState?.loading ? "Thinking…" : "Ask"}
@@ -249,30 +250,34 @@ export default function ActionItems() {
                 </Td>
                 <Td>
                   {s.covered_by_po ? (
-                    <span style={{ fontSize: "var(--text-xs)", color: "var(--green)", fontWeight: 600 }}>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--green-text)", fontWeight: 600 }}>
                       ✓ PO arrives day {s.incoming_eta_days ?? "?"}
                     </span>
                   ) : (
-                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>—</span>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>-</span>
                   )}
                 </Td>
                 <Td>
                   {s.suggested_order_qty > 0 ? (
-                    <Link to="/alerts" style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue)" }}>
+                    <Link to="/alerts" style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue-text)", display: "inline-block", padding: "6px 0" }}>
                       Order {s.suggested_order_qty} MT →
                     </Link>
                   ) : (
-                    <Link to={`/inventory/${s.sku_id}/forecast`} style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-secondary)" }}>
+                    <Link to={`/inventory/${s.sku_id}/forecast`} style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-secondary)", display: "inline-block", padding: "6px 0" }}>
                       Watch →
                     </Link>
                   )}
                 </Td>
-                <Td><WhyButton onClick={() => askAI("stockout", s, `${s.product_name} — ${nearest.days} days to ${isStockout ? "stockout" : "safety breach"}`)} /></Td>
+                <Td><WhyButton onClick={() => askAI("stockout", s, `${s.product_name}: ${nearest.days} days to ${isStockout ? "stockout" : "safety breach"}`)} /></Td>
               </tr>
             ))}
           </Table>
         )}
       </Section>
+
+      <div style={{ height: 20 }} />
+
+      <MarketSignals />
 
       <div style={{ height: 20 }} />
 
@@ -299,14 +304,14 @@ export default function ActionItems() {
                 <Td style={{ color: "var(--text-secondary)" }}>{reason.why}</Td>
                 <Td>
                   {reason.fixLink ? (
-                    <Link to={reason.fixLink} style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue)" }}>
+                    <Link to={reason.fixLink} style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue-text)" }}>
                       {reason.fix} →
                     </Link>
                   ) : (
                     <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>{reason.fix}</span>
                   )}
                 </Td>
-                <Td><WhyButton onClick={() => askAI("blindspot", s, `${s.product_name} — ${reason.whatsMissing}`)} /></Td>
+                <Td><WhyButton onClick={() => askAI("blindspot", s, `${s.product_name}: ${reason.whatsMissing}`)} /></Td>
               </tr>
             ))}
           </Table>
@@ -403,7 +408,7 @@ function HealthPill({ status }) {
     <span style={{
       fontSize: "var(--text-xs)", fontWeight: 700, color: HEALTH_COLOR[status] || "var(--text-muted)",
     }}>
-      {status || "—"}
+      {status || "-"}
     </span>
   );
 }

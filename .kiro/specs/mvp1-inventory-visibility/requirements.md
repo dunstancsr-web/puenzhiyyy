@@ -415,6 +415,27 @@ Receiving and picking on a handheld, attributed to a named operator.
 
 ---
 
+### REQ-25 - Market signals (news that affects supply) ✅ replay built 2026-09-19
+
+Serves the problem statement's "identify potential shortages early".
+
+- A market signal is a news event in a fixed shape (origin or supplier, event type, severity, direction,
+  optional variety scope), with its source link and date.
+- For each affected SKU the system shows, deterministically, the stock-out date if supply slips, how many
+  days the SKU would be empty, the latest date to order, and the quantity to order at least. Formulas: design.md,
+  "Market Signals".
+- The days an event costs come from a visible table, never from a model or the article.
+- A signal that does not affect a SKU (wrong origin, or an exempt variety) does not flag it, and the screen
+  says which SKUs were spared and why.
+- A SKU already short before the news is shown as such, not blamed on the news.
+- A person accepts, dismisses or withdraws a signal; accepting adds a buffer to the reorder point and is
+  recorded in the audit log. The system never creates an order.
+- Past real events can be replayed against current stock.
+- A person can scan recent news. A headline is read into the fixed shape by a local model (else a keyword
+  list), checked against fixed lists, shown with who read it, and editable by a person; the same story from
+  several outlets is one signal. A paid model is never used for this.
+- On a public server, changes (scan, accept, dismiss, correct) are accepted only in the demo sandbox.
+
 ## Explicitly Deferred (Phase 2/3)
 
 The source technical spec (`reference/rice-inventory-technical-spec.md`) describes a mature enterprise

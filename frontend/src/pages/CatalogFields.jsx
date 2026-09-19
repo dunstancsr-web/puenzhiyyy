@@ -92,7 +92,7 @@ export default function CatalogFields() {
 
         <div className="card" style={{ padding: "18px 22px" }}>
           <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginBottom: 8 }}>
-            Everything else — add later, not now
+            Everything else: add later, not now
           </div>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.6, margin: "0 0 10px" }}>
             Variety, grade, supplier, costs, min/max stock and a few statistical tuning fields. All real,
@@ -145,7 +145,7 @@ function FieldRow({ f, required }) {
           </code>
           {f.unit && (
             <span style={{
-              fontSize: 10, fontWeight: 700, color: "var(--blue)",
+              fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--blue-text)",
               background: "var(--blue-light)", borderRadius: 4, padding: "1px 5px",
             }}>
               {f.unit}

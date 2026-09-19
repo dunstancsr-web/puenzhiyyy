@@ -234,7 +234,7 @@ export default function Outbound() {
                   </div>
                   {/* Said before the operator walks to the shelf, not after. */}
                   {!o.can_fulfil && (
-                    <div style={{ fontSize: "var(--text-xs)", color: "var(--red)", marginTop: 4, fontWeight: 600 }}>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--red-text)", marginTop: 4, fontWeight: 600 }}>
                       Only {fmt(o.on_hand_qty ?? 0)} MT on hand, this will be a short pick
                     </div>
                   )}
@@ -304,7 +304,7 @@ export default function Outbound() {
             </div>
 
             {wrong && (
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginTop: 9, lineHeight: 1.5 }}>
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--red-text)", marginTop: 9, lineHeight: 1.5 }}>
                 That code is not {order.sku_id}. If the pallet really is a different product, go back
                 and pick the order that matches it.
               </div>
@@ -443,7 +443,7 @@ export default function Outbound() {
                     minHeight: 48, fontSize: "var(--text-sm)", textAlign: "left", padding: "0 14px",
                     borderColor: reason === r ? "var(--blue)" : "var(--border)",
                     background: reason === r ? "var(--blue-light)" : "var(--card-bg)",
-                    color: reason === r ? "var(--blue)" : "var(--text-primary)",
+                    color: reason === r ? "var(--blue-text)" : "var(--text-primary)",
                   }}>
                   {r}
                 </button>

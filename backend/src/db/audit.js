@@ -49,6 +49,9 @@ const EVENTS = Object.freeze({
   // sales_transactions. One row per import, not one per sales row, since the
   // import as a whole is the auditable act.
   SALES_HISTORY_IMPORTED: "SALES_HISTORY_IMPORTED",
+  // A person accepting, dismissing or withdrawing a market signal. Accepting
+  // changes the risk buffer the reorder point uses, so it is a decision.
+  SIGNAL_DECIDED: "SIGNAL_DECIDED",
 });
 
 // JSON.stringify can throw (circular refs) and can return undefined (for a bare
