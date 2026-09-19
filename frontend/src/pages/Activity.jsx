@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   PackagePlus, SlidersHorizontal, Truck, BellRing, BellOff,
   UserCheck, Cpu, RefreshCw, ChevronRight, FileSearch, KeyRound, ShieldAlert,
-  ArrowDownToLine, ArrowUpFromLine, Newspaper } from "lucide-react";
+  ArrowDownToLine, ArrowUpFromLine, Newspaper, Send,
+} from "lucide-react";
 import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
@@ -26,6 +27,12 @@ import { useLiveRefresh } from "../hooks/useLiveRefresh";
 const TYPE_META = {
   ALERT_TRIGGERED:    { icon: BellRing,          color: "var(--red-text)",    label: "Alert raised" },
   DECISION_RECORDED:  { icon: UserCheck,         color: "var(--blue-text)",   label: "Manager decision" },
+  // Reorder Loop step 7: the Control Tower's one write. A request to the buyer,
+  // never a stock change.
+  ORDER_REQUESTED:    { icon: Send,              color: "var(--blue-text)",   label: "Order requested" },
+  // RESTOCK is retired (Reorder Loop step 7 removed the office restock action),
+  // kept here so any pre-existing audit rows still render rather than showing a
+  // raw event code, the same reason LLM_MODE_CHANGED's renderer was kept.
   RESTOCK:            { icon: Truck,             color: "var(--green-text)",  label: "Stock received" },
   SKU_UPDATED:        { icon: SlidersHorizontal, color: "var(--yellow)", label: "Policy changed" },
   SKU_CREATED:        { icon: PackagePlus,       color: "var(--purple-text)", label: "SKU added" },
@@ -50,7 +57,7 @@ const TYPE_META = {
 // which is the actual loop the app implements, so the row of chips reads as the
 // story rather than as a legend.
 const TYPE_ORDER = [
-  "ALERT_TRIGGERED", "DECISION_RECORDED", "LLM_CALL",
+  "ALERT_TRIGGERED", "DECISION_RECORDED", "ORDER_REQUESTED", "LLM_CALL",
   "GOODS_RECEIVED", "GOODS_ISSUED", "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
   "SALES_HISTORY_IMPORTED", "SIGNAL_DECIDED", "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT",
 ];
@@ -173,6 +180,15 @@ function describe(event) {
       }
       if (o.manager_reason) detail = `${detail ? `${detail} ` : ""}Reason given: "${o.manager_reason}"`;
       return { headline: `${verb} the recommendation for ${sku}`, detail };
+    }
+
+    case "ORDER_REQUESTED": {
+      const parts = [`Sent to the buyer${o.request_no ? ` as ${o.request_no}` : ""}. Stock is unchanged until the delivery is received.`];
+      if (i.reason) parts.push(`Reason given: "${i.reason}"`);
+      return {
+        headline: `Requested ${num(i.quantity_mt)} MT of ${sku}`,
+        detail: parts.join(" "),
+      };
     }
 
     case "RESTOCK":

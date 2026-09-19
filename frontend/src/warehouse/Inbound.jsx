@@ -73,7 +73,7 @@ export default function Inbound() {
 
   useEffect(() => { if (operator) loadDeliveries(); }, [operator, loadDeliveries]);
 
-  if (!operator) return <Login purpose="receiving" onSignedIn={setOperator} />;
+  if (!operator) return <Login purpose="receiving" duty="receipt" onSignedIn={setOperator} />;
 
   const reset = () => {
     setPo(null); setScan(""); setQty(""); setReason(""); setError(null); setReceipt(null); setStep(1);

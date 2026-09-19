@@ -85,7 +85,7 @@ app.use("/api/products", productRoutes); // legacy in-memory demo store, unrelat
 app.use("/api", demoRoutes);
 app.use("/api", inventoryRoutes);
 app.use("/api", signalRoutes);          // market signals: news events assessed against stock, approved by a person
-app.use("/api", warehouseRoutes);       // warehouse floor: goods receipt and goods issue        // real schema: /api/skus, /api/dashboard/stats, /api/alerts, /api/inventory/restock
+app.use("/api", warehouseRoutes);       // warehouse floor: goods receipt and goods issue
 
 // Health check
 app.get("/api/health", (req, res) => {

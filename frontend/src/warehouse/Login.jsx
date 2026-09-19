@@ -17,7 +17,13 @@ import { FloorError } from "./Handheld";
 // is labelled as one so nobody mistakes it for a design.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function Login({ onSignedIn, purpose }) {
+// Who may do what. Mirrors requireOperatorRole in backend/src/routes/warehouse.js, which is
+// the real enforcement; checking here as well means a receiving-only operator is told at the
+// PIN step, not after filling in four screens and getting a refusal at Confirm.
+const DUTY_ROLES = { receipt: ["receiving", "both"], issue: ["dispatch", "both"] };
+const DUTY_WORDS = { receipt: "receive stock", issue: "dispatch stock" };
+
+export default function Login({ onSignedIn, purpose, duty }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -41,7 +47,13 @@ export default function Login({ onSignedIn, purpose }) {
     setBusy(true);
     setError(null);
     api.warehouseLogin(pin)
-      .then((op) => onSignedIn(op))
+      .then((op) => {
+        const allowed = duty && DUTY_ROLES[duty];
+        if (allowed && !allowed.includes(op.role)) {
+          throw new Error(`${op.name} is not cleared to ${DUTY_WORDS[duty]}. Ask a ${allowed[0]} operator to sign in.`);
+        }
+        onSignedIn(op);
+      })
       .catch((err) => { setError(err.message); setPin(""); })
       .finally(() => { submitting.current = false; setBusy(false); });
   }, [pin, onSignedIn]);

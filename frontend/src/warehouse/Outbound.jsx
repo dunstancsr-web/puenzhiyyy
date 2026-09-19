@@ -68,7 +68,7 @@ export default function Outbound() {
 
   useEffect(() => { if (operator) loadOrders(); }, [operator, loadOrders]);
 
-  if (!operator) return <Login purpose="picking" onSignedIn={setOperator} />;
+  if (!operator) return <Login purpose="picking" duty="issue" onSignedIn={setOperator} />;
 
   const reset = () => {
     setOrder(null); setScan(""); setQty(""); setReason(""); setError(null); setNote(null); setStep(1);
