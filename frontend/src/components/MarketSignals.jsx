@@ -326,13 +326,16 @@ function SignalCard({ s, busy, onDecide, onCorrect, meta }) {
 
 // Two ways to add a signal, chosen one at a time. A segmented control (not two rows of buttons)
 // because they are alternatives for the same job, and showing both at once read as two steps of one
-// process. Results from either land in the same list below, each tagged with where it came from.
+// process. The control also decides which signals are listed below it: real headlines and rehearsals
+// of past events are different things and must not share one list, or a rehearsal reads as news. A
+// blue count on a tab is how many signals in it still wait for a decision, so nothing hides in the
+// other tab.
 const MODES = [
   { id: "live", label: "Live news", Icon: Newspaper },
   { id: "past", label: "Past events", Icon: History },
 ];
 
-function ModeSwitch({ mode, onChange, disabled }) {
+function ModeSwitch({ mode, onChange, disabled, waiting }) {
   const move = (e) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
@@ -354,6 +357,12 @@ function ModeSwitch({ mode, onChange, disabled }) {
               boxShadow: on ? "var(--shadow)" : "none", opacity: disabled && !on ? 0.6 : 1,
             }}>
             <Icon size={15} /> {label}
+            {waiting[id] > 0 && (
+              <span aria-label={`${waiting[id]} waiting for your decision`} style={{
+                minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "var(--blue-strong)", color: "#fff",
+                fontSize: "var(--text-xs)", fontWeight: 700, lineHeight: "18px", textAlign: "center",
+              }}>{waiting[id]}</span>
+            )}
           </button>
         );
       })}
@@ -403,6 +412,12 @@ export default function MarketSignals() {
 
   const catalog = data?.catalog || [];
   const signals = data?.signals || [];
+  const isPast = (x) => x.origin === "replay";
+  const shown = signals.filter((x) => (mode === "past" ? isPast(x) : !isPast(x)));
+  const waiting = {
+    live: signals.filter((x) => !isPast(x) && x.status === "pending").length,
+    past: signals.filter((x) => isPast(x) && x.status === "pending").length,
+  };
 
   return (
     <div className="card" style={{ padding: "18px 20px" }}>
@@ -434,7 +449,7 @@ export default function MarketSignals() {
       {data && (
         <>
           <div style={{ marginTop: 16 }}>
-            <ModeSwitch mode={mode} onChange={setMode} disabled={busy} />
+            <ModeSwitch mode={mode} onChange={setMode} disabled={busy} waiting={waiting} />
           </div>
 
           <div role="tabpanel" id="ms-panel" aria-labelledby={`ms-tab-${mode}`} style={{ marginTop: 12 }}>
@@ -466,7 +481,7 @@ export default function MarketSignals() {
                   )}
                   {/* One primary per surface: this leads only while nothing waits for a decision; once a
                       signal is pending, its own Add buffer button is the primary action. */}
-                  <Btn primary={signals.every((x) => x.status !== "pending")} disabled={busy || !daysOk} onClick={scan}>
+                  <Btn primary={shown.every((x) => x.status !== "pending")} disabled={busy || !daysOk} onClick={scan}>
                     {scanning ? "Reading the news..." : "Scan the news"}
                   </Btn>
                 </div>
@@ -492,7 +507,7 @@ export default function MarketSignals() {
                   Real 2022 to 2024 events, run against today's stock as if they were breaking news. It shows what the advice would have been.
                   <Help label="past events"
                     what="Real supply shocks from 2022 to 2024, like India's rice export ban. We treat one as if it just happened and run it against your stock as it is today."
-                    how="It is a rehearsal, to see how the advice works. It does not mean the event is happening now." />
+                    how={"It is a rehearsal, to see how the advice works. It does not mean the event is happening now.\nAdding a buffer from a past event changes your real reorder points, so choose Dismiss if you only want to look."} />
                 </p>
                 <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <select aria-label="Choose a past event" className="ms-select" value={pick} onChange={(e) => setPick(e.target.value)} disabled={busy || catalog.length === 0}
@@ -500,7 +515,7 @@ export default function MarketSignals() {
                     <option value="">{catalog.length ? "Choose an event..." : "Every past event is already loaded"}</option>
                     {catalog.map((c) => <option key={c.fixture_id} value={c.fixture_id}>{c.published_at} · {c.headline}</option>)}
                   </select>
-                  <Btn primary={signals.every((x) => x.status !== "pending")} disabled={busy || !pick} title={pick ? undefined : "Choose a past event first"}
+                  <Btn primary={shown.every((x) => x.status !== "pending")} disabled={busy || !pick} title={pick ? undefined : "Choose a past event first"}
                     onClick={() => run(async () => { const d = await api.replaySignal(pick); setPick(""); return d; })}>
                     Run this event
                   </Btn>
@@ -508,7 +523,7 @@ export default function MarketSignals() {
               </>
             )}
           </div>
-          {scanNote && <div style={{ marginTop: 10, fontSize: "var(--text-xs)", color: "var(--text-secondary)", lineHeight: 1.5 }}>{scanNote}</div>}
+          {mode === "live" && scanNote && <div style={{ marginTop: 10, fontSize: "var(--text-xs)", color: "var(--text-secondary)", lineHeight: 1.5 }}>{scanNote}</div>}
 
           {signals.length === 0 ? (
             <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
@@ -521,11 +536,21 @@ export default function MarketSignals() {
             </div>
           ) : (
             <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid var(--border)", fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-              Signals · {signals.length}
+              {mode === "past" ? "Past events you have run" : "Live news signals"} · {shown.length}
+            </div>
+          )}
+          {signals.length > 0 && shown.length === 0 && (
+            <div style={{ marginTop: 10, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+              {mode === "past"
+                ? "You have not run a past event yet. Choose one above to see what the advice would have been."
+                : "No live signals yet. Scan the news to check today's headlines."}
+              {waiting[mode === "past" ? "live" : "past"] > 0 && (
+                <> {waiting[mode === "past" ? "live" : "past"]} in {mode === "past" ? "Live news" : "Past events"} still {waiting[mode === "past" ? "live" : "past"] === 1 ? "waits" : "wait"} for your decision.</>
+              )}
             </div>
           )}
 
-          {signals.map((s) => (
+          {shown.map((s) => (
             <SignalCard key={s.id} s={s} busy={busy} meta={data} onDecide={(id, d) => run(() => api.decideSignal(id, d))} onCorrect={(id, body) => run(() => api.correctSignal(id, body))} />
           ))}
 
