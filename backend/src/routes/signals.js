@@ -260,8 +260,8 @@ router.patch("/market-signals/:id", sandboxOnlyWhenPublic, (req, res) => {
 router.post("/market-signals/:id/decision", sandboxOnlyWhenPublic, (req, res) => {
   const { decision } = req.body || {};
   const decidedBy = String(req.body?.decided_by || "Manager").slice(0, 60);
-  if (!["approve", "dismiss", "withdraw"].includes(decision)) {
-    return res.status(400).json({ success: false, message: "decision must be approve, dismiss or withdraw" });
+  if (!["approve", "dismiss", "withdraw", "reopen"].includes(decision)) {
+    return res.status(400).json({ success: false, message: "decision must be approve, dismiss, withdraw or reopen" });
   }
   try {
     const db = getDb();
@@ -298,6 +298,12 @@ router.post("/market-signals/:id/decision", sandboxOnlyWhenPublic, (req, res) =>
       if (sig.status !== "pending") return res.status(409).json({ success: false, message: `Already ${sig.status}` });
       status = "dismissed";
       db.prepare(`UPDATE market_signals SET status = 'dismissed', decided_at = datetime('now'), decided_by = ? WHERE id = ?`).run(decidedBy, sig.id);
+    } else if (decision === "reopen") {
+      // The undo for a dismissal (including "Acknowledge all"). Only a dismissed signal can come back: an
+      // approved one has already added a buffer, and taking that back is a withdrawal, which is its own step.
+      if (sig.status !== "dismissed") return res.status(409).json({ success: false, message: "Only a dismissed signal can be reopened" });
+      status = "pending";
+      db.prepare(`UPDATE market_signals SET status = 'pending', decided_at = NULL, decided_by = NULL WHERE id = ?`).run(sig.id);
     } else {
       if (sig.status !== "approved") return res.status(409).json({ success: false, message: "Only an approved signal can be withdrawn" });
       status = "withdrawn";

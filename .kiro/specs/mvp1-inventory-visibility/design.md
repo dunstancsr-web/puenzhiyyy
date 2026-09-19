@@ -579,6 +579,16 @@ is not "basmati" (`isVariety` in `signals.js`), so India's non-basmati bans do n
 **Urgency:** `act_now` if `days_without_stock > 0` at the high end; `order_soon` if `latest_order_in_days <= 14`;
 otherwise `monitor`. Sorted worst first.
 
+**Decisions and the list.** `POST /api/market-signals/:id/decision` takes approve, dismiss, withdraw or
+reopen. Reopen is the undo for a dismissal and is allowed only from dismissed (an approved signal has already
+added a buffer, and taking that back is a withdrawal): otherwise 409. The screen sorts a tab's signals by what
+the reader must do, not by date: **Needs a decision** (pending, tightens supply, touches a product; worst
+urgency first, always open), **No effect on your stock** (pending and eases supply or touches nothing; folded,
+with one "Acknowledge all" that applies only to this group and an undo bar for 12 seconds), and **Decided**
+(folded, with a count of active buffers). Each signal is a one line row that opens into the full card, one at
+a time; the first needing a decision opens itself. A signal just added by a scan or a replay opens its own
+group and card, so a result never hides in a folded group.
+
 **Approving** inserts a `risk_events` row (midpoint of the range as `buffer_days_add`, `is_illustrative = 0`,
 carrying the variety scope) so every existing figure reflects it. `riskbuffer.js` caps the total at 30 days
 (`MAX_BUFFER_DAYS`), so a SKU already carrying an earlier event gains less than the signal's own figure; the

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Newspaper, ExternalLink, History } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Newspaper, ExternalLink, History, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { api } from "../api/inventory";
 import ColHint from "./ColHint";
 import WorkingNote from "./WorkingNote";
@@ -212,7 +212,88 @@ function ReadingEditor({ s, meta, busy, onSave }) {
   );
 }
 
-function SignalCard({ s, busy, onDecide, onCorrect, meta }) {
+// Which group a signal belongs in. Sorted by what the reader has to DO, not by date: a signal needs a decision
+// only if it could add a buffer (it tightens supply and touches at least one product); everything else has no
+// effect on their stock and only needs a glance. Same test the card uses to decide whether to offer "Add buffer".
+function kindOf(s) {
+  if (s.status !== "pending") return "decided";
+  const a = s.assessment;
+  return s.direction !== "eases" && a.playbook && a.exposures.length > 0 ? "needs" : "noeffect";
+}
+const URGENCY_RANK = { act_now: 0, order_soon: 1, monitor: 2, informational: 3 };
+function worstUrgency(s) {
+  const ranks = s.assessment.exposures.filter((e) => e.low).map((e) => e.urgency);
+  return ranks.sort((x, y) => (URGENCY_RANK[x] ?? 9) - (URGENCY_RANK[y] ?? 9))[0] || null;
+}
+const byUrgencyThenDate = (x, y) =>
+  (URGENCY_RANK[worstUrgency(x)] ?? 9) - (URGENCY_RANK[worstUrgency(y)] ?? 9)
+  || String(y.published_at).localeCompare(String(x.published_at)) || y.id - x.id;
+
+// A signal folded to one line: what it is, and the one thing to know about it. Opening it shows the full card.
+function SignalRow({ s, kind, onOpen }) {
+  const n = s.assessment.exposures.length;
+  const worst = worstUrgency(s);
+  let right;
+  if (kind === "needs") {
+    right = (
+      <>
+        {worst && <Pill u={worst} />}
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{plural(n, "product")} affected</span>
+      </>
+    );
+  } else if (kind === "noeffect") {
+    right = <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{s.direction === "eases" ? "Eases supply" : "No products affected"}</span>;
+  } else {
+    right = (
+      <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", textTransform: "capitalize" }}>
+        {s.status === "approved" ? "Buffer active" : s.status}
+      </span>
+    );
+  }
+  return (
+    <button type="button" onClick={onOpen} aria-expanded="false" className="ms-btn" style={{
+      display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", marginTop: 8, padding: "12px 14px",
+      border: "1px solid var(--border)", borderRadius: 12, background: kind === "decided" ? "var(--surface-2)" : "var(--card-bg)",
+      color: "var(--text-primary)", cursor: "pointer",
+    }}>
+      <ChevronRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} aria-hidden />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 600 }}>
+          {s.published_at} · {EVENT_LABEL[s.event_type] || s.event_type} · {s.country_of_origin || s.supplier}
+        </span>
+        <span style={{ display: "block", fontSize: "var(--text-base)", fontWeight: 600, lineHeight: 1.35, marginTop: 2 }}>{s.headline}</span>
+      </span>
+      <span style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, textAlign: "right" }}>{right}</span>
+    </button>
+  );
+}
+
+// A titled group of signals. Collapsible groups keep their count visible when folded, and their one
+// bulk action (if any) beside the title, so it can be used without opening the group.
+function Group({ title, count, hint, open, onToggle, action, children }) {
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        {onToggle ? (
+          <button type="button" onClick={onToggle} aria-expanded={open} className="ms-btn" style={{
+            display: "inline-flex", alignItems: "center", gap: 6, padding: 0, background: "none", border: "none", cursor: "pointer",
+            fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)",
+          }}>
+            {open ? <ChevronDown size={14} aria-hidden /> : <ChevronRight size={14} aria-hidden />}
+            {title} · {count}
+          </button>
+        ) : (
+          <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)" }}>{title} · {count}</div>
+        )}
+        {action}
+      </div>
+      {hint && <div style={{ marginTop: 4, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{hint}</div>}
+      {(!onToggle || open) && children}
+    </div>
+  );
+}
+
+function SignalCard({ s, busy, onDecide, onCorrect, meta, onCollapse }) {
   const a = s.assessment;
   const eases = s.direction === "eases";
   const affected = a.exposures.length;
@@ -221,7 +302,7 @@ function SignalCard({ s, busy, onDecide, onCorrect, meta }) {
 
   return (
     <div style={{
-      border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", marginTop: 14,
+      border: "1px solid var(--border)", borderRadius: 14, padding: "16px 18px", marginTop: 8,
       background: decided ? "var(--surface-2)" : "var(--card-bg)", opacity: s.status === "dismissed" ? 0.7 : 1,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
@@ -230,9 +311,19 @@ function SignalCard({ s, busy, onDecide, onCorrect, meta }) {
           {s.origin === "replay" && <span style={{ marginLeft: 8, color: "var(--purple-text)" }}>Past event, replayed</span>}
           {s.origin === "live" && <span style={{ marginLeft: 8, color: "var(--blue-text)" }}>Live news</span>}
         </div>
-        {decided && (
-          <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", textTransform: "capitalize" }}>{s.status}</span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {decided && (
+            <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", textTransform: "capitalize" }}>{s.status}</span>
+          )}
+          {onCollapse && (
+            <button type="button" onClick={onCollapse} aria-expanded="true" className="ms-btn" style={{
+              display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 0", background: "none", border: "none", cursor: "pointer",
+              fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)",
+            }}>
+              Show less <ChevronUp size={14} aria-hidden />
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ fontSize: "var(--text-base)", fontWeight: 700, marginTop: 6, lineHeight: 1.35 }}>{s.headline}</div>
@@ -314,6 +405,12 @@ function SignalCard({ s, busy, onDecide, onCorrect, meta }) {
           )}
         </div>
       )}
+      {s.status === "dismissed" && (
+        <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>Dismissed. Nothing was changed.</span>
+          <Btn disabled={busy} onClick={() => onDecide(s.id, "reopen")}>Reopen</Btn>
+        </div>
+      )}
       {s.status === "approved" && (
         <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "center" }}>
           <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>Buffer is active in the reorder points.</span>
@@ -381,14 +478,70 @@ export default function MarketSignals() {
   const [mode, setMode] = useState("live");
   const [windowChoice, setWindowChoice] = useState("14"); // a preset's value, or "custom"
   const [customDays, setCustomDays] = useState("10");
+  // Which signal is open as a full card. undefined = the first one needing a decision opens itself, so the
+  // list always starts on the thing to do; null = the reader closed everything; an id = that one.
+  const [openId, setOpenId] = useState(undefined);
+  const [showNoEffect, setShowNoEffect] = useState(false);
+  const [showDecided, setShowDecided] = useState(false);
+  const [undo, setUndo] = useState(null); // { ids } while "Acknowledge all" can still be taken back
+  const undoTimer = useRef(null);
+  useEffect(() => () => clearTimeout(undoTimer.current), []);
 
   useEffect(() => {
     api.getMarketSignals().then(setData).catch((e) => setError(e.message));
   }, []);
 
-  const run = async (fn) => {
+  const run = async (fn, { reveal: wantReveal = false } = {}) => {
     setBusy(true); setError(null); setNeedsDemo(false);
-    try { setData(await fn()); } catch (e) { setError(e.message); setNeedsDemo(!!e.needsDemo); } finally { setBusy(false); }
+    try {
+      const before = data?.signals || [];
+      const d = await fn();
+      setData(d);
+      if (wantReveal) reveal(before, d);
+    } catch (e) { setError(e.message); setNeedsDemo(!!e.needsDemo); } finally { setBusy(false); }
+  };
+
+  // A signal that was just added must not vanish into a folded group, or "Run this event" would look like it
+  // did nothing. Open the group it landed in, and the card itself.
+  const reveal = (before, after) => {
+    const seen = new Set(before.map((x) => x.id));
+    const fresh = (after.signals || []).filter((x) => !seen.has(x.id)).sort(byUrgencyThenDate);
+    if (!fresh.length) return;
+    const first = fresh.find((x) => kindOf(x) === "needs") || fresh[0];
+    if (kindOf(first) === "noeffect") setShowNoEffect(true);
+    if (kindOf(first) === "decided") setShowDecided(true);
+    setOpenId(first.id);
+  };
+
+  // After a decision, the next signal needing one opens on its own (a reopened one opens itself instead).
+  const decide = (id, decision) => run(async () => {
+    const r = await api.decideSignal(id, decision);
+    setOpenId(decision === "reopen" ? id : undefined);
+    return r;
+  });
+
+  const offerUndo = (ids) => {
+    clearTimeout(undoTimer.current);
+    setUndo({ ids });
+    undoTimer.current = setTimeout(() => setUndo(null), 12000);
+  };
+  // Acknowledge everything in the group, one by one (there is no bulk endpoint, and each is audited). If one
+  // fails part way, the ones that went through are kept and offered for undo, and the error is shown.
+  const acknowledgeAll = async (list) => {
+    setBusy(true); setError(null); setNeedsDemo(false);
+    const done = [];
+    let last = null;
+    try {
+      for (const x of list) { last = await api.decideSignal(x.id, "dismiss"); done.push(x.id); }
+    } catch (e) { setError(e.message); setNeedsDemo(!!e.needsDemo); }
+    finally { if (last) setData(last); setBusy(false); }
+    if (done.length) { setOpenId(undefined); offerUndo(done); }
+  };
+  const undoAcknowledge = () => {
+    const ids = undo.ids;
+    clearTimeout(undoTimer.current);
+    setUndo(null);
+    run(async () => { let last = null; for (const id of ids) last = await api.decideSignal(id, "reopen"); return last; });
   };
 
   const limits = data?.scan_days || { min: 1, max: 30, default: 14 };
@@ -399,8 +552,10 @@ export default function MarketSignals() {
     if (!daysOk) return;
     setBusy(true); setScanning(true); setError(null); setNeedsDemo(false); setScanNote(null);
     try {
+      const before = signals;
       const d = await api.scanSignals(days);
       setData(d);
+      reveal(before, d);
       const s = d.scan;
       setScanNote(
         `Checked ${s.fetched} headlines from the last ${days} ${dayWord(days)} in ${s.seconds} seconds: ${s.added} new, ${s.merged} merged into existing stories, ` +
@@ -414,6 +569,15 @@ export default function MarketSignals() {
   const signals = data?.signals || [];
   const isPast = (x) => x.origin === "replay";
   const shown = signals.filter((x) => (mode === "past" ? isPast(x) : !isPast(x)));
+  const needs = shown.filter((x) => kindOf(x) === "needs").sort(byUrgencyThenDate);
+  const noEffect = shown.filter((x) => kindOf(x) === "noeffect");
+  const decidedList = shown.filter((x) => kindOf(x) === "decided");
+  const activeBuffers = decidedList.filter((x) => x.status === "approved").length;
+  const effectiveOpen = openId === undefined ? needs[0]?.id : openId;
+  const item = (x) => (effectiveOpen === x.id
+    ? <SignalCard key={x.id} s={x} busy={busy} meta={data} onCollapse={() => setOpenId(null)} onDecide={decide}
+        onCorrect={(id, body) => run(() => api.correctSignal(id, body))} />
+    : <SignalRow key={x.id} s={x} kind={kindOf(x)} onOpen={() => setOpenId(x.id)} />);
   const waiting = {
     live: signals.filter((x) => !isPast(x) && x.status === "pending").length,
     past: signals.filter((x) => isPast(x) && x.status === "pending").length,
@@ -481,7 +645,7 @@ export default function MarketSignals() {
                   )}
                   {/* One primary per surface: this leads only while nothing waits for a decision; once a
                       signal is pending, its own Add buffer button is the primary action. */}
-                  <Btn primary={shown.every((x) => x.status !== "pending")} disabled={busy || !daysOk} onClick={scan}>
+                  <Btn primary={needs.length === 0} disabled={busy || !daysOk} onClick={scan}>
                     {scanning ? "Reading the news..." : "Scan the news"}
                   </Btn>
                 </div>
@@ -515,8 +679,8 @@ export default function MarketSignals() {
                     <option value="">{catalog.length ? "Choose an event..." : "Every past event is already loaded"}</option>
                     {catalog.map((c) => <option key={c.fixture_id} value={c.fixture_id}>{c.published_at} · {c.headline}</option>)}
                   </select>
-                  <Btn primary={shown.every((x) => x.status !== "pending")} disabled={busy || !pick} title={pick ? undefined : "Choose a past event first"}
-                    onClick={() => run(async () => { const d = await api.replaySignal(pick); setPick(""); return d; })}>
+                  <Btn primary={needs.length === 0} disabled={busy || !pick} title={pick ? undefined : "Choose a past event first"}
+                    onClick={() => run(async () => { const d = await api.replaySignal(pick); setPick(""); return d; }, { reveal: true })}>
                     Run this event
                   </Btn>
                 </div>
@@ -534,13 +698,8 @@ export default function MarketSignals() {
                 <li><strong>You decide.</strong> Add a safety buffer, or dismiss it. Nothing is ordered for you.</li>
               </ol>
             </div>
-          ) : (
-            <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid var(--border)", fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-              {mode === "past" ? "Past events you have run" : "Live news signals"} · {shown.length}
-            </div>
-          )}
-          {signals.length > 0 && shown.length === 0 && (
-            <div style={{ marginTop: 10, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+          ) : shown.length === 0 ? (
+            <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid var(--border)", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
               {mode === "past"
                 ? "You have not run a past event yet. Choose one above to see what the advice would have been."
                 : "No live signals yet. Scan the news to check today's headlines."}
@@ -548,11 +707,41 @@ export default function MarketSignals() {
                 <> {waiting[mode === "past" ? "live" : "past"]} in {mode === "past" ? "Live news" : "Past events"} still {waiting[mode === "past" ? "live" : "past"] === 1 ? "waits" : "wait"} for your decision.</>
               )}
             </div>
-          )}
+          ) : (
+            <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+              <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                {plural(shown.length, "signal")}
+                {": "}
+                {[
+                  needs.length && `${needs.length} ${needs.length === 1 ? "needs" : "need"} a decision`,
+                  noEffect.length && `${noEffect.length} ${noEffect.length === 1 ? "does not" : "do not"} affect your stock`,
+                  decidedList.length && `${decidedList.length} decided`,
+                ].filter(Boolean).join(", ")}
+              </div>
+              {undo && (
+                <div role="status" style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, padding: "8px 12px", borderRadius: 10, background: "var(--surface-2)", fontSize: "var(--text-sm)", flexWrap: "wrap" }}>
+                  <span>Acknowledged {plural(undo.ids.length, "signal")}.</span>
+                  <button type="button" onClick={undoAcknowledge} disabled={busy} className="ms-btn" style={{ padding: "2px 4px", background: "none", border: "none", cursor: "pointer", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--blue-text)" }}>Undo</button>
+                </div>
+              )}
 
-          {shown.map((s) => (
-            <SignalCard key={s.id} s={s} busy={busy} meta={data} onDecide={(id, d) => run(() => api.decideSignal(id, d))} onCorrect={(id, body) => run(() => api.correctSignal(id, body))} />
-          ))}
+              <Group title="Needs a decision" count={needs.length} hint={needs.length === 0 ? "Nothing here needs a decision." : null}>
+                {needs.map(item)}
+              </Group>
+              {noEffect.length > 0 && (
+                <Group title="No effect on your stock" count={noEffect.length} open={showNoEffect} onToggle={() => setShowNoEffect((v) => !v)}
+                  action={<Btn disabled={busy} title="Marks these as seen. Nothing is changed, and you can undo it." onClick={() => acknowledgeAll(noEffect)}>Acknowledge all</Btn>}>
+                  {noEffect.map(item)}
+                </Group>
+              )}
+              {decidedList.length > 0 && (
+                <Group title="Decided" count={decidedList.length} open={showDecided} onToggle={() => setShowDecided((v) => !v)}
+                  hint={activeBuffers > 0 ? `${plural(activeBuffers, "buffer")} active in your reorder points.` : null}>
+                  {decidedList.map(item)}
+                </Group>
+              )}
+            </div>
+          )}
 
           {data.playbook && (
             <details style={{ marginTop: 16 }}>
