@@ -33,12 +33,16 @@ Four deliverables. Status as of 15 Sep.
 |---|---|---|
 | When does stock become "At Risk"? | **A.** keep the code: bands scaled to each product's own holding limit (At Risk from 90% of the limit). **B.** follow requirements.md REQ-08: fixed day bands (At Risk from day 271 for every product). Nothing changes on today's data; it matters for short-life products (Brown Rice's 180 day limit: A warns at day 162, B at day 271) | design.md, "Supporting Formulas", ageing status |
 
+| Seeded "India non-basmati export restriction" risk event buffers basmati SKUs, unscoped | **A.** scope it to non-basmati (matches the real 2023 ban). **B.** leave it | design.md, "Market Signals" |
+| Should a market signal's "order at least X MT" feed an order request? | **A.** yes, prefilled for the buyer, person still sends. **B.** keep them separate | not built |
+
 ## To do, not blocked
 
 - **Recapture two features-guide screenshots** that show old versions: `docs/Guide/images/11-inventory.jpg`
   (the table before the Edit button fix) and `16-why.jpg` (the summary before urgency wording was
   removed). Then rebuild the PDF: `python3 docs/Guide/build-pdf.py`.
-- **Goods Out screens** (optional before submission): the API exists; Home shows the card as "Coming soon".
+- **Check the merged app once in a browser** (20 Sep): Onboarding's opening balance step (new route, tested on a scratch database only) and the Request order modal, then reseed.
+- **Show Tawmo the merge** (PR #5, 20 Sep): if she wants changes, fix on a new branch; undo is `git revert -m 1 15153c4`.
 
 ## Decisions already made
 
@@ -54,6 +58,8 @@ Four deliverables. Status as of 15 Sep.
 | Formulas where the spec and the code disagreed | lost sales are not sales; Slow Moving means over 120 days of cover; one demand rate, the 30 day moving average, across the whole app (15 Sep) | each conflict, choice and reason: design.md, "Formula decisions" |
 | Urgency in model summaries | removed by a rule after the model answers, not by retries (15 Sep) | free and predictable; design.md, "Explanation Layer", Tone |
 | How documents and rules are kept | filed by reader, listed in `docs/DIRECTORY.md`, every rule in `.kiro/steering/rules.md`, one owner per fact (15 Sep) | `.kiro/steering/rules.md` |
+| Duties split and opening balance (20 Sep) | the office writes no stock; stock moves on the warehouse floor. Onboarding's first count uses one audited, once-per-product action (OB-0001, movement type OPENING) allowed only where on hand is 0 | keeps the office from topping up live stock while still letting a new catalogue start; requirements.md, REQ-11 |
+| Public-server writes (20 Sep) | stock movements, order requests, signal decisions and opening balances are accepted only in the demo sandbox unless ALLOW_LIVE_WAREHOUSE_WRITES=1 | `backend/src/middleware/sandboxGuard.js` |
 | Onboarding shape | sequential, story-style (progress bar, Back, Skip advances/exits); no "minimize and resume from anywhere" chip (17 Sep) | reversed an earlier decision in the same feature branch; nothing to resume into once a skip just means finishing setup later through Inventory or Bulk edit like any other data entry |
 | Onboarding order: catalog before sales, never the reverse (17 Sep) | catalog-first stays; someone with both files ready can attach sales to the SAME upload instead of a separate step | a sales row has no product_name, variety, origin, packaging or supplier to build a catalog row FROM - reversing the order would mean SKUs created with a reorder policy and safety stock of 0, which reads as healthy everywhere, not as unconfigured |
 | Forecast Overview promoted to Sidebar's permanent nav, between Dashboard and Inventory (17 Sep) | a decision held open since design.md first shipped the page ("MVP2 is still a feature branch") | the approve/modify/reject decision for a suggested reorder point stays on Alerts only - Forecast explains and simulates, it does not also duplicate the decision |

@@ -258,7 +258,9 @@ endpoint list**; this is the shape as of 15 Sep.
 - Alerts and decisions: `GET /api/alerts`, `POST /api/alerts/:id/acknowledge`, `GET /api/decisions`,
   `POST /api/decisions`
 - Order requests (Reorder Loop step 7, the Control Tower's one write, no stock change):
-  `POST /api/order-requests`, `GET /api/order-requests`. (`POST /api/inventory/restock` was removed
+  `POST /api/order-requests`, `GET /api/order-requests`, `PATCH /api/order-requests/:id`. Onboarding's
+  one-time first count: `POST /api/skus/opening-balance` (zero-stock products only, once each,
+  movement type OPENING). (`POST /api/inventory/restock` was removed
   here when the duties were separated: the office no longer writes stock; stock moves only on the
   warehouse floor.)
 - Explanations: `POST /api/alerts/explain`, `GET /api/llm/mode`, `POST /api/llm/unlock`
