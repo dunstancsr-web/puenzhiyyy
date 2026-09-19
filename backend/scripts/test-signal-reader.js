@@ -47,6 +47,18 @@ const deps = (reply, o = {}) => ({ chatFn: fakeChat(reply), resolveTierFn: local
     assert.strictEqual(r.errors.length, 1);
   });
   await check("one query per origin plus a general one", () => assert.strictEqual(feed.buildQueries(["India", "Thailand"]).length, 3));
+  await check("the search window follows the days asked for, and defaults to 14", () => {
+    assert.ok(feed.buildQueries(["India"], 3).every((q) => q.endsWith("when:3d")));
+    assert.ok(feed.buildQueries(["India"]).every((q) => q.endsWith("when:14d")));
+  });
+  await check("the age filter follows maxAgeDays", async () => {
+    const now = Date.UTC(2026, 8, 19);
+    const fetchImpl = async () => ({ ok: true, text: async () => XML });
+    const wide = await feed.fetchHeadlines(["a"], { fetchImpl, now, pauseMs: 0, maxAgeDays: 365 });
+    const narrow = await feed.fetchHeadlines(["a"], { fetchImpl, now, pauseMs: 0, maxAgeDays: 0 });
+    assert.strictEqual(wide.items.length, 2);
+    assert.strictEqual(narrow.items.length, 0);
+  });
 
   console.log("stage 1: the candidate filter (real headlines from 19 Sep)");
   await check("keeps rice supply news naming an origin", () => assert.strictEqual(R.candidateFilter(item("India sets minimum export price on basmati rice"), ctx).keep, true));

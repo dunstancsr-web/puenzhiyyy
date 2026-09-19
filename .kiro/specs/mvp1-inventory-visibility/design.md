@@ -594,8 +594,14 @@ points, so it was left as is.
 fixed shape. Files: `signals/feed.js`, `signals/reader.js`, tests `test-signal-reader.js`, measurement
 `bench-signal-reader.js`.
 
-- **Feed:** Google News RSS search, one query per origin bought from plus one general query, spaced, 21 day
-  window, deduplicated. Unofficial route, terms of automated use NOT checked. GDELT was tried first and
+- **Feed:** Google News RSS search, one query per origin bought from plus one general query, spaced,
+  deduplicated. The look-back is chosen per scan as a whole number of days, 1 to 30, default 14
+  (`SCAN_DAYS` in `routes/signals.js`, which also sends the limits to the page, so the server is the one
+  owner; a bad value is refused with 400 before the cooldown is used). The search asks for that many days
+  and items older than the window plus 7 days are dropped. The ceiling is 30 because one scan reads at most
+  16 headlines, so a longer window mostly adds older stories that wait for the next scan. (This section
+  said "21 day window" until 20 Sep; the query had always asked for 14.) Unofficial route, terms of
+  automated use NOT checked. GDELT was tried first and
   answered 429 (one request per five seconds).
 - **Reader, three stages.** (1) A keyword filter (rice words, an origin or general exporter word, a
   market-moving word) discards most headlines with no model call. (2) A LOCAL model (`SIGNAL_READER_MODEL`,

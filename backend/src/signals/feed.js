@@ -28,11 +28,11 @@ const decode = (s) =>
     .replace(/\s+/g, " ")
     .trim();
 
-/** One query per origin we import from, plus one general one, each looking back 14 days. */
-function buildQueries(origins) {
+/** One query per origin we import from, plus one general one, each looking back `days` (default 14). */
+function buildQueries(origins, days = 14) {
   const terms = "(export OR ban OR duty OR quota OR flood OR typhoon OR drought OR port OR strike OR price OR shortage)";
-  const qs = origins.map((o) => `rice ${o} ${terms} when:14d`);
-  qs.push(`rice exporters restrictions OR "export ban" OR "export duty" when:14d`);
+  const qs = origins.map((o) => `rice ${o} ${terms} when:${days}d`);
+  qs.push(`rice exporters restrictions OR "export ban" OR "export duty" when:${days}d`);
   return qs;
 }
 
@@ -61,7 +61,7 @@ function parseRss(xml) {
  * Fetch every query in turn (spaced, never in parallel) and return one deduplicated,
  * newest-first list. A failed query is skipped and reported, not fatal.
  */
-async function fetchHeadlines(queries, { fetchImpl = fetch, now = Date.now(), pauseMs = 400, timeoutMs = 8000 } = {}) {
+async function fetchHeadlines(queries, { fetchImpl = fetch, now = Date.now(), pauseMs = 400, timeoutMs = 8000, maxAgeDays = MAX_ITEM_AGE_DAYS } = {}) {
   const seen = new Set();
   const items = [];
   const errors = [];
@@ -73,7 +73,7 @@ async function fetchHeadlines(queries, { fetchImpl = fetch, now = Date.now(), pa
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       for (const it of parseRss(await res.text())) {
-        if (now - it.published_ms > MAX_ITEM_AGE_DAYS * DAY_MS) continue;
+        if (now - it.published_ms > maxAgeDays * DAY_MS) continue;
         const key = it.link || it.title.toLowerCase();
         if (seen.has(key)) continue;
         seen.add(key);

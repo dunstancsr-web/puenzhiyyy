@@ -36,6 +36,10 @@ const SIGNAL_READER_MODEL = process.env.SIGNAL_READER_MODEL || "llama3.1:8b";
 const SCAN_COOLDOWN_MS = 45_000;   // a public server must not let a button hammer a news site and a model
 const MAX_MODEL_READS = 16;        // per scan (about 20 seconds on the local model); the rest wait for the next one
 const SCAN_BUDGET_MS = 75_000;
+// How far back a scan may look, in whole days. The page reads these limits from the server (see the
+// payload below), so there is one owner. A month is the ceiling because a scan reads at most
+// MAX_MODEL_READS headlines: a longer window mostly finds older stories that wait for the next scan.
+const SCAN_DAYS = { min: 1, max: 30, default: 14 };
 let lastScanAt = 0;
 let scanning = false;
 
@@ -82,7 +86,7 @@ function listSignals(db) {
     .filter((e) => !loaded.has(e.fixture_id))
     .map(({ fixture_id, published_at, headline, source_name }) => ({ fixture_id, published_at, headline, source_name }));
   const origins = [...new Set(skus.map((k) => k.country_of_origin).filter(Boolean))];
-  return { signals, catalog, playbook: PLAYBOOK, max_buffer_days: MAX_BUFFER_DAYS, origins, event_types: EVENT_TYPES, severities: SEVERITIES, directions: DIRECTIONS };
+  return { signals, catalog, playbook: PLAYBOOK, max_buffer_days: MAX_BUFFER_DAYS, scan_days: SCAN_DAYS, origins, event_types: EVENT_TYPES, severities: SEVERITIES, directions: DIRECTIONS };
 }
 
 router.get("/market-signals", (req, res) => {
@@ -124,6 +128,11 @@ router.post("/market-signals/replay", sandboxOnlyWhenPublic, (req, res) => {
 //   signals. Nothing is accepted and nothing is ordered here. The paid tier is
 //   unreachable from this route (see signals/reader.js).
 router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
+  // Checked first, so a bad request neither starts a scan nor uses up the cooldown.
+  const days = req.body?.days == null ? SCAN_DAYS.default : Number(req.body.days);
+  if (!Number.isInteger(days) || days < SCAN_DAYS.min || days > SCAN_DAYS.max) {
+    return res.status(400).json({ success: false, message: `Choose a whole number of days from ${SCAN_DAYS.min} to ${SCAN_DAYS.max}.` });
+  }
   const wait = SCAN_COOLDOWN_MS - (Date.now() - lastScanAt);
   if (scanning) return res.status(409).json({ success: false, message: "A scan is already running." });
   if (wait > 0) return res.status(429).json({ success: false, message: `Scanned a moment ago. Try again in ${Math.ceil(wait / 1000)} seconds.` });
@@ -138,7 +147,7 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
       return res.status(400).json({ success: false, message: "Add products first: the scan looks for news about the countries you buy from." });
     }
 
-    const { items, errors } = await fetchHeadlines(buildQueries(ctx.origins));
+    const { items, errors } = await fetchHeadlines(buildQueries(ctx.origins, days), { maxAgeDays: days + 7 });
     const hash = (it) => crypto.createHash("sha1").update(it.link).digest("hex").slice(0, 16);
     const seenStmt = db.prepare(`SELECT 1 FROM signal_seen WHERE url_hash = ?`);
     const markSeen = db.prepare(`INSERT OR IGNORE INTO signal_seen (url_hash, verdict) VALUES (?, ?)`);
