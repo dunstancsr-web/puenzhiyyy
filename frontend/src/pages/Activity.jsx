@@ -41,6 +41,7 @@ const TYPE_META = {
   // Handheld floor movements (TASK-46). Until 15 Sep these had no entry and
   // rendered as the raw event code with no detail and no filter chip.
   GOODS_RECEIVED:     { icon: ArrowDownToLine,   color: "var(--green-text)",  label: "Goods in" },
+  OPENING_BALANCE_SET: { icon: PackagePlus,    color: "var(--green-text)",  label: "Opening balance" },
   GOODS_ISSUED:       { icon: ArrowUpFromLine,   color: "var(--orange-text)", label: "Goods out" },
   // TASK-90. Unlocking is a spending decision and reads like one; a lockout is
   // the only security event in this log, so it takes the alarm colour.
@@ -58,7 +59,7 @@ const TYPE_META = {
 // story rather than as a legend.
 const TYPE_ORDER = [
   "ALERT_TRIGGERED", "DECISION_RECORDED", "ORDER_REQUESTED", "LLM_CALL",
-  "GOODS_RECEIVED", "GOODS_ISSUED", "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
+  "OPENING_BALANCE_SET", "GOODS_RECEIVED", "GOODS_ISSUED", "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
   "SALES_HISTORY_IMPORTED", "SIGNAL_DECIDED", "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT",
 ];
 
@@ -205,6 +206,12 @@ function describe(event) {
       if (o.on_hand_before != null && o.on_hand_after != null) parts.push(`On hand went ${num(o.on_hand_before)} to ${num(o.on_hand_after)} MT.`);
       return { headline: `Received ${num(i.received_qty)} MT of ${sku}`, detail: parts.join(" ") };
     }
+
+    case "OPENING_BALANCE_SET":
+      return {
+        headline: `Opening balance of ${num(i.quantity_mt)} MT set for ${sku}`,
+        detail: `${o.movement_no || "Opening balance"}, entered during onboarding for a product with no stock. On hand went ${num(i.on_hand_before)} to ${num(o.on_hand_after)} MT.`,
+      };
 
     case "SIGNAL_DECIDED": {
       const verb = { approve: "Accepted", dismiss: "Dismissed", withdraw: "Withdrew", edit: "Corrected the reading of" }[i.decision] || "Decided";

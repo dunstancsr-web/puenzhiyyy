@@ -77,11 +77,10 @@ export const api = {
   getSku: (id) => request(`/skus/${id}`),
   createSku: (body) => request("/skus", { method: "POST", body }),
   updateSku: (id, body) => request(`/skus/${id}`, { method: "PUT", body }),
-  // PENDING DECISION (see the integration note in the devlog): the backend route this calls
-  // was removed with the duties split, so it answers 404. Onboarding's opening balance step
-  // still uses it until an audited one-time opening balance action replaces it.
-  restockSku: (skuId, quantity) =>
-    request("/inventory/restock", { method: "POST", body: { sku_id: skuId, quantity } }),
+  // Onboarding's one-time starting count for a product with no stock yet. Audited, once per
+  // product, refused if stock already exists (the office cannot top up a live balance).
+  setOpeningBalance: (skuId, quantity) =>
+    request("/skus/opening-balance", { method: "POST", body: { sku_id: skuId, quantity } }),
   getOpeningBalanceSuggestions: () => request("/skus/opening-balance-suggestions"),
   // Reorder Loop step 7: the one write the Control Tower may trigger. Records a
   // request to the buyer, never a stock change. (The old restockSku, which

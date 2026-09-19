@@ -35,6 +35,9 @@ const EVENTS = Object.freeze({
   // real order) or cancelled. Still no stock change - stock only moves when the
   // warehouse later receives against the resulting order.
   ORDER_REQUEST_UPDATED: "ORDER_REQUEST_UPDATED",
+  // Onboarding's one-time starting count for a product that has no stock yet. Audited and
+  // recorded as its own movement type (OPENING), so it is never mistaken for a delivery.
+  OPENING_BALANCE_SET: "OPENING_BALANCE_SET",
   ALERT_TRIGGERED: "ALERT_TRIGGERED",
   ALERT_ACKNOWLEDGED: "ALERT_ACKNOWLEDGED",
   DECISION_RECORDED: "DECISION_RECORDED",

@@ -198,7 +198,7 @@ export default function Onboarding() {
   // (that would contradict on_hand_qty's own documented status as a mutable
   // snapshot, project-context.md). So Continue leads here instead of straight
   // to Home: one short "what do you actually have right now" step, additive
-  // onto the 0 baseline via the same POST /inventory/restock the rest of the
+  // onto the 0 baseline via the audited POST /skus/opening-balance the rest of the
   // app already uses for a real stock receipt - no new backend logic, just
   // reusing it during onboarding.
   const [balanceSkus, setBalanceSkus] = useState(null);
@@ -226,7 +226,7 @@ export default function Onboarding() {
     }
   }, []);
 
-  // Blank/zero entries are left at 0, not sent - POST /inventory/restock
+  // Blank/zero entries are left at 0, not sent - POST /skus/opening-balance
   // itself refuses a non-positive quantity, so this just skips the request
   // rather than relying on the backend to reject it silently per row.
   const submitBalances = useCallback(async () => {
@@ -234,7 +234,7 @@ export default function Onboarding() {
     try {
       const entries = Object.entries(balances).filter(([, v]) => Number(v) > 0);
       for (const [sku_id, v] of entries) {
-        await api.restockSku(sku_id, Number(v));
+        await api.setOpeningBalance(sku_id, Number(v));
       }
       setAnalysis(await api.getSkus());
       setBalanceSkus(null);

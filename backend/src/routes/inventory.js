@@ -135,6 +135,61 @@ router.get("/skus/opening-balance-suggestions", (req, res) => {
   }
 });
 
+// POST /api/skus/opening-balance  { sku_id, quantity }
+// The one way onboarding puts a first count on the shelf, replacing the office restock removed
+// with the duties split. It is deliberately narrow so it cannot become that restock again:
+//   - only a product with NO stock yet (on hand is 0), so it can never top up a live balance;
+//   - only once per product (a second call is refused with 409);
+//   - recorded as its own movement type, OPENING (OB-0001), never as a RECEIPT, so it is not
+//     mistaken for a delivery and does not feed the opening-balance suggestion;
+//   - audited (OPENING_BALANCE_SET) with who and when, and refused on a public server outside
+//     the demo sandbox like every other write.
+// Once a product has stock, it changes only on the warehouse floor.
+router.post("/skus/opening-balance", sandboxOnlyWhenPublic, (req, res) => {
+  const { sku_id, quantity } = req.body || {};
+  if (!sku_id) return res.status(400).json({ success: false, message: "sku_id is required" });
+  const qty = Number(quantity);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return res.status(400).json({ success: false, message: "quantity must be a positive number" });
+  }
+  try {
+    const db = getDb();
+    const pos = db.prepare(`SELECT on_hand_qty FROM inventory_positions WHERE sku_id = ?`).get(sku_id);
+    if (!pos) return res.status(404).json({ success: false, message: "SKU not found" });
+    if (Number(pos.on_hand_qty) > 0) {
+      return res.status(409).json({ success: false, message: "This product already has stock. From here on it changes only when the warehouse receives or dispatches goods." });
+    }
+    const done = db.prepare(`SELECT movement_no FROM goods_movements WHERE sku_id = ? AND movement_type = 'OPENING'`).get(sku_id);
+    if (done) {
+      return res.status(409).json({ success: false, message: `An opening balance was already recorded for this product (${done.movement_no}).` });
+    }
+    const last = db.prepare(`SELECT movement_no FROM goods_movements WHERE movement_type = 'OPENING' ORDER BY id DESC LIMIT 1`).get();
+    const n = last ? Number(String(last.movement_no).split("-")[1]) + 1 : 1;
+    const movementNo = `OB-${String(n).padStart(4, "0")}`;
+    const day = new Date().toISOString().slice(0, 10);
+
+    db.transaction(() => {
+      db.prepare(`UPDATE inventory_positions SET on_hand_qty = ?, last_received_date = ?, last_updated = datetime('now') WHERE sku_id = ?`)
+        .run(qty, day, sku_id);
+      db.prepare(`
+        INSERT INTO goods_movements (movement_no, movement_type, reference, sku_id, expected_qty, actual_qty, variance_qty, operator_name)
+        VALUES (?, 'OPENING', 'opening balance', ?, NULL, ?, 0, 'onboarding')`).run(movementNo, sku_id, qty);
+    })();
+
+    const { skus } = buildAnalytics(db);
+    const after = skus.find((x) => x.sku_id === sku_id);
+    logEvent(EVENTS.OPENING_BALANCE_SET, {
+      skuId: sku_id,
+      input: { quantity_mt: qty, on_hand_before: pos.on_hand_qty, at: new Date().toISOString() },
+      output: { movement_no: movementNo, on_hand_after: qty, available_qty: after ? after.available_qty : null, health_status: after ? after.health_status : null },
+    });
+    res.status(201).json({ success: true, data: after });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to record the opening balance" });
+  }
+});
+
 // GET /api/skus/:id — single SKU, fully computed
 router.get("/skus/:id", (req, res) => {
   try {
