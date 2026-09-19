@@ -52,7 +52,11 @@ async function request(path, options = {}) {
   }
 
   if (!res.ok || body.success === false) {
-    throw new Error(body.message || `Request failed (${res.status})`);
+    const err = new Error(body.message || `Request failed (${res.status})`);
+    // The server refused a write because this visitor is not in the demo sandbox;
+    // the handheld uses this to offer a one tap join (see JoinDemo).
+    if (body.needs_demo) err.needsDemo = true;
+    throw err;
   }
   return body.data;
 }
@@ -63,16 +67,34 @@ export const api = {
   // production), so no extra fetch option is needed for the demo cookie to
   // round-trip correctly.
   getDemoStatus: () => request("/demo/status"),
+  getDataVersion: () => request("/data-version"),
   enterDemoMode: () => request("/demo/enter", { method: "POST" }),
   exitDemoMode: () => request("/demo/exit", { method: "POST" }),
+  seedSampleData: () => request("/demo/seed-sample", { method: "POST" }),
 
   // SKUs
   getSkus: () => request("/skus"),
   getSku: (id) => request(`/skus/${id}`),
   createSku: (body) => request("/skus", { method: "POST", body }),
   updateSku: (id, body) => request(`/skus/${id}`, { method: "PUT", body }),
-  restockSku: (skuId, quantity) =>
-    request("/inventory/restock", { method: "POST", body: { sku_id: skuId, quantity } }),
+  // Onboarding's one-time starting count for a product with no stock yet. Audited, once per
+  // product, refused if stock already exists (the office cannot top up a live balance).
+  setOpeningBalance: (skuId, quantity) =>
+    request("/skus/opening-balance", { method: "POST", body: { sku_id: skuId, quantity } }),
+  getOpeningBalanceSuggestions: () => request("/skus/opening-balance-suggestions"),
+  // Reorder Loop step 7: the one write the Control Tower may trigger. Records a
+  // request to the buyer, never a stock change. (The old restockSku, which
+  // added on-hand stock from the office, was removed when the duties were
+  // separated - stock now moves only on the warehouse floor.)
+  raiseOrderRequest: (body) => request("/order-requests", { method: "POST", body }),
+  getOrderRequests: (params) => {
+    const q = new URLSearchParams(params || {}).toString();
+    return request(`/order-requests${q ? `?${q}` : ""}`);
+  },
+  // Reorder Loop step 7 follow-through: a buyer closes an open request by
+  // marking it ordered or cancelled. Still no stock change.
+  updateOrderRequest: (id, status) =>
+    request(`/order-requests/${id}`, { method: "PATCH", body: { status } }),
   getSkuProjection: (id) => request(`/skus/${id}/projection`),
 
   // Forecasting (MVP2 Day 5). getSkuForecast returns { history, forecast } -
@@ -129,7 +151,12 @@ export const api = {
     if (!res.ok) throw new Error("Could not export sales history. Check the backend log.");
     return res.text();
   },
-  importSalesHistoryCsv: (csv, apply) => request("/skus/history/import-sales", { method: "POST", body: { csv, apply } }),
+  // pendingSkus (optional, [{sku_id, product_name}]): onboarding's combined
+  // catalog + sales preview (Onboarding.jsx). SKUs about to be created in
+  // the same action, not yet real, so the preview shouldn't flag them as
+  // unknown or show a placeholder where the real name is already known. See
+  // the route.
+  importSalesHistoryCsv: (csv, apply, pendingSkus) => request("/skus/history/import-sales", { method: "POST", body: { csv, apply, pendingSkus } }),
 
   // Dashboard
   getDashboardStats: () => request("/dashboard/stats"),
@@ -157,6 +184,26 @@ export const api = {
       body: { sku_id: skuId, alert_type: alertType, tier },
     }),
 
+  // Action Items' own "Why?" (19 Sep) - same shape as explainAlert above,
+  // separate endpoint because it explains a different kind of thing
+  // (nearest-stockout / blind-spot rows, not the six alert types).
+  explainActionItem: (skuId, kind, { tier, pass } = {}) =>
+    request("/action-items/explain", {
+      method: "POST",
+      headers: pass ? { "X-Demo-Unlock": pass } : undefined,
+      body: { sku_id: skuId, kind, tier },
+    }),
+
+  // Open-ended follow-up questions (19 Sep) - the model can call a small set
+  // of read-only tools (backend/src/llm/tools.js) to fetch facts about any
+  // SKU, not just the one row a fixed "Why?" already knew about.
+  askDatabase: (question, { tier, pass } = {}) =>
+    request("/ask-database", {
+      method: "POST",
+      headers: pass ? { "X-Demo-Unlock": pass } : undefined,
+      body: { question, tier },
+    }),
+
   // Model tier (TASK-42). What this server can offer. There is no setter since
   // TASK-90: the choice is stored per browser, not on the server.
   getLlmMode: () => request("/llm/mode"),
@@ -173,6 +220,14 @@ export const api = {
   getOutbound: () => request("/warehouse/outbound"),
   pickGoods: (body) => request("/warehouse/outbound/pick", { method: "POST", body }),
   getMovements: () => request("/warehouse/movements"),
+
+  // Market signals: news events assessed against stock. Every call resolves to
+  // { signals, catalog, playbook }, the whole picture after the change.
+  getMarketSignals: () => request("/market-signals"),
+  replaySignal: (fixture_id) => request("/market-signals/replay", { method: "POST", body: { fixture_id } }),
+  decideSignal: (id, decision) => request(`/market-signals/${id}/decision`, { method: "POST", body: { decision } }),
+  scanSignals: () => request("/market-signals/scan", { method: "POST", body: {} }),
+  correctSignal: (id, body) => request(`/market-signals/${id}`, { method: "PATCH", body }),
 
   // Audit log (TASK-31) - every state change the API made, newest first.
   // Resolves to { events, counts }, not a bare array: `counts` is the whole

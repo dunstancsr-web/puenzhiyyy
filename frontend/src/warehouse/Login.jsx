@@ -17,7 +17,13 @@ import { FloorError } from "./Handheld";
 // is labelled as one so nobody mistakes it for a design.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function Login({ onSignedIn, purpose }) {
+// Who may do what. Mirrors requireOperatorRole in backend/src/routes/warehouse.js, which is
+// the real enforcement; checking here as well means a receiving-only operator is told at the
+// PIN step, not after filling in four screens and getting a refusal at Confirm.
+const DUTY_ROLES = { receipt: ["receiving", "both"], issue: ["dispatch", "both"] };
+const DUTY_WORDS = { receipt: "receive stock", issue: "dispatch stock" };
+
+export default function Login({ onSignedIn, purpose, duty }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -41,7 +47,13 @@ export default function Login({ onSignedIn, purpose }) {
     setBusy(true);
     setError(null);
     api.warehouseLogin(pin)
-      .then((op) => onSignedIn(op))
+      .then((op) => {
+        const allowed = duty && DUTY_ROLES[duty];
+        if (allowed && !allowed.includes(op.role)) {
+          throw new Error(`${op.name} is not cleared to ${DUTY_WORDS[duty]}. Ask a ${allowed[0]} operator to sign in.`);
+        }
+        onSignedIn(op);
+      })
       .catch((err) => { setError(err.message); setPin(""); })
       .finally(() => { submitting.current = false; setBusy(false); });
   }, [pin, onSignedIn]);
@@ -58,7 +70,7 @@ export default function Login({ onSignedIn, purpose }) {
     <div className="hh-screen">
       <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)" }}>
         <Link to="/" aria-label="All modes"
-          style={{ color: "var(--text-secondary)", display: "inline-flex", padding: 4, marginLeft: -4 }}>
+          style={{ color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 11, marginLeft: -11, minWidth: 44, minHeight: 44 }}>
           <ChevronLeft size={22} />
         </Link>
       </div>
@@ -115,7 +127,7 @@ export default function Login({ onSignedIn, purpose }) {
               <button key={o.id} onClick={() => setPin(o.pin)} disabled={busy}
                 style={{
                   display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center",
-                  background: "none", border: "none", padding: "5px 0", cursor: "pointer",
+                  background: "none", border: "none", padding: "5px 0", minHeight: 44, cursor: "pointer",
                   fontSize: "var(--text-xs)", color: "var(--text-secondary)",
                 }}>
                 <span>{o.name}<span style={{ color: "var(--text-muted)" }}> · {o.role}</span></span>

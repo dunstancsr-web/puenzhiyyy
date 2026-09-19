@@ -87,6 +87,13 @@ export default function ForecastDetail() {
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState(null);
   const debounceRef = useRef(null);
+
+  // Scroll targets for DataStory's "see how" buttons, same
+  // scrollIntoView(prefers-reduced-motion) pattern Dashboard.jsx uses for its
+  // Needs Attention jump.
+  const modelRef = useRef(null);
+  const sandboxRef = useRef(null);
+  const simRef = useRef(null);
   useEffect(() => {
     if (!inputs) return;
     clearTimeout(debounceRef.current);
@@ -106,7 +113,13 @@ export default function ForecastDetail() {
       }
     }, 200);
     return () => clearTimeout(debounceRef.current);
-  }, [inputs, skuId]);
+    // forecastData?.forecast?.generated_at: Recompute changes the ACTIVE
+    // forecast without changing `inputs` at all, so without this the preview
+    // stayed on its pre-recompute result (often the "No forecast yet" error
+    // from before one existed) until a full page reload. Found live: the new
+    // DataStory panel above stuck on "Computing…" right after clicking the
+    // page's own primary Recompute button.
+  }, [inputs, skuId, forecastData?.forecast?.generated_at]);
 
   const setInput = (key) => (value) => setInputs((s) => ({ ...s, [key]: Number(value) }));
   const resetInputs = () => setInputs(savedInputs);
@@ -158,30 +171,38 @@ export default function ForecastDetail() {
     <div>
       <ForecastHeader sku={sku} forecast={forecast} onBack={() => navigate("/inventory")} onRecompute={() => recompute()} recomputing={recomputing} />
 
-      <ModelPicker
-        mode={mode} setMode={setMode_} activeModel={activeModel} scores={scores} bestScore={bestScore}
-        models={models} onPick={(id) => { if (mode === "manual") recompute(id); }} lowConfidence={forecast?.low_confidence}
-      />
+      <DataStory sku={sku} preview={preview} hasForecast={!!forecast} modelRef={modelRef} simRef={simRef} sandboxRef={sandboxRef} />
+
+      <div ref={modelRef}>
+        <ModelPicker
+          mode={mode} setMode={setMode_} activeModel={activeModel} scores={scores} bestScore={bestScore}
+          models={models} onPick={(id) => { if (mode === "manual") recompute(id); }} lowConfidence={forecast?.low_confidence}
+        />
+      </div>
 
       <SalesChart history={history} forecast={forecast} activeModel={activeModel} />
 
-      <WhatIfSandbox
-        sku={sku} inputs={inputs} setInput={setInput} onReset={resetInputs}
-        preview={preview} previewError={previewError} hasForecast={!!forecast}
-      />
+      <div ref={sandboxRef}>
+        <WhatIfSandbox
+          sku={sku} inputs={inputs} setInput={setInput} onReset={resetInputs}
+          preview={preview} previewError={previewError} hasForecast={!!forecast}
+        />
+      </div>
 
-      <ReasoningChain sku={sku} preview={preview} hasForecast={!!forecast} onUseForecast={toggleUseForecast} />
+      <ReasoningChain sku={sku} preview={preview} hasForecast={!!forecast} onUseForecast={toggleUseForecast} modelRef={modelRef} />
 
       {forecast && preview && (
         <>
-          <ReorderSimulation invHistory={invHistory} preview={preview} inputs={inputs} sku={sku} />
+          <div ref={simRef}>
+            <ReorderSimulation invHistory={invHistory} preview={preview} inputs={inputs} sku={sku} />
+          </div>
           <FlowChart invHistory={invHistory} />
         </>
       )}
 
       <div style={{ textAlign: "center", fontSize: "var(--text-sm)", color: "var(--text-secondary)", padding: "8px 0 24px" }}>
         A policy-change suggestion for this SKU appears on{" "}
-        <Link to="/alerts" style={{ color: "var(--blue)", fontWeight: 600 }}>Alerts</Link>{" "}
+        <Link to="/alerts" style={{ color: "var(--blue-text)", fontWeight: 600 }}>Alerts</Link>{" "}
         once the gap between approved and suggested is large enough. Approve, amend, or reject it there.
       </div>
     </div>
@@ -221,14 +242,28 @@ function ForecastHeader({ sku, forecast, onBack, onRecompute, recomputing }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Stat label="Approved" value={`${Math.round(sku.reorder_point_policy)} MT`} />
+          <Stat label="Current reorder pt" tip={{
+            what: "The approved reorder point - the value alerts and health status actually key off today.",
+            how: "Changed on Alerts, by approving a policy-change suggestion, or from Inventory directly. Never changes just from looking at this page.",
+          }} value={`${Math.round(sku.reorder_point_policy)} MT`} />
           <span style={{ color: "var(--text-muted)", fontSize: 20 }}>&rarr;</span>
-          <Stat label="Suggested" value={`${Math.round(sku.reorder_point_suggested_with_risk)} MT`} color="var(--blue)" />
+          <Stat
+            label="Suggested reorder pt"
+            tip={{
+              what: "What the safety-stock formula would set the reorder point to, from this SKU's demand rate, lead time and target service level.",
+              how: "The badge underneath says which demand rate fed it - the plain 30-day average by default, or a statistical model once you switch one on. See the full breakdown below.",
+            }}
+            value={`${Math.round(sku.reorder_point_suggested_with_risk)} MT`}
+            color="var(--blue)"
+            badge={sku.use_forecast
+              ? { text: `Model · ${(sku.forecast_active_model || sku.demand_source || "").replace(/_/g, " ")}`, tone: "model" }
+              : { text: "Baseline · 30-day average", tone: "baseline" }}
+          />
         </div>
         <div style={{ textAlign: "right" }}>
           {forecast && (
             <div style={{ fontSize: "var(--text-xs)", fontWeight: isStale ? 700 : 400, color: isStale ? "var(--yellow)" : "var(--text-muted)", marginBottom: 5 }}>
-              {isStale ? `Stale — recomputed ${staleDays} days ago` : `Recomputed ${staleDays === 0 ? "today" : `${staleDays}d ago`}`}
+              {isStale ? `Stale, recomputed ${staleDays} days ago` : `Recomputed ${staleDays === 0 ? "today" : `${staleDays}d ago`}`}
             </div>
           )}
           <button onClick={onRecompute} disabled={recomputing} className="card" style={{
@@ -247,14 +282,159 @@ function ForecastHeader({ sku, forecast, onBack, onRecompute, recomputing }) {
   );
 }
 
-function Stat({ label, value, color }) {
+const STAT_BADGE_STYLE = {
+  baseline: { bg: "var(--surface-2)", fg: "var(--text-secondary)" },
+  model: { bg: "var(--blue-light)", fg: "var(--blue)" },
+};
+
+function Stat({ label, value, color, tip, badge }) {
+  const badgeStyle = badge && STAT_BADGE_STYLE[badge.tone];
   return (
     <div style={{ textAlign: "right" }}>
-      <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)" }}>{label}</div>
+      <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3 }}>
+        {label}
+        {tip && <ColHint label={label} what={tip.what} how={tip.how} />}
+      </div>
       <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: color || "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      {badge && (
+        <div style={{
+          display: "inline-block", marginTop: 3, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase",
+          letterSpacing: "0.03em", padding: "2px 7px", borderRadius: 99,
+          background: badgeStyle?.bg, color: badgeStyle?.fg,
+        }}>
+          {badge.text}
+        </div>
+      )}
     </div>
   );
 }
+
+// ── Data story ───────────────────────────────────────────────────────────────
+// The plain-English front door to everything below it (Stan's ask, 17 Sep):
+// state what was found, what it suggests, and how that compares to what's
+// approved today, in sentences rather than a chain diagram, before handing
+// off to the model picker / sandbox / simulation for anyone who wants to look
+// closer. Reads `preview`, the SAME object ReasoningChain and
+// ReorderSimulation already use, rather than recomputing anything, so this
+// can never disagree with the numbers below it (rules.md, "derived values
+// computed twice eventually disagree").
+function scrollToRef(ref) {
+  return () => {
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    ref.current?.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+  };
+}
+
+function DataStory({ sku, preview, hasForecast, modelRef, simRef, sandboxRef }) {
+  // Previously returned null here before a forecast existed - meaning most
+  // SKUs (nobody has run Recompute for them yet) landed on this page with NO
+  // explanation at all between the header and the model picker. Found from
+  // Stan asking, as a new user, why the page didn't feel like it was telling
+  // him "you're on a default, here are 4 better options" - because for the
+  // majority of SKUs it genuinely wasn't saying that anywhere.
+  if (!hasForecast) {
+    return (
+      <div className="card" style={{
+        padding: "20px 22px", marginBottom: 16,
+        background: "var(--surface-2)", border: "1px solid var(--border)",
+      }}>
+        <div style={{
+          fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em",
+          textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 10,
+        }}>
+          What your data tells us
+        </div>
+        <p style={{ fontSize: "var(--text-base)", lineHeight: 1.65, color: "var(--text-primary)", margin: 0 }}>
+          No forecast has been run for {sku.product_name} yet, so the <b>{Math.round(sku.reorder_point_suggested_with_risk)} MT</b> suggested
+          above is today's <b>default</b>: a plain 30-day average of actual sales ({sku.avg_daily_usage_30d} MT/day), no trend or
+          seasonality. That's a reasonable starting point, but four statistical models below can often do
+          better, especially if this product sells more in some months than others.
+        </p>
+        <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+          <button type="button" onClick={scrollToRef(modelRef)} style={STORY_LINK_STYLE}>Try the 4 models &darr;</button>
+        </div>
+      </div>
+    );
+  }
+  if (!preview) {
+    return (
+      <div className="card" style={{ padding: "18px 20px", marginBottom: 16 }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Computing…</div>
+      </div>
+    );
+  }
+
+  const approved = sku.reorder_point_policy;
+  const suggested = preview.reorder_point_suggested_with_risk;
+  const gapPct = approved > 0 ? Math.round(((suggested - approved) / approved) * 100) : null;
+
+  return (
+    <div className="card" style={{
+      padding: "20px 22px", marginBottom: 16,
+      background: "var(--blue-light)", border: "1px solid var(--blue)",
+    }}>
+      <div style={{
+        fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em",
+        textTransform: "uppercase", color: "var(--blue-text)", marginBottom: 10,
+      }}>
+        What your data tells us
+      </div>
+
+      <p style={{ fontSize: "var(--text-base)", lineHeight: 1.65, color: "var(--text-primary)", margin: 0 }}>
+        From {sku.product_name}'s sales history, the <b>{preview.forecast_model?.replace("_", " ")}</b> model
+        (a statistical forecast, traditional/predictive AI, not generative) forecasts average demand of
+        {" "}<b>{preview.forecast_avg_daily_demand} MT/day</b>. Using this product's
+        saved lead time of <b>{preview.inputs.leadTimeDays} days</b> (variability <b>±{preview.inputs.leadTimeStdDays} days</b>)
+        and a target service level of <b>{Math.round(preview.inputs.targetServiceLevel * 100)}%</b>, we suggest
+        reordering at <b>{Math.round(suggested)} MT</b> and stocking up to <b>{Math.round(preview.target_stock_suggested)} MT</b>.
+      </p>
+
+      <p style={{ fontSize: "var(--text-base)", lineHeight: 1.65, color: "var(--text-secondary)", marginTop: 10 }}>
+        {gapPct === null ? (
+          "This product has no approved reorder point yet, so there's nothing to compare the suggestion against."
+        ) : gapPct === 0 ? (
+          <>Your approved reorder point, <b style={{ color: "var(--text-primary)" }}>{Math.round(approved)} MT</b>, already matches this.</>
+        ) : (
+          <>
+            You're currently approved to reorder at <b style={{ color: "var(--text-primary)" }}>{Math.round(approved)} MT</b>,
+            {" "}{Math.abs(gapPct)}% {gapPct > 0 ? "lower" : "higher"} than what we're suggesting.
+          </>
+        )}
+        {" "}Don't just take these numbers: the lead time and its variability came from what's saved for
+        this product, not from the sales data itself, so they're only as good as what you (or your supplier)
+        told us. See how the suggestion was built, and how it plays out over time, before approving anything.
+      </p>
+
+      {/* Only when the two CAN legitimately disagree: engines/index.js only
+          feeds the forecast's demand rate into the live SUGGESTED figure
+          above when use_forecast is on (the sandbox here always uses it,
+          regardless - see the comment on POST /skus/:id/forecast/preview).
+          Found live: a SKU with use_forecast off showed 185 MT up top and
+          113 MT here, same lead time, no explanation - this is that
+          explanation. */}
+      {!sku.use_forecast && (
+        <p style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, color: "var(--text-secondary)", marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--border)" }}>
+          This won't match the <b style={{ color: "var(--text-primary)" }}>SUGGESTED</b> figure above: {sku.product_name} isn't
+          set to use the forecast yet, so that one is still built on the 30-day sales average
+          ({" "}{sku.avg_daily_usage_30d} MT/day), not this model's {preview.forecast_avg_daily_demand} MT/day. Switch it
+          over in "See the model behind this" below to bring the two in line.
+        </p>
+      )}
+
+      <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+        <button type="button" onClick={scrollToRef(modelRef)} style={STORY_LINK_STYLE}>See the model behind this ↓</button>
+        <button type="button" onClick={scrollToRef(sandboxRef)} style={STORY_LINK_STYLE}>Try different assumptions ↓</button>
+        <button type="button" onClick={scrollToRef(simRef)} style={STORY_LINK_STYLE}>Explore the simulation ↓</button>
+      </div>
+    </div>
+  );
+}
+
+const STORY_LINK_STYLE = {
+  font: "inherit", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue-text)",
+  background: "var(--card-bg)", border: "1px solid var(--blue)", borderRadius: 99,
+  padding: "7px 14px", cursor: "pointer",
+};
 
 // ── Model picker ─────────────────────────────────────────────────────────────
 const MODEL_HINT = {
@@ -279,9 +459,20 @@ const MODEL_HINT = {
 function ModelPicker({ mode, setMode, activeModel, scores, bestScore, models, onPick, lowConfidence }) {
   return (
     <div className="card" style={{ padding: "16px 20px", marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 8 }}>
           Model selection
+          {/* The bracketed form Stan asked for: "statistical forecast" alone
+              didn't land for him, but pairing it against the AI framing he
+              already knows made it click immediately. Placed here, not in
+              ChainStep's tiny badge, since this heading has room for it and
+              names all four models at once, not one reasoning-chain step. */}
+          <span style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.02em", textTransform: "uppercase",
+            border: "1px dashed var(--purple)", color: "var(--purple-text)", padding: "1.5px 7px", borderRadius: 5,
+          }}>
+            Statistical forecast (traditional / predictive AI)
+          </span>
         </span>
         <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 99, padding: 2, background: "var(--surface-2)" }}>
           {["auto", "manual"].map((m) => (
@@ -352,7 +543,7 @@ function ModelPicker({ mode, setMode, activeModel, scores, bestScore, models, on
                   <div style={{ height: "100%", borderRadius: 3, background: MODEL_COLOR[id], width: `${barPct}%` }} />
                 </div>
                 <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                  {score != null ? `WMAPE ${score}` : "—"}
+                  {score != null ? `WMAPE ${score}` : "-"}
                 </span>
               </div>
             </div>
@@ -419,12 +610,12 @@ function WhatIfSandbox({ sku, inputs, setInput, onReset, preview, previewError, 
     <div className="card" style={{ padding: "18px 20px", marginBottom: 16, border: "1.5px solid var(--blue)" }}>
       <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, marginBottom: 2, display: "flex", alignItems: "center", gap: 8 }}>
         What if...
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", border: "1px dashed var(--blue)", color: "var(--blue)", padding: "1.5px 7px", borderRadius: 5 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", border: "1px dashed var(--blue)", color: "var(--blue-text)", padding: "1.5px 7px", borderRadius: 5 }}>
           Sandbox
         </span>
       </h2>
       <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 14 }}>
-        Drag these to see how the suggested reorder point responds. These are this SKU's real settings &mdash; nothing here is saved until you use the SKU edit form.
+        Drag these to see how the suggested reorder point responds. These are this SKU's real settings, nothing here is saved until you use the SKU edit form.
       </p>
       {!hasForecast ? (
         <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Generate a forecast first (Recompute above) to use the sandbox.</div>
@@ -432,22 +623,42 @@ function WhatIfSandbox({ sku, inputs, setInput, onReset, preview, previewError, 
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "4px 28px" }}>
             <div>
-              <SliderField label="Lead time" suffix="days" value={inputs.leadTimeDays} onChange={setInput("leadTimeDays")} min={20} max={90} step={1} />
-              <SandboxNote text="No suggestion yet — needs receiving history (this app has no closed purchase-order data to measure a real average from)." />
+              <SliderField
+                label={<SandboxLabel text="Lead time" hint={{
+                  what: "How many days after you place an order with this supplier before it arrives. A characteristic of this product's supplier, not something read off your sales data.",
+                  how: "Feeds King's formula directly: Lead-Time Demand = average daily demand × lead time. Set on the SKU's Policy tab, not calculated here.",
+                }} />}
+                suffix="days" value={inputs.leadTimeDays} onChange={setInput("leadTimeDays")} min={20} max={90} step={1} />
+              <SandboxNote text="No suggestion yet: needs receiving history (this app has no closed purchase-order data to measure a real average from)." />
             </div>
             <div>
-              <SliderField label="Lead time variability (σ)" suffix="days" value={inputs.leadTimeStdDays} onChange={setInput("leadTimeStdDays")} min={0} max={15} step={0.5} />
-              <SandboxNote text="No suggestion yet — same reason as lead time above." />
+              <SliderField
+                label={<SandboxLabel text="Lead time variability (σ)" hint={{
+                  what: "How much that lead time actually swings, delivery to delivery. A wider spread means a less predictable supplier, also set on the Policy tab, not derived from sales.",
+                  how: "Widens the safety stock King's formula asks for: a bigger σ means more stock held just in case a delivery runs late.",
+                }} />}
+                suffix="days" value={inputs.leadTimeStdDays} onChange={setInput("leadTimeStdDays")} min={0} max={15} step={0.5} />
+              <SandboxNote text="No suggestion yet, same reason as lead time above." />
             </div>
             <div>
-              <SliderField label="Target service level" suffix="%" value={inputs.serviceLevelPct} onChange={setInput("serviceLevelPct")} min={80} max={99} step={1} />
+              <SliderField
+                label={<SandboxLabel text="Target service level" hint={{
+                  what: "How often you're willing to risk running out before the next delivery lands. 98% means roughly a 2% chance of a stockout in a typical cycle: a business choice, not a measurement.",
+                  how: "Converts to a Z-score in King's formula: a higher service level asks for more safety stock for the same demand and lead time.",
+                }} />}
+                suffix="%" value={inputs.serviceLevelPct} onChange={setInput("serviceLevelPct")} min={80} max={99} step={1} />
               <SandboxNote
                 text={`Suggested (${sku.abc_class}-tier default): ${TIER_SERVICE_LEVEL[sku.abc_class] || 95}%`}
                 onUse={() => setInput("serviceLevelPct")(TIER_SERVICE_LEVEL[sku.abc_class] || 95)}
               />
             </div>
             <div>
-              <SliderField label="Target stock (order-up-to)" suffix="MT" value={inputs.targetStock} onChange={setInput("targetStock")} min={60} max={300} step={5} />
+              <SliderField
+                label={<SandboxLabel text="Target stock (order-up-to)" hint={{
+                  what: "How much stock you want on hand right after a delivery arrives: the level a reorder tries to bring you back up to.",
+                  how: "The one figure here with a live formula behind it: forecast demand × (a 30-day review cycle + lead time) + safety stock. Hit “Use” below to apply it.",
+                }} />}
+                suffix="MT" value={inputs.targetStock} onChange={setInput("targetStock")} min={60} max={300} step={5} />
               {preview && (
                 <SandboxNote
                   text={`Suggested (formula-derived): ${Math.round(preview.target_stock_suggested)} MT`}
@@ -458,28 +669,42 @@ function WhatIfSandbox({ sku, inputs, setInput, onReset, preview, previewError, 
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)", flexWrap: "wrap", gap: 10 }}>
             <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-              Demand variability and the risk buffer stay fixed &mdash; they come from the forecast model and the matched risk event, not a setting.
+              Demand variability and the risk buffer stay fixed, they come from the forecast model and the matched risk event, not a setting.
             </span>
             <button type="button" onClick={onReset} style={{
               font: "inherit", fontWeight: 700, fontSize: "var(--text-xs)", padding: "7px 14px", borderRadius: "var(--radius)",
               border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-secondary)", cursor: "pointer",
             }}>Reset to saved values</button>
           </div>
-          {previewError && <div style={{ marginTop: 10, fontSize: "var(--text-xs)", color: "var(--red)" }}>{previewError}</div>}
+          {previewError && <div style={{ marginTop: 10, fontSize: "var(--text-xs)", color: "var(--red-text)" }}>{previewError}</div>}
         </>
       )}
     </div>
   );
 }
 
+// A slider's label, plus the ⓘ this page already uses elsewhere (SalesChart,
+// ReorderSimulation). SliderField renders whatever `label` it's given inside
+// a plain, un-`htmlFor`'d <label> tag, so nesting ColHint's own button here
+// is safe: nothing tries to steal focus back to the range input the way a
+// real form-control association would.
+function SandboxLabel({ text, hint }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+      {text}
+      <ColHint label={text} what={hint.what} how={hint.how} />
+    </span>
+  );
+}
+
 function SandboxNote({ text, onUse }) {
   return (
-    <div style={{ fontSize: 10.5, marginTop: 3, display: "flex", alignItems: "center", gap: 6, color: onUse ? "var(--blue)" : "var(--text-muted)" }}>
+    <div style={{ fontSize: 10.5, marginTop: 3, display: "flex", alignItems: "center", gap: 6, color: onUse ? "var(--blue-text)" : "var(--text-muted)" }}>
       {text}
       {onUse && (
         <button type="button" onClick={onUse} style={{
           font: "inherit", fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 99, border: "1px solid var(--blue)",
-          background: "var(--blue-light)", color: "var(--blue)", cursor: "pointer", flex: "none",
+          background: "var(--blue-light)", color: "var(--blue-text)", cursor: "pointer", flex: "none",
         }}>Use</button>
       )}
     </div>
@@ -487,12 +712,17 @@ function SandboxNote({ text, onUse }) {
 }
 
 // ── Reasoning chain ──────────────────────────────────────────────────────────
-function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
+function ReasoningChain({ sku, preview, hasForecast, onUseForecast, modelRef }) {
   const demandLabel = sku.use_forecast ? `forecast (${sku.demand_source?.replace("_", " ") || sku.forecast_model})` : "30-day average";
   return (
     <div className="card" style={{ padding: "18px 20px", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-        <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700 }}>How this becomes the suggested reorder point</h2>
+        <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+          How this becomes the suggested reorder point
+          <ColHint label="How this becomes the suggested reorder point"
+            what="None of this is generative AI. Forecast demand comes from a statistical forecast model (Naive seasonal, Linear trend, Holt-Winters, or Holt damped + seasonal) - traditional or predictive AI, backtested against real sales history, always producing the same output for the same inputs. Everything after it is a fixed formula (King's formula) applied on top."
+            how="The tags below say which is which: SALES HISTORY is a plain historical average (no model behind it yet), YOUR INPUT is something you (or your supplier) told the system, STATISTICAL FORECAST is a model's own output, and no tag means fixed arithmetic on top of those. AI only appears elsewhere in this app, on Alerts's Why? button, and only to explain a number, never to calculate one." />
+        </h2>
         {hasForecast && (
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer" }}>
             <input type="checkbox" checked={!!sku.use_forecast} onChange={onUseForecast} />
@@ -503,19 +733,51 @@ function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 12 }}>
         Currently operating on the <b style={{ color: "var(--text-secondary)" }}>{demandLabel}</b>.
       </div>
-      {!preview ? (
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-          {hasForecast ? "Computing…" : "Generate a forecast to see the reasoning chain."}
-        </div>
+      {!hasForecast ? (
+        // Real numbers, not a placeholder: everything here is already on
+        // `sku` from GET /skus (engines/index.js), computed off the 30-day
+        // average whether or not anyone has ever clicked Recompute. Someone
+        // landing on a SKU that's never been forecast used to see one line of
+        // muted text here and nothing else - this is the actual math behind
+        // today's SUGGESTED figure, not a promise of what a forecast would add.
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <ChainStep label="Avg daily sales (30d)" value={`${sku.avg_daily_usage_30d} MT/day`} tag="sales history" />
+            <ChainOp>&times;</ChainOp>
+            <ChainStep label="Lead time" value={`${sku.lead_time_days} days`} tag="your input" />
+            <ChainOp>=</ChainOp>
+            <ChainStep label="Lead time demand" value={`${sku.lead_time_demand_mt} MT`} />
+            <ChainOp>+</ChainOp>
+            <ChainStep label="Safety stock" value={`${sku.safety_stock_mt} MT`} tag="formula" />
+            <ChainOp>+</ChainOp>
+            <ChainStep label="Risk buffer" value={`+${sku.risk_buffer_mt} MT`} accent="var(--orange)" tag="formula" />
+            <ChainOp>=</ChainOp>
+            <ChainStep label="Suggested (baseline)" value={`${Math.round(sku.reorder_point_suggested_with_risk)} MT`} accent="var(--blue)" total />
+          </div>
+          <div style={{
+            marginTop: 14, padding: "10px 14px", display: "flex", alignItems: "center",
+            justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+            background: "var(--purple-light)", border: "1px solid var(--purple)", borderRadius: "var(--radius)",
+          }}>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+              This is the default calculation - no trend, no seasonality, just a plain average of recent sales.
+            </span>
+            <button type="button" onClick={scrollToRef(modelRef)} style={STORY_LINK_STYLE}>
+              Try the 4 models &darr;
+            </button>
+          </div>
+        </>
+      ) : !preview ? (
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Computing…</div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <ChainStep label="Forecast demand" value={`${preview.forecast_avg_daily_demand} MT/day`} tag="derived" />
+          <ChainStep label="Forecast demand" value={`${preview.forecast_avg_daily_demand} MT/day`} tag="statistical forecast" />
           <ChainOp>&times;</ChainOp>
           <ChainStep label="Lead time" value={`${preview.inputs.leadTimeDays} days`} tag="your input" />
           <ChainOp>+</ChainOp>
-          <ChainStep label="Safety stock" value={`${preview.safety_stock_mt} MT`} tag="derived" />
+          <ChainStep label="Safety stock" value={`${preview.safety_stock_mt} MT`} tag="formula" />
           <ChainOp>+</ChainOp>
-          <ChainStep label="Risk buffer" value={`+${preview.risk_buffer_mt} MT`} accent="var(--orange)" tag="derived" />
+          <ChainStep label="Risk buffer" value={`+${preview.risk_buffer_mt} MT`} accent="var(--orange)" tag="formula" />
           <ChainOp>=</ChainOp>
           <ChainStep label="Suggested" value={`${Math.round(preview.reorder_point_suggested_with_risk)} MT`} accent="var(--blue)" total />
         </div>
@@ -530,7 +792,21 @@ function ReasoningChain({ sku, preview, hasForecast, onUseForecast }) {
   );
 }
 
+// Three tags, three honest answers to "where did this come from": a person
+// typed it in, a statistical forecast model computed it from sales history,
+// or it's fixed arithmetic applied to one of those two. None of them is
+// generative AI - see the note in ReasoningChain's header. "formula" gets no
+// colour of its own on purpose: it's the default, unremarkable case, and
+// giving it a tint would spend the same visual weight as the two things
+// actually worth flagging.
+const CHAIN_TAG_STYLE = {
+  "your input": { bg: "var(--blue-light)", fg: "var(--blue)" },
+  "statistical forecast": { bg: "var(--purple-light)", fg: "var(--purple)" },
+  "sales history": { bg: "var(--surface-2)", fg: "var(--text-secondary)" },
+};
+
 function ChainStep({ label, value, accent, tag, total }) {
+  const tagStyle = CHAIN_TAG_STYLE[tag];
   return (
     <div style={{
       background: total ? "var(--blue-light)" : accent === "var(--orange)" ? "var(--orange-light)" : "var(--surface-2)",
@@ -542,8 +818,8 @@ function ChainStep({ label, value, accent, tag, total }) {
         {tag && (
           <span style={{
             fontSize: 9.5, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
-            background: tag === "your input" ? "var(--blue-light)" : "var(--surface-2)",
-            color: tag === "your input" ? "var(--blue)" : "var(--text-muted)",
+            background: tagStyle?.bg || "var(--surface-2)",
+            color: tagStyle?.fg || "var(--text-muted)",
           }}>{tag}</span>
         )}
       </div>
@@ -612,7 +888,7 @@ function ReorderSimulation({ invHistory, preview, inputs, sku }) {
         On-hand stock in MT: {invHistory.length} months actual, then a repeating reorder cycle from the sandbox settings above.
       </p>
       <div style={{ fontSize: "var(--text-xs)", background: "var(--blue-light)", border: "1px solid var(--blue)", borderRadius: "var(--radius)", padding: "8px 12px", marginBottom: 12, color: "var(--text-secondary)" }}>
-        &uarr; Demand rate driving this simulation: <b style={{ color: "var(--blue)" }}>{preview.forecast_avg_daily_demand} MT/day</b> &mdash; the {preview.forecast_model?.replace("_", " ")} forecast from the sales chart above.
+        &uarr; Demand rate driving this simulation: <b style={{ color: "var(--blue-text)" }}>{preview.forecast_avg_daily_demand} MT/day</b>, the {preview.forecast_model?.replace("_", " ")} forecast from the sales chart above.
       </div>
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data} margin={{ top: 20, right: 20, bottom: 0, left: -16 }}>

@@ -63,7 +63,8 @@ One owner per fact. Read it there, change it there, and link to it from anywhere
 backend/src/
   engines/     nine deterministic engines, index.js orchestrates. The source of truth for EVERY
                figure. Never recompute what they emit elsewhere.
-  llm/         the explanation layer (see "The model layer" below); tone.js cleans the model's wording
+  llm/         the explanation layer (see "The model layer" below); tone.js cleans the model's wording;
+               tools.js + askDatabase.js are the one tool-calling exception, see below
   routes/      inventory.js is the Control Tower API, warehouse.js the handheld floor API
   db/          SQLite schema, deterministic seed, audit log
 backend/scripts/
@@ -76,8 +77,10 @@ backend/scripts/
   check-deploy.js   checks a live deployment, never calls the model
   rehearse-deploy.sh  runs the app like the container on a Mac, then runs check-deploy.js
 frontend/src/
-  pages/       Home, Dashboard, Inventory, Alerts, Activity (the Control Tower)
-  warehouse/   Goods In and operator PIN sign-in (the handheld; Goods Out screens not built)
+  pages/       Home, Dashboard, Action Items, Forecast, Inventory, Alerts, Activity, Table (the
+               Control Tower - order is Sidebar.jsx's own; Action Items and Table, both 19 Sep, are
+               additive, not replacements for Alerts or Activity)
+  warehouse/   Goods In, Goods Out and operator PIN sign-in (the handheld)
   lib/explain.js    the rule-based Why? explanation, four plain-English steps
 frontend/tuners/    Stan's design tuners: sliders over real components, he pastes back CSS
 docs/Guide/         the features guide (Markdown, screenshots) and build-pdf.py for its PDF
@@ -86,7 +89,7 @@ docs/Guide/         the features guide (Markdown, screenshots) and build-pdf.py 
                      `npm run install:all`; see rules.md, "Tooling"
 ```
 
-Three workspaces share one database: **Goods In** and **Goods Out** (API only, "Coming soon" on screen) on a handheld, the **Control
+Three workspaces share one database: **Goods In** and **Goods Out** on a handheld, the **Control
 Tower** on a desktop. The Dashboard's sections, in order: Key Metrics, Needs Attention, Cover vs Lead
 + Safety beside Inventory Health, Value × Movement.
 
@@ -107,6 +110,23 @@ removed by rule (`tone.js`) rather than retried. **The full design, file by file
 `node backend/scripts/bench-models.js llama3 --repeat 4 --scenario reorder` and compare.** One run of
 16 is noise; four passes is the number to trust. Record the result in the devlog entry.
 
+**Action Items' "Ask about your data" (19 Sep) is a second, separate model feature**, past the
+Why?-button tier above: an open-ended question, answered by a model that can call a small set of
+read-only tools (`llm/tools.js`) to fetch facts it wasn't pre-loaded with - the domain spec's Step 14
+tier. It reuses the placeholder guarantee (`slots.js`) but not the alert-specific semantic verifier,
+and deliberately runs its own local model (`llm/askDatabase.js`'s `ASK_DATABASE_MODEL`, currently
+`llama3.1:8b`) rather than sharing `OLLAMA_MODEL` - that env var's `llama3` default is itself a
+recorded benchmark result for the Why?-button feature specifically (see `backend/.env`'s own comment),
+and changing it to help one feature would have silently regressed the other. If you tune either
+feature's model or prompt, check the other still matches its own benchmark before assuming a shared
+change is safe.
+
+**Action Items' "Market signals" (19 Sep)** turns a news event into what it does to each SKU's stock and
+what to order, with the days an event costs read from a visible table, never from a model. It is built on the
+replay of real past events and a live news scan (Google News RSS, read by a local model, else a keyword list, never the paid tier; editable by a person). Formulas, matching and
+the open question about a seeded risk event: `design.md`, "Market Signals". Check with
+`node backend/scripts/test-signals.js`.
+
 ## History, in phases
 
 | Dates | Tasks | What happened |
@@ -123,6 +143,7 @@ removed by rule (`tone.js`) rather than retried. **The full design, file by file
 | 15 Sep | none | One rulebook (rules.md) and one master directory (docs/DIRECTORY.md); end of session docs check for Claude Code and Kiro; Kiro specs and steering brought up to date |
 | 15 Sep | none | Formula check in CI (26 checks). Stan's formula decisions: fulfilled sales only, Slow Moving by cover, the 30 day average as the one demand rate app-wide |
 | 15 Sep | none | Deploy rehearsal without Docker; README rewritten; goods movements shown on Activity; features guide with screenshots and PDF; Inventory table fitted to laptop widths; urgency and leaked names removed from model wording by rule |
+| 19 Sep | none | Opening-balance step and a receipts-realism seed fix; two new additive tabs (Table, Action Items); the Forecast page's default-vs-4-models story made visible before a forecast is run; a second model feature, Ask about your data (tool-calling, Step 14 of the domain spec), with its own scoped local model; chosen problem statement added to project-context.md as an explicit north star |
 
 ## Decisions already made
 
@@ -146,6 +167,7 @@ cd backend && npm run demo:reset     # reset for recording, and check the video 
 cd frontend && npx vite build        # the build must pass before committing
 node backend/scripts/bench-models.js llama3 --repeat 4 --scenario reorder   # after LLM changes
 node backend/scripts/check-formulas.js   # after ANY engine change: do the formulas still match design.md?
+npm run ux:audit                         # after UI changes: overlap, contrast, touch size, keyboard (skill: .claude/skills/ui-ux-audit)
 node backend/scripts/test-tone.js        # after editing backend/src/llm/tone.js
 sh backend/scripts/rehearse-deploy.sh    # run the app like the Lightsail container, then check it
 python3 docs/Guide/build-pdf.py          # rebuild the features guide PDF into ~/Downloads
@@ -162,12 +184,23 @@ do not rely on a summary of them.
 
 ## Keeping this in sync
 
-At the end of a session in which you changed the project:
+At the end of a session in which you changed the project, **or the moment the user says "prepare for
+handover" (to Claude, Kiro, or any agent, in those words or close to them)**, run this checklist right
+away rather than waiting to be asked twice:
 
-1. Add a `.kiro/DEVLOG.md` entry in the existing format.
+1. Add a `.kiro/DEVLOG.md` entry in the existing format, if the session's changes aren't already logged
+   there. Newest entry at the bottom is what a fresh agent reads first (see "Reading order" above).
 2. If status, next steps or a decision changed, update the **submission tracker**, not this file.
 3. If a paid model call was made, add it to the **spend ledger**.
 4. Update this file only if something it describes changed: the architecture, a rule, the reading
    order, or where a fact lives.
+5. Run `git status`. If there is meaningful uncommitted work, say so plainly and ask whether to commit
+   it now, don't commit or push on your own initiative (rules.md, "Working rules": commit only when
+   asked). If the branch is ahead of `origin`, mention that too: a new session on a different machine or
+   a cloud session only sees what's pushed.
+6. Close with a short, plain-English summary in chat: what changed, what's next, what (if anything) is
+   blocked or waiting on a decision. This is for the human as much as the next agent; don't skip it just
+   because the documents above already say the same thing.
 
-A hook checks step 1 automatically; see `rules.md`, "Tooling".
+A hook checks step 1 automatically; see `rules.md`, "Tooling". The trigger phrase in this section is
+the one place that behavior is defined, for every tool, so it never needs restating elsewhere.

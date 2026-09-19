@@ -13,11 +13,26 @@ architecture and where each fact lives, and `rules.md` for the rules; this file 
 - Event: AWS NUS-ISS SMYA 2026 Hackathon. Team Puenzhiyyy; Stan leads and decides.
 - Deadlines, deliverables, judging criteria and status: `docs/(Stan) 1 Reference/(Stan) SUBMISSION TRACKER.md`
 
-## Business Problem
-Rice importer/distributor needs to move from reactive spreadsheet-based inventory management to a proactive, AI-assisted system.
-Two competing objectives:
+## Business Problem — the north star
+The chosen hackathon problem statement, verbatim, as the check against scope drift: read this before
+adding a feature, and ask whether it moves the needle on THIS, not on inventory management in general.
+
+> **Inventory Monitoring:** Inventory managers are responsible for ensuring adequate stock while
+> avoiding excess inventory. Stock levels are typically reviewed using spreadsheets or periodic
+> reports, making it difficult to identify slow-moving products, fast-selling items, or potential
+> shortages early. As product ranges increase, inventory planning becomes increasingly reactive,
+> leading to stockouts, overstocking, and unnecessary storage costs.
+
+In StockSense's own terms, that breaks into: replace the spreadsheet/periodic-report review with
+something live; identify slow-moving and fast-selling SKUs without manually scanning a sheet; surface
+potential shortages *before* they happen, not after; and do all of this in a way that keeps working as
+the product range grows, rather than getting more reactive as it does. Two competing objectives sit
+underneath it:
 - Customer fulfilment (avoid stockouts)
 - Working capital efficiency (avoid excess stock, ageing, storage costs)
+
+A feature that doesn't serve one of the four breakdowns above, or one of these two objectives, is
+probably scope creep for this hackathon - even if it's a good idea in general for an inventory system.
 
 ## Scope
 What began as MVP 1 (inventory visibility) now also includes safety stock and reorder points, the

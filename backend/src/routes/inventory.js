@@ -14,10 +14,13 @@ const { getDb } = require("../db/init");
 const { EVENTS, logEvent, readEvents, eventCounts, diffFields } = require("../db/audit");
 const { buildAnalytics } = require("../engines/index");
 const { explainAlert, providerInfo, LlmUnavailable } = require("../llm/explain");
+const { explainActionItem } = require("../llm/explainActionItem");
+const { askDatabase } = require("../llm/askDatabase");
 const { listModes, getDefaultMode, resolveTier } = require("../llm/provider");
 const demoAccess = require("../llm/demoAccess");
 const { projectInventory } = require("../engines/projection");
 const { toCsv, parseCsv } = require("../db/csv");
+const { sandboxOnlyWhenPublic } = require("../middleware/sandboxGuard");
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -33,7 +36,7 @@ function getAnalytics() {
 // as-is with no error.
 const NONNEGATIVE_NUMERIC_FIELDS = [
   "min_order_qty", "reorder_point_policy", "min_stock", "target_stock", "max_stock",
-  "safety_stock_pct", "lead_time_days", "target_service_level", "unit_cost_sgd",
+  "safety_stock_pct", "lead_time_days", "lead_time_std_days", "target_service_level", "unit_cost_sgd",
   "unit_price_sgd", "reserved_qty", "quality_hold_qty",
 ];
 
@@ -84,7 +87,9 @@ router.get("/skus/export", (req, res) => {
       return { ...r, ...Object.fromEntries(EXPORT_CONTEXT.map((k) => [k, c[k]])) };
     });
 
-    const csv = toCsv([...IMPORT_COLUMNS, ...EXPORT_CONTEXT], merged);
+    const csv = merged.length
+      ? toCsv([...IMPORT_COLUMNS, ...EXPORT_CONTEXT], merged)
+      : toCsv(MINIMAL_TEMPLATE_COLUMNS, [EXAMPLE_ROW]);
     const stamp = today();
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="stocksense-inventory-${stamp}.csv"`);
@@ -92,6 +97,96 @@ router.get("/skus/export", (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to export SKUs" });
+  }
+});
+
+// GET /api/skus/opening-balance-suggestions — one plain sum per SKU (receipts
+// in minus fulfilled sales out, all time), offered on onboarding's opening
+// balance step as an opt-in starting point someone clicks to accept, never
+// pre-filled (Stan's call, 18 Sep: this is exactly the "sum the history"
+// derivation onboarding deliberately does NOT trust as a real count, so it
+// stays a labelled suggestion, not the value itself). One query, one owner:
+// nothing else should re-derive this from row-level history (rules.md,
+// "Derived values computed twice"). Fulfilled sales only, matching Stan's
+// formula decision (see formula-decisions.json) used everywhere else demand
+// is summed. Must be registered BEFORE /skus/:id below, or Express reads
+// "opening-balance-suggestions" as a sku_id and this 404s as "SKU not found" -
+// caught by actually curling it, not just reading the route table.
+router.get("/skus/opening-balance-suggestions", (req, res) => {
+  try {
+    const db = getDb();
+    const received = db.prepare(`
+      SELECT sku_id, SUM(actual_qty) AS qty FROM goods_movements
+       WHERE movement_type = 'RECEIPT' GROUP BY sku_id`).all();
+    const sold = db.prepare(`
+      SELECT sku_id, SUM(quantity_mt) AS qty FROM sales_transactions
+       WHERE status = 'fulfilled' GROUP BY sku_id`).all();
+    const net = {};
+    for (const r of received) net[r.sku_id] = (net[r.sku_id] || 0) + r.qty;
+    for (const s of sold) net[s.sku_id] = (net[s.sku_id] || 0) - s.qty;
+    const suggestions = {};
+    for (const [sku_id, qty] of Object.entries(net)) {
+      suggestions[sku_id] = Math.round(Math.max(0, qty) * 10) / 10;
+    }
+    res.json({ success: true, data: suggestions });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to compute opening balance suggestions" });
+  }
+});
+
+// POST /api/skus/opening-balance  { sku_id, quantity }
+// The one way onboarding puts a first count on the shelf, replacing the office restock removed
+// with the duties split. It is deliberately narrow so it cannot become that restock again:
+//   - only a product with NO stock yet (on hand is 0), so it can never top up a live balance;
+//   - only once per product (a second call is refused with 409);
+//   - recorded as its own movement type, OPENING (OB-0001), never as a RECEIPT, so it is not
+//     mistaken for a delivery and does not feed the opening-balance suggestion;
+//   - audited (OPENING_BALANCE_SET) with who and when, and refused on a public server outside
+//     the demo sandbox like every other write.
+// Once a product has stock, it changes only on the warehouse floor.
+router.post("/skus/opening-balance", sandboxOnlyWhenPublic, (req, res) => {
+  const { sku_id, quantity } = req.body || {};
+  if (!sku_id) return res.status(400).json({ success: false, message: "sku_id is required" });
+  const qty = Number(quantity);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return res.status(400).json({ success: false, message: "quantity must be a positive number" });
+  }
+  try {
+    const db = getDb();
+    const pos = db.prepare(`SELECT on_hand_qty FROM inventory_positions WHERE sku_id = ?`).get(sku_id);
+    if (!pos) return res.status(404).json({ success: false, message: "SKU not found" });
+    if (Number(pos.on_hand_qty) > 0) {
+      return res.status(409).json({ success: false, message: "This product already has stock. From here on it changes only when the warehouse receives or dispatches goods." });
+    }
+    const done = db.prepare(`SELECT movement_no FROM goods_movements WHERE sku_id = ? AND movement_type = 'OPENING'`).get(sku_id);
+    if (done) {
+      return res.status(409).json({ success: false, message: `An opening balance was already recorded for this product (${done.movement_no}).` });
+    }
+    const last = db.prepare(`SELECT movement_no FROM goods_movements WHERE movement_type = 'OPENING' ORDER BY id DESC LIMIT 1`).get();
+    const n = last ? Number(String(last.movement_no).split("-")[1]) + 1 : 1;
+    const movementNo = `OB-${String(n).padStart(4, "0")}`;
+    const day = new Date().toISOString().slice(0, 10);
+
+    db.transaction(() => {
+      db.prepare(`UPDATE inventory_positions SET on_hand_qty = ?, last_received_date = ?, last_updated = datetime('now') WHERE sku_id = ?`)
+        .run(qty, day, sku_id);
+      db.prepare(`
+        INSERT INTO goods_movements (movement_no, movement_type, reference, sku_id, expected_qty, actual_qty, variance_qty, operator_name)
+        VALUES (?, 'OPENING', 'opening balance', ?, NULL, ?, 0, 'onboarding')`).run(movementNo, sku_id, qty);
+    })();
+
+    const { skus } = buildAnalytics(db);
+    const after = skus.find((x) => x.sku_id === sku_id);
+    logEvent(EVENTS.OPENING_BALANCE_SET, {
+      skuId: sku_id,
+      input: { quantity_mt: qty, on_hand_before: pos.on_hand_qty, at: new Date().toISOString() },
+      output: { movement_no: movementNo, on_hand_after: qty, available_qty: after ? after.available_qty : null, health_status: after ? after.health_status : null },
+    });
+    res.status(201).json({ success: true, data: after });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to record the opening balance" });
   }
 });
 
@@ -223,7 +318,7 @@ router.post("/skus", (req, res) => {
 const SKU_TABLE_FIELDS = [
   "product_name", "rice_variety", "grade", "country_of_origin", "brand", "supplier", "packaging_size",
   "min_order_qty", "reorder_point_policy", "min_stock", "target_stock", "max_stock", "safety_stock_pct",
-  "lead_time_days", "target_service_level", "unit_cost_sgd", "unit_price_sgd",
+  "lead_time_days", "lead_time_std_days", "target_service_level", "unit_cost_sgd", "unit_price_sgd",
 ];
 const POSITION_TABLE_FIELDS = ["reserved_qty", "quality_hold_qty"];
 
@@ -665,8 +760,19 @@ router.get("/skus/history/export-sales", (req, res) => {
   }
 });
 
+// pendingSkus: onboarding's combined "attach sales while reviewing the
+// catalog upload" step (Onboarding.jsx). Those SKUs aren't in the table yet
+// at PREVIEW time (they're rows in a CSV the user hasn't clicked Apply on),
+// so without this every one of them would preview as "not a known SKU".
+// {sku_id, product_name} pairs, not bare IDs, so the breakdown below can
+// still show a real name instead of a placeholder. Only ever honoured on a
+// preview (apply=false): the real insert below always re-checks the live
+// table regardless of what this array claims, since by the time sales
+// actually apply, the frontend has already applied the catalog for real, and
+// pretending a request-supplied ID exists at APPLY time would let a sale
+// reference a product that was never actually created.
 router.post("/skus/history/import-sales", (req, res) => {
-  const { csv, apply = false } = req.body || {};
+  const { csv, apply = false, pendingSkus = [] } = req.body || {};
   if (typeof csv !== "string" || !csv.trim()) {
     return res.status(400).json({ success: false, message: "No CSV content was received" });
   }
@@ -691,6 +797,11 @@ router.post("/skus/history/import-sales", (req, res) => {
     const skuNames = new Map(
       db.prepare(`SELECT sku_id, product_name FROM skus`).all().map((r) => [r.sku_id, r.product_name])
     );
+    if (!apply) {
+      for (const p of pendingSkus) {
+        if (p?.sku_id && !skuNames.has(p.sku_id)) skuNames.set(p.sku_id, p.product_name || "(new product)");
+      }
+    }
     const ignored = parsed.columns.filter((c) => !SALES_COLUMNS.includes(c));
 
     const toInsert = [];
@@ -738,6 +849,17 @@ router.post("/skus/history/import-sales", (req, res) => {
     }
 
     const dates = toInsert.map((r) => r.record.sale_date).sort();
+
+    // Actual rows, not just the aggregated skuBreakdown below - so "300 sales
+    // across 3 SKUs" is something you can also SEE, not just take on faith.
+    // Earliest and latest 5 by date (not file order, which is whatever the
+    // CSV happened to list first) rather than all of them: readable at a
+    // glance for the 4-row case and the 4,000-row one alike.
+    const byDate = [...toInsert].sort((a, b) => a.record.sale_date.localeCompare(b.record.sale_date));
+    const sampleRows = byDate.length <= 10
+      ? byDate.map((r) => r.record)
+      : [...byDate.slice(0, 5), ...byDate.slice(-5)].map((r) => r.record);
+
     const summary = {
       rows: parsed.rows.length,
       changed: toInsert.length, // reused for BulkEdit.jsx's shared blocked/apply-button logic
@@ -748,6 +870,8 @@ router.post("/skus/history/import-sales", (req, res) => {
       unknownSkus: [...unknownSkus],
       dateRange: dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null,
       skuBreakdown: [...bySku.values()].sort((a, b) => b.qty_total - a.qty_total),
+      sampleRows,
+      sampleRowsTruncated: byDate.length > 10,
       applied: false,
     };
 
@@ -801,6 +925,32 @@ const IMPORT_COLUMNS = [IMPORT_KEY, ...IMPORT_EDITABLE];
 // Read-only context columns. Exported so the spreadsheet is worth looking at on
 // its own, and ignored on the way back in, since they are computed.
 const EXPORT_CONTEXT = ["available_qty", "health_status", "days_of_cover", "abc_class"];
+
+// A blank template (no SKUs yet) ships one filled-in example row instead of
+// bare headers, so a first-time uploader sees realistic values, not columns
+// with no sense of what belongs in them. The sku_id carries the "delete me"
+// instruction because it is the leftmost, most-read cell in a spreadsheet.
+// /skus/import-new below refuses to create a real SKU from it, in case someone
+// uploads the template without deleting the row.
+//
+// Deliberately narrower than IMPORT_COLUMNS below (Stan's call, 18 Sep, after
+// the domain expert's own source document turned out to list a much shorter
+// "minimum fields" set than requirements.md's REQ-02 had grown into - see
+// reference/rice-inventory-technical-spec.md, Step 1): sku_id and
+// product_name are the only two the database actually requires, and of
+// everything else, lead_time_days/reorder_point_policy/target_stock are the
+// three that make the reorder math mean something real rather than resting
+// entirely on defaults. Every other column (variety, grade, origin, brand,
+// packaging, supplier, costs, min/max stock, safety stock %, MOQ) still
+// exists in the schema and is still editable from Inventory or Bulk edit
+// afterward - narrower here on purpose, not deleted from the app.
+const MINIMAL_TEMPLATE_COLUMNS = ["sku_id", "product_name", "lead_time_days", "reorder_point_policy", "target_stock"];
+const EXAMPLE_ROW_SKU_ID = "EXAMPLE-DELETE-ME";
+const EXAMPLE_ROW = {
+  sku_id: EXAMPLE_ROW_SKU_ID,
+  product_name: "Delete this row — Thai Jasmine 25KG shown as an example",
+  lead_time_days: 45, reorder_point_policy: 300, target_stock: 500,
+};
 
 // Every column either import treats as a non-negative number. The history
 // quantities join the set so cellChange validates and compares them the same
@@ -1238,6 +1388,21 @@ const CREATE_NUMERIC = [
 ];
 const CREATE_COLUMNS = [...CREATE_REQUIRED.filter((f) => f !== CREATE_KEY), ...CREATE_TEXT, ...CREATE_NUMERIC, CREATE_KEY];
 
+// A blank cell means "use the default", not "use zero" — matching db/init.js's
+// own column defaults and POST /skus above. Only these two need a non-zero
+// fallback: a 0-day lead time or 0% safety stock feeds straight into
+// reorder_point_suggested and reads as GREEN (nothing needed), which is the
+// opposite of "not yet configured".
+const CREATE_NUMERIC_DEFAULTS = { safety_stock_pct: 20, lead_time_days: 45 };
+
+// Labels for the "assumed" badges the import preview shows per row (Onboarding
+// step 1's review screen), one source of truth with CREATE_NUMERIC_DEFAULTS
+// above so the number shown to the uploader can never drift from the number
+// actually written. Only these two fields get a badge — every other blank
+// numeric column defaults to a genuinely unremarkable 0 (see CatalogFields.jsx),
+// not a standing assumption worth flagging.
+const ASSUMPTION_LABELS = { safety_stock_pct: "20% safety stock", lead_time_days: "45-day lead time" };
+
 router.post("/skus/import-new", (req, res) => {
   const { csv, apply = false } = req.body || {};
   if (typeof csv !== "string" || !csv.trim()) {
@@ -1266,23 +1431,30 @@ router.post("/skus/import-new", (req, res) => {
 
     const toCreate = [];
     const errors = [];
+    const warnings = [];
     const seen = new Set();
 
     for (const row of parsed.rows) {
       const line = row.__line;
       const id = row.sku_id;
       if (!id) { errors.push({ line, message: `Row ${line} has no sku_id` }); continue; }
+      if (id === EXAMPLE_ROW_SKU_ID) { warnings.push(`Line ${line}: the example row was skipped, not added.`); continue; }
       if (seen.has(id)) { errors.push({ line, message: `${id} appears more than once (line ${line})` }); continue; }
       seen.add(id);
       if (known.has(id)) { errors.push({ line, message: `${id} already exists (line ${line}) — use Upload SKUs to edit it instead` }); continue; }
       if (!row.product_name) { errors.push({ line, message: `${id}: product_name is required (line ${line})` }); continue; }
 
       const record = { sku_id: id, product_name: row.product_name };
+      const assumed = [];
       let rowFailed = false;
       for (const f of CREATE_TEXT) record[f] = row[f] || null;
       for (const f of CREATE_NUMERIC) {
         const raw = row[f];
-        if (raw === undefined || raw === "") { record[f] = 0; continue; }
+        if (raw === undefined || raw === "") {
+          record[f] = CREATE_NUMERIC_DEFAULTS[f] ?? 0;
+          if (ASSUMPTION_LABELS[f]) assumed.push(ASSUMPTION_LABELS[f]);
+          continue;
+        }
         const n = Number(raw);
         if (!Number.isFinite(n) || n < 0) {
           errors.push({ line, message: `${id}: ${f} must be a number >= 0 (line ${line})` });
@@ -1292,7 +1464,7 @@ router.post("/skus/import-new", (req, res) => {
         record[f] = n;
       }
       if (rowFailed) continue;
-      toCreate.push({ line, record });
+      toCreate.push({ line, record, assumed });
     }
 
     const summary = {
@@ -1300,9 +1472,10 @@ router.post("/skus/import-new", (req, res) => {
       changed: toCreate.length, // reused for BulkEdit.jsx/Onboarding.jsx's shared blocked/apply-button logic
       unchanged: 0,
       errors,
-      warnings: [],
+      warnings,
+      warningBody: "Nothing else needs fixing here; this is just a note about a row that was left out.",
       ignoredColumns: ignored,
-      changes: toCreate.map(({ record }) => ({ sku_id: record.sku_id, name: record.product_name, fields: {} })),
+      changes: toCreate.map(({ record, assumed }) => ({ sku_id: record.sku_id, name: record.product_name, fields: {}, assumed })),
       applied: false,
     };
 
@@ -1350,46 +1523,181 @@ router.post("/skus/import-new", (req, res) => {
 });
 
 // ── Inventory ────────────────────────────────────────────────────────────────
+//
+// There is deliberately NO stock-writing endpoint here (Reorder Loop step 7,
+// "Separate the duties"). This router serves the Control Tower, which reads the
+// ledger but never changes what is physically in the building. Stock moves only
+// on the warehouse floor, against an expected line, attributed to an operator:
+// POST /api/warehouse/inbound/receive and POST /api/warehouse/outbound/pick.
+//
+// A POST /api/inventory/restock used to live here and added on-hand quantity
+// straight from the office, with no purchase order, no operator and no
+// variance. It was removed when the duties were separated: the one thing the
+// Control Tower may now trigger is a request to the buyer (POST
+// /api/order-requests), which records intent and never touches stock.
 
-// POST /api/inventory/restock — add on-hand quantity, reset the receipt clock
-router.post("/inventory/restock", (req, res) => {
-  const { sku_id, quantity } = req.body || {};
-  if (!sku_id) return res.status(400).json({ success: false, message: "sku_id is required" });
-  const qty = Number(quantity);
-  if (!qty || qty <= 0) return res.status(400).json({ success: false, message: "quantity must be a positive number" });
+// ── Order requests (Reorder Loop step 7) ──────────────────────────────────────
+// The Control Tower's one write. It records a request to the buyer to order
+// more of a SKU; it does NOT change stock. Deliberately in this router (the
+// Control Tower API) precisely because it is the office's only permitted write,
+// and it touches order_requests, never inventory_positions.
+
+// REQ-0001, sequential, zero padded — the same shape goods_movements uses for
+// its GRN/DN numbers, so the two id schemes read alike on the Activity page.
+function nextRequestNo(db) {
+  const row = db.prepare(`SELECT request_no FROM order_requests ORDER BY id DESC LIMIT 1`).get();
+  const n = row ? Number(String(row.request_no).split("-")[1]) + 1 : 1;
+  return `REQ-${String(n).padStart(4, "0")}`;
+}
+
+// POST /api/order-requests  { sku_id, quantity, reason? }
+router.post("/order-requests", sandboxOnlyWhenPublic, (req, res) => {
+  const b = req.body || {};
+  if (!b.sku_id) return res.status(400).json({ success: false, message: "sku_id is required" });
+  const qty = Number(b.quantity);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return res.status(400).json({ success: false, message: "quantity must be a positive number" });
+  }
 
   try {
     const db = getDb();
-    const existing = db.prepare(`SELECT on_hand_qty FROM inventory_positions WHERE sku_id = ?`).get(sku_id);
-    if (!existing) return res.status(404).json({ success: false, message: "SKU not found" });
+    const sku = db.prepare(`SELECT sku_id, product_name FROM skus WHERE sku_id = ?`).get(b.sku_id);
+    if (!sku) return res.status(404).json({ success: false, message: "SKU not found" });
 
-    db.prepare(`
-      UPDATE inventory_positions
-         SET on_hand_qty = on_hand_qty + ?, last_received_date = ?, last_updated = datetime('now')
-       WHERE sku_id = ?`
-    ).run(qty, today(), sku_id);
+    const requestNo = nextRequestNo(db);
+    const reason = String(b.reason || "").trim() || null;
+    const requestedBy = String(b.requested_by || "").trim() || "control tower";
 
-    const { skus } = getAnalytics();
-    const after = skus.find((s) => s.sku_id === sku_id);
+    const info = db.prepare(`
+      INSERT INTO order_requests (request_no, sku_id, quantity_mt, reason, requested_by)
+      VALUES (?, ?, ?, ?, ?)`
+    ).run(requestNo, b.sku_id, qty, reason, requestedBy);
 
-    logEvent(EVENTS.RESTOCK, {
-      skuId: sku_id,
-      input: { quantity_mt: qty, on_hand_before: existing.on_hand_qty, received_date: today() },
-      output: after
-        ? { on_hand_after: existing.on_hand_qty + qty, available_qty: after.available_qty, health_status: after.health_status }
-        : null,
+    const created = db.prepare(`
+      SELECT r.*, s.product_name AS sku_name FROM order_requests r
+        LEFT JOIN skus s ON s.sku_id = r.sku_id
+       WHERE r.id = ?`).get(info.lastInsertRowid);
+
+    // No output stock figures on purpose: this event's whole point is that
+    // nothing about the physical position moved. Input carries the ask, output
+    // carries only the request identity and status.
+    logEvent(EVENTS.ORDER_REQUESTED, {
+      skuId: b.sku_id,
+      input: { quantity_mt: qty, reason, requested_by: requestedBy },
+      output: { request_no: requestNo, status: created.status },
     });
 
-    res.json({ success: true, data: after });
+    res.status(201).json({ success: true, data: created });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: "Failed to restock SKU" });
+    res.status(500).json({ success: false, message: "Failed to raise the order request" });
+  }
+});
+
+// GET /api/order-requests?sku_id=...&status=open
+router.get("/order-requests", (req, res) => {
+  try {
+    const db = getDb();
+    const where = [];
+    const params = {};
+    if (req.query.sku_id) { where.push("r.sku_id = @sku_id"); params.sku_id = req.query.sku_id; }
+    if (req.query.status) { where.push("r.status = @status"); params.status = req.query.status; }
+
+    const rows = db.prepare(`
+      SELECT r.*, s.product_name AS sku_name FROM order_requests r
+        LEFT JOIN skus s ON s.sku_id = r.sku_id
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+       ORDER BY r.id DESC
+       LIMIT 200`).all(params);
+
+    res.json({ success: true, count: rows.length, data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load order requests" });
+  }
+});
+
+// PATCH /api/order-requests/:id  { status: 'ordered' | 'cancelled' }
+//
+// The follow-through that closes an open request: a buyer either places the
+// order (status -> ordered) or drops it (status -> cancelled). This still
+// changes NO stock — marking a request "ordered" means an order now exists for
+// the warehouse to receive against later, and that receipt (on the floor, by an
+// operator) is the only thing that ever moves on_hand_qty. Kept a one-way step
+// from 'open', the same shape alert acknowledgement uses: a decided request is
+// not reopened, so a stale tab cannot flip an already-ordered line back.
+router.patch("/order-requests/:id", sandboxOnlyWhenPublic, (req, res) => {
+  const id = Number(req.params.id);
+  const status = String(req.body?.status || "").trim();
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ success: false, message: "A valid request id is required" });
+  }
+  if (!["ordered", "cancelled"].includes(status)) {
+    return res.status(400).json({ success: false, message: "status must be 'ordered' or 'cancelled'" });
+  }
+
+  try {
+    const db = getDb();
+    const existing = db.prepare(`SELECT * FROM order_requests WHERE id = ?`).get(id);
+    if (!existing) return res.status(404).json({ success: false, message: "Order request not found" });
+    if (existing.status !== "open") {
+      return res.status(409).json({
+        success: false,
+        message: `Request ${existing.request_no} is already ${existing.status} and cannot be changed.`,
+      });
+    }
+
+    db.prepare(`UPDATE order_requests SET status = ? WHERE id = ?`).run(status, id);
+
+    const updated = db.prepare(`
+      SELECT r.*, s.product_name AS sku_name FROM order_requests r
+        LEFT JOIN skus s ON s.sku_id = r.sku_id
+       WHERE r.id = ?`).get(id);
+
+    // Again no output stock figures: the whole point of step 7 is that this
+    // office action does not move the physical position.
+    logEvent(EVENTS.ORDER_REQUEST_UPDATED, {
+      skuId: existing.sku_id,
+      input: { request_no: existing.request_no, quantity_mt: existing.quantity_mt, from: existing.status },
+      output: { status },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to update the order request" });
   }
 });
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 // GET /api/dashboard/stats — portfolio KPI roll-up + as-of timestamp
+// GET /api/data-version - a cheap fingerprint of "has anything the Control Tower
+// shows changed". It exists so a page can ask "is what I loaded still current"
+// without recomputing the analytics (the Dashboard endpoints run every engine).
+// Five indexed MAX lookups: the audit log and the goods movement book (which
+// every stock change writes to), decisions, alerts, and the stock table's own
+// last_updated as a catch-all for any path that edits a position without an
+// audit row. Opaque to callers: only "same or different" means anything.
+router.get("/data-version", (req, res) => {
+  try {
+    const db = getDb();
+    const one = (sql) => db.prepare(sql).get().v;
+    const version = [
+      one("SELECT COALESCE(MAX(id), 0) AS v FROM audit_log"),
+      one("SELECT COALESCE(MAX(id), 0) AS v FROM goods_movements"),
+      one("SELECT COALESCE(MAX(id), 0) AS v FROM decisions"),
+      one("SELECT COALESCE(MAX(id), 0) AS v FROM alerts_log"),
+      one("SELECT COALESCE(MAX(last_updated), '') AS v FROM inventory_positions"),
+      one("SELECT COUNT(*) AS v FROM inventory_positions"),
+    ].join(":");
+    res.json({ success: true, data: { version } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to read data version" });
+  }
+});
+
 router.get("/dashboard/stats", (req, res) => {
   try {
     const { stats, asOf, primaryExceptions } = getAnalytics();
@@ -1689,6 +1997,141 @@ router.post("/alerts/explain", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to build explanation" });
+  }
+});
+
+// Same three-branch decision tree as frontend/src/pages/ActionItems.jsx's own
+// blindSpotReason() - kept deliberately duplicated rather than shared, since
+// the alternative (a shared module reachable from both a Node backend and a
+// Vite frontend bundle) is real infrastructure for three `if` statements. If
+// this grows past a handful of branches, unify it; for now the risk of the
+// two silently disagreeing is small and worth watching, not worth building
+// around yet.
+function blindSpotReasonServer(sku) {
+  if (!sku.avg_daily_usage_30d) {
+    return { whatsMissing: "No sales history yet", why: "Can't project a stockout date without a demand rate to project forward.", fix: "Nothing to do - resolves itself once this product has sold a few times." };
+  }
+  if (!sku.target_stock) {
+    return { whatsMissing: "Target stock was never set (0)", why: "Suggested order quantity is target stock minus projected position - with no target, it can't mean anything.", fix: "Set it on Table" };
+  }
+  if (!sku.reorder_point_policy) {
+    return { whatsMissing: "Reorder point was never set (0)", why: "Figures that compare against the approved reorder point aren't meaningful yet.", fix: "Set it on Table" };
+  }
+  return null;
+}
+
+// POST /api/action-items/explain  { sku_id, kind: "stockout" | "blindspot", tier? }
+//
+// Same shape as /alerts/explain just above: re-derives everything live from
+// analytics rather than trusting anything the client sends about WHY a row
+// is on the page, for the same reason - a stale tab must never hand the
+// model outdated evidence. See backend/src/llm/explainActionItem.js for the
+// explanation pipeline itself.
+router.post("/action-items/explain", async (req, res) => {
+  const { sku_id, kind } = req.body || {};
+  if (!sku_id || !["stockout", "blindspot"].includes(kind)) {
+    return res.status(400).json({ success: false, message: "sku_id and a valid kind (stockout or blindspot) are required" });
+  }
+  const tier = resolveTier(req.body?.tier || getDefaultMode());
+
+  if (tier === "cloud" && !demoAccess.passValid(req.get("X-Demo-Unlock"))) {
+    const gate = demoAccess.gateStatus();
+    return res.json({
+      success: true,
+      data: {
+        available: false,
+        locked: gate.ok,
+        reason: gate.ok ? "Paid explanations are locked. Enter the demo PIN in Settings to unlock them." : gate.reason,
+        ...providerInfo(tier),
+      },
+    });
+  }
+
+  try {
+    const { skus } = getAnalytics();
+    const sku = skus.find((s) => s.sku_id === sku_id);
+    if (!sku) return res.status(404).json({ success: false, message: "SKU not found" });
+
+    let item;
+    if (kind === "stockout") {
+      const proj = projectInventory({
+        availableQty: sku.available_qty, dailyDemand: sku.avg_daily_usage_30d,
+        openPos: sku.open_pos, safetyStockMt: sku.safety_stock_mt,
+        reorderPoint: sku.reorder_point_policy, days: 90,
+      });
+      const daysUntil = (iso) => (iso ? Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 86_400_000)) : null);
+      const stockoutDays = daysUntil(proj.first_stockout_date);
+      const breachDays = daysUntil(proj.first_safety_breach_date);
+      const days = stockoutDays != null ? stockoutDays : breachDays;
+      if (days == null) {
+        return res.status(404).json({ success: false, message: "Nothing projected to run out or breach safety stock for this SKU right now" });
+      }
+      item = { nearest: { days }, isStockout: stockoutDays != null };
+    } else {
+      const reason = blindSpotReasonServer(sku);
+      if (!reason) return res.status(404).json({ success: false, message: "No blind spot found for this SKU right now" });
+      item = { reason };
+    }
+
+    try {
+      const out = await explainActionItem({ kind, sku, item, tier });
+      res.json({
+        success: true,
+        data: { available: true, explanation: out.text, provider: out.provider, model: out.model, cached: out.cached },
+      });
+    } catch (err) {
+      if (err instanceof LlmUnavailable) {
+        return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo(tier) } });
+      }
+      throw err;
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to build explanation" });
+  }
+});
+
+// POST /api/ask-database  { question, tier? }
+//
+// The tier past Action Items' fixed "Why?" (19 Sep): an open-ended question,
+// answered by a model that can call a small set of read-only tools
+// (backend/src/llm/tools.js) to fetch facts it wasn't pre-loaded with -
+// never raw SQL, never a write. See askDatabase.js for the full reasoning.
+// Same never-500-on-a-model-problem contract as /alerts/explain and
+// /action-items/explain above.
+router.post("/ask-database", async (req, res) => {
+  const { question } = req.body || {};
+  if (!question || typeof question !== "string" || !question.trim()) {
+    return res.status(400).json({ success: false, message: "question is required" });
+  }
+  const tier = resolveTier(req.body?.tier || getDefaultMode());
+
+  if (tier === "cloud" && !demoAccess.passValid(req.get("X-Demo-Unlock"))) {
+    const gate = demoAccess.gateStatus();
+    return res.json({
+      success: true,
+      data: {
+        available: false,
+        locked: gate.ok,
+        reason: gate.ok ? "Paid explanations are locked. Enter the demo PIN in Settings to unlock them." : gate.reason,
+        ...providerInfo(tier),
+      },
+    });
+  }
+
+  try {
+    const analytics = getAnalytics();
+    const out = await askDatabase({ question: question.trim(), db: getDb(), analytics, tier });
+    res.json({
+      success: true,
+      data: { available: true, answer: out.text, provider: out.provider, model: out.model, toolCalls: out.toolCalls },
+    });
+  } catch (err) {
+    if (err instanceof LlmUnavailable) {
+      return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo(tier) } });
+    }
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to answer the question" });
   }
 });
 

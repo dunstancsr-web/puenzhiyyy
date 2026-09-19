@@ -9,6 +9,7 @@ import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { api } from "../api/inventory";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { buildExplanation } from "../lib/explain";
 import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier";
 
@@ -33,13 +34,13 @@ function useModalEscape(onClose) {
 // Colors now token-based (was hardcoded light-mode-only hex) - the direct
 // cause of this page never respecting Dark/Glass (visual overhaul, 2026-09).
 const TYPE_META = {
-  STOCKOUT_RISK: { icon: XCircle,       color: "var(--red)",    bg: "var(--red-light)",    label: "Stockout Risk" },
-  REORDER:       { icon: AlertTriangle, color: "var(--yellow)", bg: "var(--yellow-light)", label: "Reorder" },
-  OVERSTOCK:     { icon: TrendingUp,    color: "var(--purple)", bg: "var(--purple-light)", label: "Overstock" },
-  SLOW_MOVING:   { icon: TrendingDown,  color: "var(--yellow)", bg: "var(--yellow-light)", label: "Slow Moving" },
-  IDLE:          { icon: Clock,         color: "var(--red)",    bg: "var(--red-light)",    label: "Idle Stock" },
-  AGEING:        { icon: AlertTriangle, color: "var(--yellow)", bg: "var(--yellow-light)", label: "Ageing" },
-  POLICY_CHANGE_SUGGESTED: { icon: Target, color: "var(--blue)", bg: "var(--blue-light)", label: "Policy Suggestion" },
+  STOCKOUT_RISK: { icon: XCircle,       color: "var(--red-text)",    bg: "var(--red-light)",    label: "Stockout Risk" },
+  REORDER:       { icon: AlertTriangle, color: "var(--yellow-text)", bg: "var(--yellow-light)", label: "Reorder" },
+  OVERSTOCK:     { icon: TrendingUp,    color: "var(--purple-text)", bg: "var(--purple-light)", label: "Overstock" },
+  SLOW_MOVING:   { icon: TrendingDown,  color: "var(--yellow-text)", bg: "var(--yellow-light)", label: "Slow Moving" },
+  IDLE:          { icon: Clock,         color: "var(--red-text)",    bg: "var(--red-light)",    label: "Idle Stock" },
+  AGEING:        { icon: AlertTriangle, color: "var(--yellow-text)", bg: "var(--yellow-light)", label: "Ageing" },
+  POLICY_CHANGE_SUGGESTED: { icon: Target, color: "var(--blue-text)", bg: "var(--blue-light)", label: "Policy Suggestion" },
 };
 
 const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 };
@@ -136,6 +137,16 @@ export default function Alerts() {
   }, []);
 
   useEffect(() => { loadAlerts(); }, [loadAlerts]);
+
+  // A receipt can clear an alert and a pick can raise one. Alert ids are stable
+  // database ids, so an open Why? panel keeps its place across a refresh.
+  useLiveRefresh(() => {
+    Promise.all([api.getAlerts(), api.getDecisions(), api.getSkus()])
+      .then(([alertsData, decisionsData, skuData]) => {
+        setAlerts(alertsData); setDecisions(decisionsData); setSkus(skuData || []);
+      })
+      .catch(() => {});
+  });
 
   // Which tiers this server can offer, so a choice it cannot honour (an
   // expired pass, a local model that does not exist on a host) falls back
@@ -283,7 +294,7 @@ export default function Alerts() {
       {filter !== "ALL" && (
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600,
-          background: "var(--blue-light)", color: "var(--blue)", padding: "4px 10px 4px 12px",
+          background: "var(--blue-light)", color: "var(--blue-text)", padding: "4px 10px 4px 12px",
           borderRadius: 99, marginBottom: 18,
         }}>
           Filtering by {TYPE_META[filter]?.label}
@@ -377,9 +388,9 @@ function ActionButton({ onClick, children, variant = "quiet", title }) {
   // different colours (purple, green, amber, red), which is a rainbow rather
   // than a hierarchy: nothing led, so the eye had to read all four every time.
   const styles = {
-    primary: { background: "var(--blue)", color: "#fff", border: "1px solid var(--blue)" },
+    primary: { background: "var(--blue-strong)", color: "#fff", border: "1px solid var(--blue-strong)" },
     quiet:   { background: "var(--card-bg)", color: "var(--text-secondary)", border: "1px solid var(--border)" },
-    danger:  { background: "var(--card-bg)", color: "var(--red)", border: "1px solid var(--border)" },
+    danger:  { background: "var(--card-bg)", color: "var(--red-text)", border: "1px solid var(--border)" },
   }[variant];
   return (
     <button onClick={onClick} title={title}
@@ -523,7 +534,7 @@ function AiModal({ aiModal, onClose }) {
             fields, not a live model call (TASK-11 needs an API key that
             isn't available yet). Corrected to say so plainly rather than
             claim a capability that doesn't exist yet. */}
-        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--yellow)", marginBottom: 18 }}>
+        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--yellow-text)", marginBottom: 18 }}>
           {degraded
             ? "\u26A0\uFE0F This SKU's current figures could not be loaded, so only the alert's own text is shown. Reopen after a refresh for the full reasoning."
             : narrative?.available
@@ -557,7 +568,7 @@ function AiModal({ aiModal, onClose }) {
             <div style={{
               display: "flex", alignItems: "center", gap: 6, marginBottom: 7,
               fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em",
-              textTransform: "uppercase", color: "var(--purple)",
+              textTransform: "uppercase", color: "var(--purple-text)",
             }}>
               <Cpu size={12} /> Summary
               <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0, color: "var(--text-muted)" }}>
@@ -611,7 +622,7 @@ function AiModal({ aiModal, onClose }) {
 
         <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}>
           <button onClick={onClose}
-            style={{ padding: "8px 20px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff", fontWeight: 600, fontSize: "var(--text-sm)", border: "none", cursor: "pointer" }}>
+            style={{ padding: "8px 20px", borderRadius: "var(--radius)", background: "var(--blue-strong)", color: "#fff", fontWeight: 600, fontSize: "var(--text-sm)", border: "none", cursor: "pointer" }}>
             Understood
           </button>
         </div>
@@ -682,20 +693,20 @@ function ApprovalModal({ alert, sku, preAction = "approved", onDecide, onClose }
             <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ color: "var(--text-secondary)" }}>
                 Forecast model: <b style={{ color: "var(--text-primary)" }}>{(sku.demand_source || "").replace(/_/g, " ")}</b>
-                {sku.forecast_low_confidence && <span style={{ color: "var(--yellow)", fontWeight: 600 }}> · low confidence (sparse history)</span>}
+                {sku.forecast_low_confidence && <span style={{ color: "var(--yellow-text)", fontWeight: 600 }}> · low confidence (sparse history)</span>}
               </div>
               {sku.risk_buffer_mt > 0 && (
                 <div style={{ color: "var(--text-secondary)" }}>
                   Risk buffer: <b style={{ color: "var(--text-primary)" }}>+{sku.risk_buffer_mt} MT</b> ({sku.risk_buffer_reason}, illustrative)
                 </div>
               )}
-              <div style={{ color: "var(--blue)", fontWeight: 600 }}>
+              <div style={{ color: "var(--blue-text)", fontWeight: 600 }}>
                 Suggested reorder point: {sku.reorder_point_policy} → {alert.ai_recommendation_qty} MT
               </div>
             </div>
           ) : (
             alert.ai_recommendation_qty > 0 && (
-              <div style={{ marginTop: 6, color: "var(--blue)", fontWeight: 600 }}>
+              <div style={{ marginTop: 6, color: "var(--blue-text)", fontWeight: 600 }}>
                 Suggested order quantity: {alert.ai_recommendation_qty} MT
               </div>
             )
@@ -741,7 +752,7 @@ function ApprovalModal({ alert, sku, preAction = "approved", onDecide, onClose }
           {/* Reason */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
-              Reason / Notes {action !== "approved" && <span style={{ color: "var(--red)" }}>*</span>}
+              Reason / Notes {action !== "approved" && <span style={{ color: "var(--red-text)" }}>*</span>}
             </label>
             <textarea
               value={reason} onChange={(e) => setReason(e.target.value)}
@@ -755,14 +766,14 @@ function ApprovalModal({ alert, sku, preAction = "approved", onDecide, onClose }
               }}
             />
             {showReasonError && (
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--red)", marginTop: 4 }}>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--red-text)", marginTop: 4 }}>
                 A reason is required to {action === "rejected" ? "reject" : "modify"} this recommendation.
               </div>
             )}
           </div>
 
           {submitError && (
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--red)", marginBottom: 12 }}>⚠ {submitError}</div>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--red-text)", marginBottom: 12 }}>⚠ {submitError}</div>
           )}
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -772,7 +783,7 @@ function ApprovalModal({ alert, sku, preAction = "approved", onDecide, onClose }
             </button>
             <button type="submit" disabled={!valid || saving}
               style={{
-                padding: "8px 22px", borderRadius: "var(--radius)", background: "var(--blue)", color: "#fff",
+                padding: "8px 22px", borderRadius: "var(--radius)", background: "var(--blue-strong)", color: "#fff",
                 fontWeight: 600, fontSize: "var(--text-sm)", border: "none", cursor: !valid || saving ? "not-allowed" : "pointer",
                 opacity: !valid || saving ? 0.6 : 1,
               }}>

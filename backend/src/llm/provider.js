@@ -284,7 +284,17 @@ async function callAnthropic({ system, user, signal }) {
  * @param {number} [opts.timeoutMs] default 60s, because a cold local model on a
  *   laptop can genuinely take 20s or more (measured: llama3 at about 20s).
  */
-async function chat({ system, user, tier = DEFAULT_MODE, timeoutMs = 60_000 }) {
+// `model` (19 Sep): an optional per-call override for the local tier only,
+// so one feature can use a different Ollama model than OLLAMA_MODEL's own
+// default without changing that default for everyone. Needed because
+// bench-models.js scored llama3 as the best of three models for Alerts'
+// explanations specifically (see backend/.env's own recorded comment) - a
+// DIFFERENT task (askDatabase.js's tool-argument substitution) measured
+// llama3.1:8b as meaningfully more reliable, and flipping the shared
+// default to fix one would have silently regressed the other's own
+// benchmarked choice. callOllama() already spreads its args last over its
+// defaults, so passing `model` through costs nothing to wire.
+async function chat({ system, user, tier = DEFAULT_MODE, timeoutMs = 60_000, model }) {
   const t = resolveTier(tier);
   if (t === "rules") {
     throw new LlmUnavailable("Rule-based mode is active, so no model is called.");
@@ -307,7 +317,7 @@ async function chat({ system, user, tier = DEFAULT_MODE, timeoutMs = 60_000 }) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const args = { system, user, signal: controller.signal };
-    if (t === "local") return await callOllama(args);
+    if (t === "local") return await callOllama(model ? { ...args, model } : args);
     return cp === "gateway" ? await callGateway(args) : await callAnthropic(args);
   } finally {
     clearTimeout(timer);

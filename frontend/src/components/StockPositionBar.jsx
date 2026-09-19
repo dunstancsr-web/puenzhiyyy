@@ -11,6 +11,8 @@ import HoverHint from "./HoverHint";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FILL = { red: "var(--red)", amber: "var(--yellow)", green: "var(--green)", purple: "var(--purple)" };
+// The same four zones as WORDS: the fills above are too light to read as text.
+const TEXT = { red: "var(--red-text)", amber: "var(--yellow-text)", green: "var(--green-text)", purple: "var(--purple-text)" };
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const fmt = (n) => Math.round(n).toLocaleString("en-SG");
@@ -140,7 +142,7 @@ export default function StockPositionBar({
   // The quantity itself is a hard fact and stays fully legible even when the
   // state is not an emergency. Muting it to secondary made 78 MT of trapped
   // capital look like a disabled field.
-  const valueColor = zoneKey === "idle" ? "var(--text-primary)" : FILL[zoneKey];
+  const valueColor = zoneKey === "idle" ? "var(--text-primary)" : TEXT[zoneKey];
 
   // Applied to the measure bar. Idle gets hatching, everything else a solid.
   const measureFill = zoneKey === "idle"
@@ -180,10 +182,10 @@ export default function StockPositionBar({
       gapWeight = 700;
     } else if (gap < rop * 0.15) {
       gapText = `+${fmt(gap)} MT - near reorder point`;
-      gapColor = "var(--yellow)";
+      gapColor = "var(--yellow-text)";
     } else {
       gapText = `+${fmt(gap)} MT above reorder point`;
-      gapColor = "var(--green)";
+      gapColor = "var(--green-text)";
     }
   }
 

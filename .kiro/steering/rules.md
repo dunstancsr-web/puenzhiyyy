@@ -126,6 +126,23 @@ Read before making UI changes.
 - **`theme` is a preference, `resolved` is an appearance.** `useTheme()` returns both. `theme` can be
   `"auto"`, so `theme === "light" ? a : b` silently takes the dark branch on a light page. Anything
   picking a COLOUR reads `resolved`; only the settings UI reads `theme`.
+- **Anything `position: fixed` must clear the demo banner.** Body padding moves in-flow content only, so a
+  fixed top bar at `top: 0` sits UNDER the banner. Offset it by `var(--demo-banner-height)`. That token is
+  MEASURED by `DemoModeBadge` (a `ResizeObserver`), never a constant: a fixed 40px banner overflowed the day
+  its sentence wrapped, and covered the phone navigation.
+- **A floating control always covers something.** The "Enter demo mode" pill sat on top of Bulk edit and Add
+  SKU on desktop. Entry points to a mode live in a menu or in the flow of a page (Settings, Home), never as a
+  permanent fixed button.
+- **Accent colours are for fills; use the `*-text` tokens for words.** `--red`, `--blue`, `--green`,
+  `--yellow`, `--orange` and `--purple` fail 4.5:1 as small text on a light surface. Use
+  `--red-text`, `--blue-text`, `--green-text`, `--yellow-text`, `--orange-text`, `--purple-text` for text, and
+  `--blue-strong` behind white text. The dark theme maps them back to the bright accents.
+- **Touch targets are 44px on phones.** Global rules in `index.css` set it for buttons, selects and inputs
+  under 769px; `.hit-44` and `.hit-44-icon` grow the hit area of a small visible control without changing its
+  size, and `.touch-44` beats inline styles (`all: unset`, fixed padding). Inline `min-height` defeats the
+  global rule, so do not set one.
+- **A hidden browser tab freezes CSS transitions**, so a colour that inherits from `body` (mid 0.3s transition)
+  can look wrong in an automated screenshot. Disable transitions in the frame before judging contrast.
 - **Never put a `//` comment inside a JSX opening tag.** esbuild tolerates it and the build passes,
   but it is not valid JSX and other toolchains reject it. Put `{/* ... */}` above the element.
 - **Verify against the real cascade, not a mock of it.** Injecting `!important` to force a breakpoint
@@ -135,7 +152,7 @@ Read before making UI changes.
 - **Prove a new check can fail.** Before trusting a check, give it a case it must catch. On 15 Sep the
   formula check was proven by breaking a health rule on purpose, and the directory check turned out to
   pass everything under `docs/` until a deliberately unlisted file slipped through it.
-- **Describe what the running app does, not what the backend supports.** Goods Out has an API but no
+- **Describe what the running app does, not what the backend supports.** Goods Out once had an API but no
   screens, and five documents called it a working flow until someone clicked through the app. Check a
   feature on screen before writing that it exists.
 - **Never point a prompt brief at a figure that has no placeholder.** An ageing brief saying "the
@@ -152,10 +169,11 @@ Read before making UI changes.
 
 - **Home**: the screen at `/` with the three workspaces (`frontend/src/pages/Home.jsx`). Briefly
   called the Launchpad; Stan renamed it because everyone already knows what Home means.
-- **The Control Tower**: the desktop side, Dashboard, Inventory, Alerts, Activity. The only part with
-  the sidebar.
-- **Goods In** and **Goods Out**: the handheld warehouse floor flows (Goods Out has an API but no screens
-  yet). Industry terms: inbound / goods
+- **The Control Tower**: the desktop side. The sidebar's own order (`Sidebar.jsx`): Dashboard, Action
+  Items, Forecast, Inventory, Alerts, Activity, Table. The only part with the sidebar. Action Items
+  and Table (both 19 Sep) are additive - Alerts keeps the approve/modify/reject workflow, Activity
+  keeps the audit record, neither was replaced.
+- **Goods In** and **Goods Out**: the handheld warehouse floor flows. Industry terms: inbound / goods
   receipt, outbound / goods issue.
 - **Key Metrics**: the top card on the Dashboard (hero value, baseline comparison, the Service &
   availability and Working capital groups). The Dashboard's sections after it, in order: **Needs
@@ -181,12 +199,18 @@ Read before making UI changes.
 
 ## 8. Tooling
 
+- **"Prepare for handover"**, said to any agent, means run the checklist in `handoff.md`, "Keeping
+  this in sync", right then rather than at the natural end of a session. Defined once there, not
+  repeated here.
 - `.kiro/hooks/*.json` fire only in Kiro; `.claude/settings.json` fires only in Claude Code. Kiro
   trigger names are PascalCase (`AgentStop`, `PostTaskExecution`).
 - The one check both share is `.kiro/hooks/docs-check.sh`: when an agent finishes responding with
   files changed since the last devlog entry, it asks for the entry. Claude Code blocks the stop once;
   Kiro, which cannot block, prints a reminder. If you are only pausing to ask Stan a question, say so
   and stop.
+- **UI changes are checked with the UI/UX audit skill** (`.claude/skills/ui-ux-audit/`, or `#ui-ux-audit` in
+  Kiro; `npm run ux:audit`). It is the shared procedure for both tools and holds no rules of its own: the
+  rules it enforces (type scale, no dashes, one primary action, contrast tokens) are in this file.
 - A second shared check, same pattern: `.kiro/hooks/branch-check.sh`, run as a Claude Code
   `SessionStart` hook and a Kiro `PostTaskExecution` hook. It only reminds; it never blocks. The
   actual enforcement of the branch workflow (see "Working rules") is `.githooks/pre-commit` and

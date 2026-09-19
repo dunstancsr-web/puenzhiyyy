@@ -1,0 +1,30 @@
+<!doctype html>
+<!-- The clean twin of bad.html: the same structure, done right. The audit must report no error. -->
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Report</title>
+<style>
+  :root { --banner-h: 44px; }
+  body { margin: 0; font-family: sans-serif; background: #fff; color: #111; padding-top: var(--banner-h); }
+  #banner { position: fixed; top: 0; left: 0; right: 0; min-height: var(--banner-h); box-sizing: border-box; padding: 4px 12px; display: flex; align-items: center; background: #fa0; z-index: 10; }
+  nav { position: sticky; top: var(--banner-h); height: 50px; background: #eee; z-index: 5; display: flex; align-items: center; gap: 8px; }
+  nav a, button { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  button:focus-visible { outline: 3px solid #05c; outline-offset: 2px; }
+  .clip { min-height: 80px; overflow: hidden; border: 1px solid #999; }
+</style></head>
+<body>
+  <div id="banner">DEMO MODE. Sandbox data</div>
+  <nav><a href="#">Home</a> <a href="#">Reports</a></nav>
+  <main style="padding:0 12px">
+    <h1>Report</h1>
+    <p style="font-size:13px">A readable footnote.</p>
+    <p style="color:#444">A paragraph with strong contrast.</p>
+    <button aria-label="Close">x</button>
+    <button>Save</button>
+    <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="40" height="40" alt="Logo">
+    <div id="one">a</div><div id="two">b</div>
+    <div style="max-width:100%;height:20px;background:#cde">a block that fits</div>
+    <div class="clip"><div style="height:80px">child fits its parent</div></div>
+    <p>Loading, please wait</p>
+  </main>
+</body>
+</html>

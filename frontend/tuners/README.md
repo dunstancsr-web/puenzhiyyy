@@ -10,6 +10,8 @@ rather than approximated.
 | [`type-scale.html`](type-scale.html) | How big every piece of text is | `--text-*` in `frontend/src/index.css` |
 | [`glass-tooltip.html`](glass-tooltip.html) | How the frosted panels look | `--hint-*` and `.hint-panel` in `frontend/src/index.css` |
 | [`table-density.html`](table-density.html) | Every gap in the Needs Attention card | the density constants in `frontend/src/pages/Dashboard.jsx` |
+| [`demo-glow.html`](demo-glow.html) | **Superseded, 17 Sep**: a screen-edge glow (flat, then rotating rainbow) was replaced with a labelled top banner, the industry-standard pattern for this, since a colour cue only works once someone has learned what it means. Kept for reference; does not describe current `DemoModeBadge.jsx`. | nothing, currently |
+| [`demo-frame.html`](demo-frame.html) | Compared a full top banner, a minimized hover strip, and a top-edge-only structural frame; Stan picked the frame. Shape confirmed here, actual fix lives in `DemoModeBadge.jsx`, `index.css` and every full-height layout | nothing, describes a decision already shipped |
 
 Published copies, for looking at on a phone or sending to someone:
 

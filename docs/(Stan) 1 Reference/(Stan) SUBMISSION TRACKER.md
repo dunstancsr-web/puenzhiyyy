@@ -1,5 +1,11 @@
 # Submission tracker
 
+> **This copy is stale (still 15 Sep).** The current tracker (17 Sep: MVP2 merge status, the
+> archived video script decision, the corrected engine count) lives on branch
+> `docs/mvp2-tracker-update` / PR #3, not yet merged to `main` as of 17 Sep. Read that version, not
+> this one, until the branches converge. This note exists so starting a fresh session on the wrong
+> branch doesn't mean trusting an out-of-date status.
+
 AWS NUS-ISS SMYA 2026 Hackathon. **Shortlisting deadline: 28 September 2026, 9:00am. Finale: 10 October.**
 
 Four deliverables. Status as of 15 Sep.
@@ -48,6 +54,10 @@ Four deliverables. Status as of 15 Sep.
 | Formulas where the spec and the code disagreed | lost sales are not sales; Slow Moving means over 120 days of cover; one demand rate, the 30 day moving average, across the whole app (15 Sep) | each conflict, choice and reason: design.md, "Formula decisions" |
 | Urgency in model summaries | removed by a rule after the model answers, not by retries (15 Sep) | free and predictable; design.md, "Explanation Layer", Tone |
 | How documents and rules are kept | filed by reader, listed in `docs/DIRECTORY.md`, every rule in `.kiro/steering/rules.md`, one owner per fact (15 Sep) | `.kiro/steering/rules.md` |
+| Onboarding shape | sequential, story-style (progress bar, Back, Skip advances/exits); no "minimize and resume from anywhere" chip (17 Sep) | reversed an earlier decision in the same feature branch; nothing to resume into once a skip just means finishing setup later through Inventory or Bulk edit like any other data entry |
+| Onboarding order: catalog before sales, never the reverse (17 Sep) | catalog-first stays; someone with both files ready can attach sales to the SAME upload instead of a separate step | a sales row has no product_name, variety, origin, packaging or supplier to build a catalog row FROM - reversing the order would mean SKUs created with a reorder policy and safety stock of 0, which reads as healthy everywhere, not as unconfigured |
+| Forecast Overview promoted to Sidebar's permanent nav, between Dashboard and Inventory (17 Sep) | a decision held open since design.md first shipped the page ("MVP2 is still a feature branch") | the approve/modify/reject decision for a suggested reorder point stays on Alerts only - Forecast explains and simulates, it does not also duplicate the decision |
+| Forecast Detail's suggestions are not labelled "AI generated" (18 Sep) | tagged instead as YOUR INPUT, STATISTICAL FORECAST or plain formula, with an explicit "none of this is generative AI" tooltip | none of it is: the demand number is a backtested statistical model (Naive/Linear/Holt-Winters/Holt damped), never an LLM call, and everything after it is fixed arithmetic; the only real AI in this app is the bounded Why? narration on Alerts |
 
 ## Judging criteria
 

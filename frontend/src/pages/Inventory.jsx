@@ -12,6 +12,7 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { TextField, NumberField, SliderField, niceCeil } from "../components/FormField";
 import { api } from "../api/inventory";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 // Used only for the SkuEditForm's instant live-preview strip while dragging sliders
 // (no round-trip per keystroke) - the actual Save always persists via the real API
 // below. Formulas are identical post the domain-alignment rename, so the preview
@@ -66,7 +67,7 @@ const COLS = [
     key: null, label: "Actions", width: "15%",
     tip: {
       what: "Quick actions you can take on this SKU.",
-      how: "Restock - record a new incoming quantity (e.g. a shipment just arrived).\nEdit - open the full SKU record to change policy thresholds, supplier, costs, lead time, and stock adjustments.",
+      how: "Request order - raise a request to the buyer to order more (does not change stock; stock only moves when the warehouse receives a delivery).\nEdit - open the full SKU record to change policy thresholds, supplier, costs, lead time, and stock adjustments.",
     },
   },
 ];
@@ -93,6 +94,7 @@ const EDIT_GROUPS = [
       ["max_stock", "num", "Max stock", false, "MT"],
       ["reorder_point_policy", "num", "Reorder point", false, "MT"],
       ["lead_time_days", "num", "Lead time", false, "days"],
+      ["lead_time_std_days", "num", "Lead time variability (σ)", false, "days"],
       ["target_service_level_pct", "num", "Target service level", false, "%"],
       ["safety_stock_pct", "num", "Safety stock", false, "%"],
       ["min_order_qty", "num", "Min order qty", false, "MT"],
@@ -145,6 +147,9 @@ const SLIDER_SPECS = {
   target_service_level_pct: { min: 50, max: 99.9, step: 0.5 },
   safety_stock_pct: { min: 0, max: 50, step: 1 },
   lead_time_days: { min: 1, max: 120, step: 1 },
+  // Same range as the ForecastDetail "what if" sandbox's own slider for this
+  // field, so a value that looks sane in one place looks sane in the other.
+  lead_time_std_days: { min: 0, max: 15, step: 0.5 },
 };
 
 function resolveSpec(spec, { axisMax, physicalStock }) {
@@ -161,6 +166,7 @@ const stockAxisMax = (form, physicalStock = 0) =>
   );
 
 export default function Inventory() {
+  const navigate = useNavigate();
   const [skus, setSkus] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState("");
@@ -169,8 +175,9 @@ export default function Inventory() {
   const [originFilter, setOriginFilter] = useState("All");
   const [sortKey, setSortKey] = useState("health_status");
   const [sortDir, setSortDir] = useState("asc");
-  const [restockTarget, setRestockTarget] = useState(null);
-  const [restockQty, setRestockQty] = useState("");
+  const [orderTarget, setOrderTarget] = useState(null);
+  const [orderQty, setOrderQty] = useState("");
+  const [orderReason, setOrderReason] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSku, setSelectedSku] = useState(null);
 
@@ -187,6 +194,16 @@ export default function Inventory() {
     }
   }, [searchParams, setSearchParams]);
 
+  // Cancelling on an empty catalog would otherwise strand a manager here with
+  // a bare table and no way back — this is exactly the state onboarding's own
+  // "Add one product by hand" hands off into. Home already renders Onboarding
+  // itself when the live count is 0, so returning there re-enters the flow
+  // instead of duplicating that check here.
+  const closeAddModal = useCallback(() => {
+    setShowAddModal(false);
+    if (skus && skus.length === 0) navigate("/");
+  }, [skus, navigate]);
+
   const loadSkus = useCallback(() => {
     setLoadError(null);
     setSkus(null);
@@ -194,6 +211,9 @@ export default function Inventory() {
   }, []);
 
   useEffect(() => { loadSkus(); }, [loadSkus]);
+
+  // Silent, so an open edit or sort survives; see hooks/useLiveRefresh.js.
+  useLiveRefresh(() => { api.getSkus().then(setSkus).catch(() => {}); });
 
   const ORIGINS = useMemo(
     () => ["All", ...new Set((skus || []).map((s) => s.country_of_origin)).values()],
@@ -252,32 +272,69 @@ export default function Inventory() {
   const replaceSku = (updated) =>
     setSkus((prev) => prev.map((s) => (s.sku_id === updated.sku_id ? updated : s)));
 
-  const [restockSaving, setRestockSaving] = useState(false);
-  const [restockError, setRestockError] = useState(null);
+  const [orderSaving, setOrderSaving] = useState(false);
+  const [orderError, setOrderError] = useState(null);
+  const [orderDone, setOrderDone] = useState(false);
 
-  const handleRestock = async () => {
-    const qty = parseFloat(restockQty);
-    // Used to just `return` here on a zero/negative/unparseable quantity -
-    // the button looked like it did nothing, with no indication why. The
-    // native <input type="number" min={0.1}> attributes look like validation
-    // but never actually run: this button isn't a form submit, so HTML5
-    // constraint validation never triggers on click.
+  // Open buyer requests (Reorder Loop step 7). Shown as a card above the table
+  // so the office can see and act on what it has asked the buyer for. Loaded
+  // separately from the SKU list because acting on a request changes no stock,
+  // so there is nothing on a SKU row to refresh.
+  const [openRequests, setOpenRequests] = useState([]);
+  const [requestBusyId, setRequestBusyId] = useState(null);
+  const loadOpenRequests = useCallback(() => {
+    api.getOrderRequests({ status: "open" }).then(setOpenRequests).catch(() => setOpenRequests([]));
+  }, []);
+  useEffect(() => { loadOpenRequests(); }, [loadOpenRequests]);
+
+  const handleRequestStatus = async (id, status) => {
+    setRequestBusyId(id);
+    try {
+      await api.updateOrderRequest(id, status);
+      loadOpenRequests();
+    } catch {
+      // A failed transition (e.g. someone else already closed it) just refreshes
+      // the list so the stale row disappears rather than showing an error box.
+      loadOpenRequests();
+    } finally {
+      setRequestBusyId(null);
+    }
+  };
+
+  // Reorder Loop step 7: the Control Tower raises a request to the buyer. It
+  // records intent for a manager to act on; it does NOT change stock. Stock
+  // only moves on the warehouse floor, so there is no replaceSku here.
+  const handleOrderRequest = async () => {
+    const qty = parseFloat(orderQty);
+    // Same lesson as the old restock button: this isn't a form submit, so the
+    // input's min attribute never runs. Validate explicitly.
     if (!qty || qty <= 0) {
-      setRestockError("Enter a quantity greater than 0.");
+      setOrderError("Enter a quantity greater than 0.");
       return;
     }
-    setRestockSaving(true);
-    setRestockError(null);
+    setOrderSaving(true);
+    setOrderError(null);
     try {
-      const updated = await api.restockSku(restockTarget.sku_id, qty);
-      replaceSku(updated);
-      setRestockTarget(null);
-      setRestockQty("");
+      await api.raiseOrderRequest({
+        sku_id: orderTarget.sku_id,
+        quantity: qty,
+        reason: orderReason.trim() || null,
+      });
+      setOrderDone(true);
+      loadOpenRequests(); // the new request shows in the open-requests card
     } catch (err) {
-      setRestockError(err.message || "Failed to restock");
+      setOrderError(err.message || "Failed to raise the request");
     } finally {
-      setRestockSaving(false);
+      setOrderSaving(false);
     }
+  };
+
+  const closeOrderModal = () => {
+    setOrderTarget(null);
+    setOrderQty("");
+    setOrderReason("");
+    setOrderError(null);
+    setOrderDone(false);
   };
 
   // patch -> Promise, so SkuEditForm can await and surface a server error inline.
@@ -322,7 +379,7 @@ export default function Inventory() {
           {/* Outlined, same weight as Bulk edit, so "Add SKU" stays the one
               primary action on this surface. MVP2 (branch-only for now) -
               see the App.jsx route comment for why this isn't in Sidebar yet. */}
-          <Link to="/forecast" style={{
+          <Link to="/forecast" className="touch-44" style={{
             display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: "var(--radius)",
             border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-secondary)",
             fontSize: "var(--text-sm)", fontWeight: 600, textDecoration: "none",
@@ -334,7 +391,7 @@ export default function Inventory() {
             onClick={() => setShowAddModal(true)}
             style={{
               display: "flex", alignItems: "center", gap: 7,
-              background: "var(--blue)", color: "#fff",
+              background: "var(--blue-strong)", color: "#fff",
               padding: "9px 18px", borderRadius: "var(--radius)",
               fontWeight: 600, fontSize: "var(--text-sm)", border: "none",
               cursor: "pointer", flexShrink: 0,
@@ -359,6 +416,39 @@ export default function Inventory() {
         <Select value={movementFilter} onChange={setMovementFilter} options={MOVEMENT_CLASSES} placeholder="Movement" />
         <Select value={originFilter}   onChange={setOriginFilter}   options={ORIGINS}          placeholder="Origin" />
       </div>
+
+      {/* ── Open buyer requests (Reorder Loop step 7) ──
+          The office half of the separated duties: what the Control Tower has
+          asked the buyer for, and the two ways to close it. Acting here changes
+          no stock; stock moves only when the warehouse receives a delivery.
+          Hidden entirely when there is nothing open, so it never adds empty
+          chrome to the page. */}
+      {openRequests.length > 0 && (
+        <div className="card" style={{ padding: "14px 16px", marginBottom: 16 }}>
+          <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 10 }}>
+            Open buyer requests
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {openRequests.map((r) => (
+              <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "var(--text-base)", fontWeight: 600 }}>
+                    {r.quantity_mt} MT · {r.sku_name || r.sku_id}
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 500 }}> · {r.request_no}</span>
+                  </div>
+                  {r.reason && (
+                    <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 2 }}>{r.reason}</div>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <ActionBtn label={requestBusyId === r.id ? "…" : "Mark ordered"} onClick={() => handleRequestStatus(r.id, "ordered")} />
+                  <ActionBtn label="Cancel" variant="ghost" onClick={() => handleRequestStatus(r.id, "cancelled")} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Table ── */}
       <div
@@ -454,15 +544,15 @@ export default function Inventory() {
                     {/* Coverage vs lead time */}
                     <td style={{ padding: "13px 16px" }}>
                       {sku.days_of_cover === null ? (
-                        <span style={{ fontSize: "var(--text-xs)", color: "var(--red)", fontWeight: 700 }}>No demand</span>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--red-text)", fontWeight: 700 }}>No demand</span>
                       ) : (
                         <div>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                             <span style={{
                               fontSize: "var(--text-sm)", fontWeight: 800,
-                              color: sku.days_of_cover < sku.lead_time_days ? "var(--red)"
-                                : sku.days_of_cover < sku.lead_time_days * 1.5 ? "var(--yellow)"
-                                : "var(--green)",
+                              color: sku.days_of_cover < sku.lead_time_days ? "var(--red-text)"
+                                : sku.days_of_cover < sku.lead_time_days * 1.5 ? "var(--yellow-text)"
+                                : "var(--green-text)",
                             }}>
                               {sku.days_of_cover}d
                             </span>
@@ -499,7 +589,7 @@ export default function Inventory() {
                         net, never the intended layout. */}
                     <td style={{ padding: "13px 8px 13px 12px" }}>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        <ActionBtn label="Restock" onClick={() => { setRestockTarget(sku); setRestockQty(""); setRestockError(null); }} />
+                        <ActionBtn label="Request order" onClick={() => { setOrderTarget(sku); setOrderQty(sku.suggested_order_qty > 0 ? String(sku.suggested_order_qty) : ""); setOrderReason(""); setOrderError(null); setOrderDone(false); }} />
                         <ActionBtn label="Edit" onClick={() => setSelectedSku(sku)} variant="ghost" />
                       </div>
                     </td>
@@ -511,31 +601,60 @@ export default function Inventory() {
         </div>
       </div>
 
-      {/* ── Restock modal ── */}
-      {restockTarget && (
-        <Modal title={`Restock: ${restockTarget.product_name}`} onClose={() => setRestockTarget(null)}>
-          <InfoRow label="Current on-hand stock" value={`${restockTarget.on_hand_qty} MT`} />
-          <InfoRow label="Available stock"       value={`${restockTarget.available_qty} MT`} />
-          <InfoRow label="Target stock"            value={`${restockTarget.target_stock} MT`} />
-          <InfoRow label="Max stock"               value={`${restockTarget.max_stock} MT`} />
-          <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
-          <label style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 500, marginBottom: 6 }}>
-            Quantity to add (MT)
-          </label>
-          <input
-            type="number" min={0.1} step={0.1} value={restockQty}
-            onChange={(e) => { setRestockQty(e.target.value); setRestockError(null); }}
-            placeholder="e.g. 200"
-            style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", marginBottom: restockError ? 8 : 18, background: "var(--surface)", color: "var(--text-primary)" }}
-            autoFocus
-          />
-          {restockError && (
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--red)", marginBottom: 12 }}>⚠ {restockError}</div>
+      {/* ── Request order modal (Reorder Loop step 7) ──
+          The Control Tower's one write: it raises a request to the buyer. It
+          records intent, it does not add stock. Stock only changes when the
+          warehouse floor receives a delivery. */}
+      {orderTarget && (
+        <Modal title={`Request order: ${orderTarget.product_name}`} onClose={closeOrderModal}>
+          {orderDone ? (
+            <div>
+              <div style={{ fontSize: "var(--text-base)", marginBottom: 10 }}>
+                Request sent to the buyer.
+              </div>
+              <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 18 }}>
+                {orderQty} MT of {orderTarget.product_name} has been requested. Stock
+                will not change until the warehouse receives the delivery.
+              </p>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <ModalBtn label="Done" onClick={closeOrderModal} primary />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <InfoRow label="On-hand stock"    value={`${orderTarget.on_hand_qty} MT`} />
+              <InfoRow label="Available stock"  value={`${orderTarget.available_qty} MT`} />
+              <InfoRow label="Reorder point"    value={`${orderTarget.reorder_point_policy} MT`} />
+              <InfoRow label="Suggested order"  value={orderTarget.suggested_order_qty > 0 ? `${orderTarget.suggested_order_qty} MT` : "None"} />
+              <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
+              <label style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 500, marginBottom: 6 }}>
+                Quantity to request (MT)
+              </label>
+              <input
+                type="number" min={0.1} step={0.1} value={orderQty}
+                onChange={(e) => { setOrderQty(e.target.value); setOrderError(null); }}
+                placeholder="e.g. 200"
+                style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", marginBottom: 14, background: "var(--surface)", color: "var(--text-primary)" }}
+                autoFocus
+              />
+              <label style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 500, marginBottom: 6 }}>
+                Reason (optional)
+              </label>
+              <input
+                type="text" value={orderReason}
+                onChange={(e) => setOrderReason(e.target.value)}
+                placeholder="e.g. below reorder point, supplier lead time rising"
+                style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", marginBottom: orderError ? 8 : 18, background: "var(--surface)", color: "var(--text-primary)" }}
+              />
+              {orderError && (
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--red-text)", marginBottom: 12 }}>⚠ {orderError}</div>
+              )}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <ModalBtn label="Cancel" onClick={closeOrderModal} disabled={orderSaving} />
+                <ModalBtn label={orderSaving ? "Sending…" : "Send to buyer"} onClick={handleOrderRequest} primary disabled={orderSaving} />
+              </div>
+            </div>
           )}
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <ModalBtn label="Cancel" onClick={() => setRestockTarget(null)} disabled={restockSaving} />
-            <ModalBtn label={restockSaving ? "Saving…" : "Confirm Restock"} onClick={handleRestock} primary disabled={restockSaving} />
-          </div>
         </Modal>
       )}
 
@@ -548,8 +667,8 @@ export default function Inventory() {
 
       {/* ── Add SKU modal ── */}
       {showAddModal && (
-        <Modal title="Add New Rice SKU" onClose={() => setShowAddModal(false)} wide>
-          <AddSkuForm onSave={handleAddSku} onCancel={() => setShowAddModal(false)} />
+        <Modal title="Add New Rice SKU" onClose={closeAddModal} wide>
+          <AddSkuForm onSave={handleAddSku} onCancel={closeAddModal} />
         </Modal>
       )}
     </div>
@@ -638,7 +757,7 @@ function ProjectionChart({ skuId }) {
     <div>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "var(--text-xs)", marginBottom: 10 }}>
         {first_stockout_date ? (
-          <span style={{ color: "var(--red)", fontWeight: 700 }}>
+          <span style={{ color: "var(--red-text)", fontWeight: 700 }}>
             {/* "Projected" reads oddly for a date of today - that's not a forecast,
                 the SKU is already at/below zero right now. */}
             {first_stockout_date === curve[0]?.date
@@ -646,7 +765,7 @@ function ProjectionChart({ skuId }) {
               : `⚠ Stockout projected ${first_stockout_date}`}
           </span>
         ) : (
-          <span style={{ color: "var(--green)", fontWeight: 700 }}>✓ No stockout projected within 90 days</span>
+          <span style={{ color: "var(--green-text)", fontWeight: 700 }}>✓ No stockout projected within 90 days</span>
         )}
         {first_safety_breach_date && first_safety_breach_date !== first_stockout_date && (
           <span style={{ color: "var(--yellow)" }}>Safety stock breached {first_safety_breach_date}</span>
@@ -833,7 +952,7 @@ function SkuEditForm({ sku, onSave, onCancel }) {
               <button type="button" onClick={() => { onCancel(); navigate(`/inventory/${sku.sku_id}/forecast`); }} style={{
                 display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: "var(--text-sm)",
                 padding: "8px 14px", borderRadius: "var(--radius)", border: "1px solid var(--blue)",
-                background: "var(--blue-light)", color: "var(--blue)", cursor: "pointer", flexShrink: 0,
+                background: "var(--blue-light)", color: "var(--blue-text)", cursor: "pointer", flexShrink: 0,
               }}>
                 View forecast <ChevronRight size={14} />
               </button>
@@ -955,7 +1074,7 @@ function SkuEditForm({ sku, onSave, onCancel }) {
       </div>
 
       {saveError && (
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginTop: "var(--space-3)" }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--red-text)", marginTop: "var(--space-3)" }}>
           ⚠ {saveError}
         </div>
       )}
@@ -1051,7 +1170,7 @@ function AddSkuForm({ onSave, onCancel }) {
       </FormSection>
 
       {saveError && (
-        <div style={{ padding: "8px 12px", background: "var(--red-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--red)", marginBottom: 16 }}>
+        <div style={{ padding: "8px 12px", background: "var(--red-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--red-text)", marginBottom: 16 }}>
           ⚠ {saveError}
         </div>
       )}

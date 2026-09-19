@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   PackagePlus, SlidersHorizontal, Truck, BellRing, BellOff,
   UserCheck, Cpu, RefreshCw, ChevronRight, FileSearch, KeyRound, ShieldAlert,
-  ArrowDownToLine, ArrowUpFromLine,
+  ArrowDownToLine, ArrowUpFromLine, Newspaper, Send,
 } from "lucide-react";
 import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { api } from "../api/inventory";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ACTIVITY (TASK-31) - the read side of the audit log.
@@ -24,23 +25,32 @@ import { api } from "../api/inventory";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TYPE_META = {
-  ALERT_TRIGGERED:    { icon: BellRing,          color: "var(--red)",    label: "Alert raised" },
-  DECISION_RECORDED:  { icon: UserCheck,         color: "var(--blue)",   label: "Manager decision" },
-  RESTOCK:            { icon: Truck,             color: "var(--green)",  label: "Stock received" },
+  ALERT_TRIGGERED:    { icon: BellRing,          color: "var(--red-text)",    label: "Alert raised" },
+  DECISION_RECORDED:  { icon: UserCheck,         color: "var(--blue-text)",   label: "Manager decision" },
+  // Reorder Loop step 7: the Control Tower's one write. A request to the buyer,
+  // never a stock change.
+  ORDER_REQUESTED:    { icon: Send,              color: "var(--blue-text)",   label: "Order requested" },
+  // RESTOCK is retired (Reorder Loop step 7 removed the office restock action),
+  // kept here so any pre-existing audit rows still render rather than showing a
+  // raw event code, the same reason LLM_MODE_CHANGED's renderer was kept.
+  RESTOCK:            { icon: Truck,             color: "var(--green-text)",  label: "Stock received" },
   SKU_UPDATED:        { icon: SlidersHorizontal, color: "var(--yellow)", label: "Policy changed" },
-  SKU_CREATED:        { icon: PackagePlus,       color: "var(--purple)", label: "SKU added" },
+  SKU_CREATED:        { icon: PackagePlus,       color: "var(--purple-text)", label: "SKU added" },
   ALERT_ACKNOWLEDGED: { icon: BellOff,           color: "var(--text-muted)", label: "Alert dismissed" },
-  LLM_CALL:           { icon: Cpu,               color: "var(--purple)", label: "AI explanation" },
+  LLM_CALL:           { icon: Cpu,               color: "var(--purple-text)", label: "AI explanation" },
   // Handheld floor movements (TASK-46). Until 15 Sep these had no entry and
   // rendered as the raw event code with no detail and no filter chip.
-  GOODS_RECEIVED:     { icon: ArrowDownToLine,   color: "var(--green)",  label: "Goods in" },
-  GOODS_ISSUED:       { icon: ArrowUpFromLine,   color: "var(--orange)", label: "Goods out" },
+  GOODS_RECEIVED:     { icon: ArrowDownToLine,   color: "var(--green-text)",  label: "Goods in" },
+  OPENING_BALANCE_SET: { icon: PackagePlus,    color: "var(--green-text)",  label: "Opening balance" },
+  GOODS_ISSUED:       { icon: ArrowUpFromLine,   color: "var(--orange-text)", label: "Goods out" },
   // TASK-90. Unlocking is a spending decision and reads like one; a lockout is
   // the only security event in this log, so it takes the alarm colour.
   LLM_UNLOCKED:          { icon: KeyRound,    color: "var(--yellow)", label: "Paid AI unlocked" },
-  LLM_UNLOCK_LOCKED_OUT: { icon: ShieldAlert, color: "var(--red)",    label: "PIN lockout" },
+  LLM_UNLOCK_LOCKED_OUT: { icon: ShieldAlert, color: "var(--red-text)",    label: "PIN lockout" },
   // MVP2 step 1: the onboarding sales-history upload.
-  SALES_HISTORY_IMPORTED: { icon: FileSearch, color: "var(--blue)", label: "Sales history uploaded" },
+  SALES_HISTORY_IMPORTED: { icon: FileSearch, color: "var(--blue-text)", label: "Sales history uploaded" },
+  // A person accepting, dismissing or withdrawing a market signal.
+  SIGNAL_DECIDED: { icon: Newspaper, color: "var(--blue-text)", label: "Market signal" },
 };
 
 // Column order for the filter chips. Deliberately not alphabetical and not
@@ -48,9 +58,9 @@ const TYPE_META = {
 // which is the actual loop the app implements, so the row of chips reads as the
 // story rather than as a legend.
 const TYPE_ORDER = [
-  "ALERT_TRIGGERED", "DECISION_RECORDED", "LLM_CALL",
-  "GOODS_RECEIVED", "GOODS_ISSUED", "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
-  "SALES_HISTORY_IMPORTED", "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT",
+  "ALERT_TRIGGERED", "DECISION_RECORDED", "ORDER_REQUESTED", "LLM_CALL",
+  "OPENING_BALANCE_SET", "GOODS_RECEIVED", "GOODS_ISSUED", "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
+  "SALES_HISTORY_IMPORTED", "SIGNAL_DECIDED", "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT",
 ];
 
 const PAGE_HINT = {
@@ -173,6 +183,15 @@ function describe(event) {
       return { headline: `${verb} the recommendation for ${sku}`, detail };
     }
 
+    case "ORDER_REQUESTED": {
+      const parts = [`Sent to the buyer${o.request_no ? ` as ${o.request_no}` : ""}. Stock is unchanged until the delivery is received.`];
+      if (i.reason) parts.push(`Reason given: "${i.reason}"`);
+      return {
+        headline: `Requested ${num(i.quantity_mt)} MT of ${sku}`,
+        detail: parts.join(" "),
+      };
+    }
+
     case "RESTOCK":
       return {
         headline: `Received ${num(i.quantity_mt)} MT of ${sku}`,
@@ -186,6 +205,24 @@ function describe(event) {
       }
       if (o.on_hand_before != null && o.on_hand_after != null) parts.push(`On hand went ${num(o.on_hand_before)} to ${num(o.on_hand_after)} MT.`);
       return { headline: `Received ${num(i.received_qty)} MT of ${sku}`, detail: parts.join(" ") };
+    }
+
+    case "OPENING_BALANCE_SET":
+      return {
+        headline: `Opening balance of ${num(i.quantity_mt)} MT set for ${sku}`,
+        detail: `${o.movement_no || "Opening balance"}, entered during onboarding for a product with no stock. On hand went ${num(i.on_hand_before)} to ${num(o.on_hand_after)} MT.`,
+      };
+
+    case "SIGNAL_DECIDED": {
+      const verb = { approve: "Accepted", dismiss: "Dismissed", withdraw: "Withdrew", edit: "Corrected the reading of" }[i.decision] || "Decided";
+      return {
+        headline: `${verb} market signal: ${i.headline || "news event"}`,
+        detail: [
+          i.decided_by ? `By ${i.decided_by}.` : null,
+          o.buffer_days != null ? `Added a ${num(o.buffer_days)} day buffer to the reorder points it applies to.` : null,
+          i.decision === "withdraw" ? "The buffer it added was switched off." : null,
+        ].filter(Boolean).join(" ") || null,
+      };
     }
 
     case "GOODS_ISSUED": {
@@ -338,8 +375,9 @@ function EventRow({ event, isLast }) {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
+          className="touch-44"
           style={{
-            display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, padding: 0,
+            display: "inline-flex", alignItems: "center", gap: 4, marginTop: 4, padding: "6px 0",
             border: "none", background: "none", cursor: "pointer",
             fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
           }}
@@ -388,6 +426,13 @@ export default function Activity() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Same server-side filter as load(), without the loading state.
+  useLiveRefresh(() => {
+    api.getAuditLog({ eventType: filter === "ALL" ? undefined : filter, limit: 200 })
+      .then((res) => { setEvents(res?.events || []); setCounts(res?.counts || {}); })
+      .catch(() => {});
+  });
 
   const total = useMemo(
     () => Object.values(counts).reduce((a, b) => a + b, 0),

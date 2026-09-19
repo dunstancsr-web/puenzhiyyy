@@ -1,0 +1,425 @@
+<title>Demo Frame Tuner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --ink: #11161f; --ink-2: #47505f; --ink-3: #6b7484;
+    --ground: #eceef2; --chrome: #f7f8fa; --panel: #ffffff;
+    --line: #e0e4ea; --line-soft: #eceff4;
+    --accent: #3b82f6; --accent-ink: #1d4ed8;
+    --pass: #15803d; --pass-bg: #eaf6ee;
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --preview-face: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --r: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eef1f6; --ink-2: #a9b3c2; --ink-3: #7c8697;
+      --ground: #0d1117; --chrome: #151b24; --panel: #1a212c;
+      --line: #2a3340; --line-soft: #222b37;
+      --accent: #60a5fa; --accent-ink: #93c5fd;
+      --pass: #4ade80; --pass-bg: #12261a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eef1f6; --ink-2: #a9b3c2; --ink-3: #7c8697;
+    --ground: #0d1117; --chrome: #151b24; --panel: #1a212c;
+    --line: #2a3340; --line-soft: #222b37;
+    --accent: #60a5fa; --accent-ink: #93c5fd;
+    --pass: #4ade80; --pass-bg: #12261a;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 28px 24px 72px; }
+
+  header { margin-bottom: 22px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 4px; text-wrap: balance; }
+  .sub { color: var(--ink-2); font-size: 13px; max-width: 74ch; margin: 0; }
+  .sub code { font-family: var(--mono); font-size: 12px; color: var(--accent-ink); }
+
+  .cols { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1080px) { .cols { grid-template-columns: 1fr; } }
+  .stack { position: sticky; top: 18px; display: flex; flex-direction: column; gap: 14px; }
+  @media (max-width: 1080px) { .stack { position: static; } }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .card > .hd { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); }
+  .hd h2 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-3); }
+  .bd { padding: 14px; }
+
+  /* ── The mock browser window: fixed viewport height so clipping is real,
+       not hidden by an infinitely-tall page like the real bug only shows up
+       in an actual browser window ── */
+  .winshell { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #1e1e1e; }
+  .winbar { height: 26px; background: #2b2b2b; display: flex; align-items: center; gap: 6px; padding: 0 10px; }
+  .winbar .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .winport {
+    position: relative;
+    height: 480px;
+    background: #0d1117;
+    overflow: hidden; /* the real window's edge - content that doesn't fit is genuinely clipped, exactly like the bug */
+    font-family: var(--preview-face);
+  }
+
+  /* ── App content, three modes ── */
+  .app { position: absolute; inset: 0; display: flex; transition: inset .15s ease; }
+  .app-side { width: 148px; flex-shrink: 0; background: #11161f; border-right: 1px solid #2a3340; padding: 16px 12px; display: flex; flex-direction: column; }
+  .app-side .brand { font-size: 12px; font-weight: 700; color: #eef1f6; margin-bottom: 3px; }
+  .app-side .brand-sub { font-size: 9px; letter-spacing: .06em; color: #7c8697; margin-bottom: 16px; }
+  .app-side .nav { font-size: 12px; color: #a9b3c2; padding: 7px 8px; border-radius: 6px; margin-bottom: 2px; }
+  .app-side .nav.active { background: var(--accent); color: #fff; font-weight: 600; }
+  .app-side .spacer { flex: 1; }
+  .app-side .foot { font-size: 10px; color: #7c8697; border-top: 1px solid #2a3340; padding-top: 10px; }
+  .app-side .foot b { color: #eef1f6; }
+  .app-side .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 99px; padding: 3px 8px; margin-bottom: 8px; }
+  .app-main { flex: 1; padding: 18px 20px; overflow: hidden; }
+  .app-h1 { font-size: 16px; font-weight: 700; color: #eef1f6; margin-bottom: 4px; }
+  .app-sub { font-size: 11px; color: #7c8697; margin-bottom: 14px; }
+  .app-card { background: #1a212c; border: 1px solid #2a3340; border-radius: 10px; padding: 30px; text-align: center; color: #7c8697; font-size: 12px; }
+  .app-card b { display: block; color: #eef1f6; font-size: 13px; margin-bottom: 4px; }
+
+  /* Mode: full banner (current, unfixed) */
+  .m-banner-full .app { top: 32px; }
+  .banner {
+    position: absolute; top: 0; left: 0; right: 0; height: 32px; z-index: 20;
+    background: #f5a623; color: #3d2c00; display: flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 700; padding: 0 12px;
+  }
+  .banner .exit { margin-left: auto; border: 1px solid #3d2c00; border-radius: 99px; padding: 2px 9px; font-size: 10px; }
+
+  /* Mode: minimized strip, hover to expand */
+  .strip { position: absolute; top: 0; left: 0; right: 0; z-index: 20; overflow: hidden; transition: height .15s ease; }
+  .strip .bar { height: 32px; background: #f5a623; color: #3d2c00; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; padding: 0 12px; white-space: nowrap; }
+  .strip .bar .exit { margin-left: auto; border: 1px solid #3d2c00; border-radius: 99px; padding: 2px 9px; font-size: 10px; flex-shrink: 0; }
+
+  /* Mode: frame - a border around the whole viewport, content inset within it */
+  .frame-border { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+  .frame-label {
+    position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center;
+    font-size: 10px; font-weight: 700; color: #3d2c00; padding: 3px 10px; pointer-events: auto;
+  }
+  .frame-label .exit { margin-left: auto; border: 1px solid #3d2c00; border-radius: 99px; padding: 1px 8px; font-size: 9px; }
+
+  .verdict-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .vbox { flex: 1; min-width: 140px; border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+  .vbox .k { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .vbox .v { font-family: var(--mono); font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .note { font-size: 11.5px; color: var(--ink-3); line-height: 1.55; margin: 8px 0 0; }
+  .note strong { color: var(--ink-2); }
+
+  .seg { display: flex; gap: 4px; background: var(--chrome); border: 1px solid var(--line); border-radius: 9px; padding: 3px; flex-wrap: wrap; }
+  .seg button { appearance: none; border: 0; background: transparent; cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink-2); padding: 6px 12px; border-radius: 6px; flex: 1; white-space: nowrap; }
+  .seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); font-weight: 600; }
+  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .grp { margin-top: 4px; }
+  .grp + .grp { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+  .grp-t { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 9px; }
+
+  .row { display: grid; grid-template-columns: 108px minmax(0,1fr) 50px; gap: 9px; align-items: center; margin-bottom: 8px; }
+  .row label { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+  .row output { font-family: var(--mono); font-size: 11.5px; color: var(--ink); text-align: right; }
+
+  input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; cursor: pointer; }
+  input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: var(--line); }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; margin-top: -5px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--panel); }
+
+  .outwrap { margin-top: 20px; }
+  pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--ink); background: var(--chrome); border-top: 1px solid var(--line-soft); white-space: pre-wrap; }
+  .btn { appearance: none; cursor: pointer; border: 1px solid transparent; background: var(--accent); color: #fff; font-family: var(--sans); font-size: 12px; font-weight: 600; padding: 6px 13px; border-radius: 8px; }
+  .btn.ghost { background: transparent; color: var(--ink-2); border-color: var(--line); }
+  .hdbtns { display: flex; gap: 7px; align-items: center; }
+  .handoff { margin-top: 14px; padding: 12px 14px; border-radius: var(--r); border: 1px dashed var(--line); background: var(--chrome); font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
+  .handoff strong { color: var(--ink); font-weight: 600; }
+
+  .hint-move {
+    position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.35); color: #fff; font-size: 12px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .15s;
+  }
+  .winport:hover .hint-move.show { opacity: 1; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Demo Frame Tuner</h1>
+    <p class="sub">
+      Three ways to show demo mode without the sidebar getting clipped: the current full banner,
+      a minimized strip that expands on hover, and your idea, a frame around the whole window so the app's
+      own content area is simply smaller and the overlap problem never comes up. The window below has a
+      fixed height, like a real browser, so clipping shows up here exactly like it did in the screenshot.
+    </p>
+  </header>
+
+  <div class="cols">
+    <!-- ══ LEFT: preview ══ -->
+    <div class="stack">
+      <section class="card">
+        <div class="hd"><h2>Preview (fixed-height window, like a real browser)</h2></div>
+        <div class="bd">
+          <div class="winshell">
+            <div class="winbar">
+              <span class="dot" style="background:#ff5f57"></span>
+              <span class="dot" style="background:#febc2e"></span>
+              <span class="dot" style="background:#28c840"></span>
+            </div>
+            <div class="winport" id="winport">
+              <!-- mode layers, only one visible at a time -->
+              <div class="banner" id="bannerFull"></div>
+              <div class="strip" id="strip"></div>
+              <div class="frame-border" id="frameBorder"><div class="frame-label" id="frameLabel"></div></div>
+
+              <div class="app" id="app">
+                <div class="app-side" id="appSide">
+                  <div class="chip" id="sideChip" style="display:none">&#9679; DEMO</div>
+                  <div class="brand">&#22235;&#28023;&#31859;&#34892;</div>
+                  <div class="brand-sub">FOUR SEAS RICE</div>
+                  <div class="nav">Dashboard</div>
+                  <div class="nav">Inventory</div>
+                  <div class="nav">Alerts</div>
+                  <div class="nav active">Activity</div>
+                  <div class="spacer"></div>
+                  <div class="foot">
+                    All workspaces<br>
+                    Local model &middot; Dark<br><br>
+                    Running on <b>StockSense</b><br>
+                    AWS NUS-ISS SMYA 2026<br>
+                    Team Puenzhiyyy
+                  </div>
+                </div>
+                <div class="app-main">
+                  <div class="app-h1">Activity</div>
+                  <div class="app-sub">No activity recorded yet</div>
+                  <div class="app-card"><b>Nothing recorded yet</b>This log fills itself as the system runs.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="hd"><h2>Does the sidebar footer fit</h2></div>
+        <div class="bd">
+          <div class="verdict-row">
+            <div class="vbox">
+              <div class="k">Sidebar footer clipped</div>
+              <div class="v" id="clipVerdict">-</div>
+            </div>
+            <div class="vbox">
+              <div class="k">Overlap accounting needed</div>
+              <div class="v" id="overlapVerdict">-</div>
+            </div>
+          </div>
+          <p class="note" id="modeNote"></p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ══ RIGHT: controls ══ -->
+    <section class="card">
+      <div class="hd"><h2>Controls</h2></div>
+      <div class="bd">
+        <div class="grp">
+          <div class="grp-t">Approach</div>
+          <div class="seg" id="modeSeg"></div>
+        </div>
+
+        <div class="grp" id="thicknessGrp">
+          <div class="grp-t" id="thicknessLabel">Thickness</div>
+          <div id="thicknessRows"></div>
+        </div>
+
+        <div class="grp" id="alignGrp">
+          <div class="grp-t">Label alignment</div>
+          <div class="seg" id="alignSeg"></div>
+        </div>
+
+        <div class="grp" id="exitSideGrp">
+          <div class="grp-t">Exit button side</div>
+          <div class="seg" id="exitSeg"></div>
+        </div>
+
+        <div class="grp" id="sideChipGrp" hidden>
+          <div class="grp-t">Sidebar</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2);cursor:pointer">
+            <input type="checkbox" id="sideChipToggle"> also show a small "DEMO" chip at the top of the sidebar
+          </label>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ══ OUTPUT ══ -->
+  <section class="card outwrap">
+    <div class="hd">
+      <h2>What to hand back</h2>
+      <div class="hdbtns">
+        <button class="btn ghost" id="copyBtn" type="button">Copy summary</button>
+      </div>
+    </div>
+    <pre id="out"></pre>
+    <div class="bd" style="padding-top:0">
+      <div class="handoff">
+        <strong>Handing it back:</strong> these three approaches need different code shapes (the frame touches
+        <code>Layout.jsx</code>, not just <code>DemoModeBadge.jsx</code>), so this copies a plain description of
+        what you picked rather than a paste-in CSS block. Send it back and it gets built to match.
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var state = { mode: "frame", thickness: 28, align: "center", exitSide: "right", sideChip: true };
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function buildSeg(host, items, getActive, onPick) {
+    host.innerHTML = "";
+    items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = it.label;
+      b.setAttribute("aria-pressed", String(getActive() === it.id));
+      b.addEventListener("click", function () { onPick(it.id); });
+      host.appendChild(b);
+    });
+  }
+
+  function sliderRow(parent, opts) {
+    var row = document.createElement("div"); row.className = "row";
+    var lab = document.createElement("label"); lab.textContent = opts.label;
+    row.appendChild(lab);
+    var rng = document.createElement("input");
+    rng.type = "range"; rng.min = opts.min; rng.max = opts.max; rng.step = opts.step; rng.value = opts.value;
+    rng.addEventListener("input", function () { opts.onValue(parseFloat(rng.value)); });
+    row.appendChild(rng);
+    var out = document.createElement("output");
+    row.appendChild(out);
+    parent.appendChild(row);
+    return { range: rng, out: out };
+  }
+
+  var thicknessRef = sliderRow($("thicknessRows"), {
+    label: "size", min: 6, max: 48, step: 1, value: state.thickness,
+    onValue: function (v) { state.thickness = v; render(); }
+  });
+
+  $("sideChipToggle").checked = state.sideChip;
+  $("sideChipToggle").addEventListener("change", function () { state.sideChip = $("sideChipToggle").checked; render(); });
+
+  $("copyBtn").addEventListener("click", function () {
+    var text = $("out").textContent;
+    var done = function () {
+      var b = $("copyBtn"); var old = b.textContent;
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = old; }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  var MODES = [
+    { id: "full", label: "Full banner" },
+    { id: "minimized", label: "Minimized, hover" },
+    { id: "frame", label: "Frame (your idea)" }
+  ];
+  var ALIGNS = [
+    { id: "left", label: "Left" },
+    { id: "center", label: "Center" },
+    { id: "right", label: "Right" }
+  ];
+  var SIDES = [
+    { id: "left", label: "Left" },
+    { id: "right", label: "Right" }
+  ];
+
+  function render() {
+    buildSeg($("modeSeg"), MODES, function () { return state.mode; }, function (id) { state.mode = id; render(); });
+    buildSeg($("alignSeg"), ALIGNS, function () { return state.align; }, function (id) { state.align = id; render(); });
+    buildSeg($("exitSeg"), SIDES, function () { return state.exitSide; }, function (id) { state.exitSide = id; render(); });
+
+    thicknessRef.range.value = state.thickness;
+    thicknessRef.out.textContent = state.thickness + "px";
+    $("thicknessLabel").textContent = state.mode === "minimized" ? "Strip height (collapsed)" : (state.mode === "frame" ? "Frame thickness" : "Banner height");
+    $("alignGrp").hidden = false;
+    $("sideChipGrp").hidden = state.mode !== "frame";
+
+    var app = $("app"), bannerFull = $("bannerFull"), strip = $("strip"), frameBorder = $("frameBorder"), frameLabel = $("frameLabel");
+    var sideChip = $("sideChip");
+    bannerFull.style.display = "none"; strip.style.display = "none"; frameBorder.style.display = "none";
+    app.style.top = "0"; app.style.right = "0"; app.style.bottom = "0"; app.style.left = "0";
+    sideChip.style.display = (state.mode === "frame" && state.sideChip) ? "inline-flex" : "none";
+
+    var justify = state.align === "left" ? "flex-start" : (state.align === "right" ? "flex-end" : "center");
+
+    if (state.mode === "full") {
+      bannerFull.style.display = "flex";
+      bannerFull.style.height = state.thickness + "px";
+      bannerFull.style.justifyContent = justify;
+      bannerFull.innerHTML = labelHtml() + exitHtml();
+      if (state.exitSide === "left") bannerFull.style.flexDirection = "row-reverse"; else bannerFull.style.flexDirection = "row";
+      app.style.top = state.thickness + "px";
+      $("clipVerdict").textContent = "Yes, if content is tall"; $("clipVerdict").style.color = "#b91c1c";
+      $("overlapVerdict").textContent = "Yes, every page"; $("overlapVerdict").style.color = "#b91c1c";
+      $("modeNote").innerHTML = "<strong>Full banner:</strong> content is pushed down by exactly the banner's height. If the app itself already fills 100% of the window (like the sidebar's footer does), it now overflows by that same amount, which is the clipping bug in the screenshot. Fixable, but every layout has to know the banner exists.";
+    } else if (state.mode === "minimized") {
+      strip.style.display = "block";
+      strip.style.height = "10px";
+      strip.innerHTML = '<div class="bar" style="height:' + state.thickness + 'px;justify-content:' + justify + (state.exitSide === "left" ? ";flex-direction:row-reverse" : "") + '">' + labelHtml() + exitHtml() + '</div>';
+      app.style.top = "10px";
+      strip.onmouseenter = function () { strip.style.height = state.thickness + "px"; };
+      strip.onmouseleave = function () { strip.style.height = "10px"; };
+      $("clipVerdict").textContent = "No, only 10px reserved"; $("clipVerdict").style.color = "var(--pass)";
+      $("overlapVerdict").textContent = "A little (10px)"; $("overlapVerdict").style.color = "#a16207";
+      $("modeNote").innerHTML = "<strong>Minimized strip:</strong> only a thin sliver is always reserved; hovering it reveals the full label and Exit. Solves clipping in practice (10px is negligible), but Exit is only reachable after hovering, which is worse for the actual goal, making sure someone always has a fast, obvious way out.";
+    } else {
+      frameBorder.style.display = "block";
+      frameBorder.style.boxShadow = "inset 0 0 0 " + state.thickness + "px #f5a623";
+      frameLabel.style.height = Math.max(state.thickness, 22) + "px";
+      frameLabel.style.justifyContent = justify;
+      frameLabel.innerHTML = labelHtml(true) + exitHtml();
+      if (state.exitSide === "left") frameLabel.style.flexDirection = "row-reverse"; else frameLabel.style.flexDirection = "row";
+      app.style.top = state.thickness + "px";
+      app.style.right = state.thickness + "px";
+      app.style.bottom = state.thickness + "px";
+      app.style.left = state.thickness + "px";
+      $("clipVerdict").textContent = "No, by construction"; $("clipVerdict").style.color = "var(--pass)";
+      $("overlapVerdict").textContent = "Never, content is smaller"; $("overlapVerdict").style.color = "var(--pass)";
+      $("modeNote").innerHTML = "<strong>Frame:</strong> the app's own content area is inset by the frame's thickness on every side, so nothing can ever overlap the frame, there is nothing to account for. The trade is a slightly smaller usable screen (" + state.thickness + "px per edge) the whole time demo mode is on, which is the one real cost of this approach.";
+    }
+
+    $("out").textContent = emit();
+  }
+
+  function labelHtml(small) {
+    return '<span style="' + (small ? '' : '') + '">&#9888; DEMO MODE. Sandbox data only.</span>';
+  }
+  function exitHtml() {
+    return '<span class="exit">&#8618; Exit</span>';
+  }
+
+  function emit() {
+    var lines = [
+      "Demo indicator: " + ({ full: "full top banner", minimized: "minimized strip, hover to expand", frame: "frame around the whole window" })[state.mode],
+      "Thickness: " + state.thickness + "px",
+      "Label alignment: " + state.align,
+      "Exit button: " + state.exitSide + " side"
+    ];
+    if (state.mode === "frame") lines.push("Sidebar DEMO chip: " + (state.sideChip ? "yes" : "no"));
+    return lines.join("\n");
+  }
+
+  render();
+})();
+</script>

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Settings, Cpu, Calculator, Cloud, AlertTriangle, Sun, Moon, Monitor, Check, KeyRound, PlayCircle } from "lucide-react";
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { api } from "../api/inventory";
+import { enterDemoMode } from "../lib/demoMode";
 import { useLlmTier, effectiveTier, setTierChoice, setPass, clearPass } from "../lib/llmTier";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,6 +35,9 @@ export default function SettingsMenu({ align = "up", compact = false }) {
   const navigate = useNavigate();
   const { theme, resolved, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
+  // null until known, then true or false: whether THIS browser is in the demo sandbox.
+  const [demoActive, setDemoActive] = useState(null);
+  useEffect(() => { api.getDemoStatus().then((d) => setDemoActive(!!d?.active)).catch(() => setDemoActive(null)); }, []);
   const [state, setState] = useState(null);      // { mode, modes } from the server
   // null | "confirm" (dev: click again to spend) | "pin" (enter the demo PIN)
   const [pending, setPending] = useState(null);
@@ -250,9 +254,9 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                   style={{
                     display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
                     borderRadius: "var(--radius)", textAlign: "left", cursor: m.available ? "pointer" : "not-allowed",
-                    border: `1px solid ${awaiting ? "var(--yellow)" : active ? "var(--blue)" : "transparent"}`,
+                    border: `1px solid ${awaiting ? "var(--yellow)" : active ? "var(--blue-text)" : "transparent"}`,
                     background: awaiting ? "var(--yellow-light)" : active ? "var(--blue-light)" : "transparent",
-                    color: !m.available ? "var(--text-muted)" : awaiting ? "var(--yellow)" : active ? "var(--blue)" : "var(--text-secondary)",
+                    color: !m.available ? "var(--text-muted)" : awaiting ? "var(--yellow)" : active ? "var(--blue-text)" : "var(--text-secondary)",
                     opacity: m.available ? 1 : 0.55,
                     fontSize: "var(--text-sm)", fontWeight: active || awaiting ? 600 : 400,
                   }}>
@@ -303,7 +307,7 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                 <button type="submit" disabled={!pin.trim() || unlocking}
                   style={{
                     padding: "7px 12px", borderRadius: "var(--radius)", border: "none",
-                    background: "var(--blue)", color: "#fff", fontSize: "var(--text-sm)", fontWeight: 600,
+                    background: "var(--blue-strong)", color: "#fff", fontSize: "var(--text-sm)", fontWeight: 600,
                     cursor: !pin.trim() || unlocking ? "default" : "pointer", opacity: !pin.trim() || unlocking ? 0.55 : 1,
                   }}>
                   {unlocking ? "Checking…" : "Unlock"}
@@ -323,7 +327,7 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                 </span>
                 {cloud?.requiresPin && (
                   <button type="button" onClick={clearPass}
-                    style={{ background: "none", border: "none", padding: 0, color: "var(--blue)", fontSize: "var(--text-xs)", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                    style={{ background: "none", border: "none", padding: 0, color: "var(--blue-text)", fontSize: "var(--text-xs)", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                     Lock now
                   </button>
                 )}
@@ -331,7 +335,7 @@ export default function SettingsMenu({ align = "up", compact = false }) {
             );
           })()}
           {error && (
-            <p style={{ fontSize: "var(--text-xs)", color: "var(--red)", lineHeight: 1.45, margin: "-8px 0 12px" }}>{error}</p>
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--red-text)", lineHeight: 1.45, margin: "-8px 0 12px" }}>{error}</p>
           )}
 
           <Section title="Theme" />
@@ -351,7 +355,7 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                     padding: "8px 2px", borderRadius: "var(--radius)", cursor: "pointer",
                     border: `1px solid ${on ? "var(--blue)" : "var(--border)"}`,
                     background: on ? "var(--blue-light)" : "transparent",
-                    color: on ? "var(--blue)" : "var(--text-secondary)",
+                    color: on ? "var(--blue-text)" : "var(--text-secondary)",
                     fontSize: "var(--text-xs)", fontWeight: on ? 600 : 400,
                   }}>
                   <ThemeIcon size={14} style={{ flexShrink: 0 }} />
@@ -366,6 +370,16 @@ export default function SettingsMenu({ align = "up", compact = false }) {
               first. Home itself still shows it automatically for a genuinely
               empty catalog. */}
           <div style={{ borderTop: "1px solid var(--border)", marginTop: 14, paddingTop: 10 }}>
+            {demoActive === false && (
+              <button onClick={() => enterDemoMode()} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                padding: "7px 2px", background: "none", border: "none", cursor: "pointer",
+                fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
+              }}>
+                <PlayCircle size={14} style={{ flexShrink: 0 }} />
+                Enter demo mode (a sandbox, real data untouched)
+              </button>
+            )}
             <button onClick={() => { setOpen(false); navigate("/onboarding"); }} style={{
               display: "flex", alignItems: "center", gap: 8, width: "100%",
               padding: "7px 2px", background: "none", border: "none", cursor: "pointer",

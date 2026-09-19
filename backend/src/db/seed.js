@@ -342,11 +342,11 @@ function seed() {
     // leave duplicate ALERT_TRIGGERED rows for conditions that were re-detected
     // on the fresh data, and clearing neither leaves the trail empty after a
     // reseed, because every alert is already materialized.
-    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "forecasts", "risk_events", "skus"]) {
+    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "order_requests", "forecasts", "risk_events", "market_signals", "signal_seen", "skus"]) {
       db.exec(`DELETE FROM ${t}`);
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN
-      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','forecasts','risk_events','skus')`);
+      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','order_requests','forecasts','risk_events','market_signals','signal_seen','skus')`);
   });
   wipe();
 
@@ -383,6 +383,13 @@ function seed() {
   let poSeq = 1;
   let saleCount = 0;
   let histCount = 0;
+  // Captured here so the goods_movements (RECEIPT) block below can size
+  // receipts against what a SKU actually sold - see that block's comment for
+  // why a SKU can't just receive a fixed "few MOQs at a time" regardless of
+  // sales volume without going net-negative, a real modeling bug Stan caught
+  // by reasoning about this the way a bank account works: you can't spend
+  // (sell) more than you've ever deposited (received), starting from zero.
+  const totalSoldBySku = {};
 
   const run = db.transaction(() => {
     for (const sku of SKUS) {
@@ -399,6 +406,7 @@ function seed() {
       // twice would consume the shared PRNG twice and produce a history whose
       // issues did not match the transactions actually stored.
       const sales = buildSales(sku, rng);
+      totalSoldBySku[sku.sku_id] = sales.reduce((s, r) => s + r.quantity_mt, 0);
       for (const row of sales) { insSale.run(row); saleCount++; }
 
       for (const row of buildHistory(sku, sales)) { insHist.run(row); histCount++; }
@@ -429,6 +437,99 @@ function seed() {
     ["Stan", "6767", "both"],
   ];
   for (const o of OPERATORS) insertOp.run(...o);
+
+  // ── Goods movements (RECEIPT side, for "Try with sample data"'s preview) ───
+  // seed.js wiped this table but never wrote to it until now - the stock-out
+  // half already existed (sales_transactions), the stock-in half didn't, so
+  // "Try with sample data" had nothing to preview on receipts. A separate,
+  // independently-seeded PRNG (not the shared `rng` above): this table isn't
+  // checked against anything else's balance (only inventory_history's
+  // opening/receipts/issues/closing columns are, via verifyHistory below), so
+  // there's no determinism this needs to share with sales generation.
+  // References real operators (inserted just above) rather than an invented
+  // name, same reasoning as sales referencing real CUSTOMERS below.
+  //
+  // Each receipt now gets a matching purchase_orders row, status 'received' -
+  // not decorative, but load-bearing: POST /warehouse/inbound/receive
+  // (warehouse.js:100-108) refuses to post a receipt without a matching OPEN
+  // po_number, so a receipt with a fabricated PO reference that matches
+  // nothing in purchase_orders was never something the real Goods In flow
+  // could have produced. Found from Stan asking directly whether the PO
+  // number was real. A separate `PO-2025-####` sequence, not poSeq above
+  // (which numbers the genuinely still-open incoming orders as PO-2026-####)
+  // - reusing one counter for two different PO populations, still-open vs.
+  // already-received, would make "is this order still open" unreadable from
+  // the number alone.
+  //
+  // Sizing (Stan's call, 18 Sep): the first version picked "a few MOQs" per
+  // receipt with no regard for how much that SKU actually sold over 24
+  // months of history, so most SKUs' total received came out far BELOW total
+  // sold - a physically impossible ledger, the same way a bank account can't
+  // spend more than it ever deposited starting from a zero balance. Fixed by
+  // sizing each SKU's total receipts against its own totalSoldBySku (captured
+  // above while sales were generated), with a modest buffer so the SKU ends
+  // up net-positive (there IS a real ending stock) rather than exactly
+  // break-even. This reconciles the AGGREGATE only - receipt dates are spread
+  // across the window but not simulated day-by-day against sales, so a
+  // narrow mid-window slice could still theoretically dip low; good enough
+  // for "does the total make sense," not a claim of minute-by-minute realism.
+  const insMove = db.prepare(`
+    INSERT INTO goods_movements
+      (movement_no, movement_type, reference, sku_id, expected_qty, actual_qty, variance_qty, variance_reason, operator_id, operator_name, created_at)
+    VALUES (?, 'RECEIPT', ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const insHistPo = db.prepare(`
+    INSERT INTO purchase_orders (po_number, sku_id, ordered_qty, order_date, eta, actual_arrival, status)
+    VALUES (?, ?, ?, ?, ?, ?, 'received')`);
+  const receivingOps = db.prepare(`SELECT id, name FROM operators WHERE role != 'dispatch'`).all();
+  const moveRng = mulberry32(20260906 ^ 0x676f6f64);
+  let moveSeq = 1;
+  let histPoSeq = 1;
+  let moveCount = 0;
+  for (const sku of SKUS) {
+    const totalSold = totalSoldBySku[sku.sku_id] || 0;
+    // A SKU with no sales history still gets a modest starting stock (a few
+    // MOQs), same as the old default - nothing to reconcile against there.
+    const bufferFactor = 1.1 + moveRng() * 0.15; // ends up 10-25% ahead of what was sold
+    const targetTotal = totalSold > 0 ? round1(totalSold * bufferFactor) : round1(sku.min_order_qty * 3);
+    const receiptCount = Math.max(2, Math.min(8, Math.round(targetTotal / (sku.min_order_qty * 3 || targetTotal || 1))));
+
+    let allocated = 0;
+    for (let i = 0; i < receiptCount; i++) {
+      const isLast = i === receiptCount - 1;
+      // Even shares with jitter, except the last receipt takes whatever is
+      // left - guarantees the sum hits targetTotal exactly rather than
+      // drifting from independent per-receipt randomness.
+      const expected = isLast
+        ? round1(Math.max(sku.min_order_qty || 1, targetTotal - allocated))
+        : round1((targetTotal / receiptCount) * (0.8 + moveRng() * 0.4));
+      allocated += expected;
+
+      const short = moveRng() < 0.15; // occasional shortage, matching variance_reason existing for this
+      const variance = short ? round1(-expected * 0.02 * (0.5 + moveRng())) : 0;
+      const op = receivingOps[Math.floor(moveRng() * receivingOps.length)];
+      // Roughly chronological, earliest receipt furthest back: spreads
+      // receipts across the same ~500-day window sales use, biased so
+      // receipts keep landing throughout rather than clustering at one end.
+      const arrivalDaysAgo = Math.max(5, Math.round(500 - (i + moveRng()) * (480 / receiptCount)));
+      const poNumber = `PO-2025-${String(histPoSeq++).padStart(4, "0")}`;
+
+      insHistPo.run(
+        poNumber, sku.sku_id, expected,
+        dateOffset(arrivalDaysAgo + sku.lead_time_days), // ordered one lead time before it arrived
+        dateOffset(arrivalDaysAgo), // eta the same day it actually arrived, for a clean demo
+        dateOffset(arrivalDaysAgo),
+      );
+      insMove.run(
+        `GRN-${String(moveSeq++).padStart(4, "0")}`,
+        poNumber,
+        sku.sku_id, expected, round1(expected + variance), variance,
+        short ? "Shortage on arrival" : null,
+        op.id, op.name,
+        dateOffset(arrivalDaysAgo),
+      );
+      moveCount++;
+    }
+  }
 
   // ── Sales orders ───────────────────────────────────────────────────────────
   // Derived FROM reserved_qty rather than invented alongside it, so the open
@@ -484,7 +585,27 @@ function seed() {
     VALUES (@label, @country_of_origin, @supplier, @severity, @buffer_days_add, 1, 1, @notes)`);
   for (const r of RISK_EVENTS) insertRisk.run(r);
 
-  console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${poSeq - 1} open POs, ${soCount} open sales orders, ${OPERATORS.length} operators, ${RISK_EVENTS.length} risk events`);
+  // ── Order requests (Reorder Loop step 7) ────────────────────────────────────
+  // The Control Tower's one write: a request to the buyer, recording intent and
+  // never touching stock. Seeded so the feature is visible on a fresh demo
+  // rather than an empty list. Keyed to real seeded SKUs. One is left 'open' so
+  // there is a live request a demo can act on (mark ordered or cancelled); one
+  // is already 'ordered' so the lifecycle beyond 'open' shows without anyone
+  // having to click first. request_no continues the REQ-000N sequence the API
+  // hands out. These change no stock, exactly like the runtime endpoint.
+  const insertReq = db.prepare(`
+    INSERT INTO order_requests (request_no, sku_id, quantity_mt, reason, status, requested_by)
+    VALUES (@request_no, @sku_id, @quantity_mt, @reason, @status, @requested_by)`);
+  const ORDER_REQUESTS = [
+    { request_no: "REQ-0001", sku_id: "VF-10KG", quantity_mt: 200, status: "open",
+      reason: "Available below the approved reorder point; lead time from Vietnam trending up.",
+      requested_by: "control tower" },
+    { request_no: "REQ-0002", sku_id: "PH-25KG", quantity_mt: 150, status: "ordered",
+      reason: "Cover thin ahead of the festive period.", requested_by: "control tower" },
+  ];
+  for (const r of ORDER_REQUESTS) insertReq.run(r);
+
+  console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${moveCount} goods receipts, ${poSeq - 1} open POs, ${soCount} open sales orders, ${OPERATORS.length} operators, ${RISK_EVENTS.length} risk events, ${ORDER_REQUESTS.length} order requests`);
   console.log(`✓ Seeded ${histCount} months of inventory history (${HISTORY_MONTHS} per SKU)`);
 
   // ── Tie-out ────────────────────────────────────────────────────────────────

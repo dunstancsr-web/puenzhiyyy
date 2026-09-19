@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDownToLine, ArrowUpFromLine, ArrowRight } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, ArrowRight, PlayCircle } from "lucide-react";
 import EventCredit from "../components/EventCredit";
 import AppMark from "../components/AppMark";
 import ColHint from "../components/ColHint";
@@ -8,8 +8,10 @@ import TowerIcon from "../components/TowerIcon";
 import useDeviceClass from "../hooks/useDeviceClass";
 import { FullSeal, CLIENT_HAN, CLIENT_EN } from "../components/Tenant";
 import { api } from "../api/inventory";
+import { enterDemoMode } from "../lib/demoMode";
 import Onboarding from "./Onboarding";
 import LoadingState from "../components/LoadingState";
+import { isDismissed } from "../lib/onboardingResume";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME (TASK-47, renamed TASK-48 and TASK-50, rebuilt TASK-74 and TASK-78)
@@ -45,7 +47,7 @@ import LoadingState from "../components/LoadingState";
 const OFFICE = [{
   to: "/dashboard",
   icon: TowerIcon,
-  tint: "var(--purple)",
+  tint: "var(--purple-text)",
   bg: "var(--purple-light)",
   label: "Control Tower",
   sub: "Analysis and decisions",
@@ -57,7 +59,7 @@ const FLOOR = [
   {
     to: "/warehouse/inbound",
     icon: ArrowDownToLine,
-    tint: "var(--green)",
+    tint: "var(--green-text)",
     bg: "var(--green-light)",
     label: "Goods In",
     sub: "Receiving",
@@ -65,10 +67,9 @@ const FLOOR = [
     help: "Check a delivery against its purchase order, count what actually arrived, and record any shortfall.",
   },
   {
-    to: null,
-    soon: true,
+    to: "/warehouse/outbound",
     icon: ArrowUpFromLine,
-    tint: "var(--blue)",
+    tint: "var(--blue-text)",
     bg: "var(--blue-light)",
     label: "Goods Out",
     sub: "Picking and dispatch",
@@ -205,12 +206,27 @@ export default function Home() {
     return () => { cancelled = true; };
   }, []);
 
+  // Demo-only: previewing onboarding used to take Home to Control Tower to
+  // Settings to "Preview the onboarding journey", three screens deep, and
+  // only reachable at all once inside the Control Tower. This puts the same
+  // link where a demoing manager already is. Real (non-demo) visitors don't
+  // get it: against the live database, emptying the catalog just to see the
+  // wizard again is the destructive action rules.md already cuts elsewhere.
+  // null until known, so neither demo link flashes for the wrong state.
+  const [isDemo, setIsDemo] = useState(null);
+  useEffect(() => { api.getDemoStatus().then((d) => setIsDemo(!!d.active)).catch(() => {}); }, []);
+
   if (skuCount === null) return <LoadingState label="Loading…" />;
-  if (skuCount === 0) return <Onboarding />;
+  // Closing or finishing onboarding writes this flag specifically so a
+  // still-empty catalog doesn't loop straight back into the wizard the
+  // moment Home renders: the whole point of closing it is being able to
+  // leave and set the catalog up later, the normal way, from Inventory or
+  // Bulk edit.
+  if (skuCount === 0 && !isDismissed()) return <Onboarding />;
 
   return (
     <div style={{
-      minHeight: "100vh", background: "var(--bg)",
+      minHeight: "calc(100vh - var(--demo-banner-height))", background: "var(--bg)",
       // flex-start, not centre. Centring a short page in a tall viewport put
       // 214px of nothing above the first pixel of content, so the eye landed
       // on empty space. clamp anchors it without crowding the top edge.
@@ -284,6 +300,28 @@ export default function Home() {
             </span>
           </div>
           <EventCredit align="center" inline />
+          {isDemo === false && (
+            <div style={{ textAlign: "center", marginTop: "var(--space-3)" }}>
+              <button type="button" onClick={() => enterDemoMode()} style={{
+                display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", minHeight: 44,
+                fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
+              }}>
+                <PlayCircle size={14} />
+                Enter demo mode
+              </button>
+            </div>
+          )}
+          {isDemo && (
+            <div style={{ textAlign: "center", marginTop: "var(--space-3)" }}>
+              <Link to="/onboarding" style={{
+                display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", minHeight: 44,
+                fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
+              }}>
+                <PlayCircle size={14} />
+                Preview the onboarding journey
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
