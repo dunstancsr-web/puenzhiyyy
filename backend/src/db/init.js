@@ -265,6 +265,21 @@ function initDb(targetDb) {
     );
     CREATE INDEX IF NOT EXISTS idx_order_requests_sku ON order_requests(sku_id, status);
 
+    -- One row per step a request has been through, oldest first. order_requests.status
+    -- is only the latest step; this is the timeline. Append-only: a step is never edited.
+    -- actor is a role label ('control tower', 'buyer', 'buyer manager'); there is no
+    -- login yet, so in the demo a person plays each role and the label says so.
+    CREATE TABLE IF NOT EXISTS order_request_events (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_id  INTEGER NOT NULL,
+      status      TEXT NOT NULL,   -- open | acknowledged | po_raised | approved | rejected | cancelled
+      actor       TEXT NOT NULL,
+      note        TEXT,
+      created_at  TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (request_id) REFERENCES order_requests(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_order_request_events_req ON order_request_events(request_id, id);
+
     -- ================================================================
     -- FORECASTS  (MVP2)
     -- One row per SKU per model per generation. is_active=1 marks the one row
@@ -480,6 +495,9 @@ function initDb(targetDb) {
   // Forward migrations for databases created before these columns existed.
   // Variety scoping for risk events, so an approved market signal about NON-basmati
   // rice does not buffer a basmati SKU. NULL keeps the old, unscoped behaviour.
+  // Order requests used to end at 'ordered'. That step is now the approved purchase order, so a
+  // database from before the timeline reads the same way. Idempotent: matches nothing afterwards.
+  db.exec(`UPDATE order_requests SET status = 'approved' WHERE status = 'ordered'`);
   ensureColumn(db, "market_signals", "also_reported_by", "also_reported_by TEXT");
   ensureColumn(db, "risk_events", "affects_varieties", "affects_varieties TEXT");
   ensureColumn(db, "risk_events", "excludes_varieties", "excludes_varieties TEXT");

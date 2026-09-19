@@ -258,7 +258,9 @@ endpoint list**; this is the shape as of 15 Sep.
 - Alerts and decisions: `GET /api/alerts`, `POST /api/alerts/:id/acknowledge`, `GET /api/decisions`,
   `POST /api/decisions`
 - Order requests (Reorder Loop step 7, the Control Tower's one write, no stock change):
-  `POST /api/order-requests`, `GET /api/order-requests`, `PATCH /api/order-requests/:id`. Onboarding's
+  `POST /api/order-requests`, `GET /api/order-requests` (status may be a comma list; each row carries its
+  timeline), `PATCH /api/order-requests/:id` (one step forward: acknowledged, po_raised, approved,
+  rejected with a reason, or cancelled; anything else is 409; the actor is fixed by the step). Onboarding's
   one-time first count: `POST /api/skus/opening-balance` (zero-stock products only, once each,
   movement type OPENING). (`POST /api/inventory/restock` was removed
   here when the duties were separated: the office no longer writes stock; stock moves only on the

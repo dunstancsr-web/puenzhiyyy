@@ -91,10 +91,10 @@ export const api = {
     const q = new URLSearchParams(params || {}).toString();
     return request(`/order-requests${q ? `?${q}` : ""}`);
   },
-  // Reorder Loop step 7 follow-through: a buyer closes an open request by
-  // marking it ordered or cancelled. Still no stock change.
-  updateOrderRequest: (id, status) =>
-    request(`/order-requests/${id}`, { method: "PATCH", body: { status } }),
+  // Reorder Loop step 7 follow-through: move a request one step along its timeline
+  // (acknowledged, po_raised, approved, rejected with a note, or cancelled). Still no stock change.
+  updateOrderRequest: (id, status, note) =>
+    request(`/order-requests/${id}`, { method: "PATCH", body: { status, note } }),
   getSkuProjection: (id) => request(`/skus/${id}/projection`),
 
   // Forecasting (MVP2 Day 5). getSkuForecast returns { history, forecast } -

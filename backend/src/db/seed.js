@@ -342,11 +342,11 @@ function seed() {
     // leave duplicate ALERT_TRIGGERED rows for conditions that were re-detected
     // on the fresh data, and clearing neither leaves the trail empty after a
     // reseed, because every alert is already materialized.
-    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "order_requests", "forecasts", "risk_events", "market_signals", "signal_seen", "skus"]) {
+    for (const t of ["inventory_history", "sales_transactions", "purchase_orders", "sales_orders", "goods_movements", "operators", "inventory_positions", "alerts_log", "audit_log", "decisions", "order_request_events", "order_requests", "forecasts", "risk_events", "market_signals", "signal_seen", "skus"]) {
       db.exec(`DELETE FROM ${t}`);
     }
     db.exec(`DELETE FROM sqlite_sequence WHERE name IN
-      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','order_requests','forecasts','risk_events','market_signals','signal_seen','skus')`);
+      ('inventory_history','sales_transactions','purchase_orders','sales_orders','goods_movements','operators','inventory_positions','alerts_log','audit_log','decisions','order_request_events','order_requests','forecasts','risk_events','market_signals','signal_seen','skus')`);
   });
   wipe();
 
@@ -589,8 +589,8 @@ function seed() {
   // The Control Tower's one write: a request to the buyer, recording intent and
   // never touching stock. Seeded so the feature is visible on a fresh demo
   // rather than an empty list. Keyed to real seeded SKUs. One is left 'open' so
-  // there is a live request a demo can act on (mark ordered or cancelled); one
-  // is already 'ordered' so the lifecycle beyond 'open' shows without anyone
+  // there is a live request a demo can walk forward (acknowledge, raise the purchase
+  // order, approve or reject); one is already 'approved' so the lifecycle beyond 'open' shows without anyone
   // having to click first. request_no continues the REQ-000N sequence the API
   // hands out. These change no stock, exactly like the runtime endpoint.
   const insertReq = db.prepare(`
@@ -600,10 +600,25 @@ function seed() {
     { request_no: "REQ-0001", sku_id: "VF-10KG", quantity_mt: 200, status: "open",
       reason: "Available below the approved reorder point; lead time from Vietnam trending up.",
       requested_by: "control tower" },
-    { request_no: "REQ-0002", sku_id: "PH-25KG", quantity_mt: 150, status: "ordered",
+    { request_no: "REQ-0002", sku_id: "PH-25KG", quantity_mt: 150, status: "approved",
       reason: "Cover thin ahead of the festive period.", requested_by: "control tower" },
   ];
   for (const r of ORDER_REQUESTS) insertReq.run(r);
+
+  // Each request's timeline. REQ-0001 has only its first step, so a demo can walk it forward;
+  // REQ-0002 has been through every step, with believable gaps, so a finished timeline shows
+  // without anyone clicking first. Offsets are relative to the seed run, in SQLite's UTC form.
+  const insertStep = db.prepare(`
+    INSERT INTO order_request_events (request_id, status, actor, note, created_at)
+    VALUES ((SELECT id FROM order_requests WHERE request_no = ?), ?, ?, ?, datetime('now', ?))`);
+  const STEPS = [
+    ["REQ-0001", "open", "control tower", "Available below the approved reorder point; lead time from Vietnam trending up.", "-3 hours"],
+    ["REQ-0002", "open", "control tower", "Cover thin ahead of the festive period.", "-52 hours"],
+    ["REQ-0002", "acknowledged", "buyer", null, "-50 hours"],
+    ["REQ-0002", "po_raised", "buyer", "Sent for approval.", "-27 hours"],
+    ["REQ-0002", "approved", "buyer manager", null, "-21 hours"],
+  ];
+  for (const st of STEPS) insertStep.run(...st);
 
   console.log(`✓ Seeded ${SKUS.length} SKUs, ${saleCount} sales transactions, ${moveCount} goods receipts, ${poSeq - 1} open POs, ${soCount} open sales orders, ${OPERATORS.length} operators, ${RISK_EVENTS.length} risk events, ${ORDER_REQUESTS.length} order requests`);
   console.log(`✓ Seeded ${histCount} months of inventory history (${HISTORY_MONTHS} per SKU)`);
