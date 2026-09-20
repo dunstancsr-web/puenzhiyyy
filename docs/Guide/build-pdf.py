@@ -60,6 +60,12 @@ def main():
         sys.exit("Google Chrome was not found at " + CHROME)
     with open(SOURCE, encoding="utf-8") as f:
         body = markdown.markdown(f.read(), extensions=["tables", "fenced_code", "toc"])
+    # A contents link whose heading was renamed goes nowhere. Say so instead of shipping it.
+    import re as _re
+    _ids = set(_re.findall(r'\sid="([^"]+)"', body))
+    _broken = [l for l in _re.findall(r'href="#([^"]+)"', body) if l not in _ids]
+    if _broken:
+        print("WARNING: contents links with no matching heading:", ", ".join(_broken), file=sys.stderr)
     body = STEP.sub(
         lambda m: f'<div class="step"><div class="txt">{m.group(1)}{m.group(3)}</div>'
         f'<div class="shot">{m.group(2)}</div></div>',

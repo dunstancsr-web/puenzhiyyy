@@ -16,7 +16,7 @@ the warehouse.
 3. [Dispatcher: sending out an order (Goods Out)](#3-dispatcher-sending-out-an-order-goods-out)
 4. [Manager: the daily review (Dashboard)](#4-manager-the-daily-review-dashboard)
 5. [Manager: acting on alerts (Alerts)](#5-manager-acting-on-alerts-alerts)
-6. [Manager: news that could hit your supply (Action Items)](#6-manager-news-that-could-hit-your-supply-action-items)
+6. [Manager: what to do first (Action Items)](#6-manager-what-to-do-first-action-items)
 7. [Manager: keeping product settings right (Inventory)](#7-manager-keeping-product-settings-right-inventory)
 8. [Manager: checking what happened (Alerts, History)](#8-manager-checking-what-happened-alerts-history)
 9. [Anyone: settings](#9-anyone-settings)
@@ -275,36 +275,158 @@ most urgent for supply, ask a question in plain words, and check news that could
 - **Blind spots** (further down, when there are any) are products whose numbers cannot be trusted yet,
   for example because they have no sales history.
 
-### Market signals: news that could hit your supply
+### Market signals: an agent that watches the news and waits for you
 
-**Goal:** when news could delay or tighten rice supply, see which of your products it would leave
-short, and by when you would have to order.
+**Goal:** when news could delay or tighten rice supply, find it before a person would, work out which
+products it would leave short and by when an order must go, propose the action, and stop there. This is
+the most agent-like part of StockSense, and it is built to be agent-like without being autonomous: it
+senses, reads, reasons and proposes, but never acts on its own.
 
-![Market signals: a past event run against today's stock](images/20-market-signals.jpg)
+**The loop, end to end**
 
-There are two ways in, chosen one at a time, and each keeps its own list:
+```
+  Google News (RSS)          one query per country the business buys from
+        │   headlines
+        ▼
+  1. Keyword filter          rice words + an origin + a market-moving word; most headlines stop here (no model)
+        ▼
+  2. Reader (local model)    fills a FIXED shape: country, kind of event, severity, tightens or eases, varieties
+        ▼
+  3. Validator               every field must be from a fixed list; the country must be one you buy from
+        ▼
+  4. Same-story merge        one signal per story, with "also reported by" (a repeat never returns a dismissed one)
+        ▼
+  5. Assessment              a visible days table + the app's own projection engine: which products, by when
+        ▼
+  6. A PERSON decides        add a safety buffer, ask the buyer to order, or dismiss;  edit the reading first
+        ▼
+  7. The rest of the app     buffer raises reorder points; request follows the order loop (section 7)
+        ▼
+  Decisions and corrections are written to the audit trail (Alerts, History); each scan reports what it did on screen
+```
 
-- **Live news** scans today's rice supply headlines for the countries you buy from. Choose how far back
-  to look (3 days to a month, or a number of your own). A local model reads each headline into a fixed
-  shape (country, kind of event, how serious, whether it tightens or eases supply), and a person can
-  correct that reading. The same story from several outlets becomes one signal with its sources listed.
-- **Past events** replays real 2022 to 2024 events, such as India's non-basmati export ban, against
-  today's stock. It is practice: it shows what the advice would have been and never changes a reorder
-  point.
+**Where a model is used, and where it is not.** This is the point of the design: the model reads a
+headline, and nothing else.
 
-For each product an event touches, the card shows the days of stock cover against the supplier lead
-time, the suggested order (a low and a high figure), the latest day to order, and an urgency. **How many
-days an event costs comes from a visible table on the card, never from the article or a model.** Signals
-are grouped by what to do, and "no effect on your stock" is folded away, with **Acknowledge all** and an
-Undo.
+| Step | Done by | A model? |
+|---|---|---|
+| Finding headlines, filtering, merging repeats | fixed code | no |
+| Turning one headline into a fixed shape | a local model, checked by a validator (a keyword list if none is running) | **yes**, the only place |
+| How many days the event costs | a visible table, not the article | no |
+| What those days do to each product, the order quantity, the latest order date | the same projection engine as the rest of the app | no |
+| Adding a buffer, or asking the buyer to order | **a person** | no |
 
-On a live signal a person can:
+![A live scan under way: elapsed seconds, and what to expect](images/34-signals-scanning.jpg)
 
-- **Add a safety buffer**, which makes the reorder point tell you to order earlier for the affected
-  products (it can be withdrawn later); or
-- **Ask the buyer to order** for one product, with the quantity prefilled and editable. It goes to the
-  buyer's list on Inventory (section 7) and nothing is ordered until the buyer acts. If a request for
-  that product is already open, the card says so instead of sending a second.
+A scan is one button. It shows the seconds elapsed and how long it usually takes, rather than a fake
+progress bar, because the length depends on how many headlines the model has to read.
+
+![The result of a real scan: 204 headlines checked, 5 became signals, with what happened to the rest](images/35-signals-live-results.jpg)
+
+The summary line says exactly what the agent did, from a real run on the day this guide was updated:
+**204 headlines from the last 14 days, checked in 37 seconds: 5 new, 9 merged into existing stories, 76
+not relevant, 114 older ones waiting for the next scan**, read by a named model on this machine. Nothing
+is hidden: what was set aside and why is counted. A scan reads at most a fixed number of headlines and
+stops at a time limit, so a scan cannot run away; the rest wait for the next one.
+
+**Read the reading, and correct it.** The card says who read the headline ("Read by AI, on this machine.
+Check the headline before relying on it") and shows the four things it chose in editable menus.
+
+![A signal card: the reading, the assumed days, and what it means for each product](images/36-signals-card-detail.jpg)
+
+The reader is right about three headlines in four, not four in four, so it is never the last word. In
+this real scan it read a story about Cambodian exports to the Philippines as a Thailand supply-tightening
+event. A person sees that at a glance from the headline, and dismisses it; had the story been real but
+mis-labelled, changing a menu recalculates the whole card at once, because everything below the four
+menus is arithmetic, not model output. That is the human-in-the-loop design in practice.
+
+**What it means for each product.** For every product the event touches (matched by country of origin or
+supplier, with the variety respected: a ban on non-basmati rice does not flag a basmati product) the card
+shows days of cover against lead time, the suggested order as a low and a high figure, the latest day to
+order, and an urgency. It separates cause from news: "already short by 17 days before this news, and it
+adds 28 more", so a product that was already short is not blamed on a headline.
+
+![How the days are worked out: a fixed table of assumptions, editable, never taken from the article](images/40-signals-days-table.jpg)
+
+The days come from this table, which is on the screen and labelled as assumptions, not measurements. A
+model cannot invent a figure here, because it is never asked for one.
+
+**One story, once.** The same story arrives from many outlets, reworded.
+
+![A signal merged from seven outlets, and the list grouped by what to do](images/39-signals-merged-and-groups.jpg)
+
+This drought story appeared in seven wordings and is one card ("Also reported by 6 other sources"). Merging
+is judged by the headline text, with two guards that lean toward *not* merging, because a wrongly merged
+story hides news and a missed merge only costs a card: headlines that use opposite direction words
+("bans" against "lifts") or state different figures ("10%" against "20%") are never merged. A signal a
+person has already dismissed is compared too, so a syndicated copy cannot bring it back.
+
+The list is grouped by what the reader must do, not by date: **Needs a decision** (worst urgency first,
+always open), **No effect on your stock** (folded, with one **Acknowledge all** and a 12 second Undo)
+and **Decided** (folded, with the count of active buffers).
+
+**Acting on it, and only when a person says so.**
+
+![Ask the buyer to order: quantity prefilled, editable, nothing ordered until the buyer acts](images/37-signals-ask-buyer.jpg)
+
+- **Add a safety buffer.** The reorder point for the products above will ask for stock earlier; it can be
+  withdrawn later. It changes no stock and orders nothing.
+- **Ask the buyer to order,** per product, quantity prefilled from the low end of the advice and editable.
+
+![The request is sent, and it is followed on Inventory](images/38-signals-request-sent.jpg)
+
+  It checks first for a request already open for that product, so a second click cannot send a duplicate.
+  From here it follows the ordinary order loop (section 7): acknowledged, purchase order, manager
+  approval, then the warehouse receiving it.
+- **Dismiss,** or **Acknowledge** for news that eases pressure. Dismissing can be undone.
+
+**Past events are practice.** The second tab replays real 2022 to 2024 events (India's export bans, the
+price spillover to Thailand and Vietnam) against today's stock. It shows what the advice would have been
+and can never add a buffer or offer to order, so a rehearsal cannot change a real reorder point.
+
+**Every decision is on the record.**
+
+![The audit trail for market signals: what the system saw, and what it did](images/41-signals-audit-trail.jpg)
+
+Alerts, History, filtered to market signals with the Type menu: the approval, its buffer of 10.5 days
+and the risk event it created, the dismissal, who decided, and whether the signal was live or a replay.
+A correction to a reading is recorded too.
+
+**Guardrails, in one place**
+
+- **The paid model is never used here.** The reader runs on a local model or a keyword list, by design,
+  and this is tested, so a news scan can never spend the shared AWS credit.
+- **A headline is untrusted text.** It goes to a model with no tools, only the feed's own headline is ever
+  displayed (never text a model wrote), and extra fields a model adds are ignored. A test feeds it an
+  instruction to change the country; the model obeyed it 0 of 3 times.
+- **A wrong reading cannot reach a figure.** The validator accepts only values from fixed lists, and the
+  country must be one the business buys from. If the model is missing or fails the check, a coarser
+  keyword reading is used, labelled as such, never above medium severity.
+- **Bounded.** A pause between scans, a cap on headlines read and a time limit per scan.
+- **Public servers.** On a public address, scanning and deciding are accepted only inside the demo
+  sandbox, so a visitor cannot change the real database. The hosted container has no local model, so
+  there the reader is the keyword list alone; the local model is what runs on a developer's machine.
+
+**How it lines up with what the competition asks for**
+
+| Criterion | What Market signals shows |
+|---|---|
+| Architecture and reasoning loop | A closed loop: sense (news), read (fixed shape), reason (days table and projection engine), propose (buffer or order), decide (a person), act, record. The model is confined to one step, and every figure comes from a deterministic engine. |
+| Tool use and integration | A live news feed, a local language model behind a validator, the projection engine, the risk buffer and the order request API, all chained in one flow, with the audit log behind them. |
+| Autonomy and human in the loop | The agent proposes and never acts: nothing is ordered, no buffer is added and no stock moves without a person. The reading can be edited first, dismissals can be undone, a buffer can be withdrawn. |
+| Observability | Every scan reports on screen what it did and what it set aside, every reading names who made it, and every decision and correction stores what the system saw and what it did, filterable in History. |
+| Platform and tooling | Runs on the same Node, SQLite and React stack as the rest of the app, and is built to run on the Lightsail container in its keyword mode (no local model there). It deliberately does not call Bedrock; the paid model is reserved for Why? and Ask about your data. |
+
+**How well the reader does, and where it does not.** On a small labelled set (14 headlines, some
+written for the test) it reads about 70 to 79 percent correctly, with no unreadable answers, which is why every reading is shown, labelled and
+editable. Known misses: a country restricting foreign exporters read as an India restriction, and a big
+buyer's import surge read in the wrong direction. Severity is the model's judgement and is not yet
+calibrated against real outcomes.
+
+**Not built yet.** There is no scheduled background scan (a person presses the button), no
+supplier-specific news queries, and the news feed is an unofficial route whose terms of automated use
+have not been checked. Those are the natural next steps toward a watcher that runs by itself, and each
+would still end at the same place: a proposal that waits for a person.
 
 ---
 
