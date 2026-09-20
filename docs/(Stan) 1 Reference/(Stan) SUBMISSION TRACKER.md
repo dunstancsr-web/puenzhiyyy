@@ -27,10 +27,15 @@ Four deliverables. Status as of 20 Sep.
 
 ## Waiting for Stan's decision
 
-Nothing right now. The last three (At Risk bands, the seeded India event, market signals feeding order requests) were decided on 20 Sep and are in "Decisions already made" below.
+- **Ask about your data on the live URL** (needs a local model, which the container lacks): hide it on the deployed server (recommended) or route it to Sonnet behind the PIN.
+- **Keep or swap the misread Cambodia story** in the guide and video.
+
+Also decided earlier: The last three (At Risk bands, the seeded India event, market signals feeding order requests) were decided on 20 Sep and are in "Decisions already made" below.
 
 ## To do, not blocked
 
+- **Before deploy: make the GHCR package public.** The 20 Sep rehearsal (`rehearse-deploy.sh`) passed every site check but failed on `ghcr.io/dunstancsr-web/puenzhiyyy` being private (HTTP 403 anonymous pull), so Lightsail could not pull it. GitHub, Packages, the image, Package settings, Change visibility.
+- **Request the Innovation Sandbox lease** (Hackathon Lease template, no approval needed) when ready to deploy.
 - **Show Tawmo the merge** (PR #5, 20 Sep): if she wants changes, fix on a new branch; undo is `git revert -m 1 15153c4`.
 - **Merge the open pull requests, in this order** (only when Stan says so, see rules.md): #8 (order request timeline), #9 (Market signals), #10 (Alerts and History in one tab), then the branch `feature/ageing-and-signal-decisions` once its pull request is opened. They are stacked, so each one after the first shrinks once the one before it merges. #3 (an old tracker copy) is superseded by this file and can be closed; #4 (onboarding suggested settings) is Stan's to decide.
 - **Remote branches already merged into main** can be deleted from GitHub when Stan says so: `chore/team-workflow-hooks`, `feature/market-signals`, `feature/mvp2-forecast-day1`, `feature/mvp2-separate-duties`, `feature/onboarding-demo-ux` (some may be Tawmo's, so ask her first).
