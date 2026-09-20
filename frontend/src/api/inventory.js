@@ -226,7 +226,7 @@ export const api = {
   getMarketSignals: () => request("/market-signals"),
   replaySignal: (fixture_id) => request("/market-signals/replay", { method: "POST", body: { fixture_id } }),
   decideSignal: (id, decision) => request(`/market-signals/${id}/decision`, { method: "POST", body: { decision } }),
-  scanSignals: () => request("/market-signals/scan", { method: "POST", body: {} }),
+  scanSignals: (days) => request("/market-signals/scan", { method: "POST", body: { days } }),
   correctSignal: (id, body) => request(`/market-signals/${id}`, { method: "PATCH", body }),
 
   // Audit log (TASK-31) - every state change the API made, newest first.

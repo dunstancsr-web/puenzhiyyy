@@ -28,6 +28,7 @@ const crypto = require("crypto");
 const { sandboxOnlyWhenPublic } = require("../middleware/sandboxGuard");
 const { buildQueries, fetchHeadlines } = require("../signals/feed");
 const { contextFrom, readHeadline } = require("../signals/reader");
+const { findSameStory, MAX_DAYS_APART } = require("../signals/twins");
 const { chat, resolveTier } = require("../llm/provider");
 
 // A separate, scoped model choice, like ASK_DATABASE_MODEL: this is a classification
@@ -36,6 +37,10 @@ const SIGNAL_READER_MODEL = process.env.SIGNAL_READER_MODEL || "llama3.1:8b";
 const SCAN_COOLDOWN_MS = 45_000;   // a public server must not let a button hammer a news site and a model
 const MAX_MODEL_READS = 16;        // per scan (about 20 seconds on the local model); the rest wait for the next one
 const SCAN_BUDGET_MS = 75_000;
+// How far back a scan may look, in whole days. The page reads these limits from the server (see the
+// payload below), so there is one owner. A month is the ceiling because a scan reads at most
+// MAX_MODEL_READS headlines: a longer window mostly finds older stories that wait for the next scan.
+const SCAN_DAYS = { min: 1, max: 30, default: 14 };
 let lastScanAt = 0;
 let scanning = false;
 
@@ -82,7 +87,7 @@ function listSignals(db) {
     .filter((e) => !loaded.has(e.fixture_id))
     .map(({ fixture_id, published_at, headline, source_name }) => ({ fixture_id, published_at, headline, source_name }));
   const origins = [...new Set(skus.map((k) => k.country_of_origin).filter(Boolean))];
-  return { signals, catalog, playbook: PLAYBOOK, max_buffer_days: MAX_BUFFER_DAYS, origins, event_types: EVENT_TYPES, severities: SEVERITIES, directions: DIRECTIONS };
+  return { signals, catalog, playbook: PLAYBOOK, max_buffer_days: MAX_BUFFER_DAYS, scan_days: SCAN_DAYS, origins, event_types: EVENT_TYPES, severities: SEVERITIES, directions: DIRECTIONS };
 }
 
 router.get("/market-signals", (req, res) => {
@@ -124,6 +129,11 @@ router.post("/market-signals/replay", sandboxOnlyWhenPublic, (req, res) => {
 //   signals. Nothing is accepted and nothing is ordered here. The paid tier is
 //   unreachable from this route (see signals/reader.js).
 router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
+  // Checked first, so a bad request neither starts a scan nor uses up the cooldown.
+  const days = req.body?.days == null ? SCAN_DAYS.default : Number(req.body.days);
+  if (!Number.isInteger(days) || days < SCAN_DAYS.min || days > SCAN_DAYS.max) {
+    return res.status(400).json({ success: false, message: `Choose a whole number of days from ${SCAN_DAYS.min} to ${SCAN_DAYS.max}.` });
+  }
   const wait = SCAN_COOLDOWN_MS - (Date.now() - lastScanAt);
   if (scanning) return res.status(409).json({ success: false, message: "A scan is already running." });
   if (wait > 0) return res.status(429).json({ success: false, message: `Scanned a moment ago. Try again in ${Math.ceil(wait / 1000)} seconds.` });
@@ -138,7 +148,7 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
       return res.status(400).json({ success: false, message: "Add products first: the scan looks for news about the countries you buy from." });
     }
 
-    const { items, errors } = await fetchHeadlines(buildQueries(ctx.origins));
+    const { items, errors } = await fetchHeadlines(buildQueries(ctx.origins, days), { maxAgeDays: days + 7 });
     const hash = (it) => crypto.createHash("sha1").update(it.link).digest("hex").slice(0, 16);
     const seenStmt = db.prepare(`SELECT 1 FROM signal_seen WHERE url_hash = ?`);
     const markSeen = db.prepare(`INSERT OR IGNORE INTO signal_seen (url_hash, verdict) VALUES (?, ?)`);
@@ -154,6 +164,11 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
        WHERE origin = 'live' AND status != 'dismissed' AND country_of_origin = ? AND event_type = ? AND direction = ?
          AND ABS(julianday(published_at) - julianday(?)) <= 7
        ORDER BY id LIMIT 1`);
+    // Signals a new headline could be a repeat of: any live signal published within a week, in ANY state. A
+    // dismissed one is included on purpose, so a syndicated copy cannot bring it back as a fresh question.
+    const recentLive = db.prepare(`
+      SELECT id, headline, also_reported_by, country_of_origin, published_at FROM market_signals
+       WHERE origin = 'live' AND ABS(julianday(published_at) - julianday(?)) <= ${MAX_DAYS_APART}`);
     const tally = { fetched: items.length, already_read: 0, not_relevant: 0, merged: 0, added: 0, by_model: 0, by_rules: 0, waiting: 0, errors };
     let modelReads = 0;
     const deps = { chatFn: chat, resolveTierFn: resolveTier, model: SIGNAL_READER_MODEL };
@@ -168,7 +183,14 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
       if (r.status === "signal") {
         // The same story reported by several outlets is ONE signal with several
         // sources, not several cards asking the same question.
-        const twin = findTwin.get(r.read.country_of_origin, r.read.event_type, r.read.direction, it.published_at);
+        // Same story first, by the text of the headline (see signals/twins.js), then the older test by the
+        // reader's reading. The text test comes first because the reader is not consistent: it can read one
+        // headline two ways, and the reading test alone would then keep both.
+        const sameStory = findSameStory(
+          { title: it.title, published_at: it.published_at, country_of_origin: r.read.country_of_origin },
+          recentLive.all(it.published_at).map((x) => ({ ...x, also_reported_by: parseList(x.also_reported_by) || [] })),
+        );
+        const twin = sameStory || findTwin.get(r.read.country_of_origin, r.read.event_type, r.read.direction, it.published_at);
         if (twin) {
           const also = parseList(twin.also_reported_by) || [];
           if (also.length < 6) also.push({ title: it.title, source: it.source, url: it.link });
@@ -251,8 +273,8 @@ router.patch("/market-signals/:id", sandboxOnlyWhenPublic, (req, res) => {
 router.post("/market-signals/:id/decision", sandboxOnlyWhenPublic, (req, res) => {
   const { decision } = req.body || {};
   const decidedBy = String(req.body?.decided_by || "Manager").slice(0, 60);
-  if (!["approve", "dismiss", "withdraw"].includes(decision)) {
-    return res.status(400).json({ success: false, message: "decision must be approve, dismiss or withdraw" });
+  if (!["approve", "dismiss", "withdraw", "reopen"].includes(decision)) {
+    return res.status(400).json({ success: false, message: "decision must be approve, dismiss, withdraw or reopen" });
   }
   try {
     const db = getDb();
@@ -289,6 +311,12 @@ router.post("/market-signals/:id/decision", sandboxOnlyWhenPublic, (req, res) =>
       if (sig.status !== "pending") return res.status(409).json({ success: false, message: `Already ${sig.status}` });
       status = "dismissed";
       db.prepare(`UPDATE market_signals SET status = 'dismissed', decided_at = datetime('now'), decided_by = ? WHERE id = ?`).run(decidedBy, sig.id);
+    } else if (decision === "reopen") {
+      // The undo for a dismissal (including "Acknowledge all"). Only a dismissed signal can come back: an
+      // approved one has already added a buffer, and taking that back is a withdrawal, which is its own step.
+      if (sig.status !== "dismissed") return res.status(409).json({ success: false, message: "Only a dismissed signal can be reopened" });
+      status = "pending";
+      db.prepare(`UPDATE market_signals SET status = 'pending', decided_at = NULL, decided_by = NULL WHERE id = ?`).run(sig.id);
     } else {
       if (sig.status !== "approved") return res.status(409).json({ success: false, message: "Only an approved signal can be withdrawn" });
       status = "withdrawn";

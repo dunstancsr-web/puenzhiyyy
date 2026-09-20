@@ -8,6 +8,7 @@ import Badge from "../components/Badge";
 import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
+import WorkingNote from "../components/WorkingNote";
 import { api } from "../api/inventory";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { buildExplanation } from "../lib/explain";
@@ -547,8 +548,8 @@ function AiModal({ aiModal, onClose }) {
             reachable, the deterministic steps below are the whole explanation
             and nothing announces an absence the reader did not ask about. */}
         {narrative?.loading && (
-          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 16 }}>
-            Asking the model for a plain English summary...
+          <div style={{ marginBottom: 16 }}>
+            <WorkingNote label="Asking the model for a plain English summary" />
           </div>
         )}
         {/* The one absence that IS announced. The rule above holds for a

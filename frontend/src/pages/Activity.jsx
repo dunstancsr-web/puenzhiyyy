@@ -233,13 +233,14 @@ function describe(event) {
       };
 
     case "SIGNAL_DECIDED": {
-      const verb = { approve: "Accepted", dismiss: "Dismissed", withdraw: "Withdrew", edit: "Corrected the reading of" }[i.decision] || "Decided";
+      const verb = { approve: "Accepted", dismiss: "Dismissed", withdraw: "Withdrew", reopen: "Reopened", edit: "Corrected the reading of" }[i.decision] || "Decided";
       return {
         headline: `${verb} market signal: ${i.headline || "news event"}`,
         detail: [
           i.decided_by ? `By ${i.decided_by}.` : null,
           o.buffer_days != null ? `Added a ${num(o.buffer_days)} day buffer to the reorder points it applies to.` : null,
           i.decision === "withdraw" ? "The buffer it added was switched off." : null,
+          i.decision === "reopen" ? "It is back in the list, waiting for a decision." : null,
         ].filter(Boolean).join(" ") || null,
       };
     }

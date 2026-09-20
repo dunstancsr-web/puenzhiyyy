@@ -579,6 +579,16 @@ is not "basmati" (`isVariety` in `signals.js`), so India's non-basmati bans do n
 **Urgency:** `act_now` if `days_without_stock > 0` at the high end; `order_soon` if `latest_order_in_days <= 14`;
 otherwise `monitor`. Sorted worst first.
 
+**Decisions and the list.** `POST /api/market-signals/:id/decision` takes approve, dismiss, withdraw or
+reopen. Reopen is the undo for a dismissal and is allowed only from dismissed (an approved signal has already
+added a buffer, and taking that back is a withdrawal): otherwise 409. The screen sorts a tab's signals by what
+the reader must do, not by date: **Needs a decision** (pending, tightens supply, touches a product; worst
+urgency first, always open), **No effect on your stock** (pending and eases supply or touches nothing; folded,
+with one "Acknowledge all" that applies only to this group and an undo bar for 12 seconds), and **Decided**
+(folded, with a count of active buffers). Each signal is a one line row that opens into the full card, one at
+a time; the first needing a decision opens itself. A signal just added by a scan or a replay opens its own
+group and card, so a result never hides in a folded group.
+
 **Approving** inserts a `risk_events` row (midpoint of the range as `buffer_days_add`, `is_illustrative = 0`,
 carrying the variety scope) so every existing figure reflects it. `riskbuffer.js` caps the total at 30 days
 (`MAX_BUFFER_DAYS`), so a SKU already carrying an earlier event gains less than the signal's own figure; the
@@ -594,8 +604,14 @@ points, so it was left as is.
 fixed shape. Files: `signals/feed.js`, `signals/reader.js`, tests `test-signal-reader.js`, measurement
 `bench-signal-reader.js`.
 
-- **Feed:** Google News RSS search, one query per origin bought from plus one general query, spaced, 21 day
-  window, deduplicated. Unofficial route, terms of automated use NOT checked. GDELT was tried first and
+- **Feed:** Google News RSS search, one query per origin bought from plus one general query, spaced,
+  deduplicated. The look-back is chosen per scan as a whole number of days, 1 to 30, default 14
+  (`SCAN_DAYS` in `routes/signals.js`, which also sends the limits to the page, so the server is the one
+  owner; a bad value is refused with 400 before the cooldown is used). The search asks for that many days
+  and items older than the window plus 7 days are dropped. The ceiling is 30 because one scan reads at most
+  16 headlines, so a longer window mostly adds older stories that wait for the next scan. (This section
+  said "21 day window" until 20 Sep; the query had always asked for 14.) Unofficial route, terms of
+  automated use NOT checked. GDELT was tried first and
   answered 429 (one request per five seconds).
 - **Reader, three stages.** (1) A keyword filter (rice words, an origin or general exporter word, a
   market-moving word) discards most headlines with no model call. (2) A LOCAL model (`SIGNAL_READER_MODEL`,
@@ -607,8 +623,18 @@ fixed shape. Files: `signals/feed.js`, `signals/reader.js`, tests `test-signal-r
   silently falls back to the server default, which could be paid); tested.
 - **Untrusted text.** The headline is passed as quoted data to a model with no tools; only the feed's own
   headline text is ever displayed, never text a model wrote; extra fields a model adds are ignored.
-- **Merging.** The same story from several outlets (same country, event type and direction within 7 days)
-  becomes one signal with an "also reported by" list, not several cards.
+- **Merging (`signals/twins.js`).** The same story from several outlets becomes one signal with an "also
+  reported by" list, not several cards. It is judged by the TEXT of the headline first (word overlap of at
+  least 0.6 when the reader chose the same country, 0.9 whatever the country; within 7 days; against the
+  signal's own headline and every wording already merged into it), and only then by the older test (same
+  country, event type and direction). It compares against every live signal in any state, including
+  dismissed, so a syndicated copy cannot bring a dismissed story back. Two guards must also pass, both
+  leaning toward NOT merging, because a wrong merge hides news and a missed one only costs a card: the
+  headlines must not use opposite direction words (the first one each uses: "bans" against "lifts", "rise"
+  against "fall"), and if both state figures they must share one (10% is not 20%). The reason for the text
+  test: the reader is not consistent, so the same headline could be read two ways and never match on
+  reading. Set on 241 real headlines (20 Sep 2026); the 0.6 line kept every real repeat and let through
+  no pair of different relevant stories. Tests: `test-signal-reader.js`, "same story detection".
 - **Corrections.** `PATCH /api/market-signals/:id` lets a person fix the four fields the reader chose; the
   assessment is arithmetic and recomputes. Logged as SIGNAL_DECIDED (decision "edit").
 - **Bounds.** 45 second cooldown between scans, 16 model reads and 75 seconds per scan (the rest wait, unmarked),

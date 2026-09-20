@@ -6,6 +6,7 @@ import ErrorState from "../components/ErrorState";
 import ColHint from "../components/ColHint";
 import Modal from "../components/Modal";
 import MarketSignals from "../components/MarketSignals";
+import WorkingNote from "../components/WorkingNote";
 import { api } from "../api/inventory";
 import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier";
 
@@ -211,6 +212,11 @@ export default function ActionItems() {
         </div>
         {/* Not limited to the two rows above on purpose - this can ask about
             any SKU, using the read-only tools in backend/src/llm/tools.js. */}
+        {askState?.loading && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+            <WorkingNote label="Looking up your data and writing an answer" />
+          </div>
+        )}
         {askState && !askState.loading && (
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
             {askState.available ? (
@@ -324,7 +330,7 @@ export default function ActionItems() {
             {aiModal.label}
           </div>
           {aiModal.loading ? (
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Thinking…</div>
+            <WorkingNote label="Writing a plain English explanation" />
           ) : aiModal.available ? (
             <div style={{ fontSize: "var(--text-base)", lineHeight: 1.7, whiteSpace: "pre-line" }}>
               {aiModal.explanation}

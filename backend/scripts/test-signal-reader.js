@@ -47,6 +47,53 @@ const deps = (reply, o = {}) => ({ chatFn: fakeChat(reply), resolveTierFn: local
     assert.strictEqual(r.errors.length, 1);
   });
   await check("one query per origin plus a general one", () => assert.strictEqual(feed.buildQueries(["India", "Thailand"]).length, 3));
+  await check("the search window follows the days asked for, and defaults to 14", () => {
+    assert.ok(feed.buildQueries(["India"], 3).every((q) => q.endsWith("when:3d")));
+    assert.ok(feed.buildQueries(["India"]).every((q) => q.endsWith("when:14d")));
+  });
+  await check("the age filter follows maxAgeDays", async () => {
+    const now = Date.UTC(2026, 8, 19);
+    const fetchImpl = async () => ({ ok: true, text: async () => XML });
+    const wide = await feed.fetchHeadlines(["a"], { fetchImpl, now, pauseMs: 0, maxAgeDays: 365 });
+    const narrow = await feed.fetchHeadlines(["a"], { fetchImpl, now, pauseMs: 0, maxAgeDays: 0 });
+    assert.strictEqual(wide.items.length, 2);
+    assert.strictEqual(narrow.items.length, 0);
+  });
+
+  console.log("same story detection (headlines are real, from 20 Sep)");
+  const twins = require("../src/signals/twins");
+  const sig = (headline, country = "Pakistan", published_at = "2026-08-30", also = []) => ({ headline, country_of_origin: country, published_at, also_reported_by: also.map((title) => ({ title })) });
+  const item = (title, country = "Pakistan", published_at = "2026-08-30") => ({ title, country_of_origin: country, published_at });
+  await check("identical headlines are one story, whatever country the reader chose", () =>
+    assert.ok(twins.sameStory(item("India rice output set for biggest drop in nearly 20 years", "Thailand", "2026-09-17"), sig("India rice output set for biggest drop in nearly 20 years", "India", "2026-09-17"))));
+  await check("unit and spelling variants are one story (gov't, tons, USD 3bn)", () => {
+    assert.ok(twins.sameStory(item("Japan gov\u2019t unveils plan to buy back 210,000 tonnes of rice", "Japan", "2026-09-01"), sig("Japan gov't unveils plan to buy back 210,000 tons of rice", "Japan", "2026-09-01")));
+    assert.ok(twins.sameStory(item("Pakistan, Saudi Arabia target USD 3bn in agriculture exports"), sig("Pakistan, Saudi Arabia target $3 billion in agricultural, food exports")));
+  });
+  await check("a story that drifts in wording still gathers, through the wordings already merged into it", () => {
+    const later = item("Pakistan, Saudi Arabia set $3bn target for agricultural, food exports");
+    const head = sig("Pakistan eyes $3bn in food, agricultural exports to Saudi Arabia", "Pakistan", "2026-08-30", ["Pakistan, Saudi Arabia target $3 billion in agricultural, food exports"]);
+    assert.ok(twins.sameStory(later, head));
+  });
+  await check("a ban and its lifting are NOT the same story, however alike the words", () => {
+    assert.ok(twins.similarity("India bans exports of non-basmati white rice", "India lifts ban on non-basmati white rice exports") >= twins.SAME_STORY_SCORE);
+    assert.strictEqual(twins.sameStory(item("India bans exports of non-basmati white rice", "India", "2026-07-20"), sig("India lifts ban on non-basmati white rice exports", "India", "2026-07-21")), false);
+  });
+  await check("a headline with words from both sides (rise ... lower rainfall) is not opposed to its own copy", () =>
+    assert.strictEqual(twins.opposed("India rice export rates rise to one-year high as lower rainfall fuels", "Indian rice export rates rise to one-year high as lower rainfall fuels"), false));
+  await check("different figures are different developments (10% against 20%)", () =>
+    assert.strictEqual(twins.sameStory(item("Thai rice exports rise 10%", "Thailand"), sig("Thai rice exports rise 20%", "Thailand")), false));
+  await check("the same template about two countries is not merged (0.75 alike, different country)", () => {
+    assert.ok(twins.similarity("Top 5 Best Thai Rice Cooker 2026", "Top 5 Best Japan Rice Cooker 2026") >= 0.7);
+    assert.strictEqual(twins.sameStory(item("Top 5 Best Thai Rice Cooker 2026", "Thailand", "2026-09-11"), sig("Top 5 Best Japan Rice Cooker 2026", "Japan", "2026-09-10")), false);
+  });
+  await check("the same words a fortnight later are a new story", () =>
+    assert.strictEqual(twins.sameStory(item("Pakistan, Saudi Arabia set $3bn target for food exports", "Pakistan", "2026-09-20"), sig("Pakistan, Saudi Arabia set $3bn target for food exports", "Pakistan", "2026-08-30")), false));
+  await check("findSameStory returns the matching signal, or null", () => {
+    const a = sig("Something unrelated about wheat", "India", "2026-08-30"); const b = sig("Pakistan, Saudi Arabia set $3bn target for food exports", "Pakistan", "2026-08-30");
+    assert.strictEqual(twins.findSameStory(item("Pakistan, Saudi Arabia set $3bn target for food exports"), [a, b]), b);
+    assert.strictEqual(twins.findSameStory(item("Nothing like the others here"), [a, b]), null);
+  });
 
   console.log("stage 1: the candidate filter (real headlines from 19 Sep)");
   await check("keeps rice supply news naming an origin", () => assert.strictEqual(R.candidateFilter(item("India sets minimum export price on basmati rice"), ctx).keep, true));
