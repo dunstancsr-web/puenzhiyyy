@@ -93,6 +93,10 @@ const SAMPLE_CATALOG_SIZE = 5;
 function trimSampleCatalog(db) {
   const keep = db.prepare(`SELECT sku_id FROM skus ORDER BY id LIMIT ?`).all(SAMPLE_CATALOG_SIZE).map((r) => r.sku_id);
   const placeholders = keep.map(() => "?").join(",");
+  // Timeline rows point at order_requests, not skus, so they go first: a request cannot be
+  // deleted while its events still reference it.
+  db.prepare(`DELETE FROM order_request_events WHERE request_id IN
+    (SELECT id FROM order_requests WHERE sku_id NOT IN (${placeholders}))`).run(...keep);
   const tables = [
     "inventory_positions", "sales_transactions", "purchase_orders", "alerts_log",
     "decisions", "forecasts", "sales_orders", "goods_movements", "inventory_history",

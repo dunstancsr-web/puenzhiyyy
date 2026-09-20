@@ -1550,6 +1550,46 @@ function nextRequestNo(db) {
   return `REQ-${String(n).padStart(4, "0")}`;
 }
 
+// The steps a request can go through, and who does each one. The office raises it; the buyer
+// acknowledges it and raises the purchase order; the buyer's manager approves or rejects that
+// order. Same shape as the industry flow (requisition, purchase order, approval), kept to the
+// steps this app can show honestly. There is no login, so the ACTOR is a role fixed by the step,
+// never taken from the request body: a client cannot claim a different role than the step allows.
+// Receiving the goods (closing the request from Goods In) is a later step, see the tracker.
+const REQUEST_TRANSITIONS = {
+  open:         ["acknowledged", "cancelled"],
+  acknowledged: ["po_raised", "cancelled"],
+  po_raised:    ["approved", "rejected", "cancelled"],
+  // approved, rejected and cancelled are final.
+};
+const REQUEST_ACTORS = {
+  acknowledged: "buyer",
+  po_raised: "buyer",
+  approved: "buyer manager",
+  rejected: "buyer manager",
+  cancelled: "control tower",
+};
+
+function addRequestEvent(db, requestId, status, actor, note) {
+  db.prepare(`INSERT INTO order_request_events (request_id, status, actor, note) VALUES (?, ?, ?, ?)`)
+    .run(requestId, status, actor, note || null);
+}
+
+// Attach each request's timeline, oldest step first, in one query rather than one per request.
+function withEvents(db, rows) {
+  if (!rows.length) return rows;
+  const ids = rows.map((r) => r.id);
+  const events = db.prepare(`
+    SELECT request_id, status, actor, note, created_at FROM order_request_events
+     WHERE request_id IN (${ids.map(() => "?").join(",")}) ORDER BY id`).all(...ids);
+  const byRequest = new Map();
+  for (const e of events) {
+    if (!byRequest.has(e.request_id)) byRequest.set(e.request_id, []);
+    byRequest.get(e.request_id).push(e);
+  }
+  return rows.map((r) => ({ ...r, events: byRequest.get(r.id) || [] }));
+}
+
 // POST /api/order-requests  { sku_id, quantity, reason? }
 router.post("/order-requests", sandboxOnlyWhenPublic, (req, res) => {
   const b = req.body || {};
@@ -1572,11 +1612,13 @@ router.post("/order-requests", sandboxOnlyWhenPublic, (req, res) => {
       INSERT INTO order_requests (request_no, sku_id, quantity_mt, reason, requested_by)
       VALUES (?, ?, ?, ?, ?)`
     ).run(requestNo, b.sku_id, qty, reason, requestedBy);
+    addRequestEvent(db, info.lastInsertRowid, "open", requestedBy, reason);
 
     const created = db.prepare(`
       SELECT r.*, s.product_name AS sku_name FROM order_requests r
         LEFT JOIN skus s ON s.sku_id = r.sku_id
        WHERE r.id = ?`).get(info.lastInsertRowid);
+    created.events = withEvents(db, [created])[0].events;
 
     // No output stock figures on purpose: this event's whole point is that
     // nothing about the physical position moved. Input carries the ask, output
@@ -1594,14 +1636,19 @@ router.post("/order-requests", sandboxOnlyWhenPublic, (req, res) => {
   }
 });
 
-// GET /api/order-requests?sku_id=...&status=open
+// GET /api/order-requests?sku_id=...&status=open,acknowledged   (each row carries its timeline)
 router.get("/order-requests", (req, res) => {
   try {
     const db = getDb();
     const where = [];
     const params = {};
     if (req.query.sku_id) { where.push("r.sku_id = @sku_id"); params.sku_id = req.query.sku_id; }
-    if (req.query.status) { where.push("r.status = @status"); params.status = req.query.status; }
+    if (req.query.status) {
+      // One status, or several separated by commas (the card asks for every active one).
+      const statuses = String(req.query.status).split(",").map((x) => x.trim()).filter(Boolean);
+      where.push(`r.status IN (${statuses.map((_, i) => `@st${i}`).join(",")})`);
+      statuses.forEach((x, i) => { params[`st${i}`] = x; });
+    }
 
     const rows = db.prepare(`
       SELECT r.*, s.product_name AS sku_name FROM order_requests r
@@ -1610,44 +1657,53 @@ router.get("/order-requests", (req, res) => {
        ORDER BY r.id DESC
        LIMIT 200`).all(params);
 
-    res.json({ success: true, count: rows.length, data: rows });
+    res.json({ success: true, count: rows.length, data: withEvents(db, rows) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to load order requests" });
   }
 });
 
-// PATCH /api/order-requests/:id  { status: 'ordered' | 'cancelled' }
+// PATCH /api/order-requests/:id  { status, note? }
 //
-// The follow-through that closes an open request: a buyer either places the
-// order (status -> ordered) or drops it (status -> cancelled). This still
-// changes NO stock — marking a request "ordered" means an order now exists for
-// the warehouse to receive against later, and that receipt (on the floor, by an
-// operator) is the only thing that ever moves on_hand_qty. Kept a one-way step
-// from 'open', the same shape alert acknowledgement uses: a decided request is
-// not reopened, so a stale tab cannot flip an already-ordered line back.
+// Moves a request one step along REQUEST_TRANSITIONS: acknowledged, po_raised, approved or
+// rejected (rejecting needs a reason), or cancelled from any step before the end. This still
+// changes NO stock: an approved request means a purchase order is approved for the warehouse
+// to receive against later, and that receipt (on the floor, by an operator) is the only thing
+// that ever moves on_hand_qty. Steps only go forward, the same shape alert acknowledgement
+// uses, so a stale tab cannot flip a decided request back: a step the request cannot take
+// from where it is returns 409.
 router.patch("/order-requests/:id", sandboxOnlyWhenPublic, (req, res) => {
   const id = Number(req.params.id);
   const status = String(req.body?.status || "").trim();
+  const note = String(req.body?.note || "").trim() || null;
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ success: false, message: "A valid request id is required" });
   }
-  if (!["ordered", "cancelled"].includes(status)) {
-    return res.status(400).json({ success: false, message: "status must be 'ordered' or 'cancelled'" });
+  if (!REQUEST_ACTORS[status]) {
+    return res.status(400).json({ success: false, message: `status must be one of: ${Object.keys(REQUEST_ACTORS).join(", ")}` });
+  }
+  if (status === "rejected" && !note) {
+    return res.status(400).json({ success: false, message: "A reason is required to reject a request." });
   }
 
   try {
     const db = getDb();
     const existing = db.prepare(`SELECT * FROM order_requests WHERE id = ?`).get(id);
     if (!existing) return res.status(404).json({ success: false, message: "Order request not found" });
-    if (existing.status !== "open") {
+    if (!(REQUEST_TRANSITIONS[existing.status] || []).includes(status)) {
       return res.status(409).json({
         success: false,
-        message: `Request ${existing.request_no} is already ${existing.status} and cannot be changed.`,
+        message: `Request ${existing.request_no} is ${existing.status} and cannot move to ${status}.`,
       });
     }
 
-    db.prepare(`UPDATE order_requests SET status = ? WHERE id = ?`).run(status, id);
+    const actor = REQUEST_ACTORS[status];
+    // The status change and its timeline row go in together or not at all.
+    db.transaction(() => {
+      db.prepare(`UPDATE order_requests SET status = ? WHERE id = ?`).run(status, id);
+      addRequestEvent(db, id, status, actor, note);
+    })();
 
     const updated = db.prepare(`
       SELECT r.*, s.product_name AS sku_name FROM order_requests r
@@ -1658,11 +1714,11 @@ router.patch("/order-requests/:id", sandboxOnlyWhenPublic, (req, res) => {
     // office action does not move the physical position.
     logEvent(EVENTS.ORDER_REQUEST_UPDATED, {
       skuId: existing.sku_id,
-      input: { request_no: existing.request_no, quantity_mt: existing.quantity_mt, from: existing.status },
+      input: { request_no: existing.request_no, quantity_mt: existing.quantity_mt, from: existing.status, actor, note },
       output: { status },
     });
 
-    res.json({ success: true, data: updated });
+    res.json({ success: true, data: withEvents(db, [updated])[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to update the order request" });

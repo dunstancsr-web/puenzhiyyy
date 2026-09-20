@@ -30,6 +30,8 @@ const TYPE_META = {
   // Reorder Loop step 7: the Control Tower's one write. A request to the buyer,
   // never a stock change.
   ORDER_REQUESTED:    { icon: Send,              color: "var(--blue-text)",   label: "Order requested" },
+  // A later step on that request (acknowledged, purchase order raised, approved, rejected or cancelled).
+  ORDER_REQUEST_UPDATED: { icon: Send,           color: "var(--blue-text)",   label: "Order request update" },
   // RESTOCK is retired (Reorder Loop step 7 removed the office restock action),
   // kept here so any pre-existing audit rows still render rather than showing a
   // raw event code, the same reason LLM_MODE_CHANGED's renderer was kept.
@@ -58,7 +60,7 @@ const TYPE_META = {
 // which is the actual loop the app implements, so the row of chips reads as the
 // story rather than as a legend.
 const TYPE_ORDER = [
-  "ALERT_TRIGGERED", "DECISION_RECORDED", "ORDER_REQUESTED", "LLM_CALL",
+  "ALERT_TRIGGERED", "DECISION_RECORDED", "ORDER_REQUESTED", "ORDER_REQUEST_UPDATED", "LLM_CALL",
   "OPENING_BALANCE_SET", "GOODS_RECEIVED", "GOODS_ISSUED", "RESTOCK", "SKU_UPDATED", "SKU_CREATED", "ALERT_ACKNOWLEDGED",
   "SALES_HISTORY_IMPORTED", "SIGNAL_DECIDED", "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT",
 ];
@@ -188,6 +190,23 @@ function describe(event) {
       if (i.reason) parts.push(`Reason given: "${i.reason}"`);
       return {
         headline: `Requested ${num(i.quantity_mt)} MT of ${sku}`,
+        detail: parts.join(" "),
+      };
+    }
+
+    case "ORDER_REQUEST_UPDATED": {
+      // The status now stored is the step just taken; input.from is where it was.
+      const said = {
+        acknowledged: "acknowledged by the buyer",
+        po_raised: "turned into a purchase order by the buyer, waiting for manager approval",
+        approved: "approved by the buyer's manager",
+        rejected: "rejected by the buyer's manager",
+        cancelled: "cancelled",
+      }[o.status] || `moved to ${o.status}`;
+      const parts = [`Stock is unchanged.`];
+      if (i.note) parts.push(`${o.status === "rejected" ? "Reason given" : "Note"}: "${i.note}"`);
+      return {
+        headline: `${i.request_no || "Request"} for ${sku} ${said}`,
         detail: parts.join(" "),
       };
     }

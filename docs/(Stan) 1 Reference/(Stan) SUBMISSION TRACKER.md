@@ -41,8 +41,55 @@ Four deliverables. Status as of 15 Sep.
 - **Recapture two features-guide screenshots** that show old versions: `docs/Guide/images/11-inventory.jpg`
   (the table before the Edit button fix) and `16-why.jpg` (the summary before urgency wording was
   removed). Then rebuild the PDF: `python3 docs/Guide/build-pdf.py`.
-- **Check the merged app once in a browser** (20 Sep): Onboarding's opening balance step (new route, tested on a scratch database only) and the Request order modal, then reseed.
+- **Check the merged app once in a browser** (20 Sep): Onboarding's opening balance step (new route, tested on a scratch database only), then reseed. The sample-data button and the requests card were checked on 20 Sep.
+- **Order requests, the fuller version** (next step for that feature, when there is time): see the section below. Do not start it before the deploy is done.
 - **Show Tawmo the merge** (PR #5, 20 Sep): if she wants changes, fix on a new branch; undo is `git revert -m 1 15153c4`.
+
+## Order requests: what is built and how to do the fuller version
+
+**Built (20 Sep), the minimal timeline.** A request goes open, then acknowledged (buyer), then
+purchase order raised (buyer), then approved or rejected (buyer's manager); it can be cancelled before
+the end. Each step is a row in `order_request_events` (who, when, optional note), shown on the
+Inventory page's "Requests waiting for the buyer" card and as a line on Activity. There is no login, so
+one person plays every role in the demo; the server fixes the actor from the step. It changes no stock.
+Code: `backend/src/routes/inventory.js` (`REQUEST_TRANSITIONS`, `REQUEST_ACTORS`),
+`frontend/src/components/OrderRequestsCard.jsx`.
+
+**Not built: the request never becomes a real purchase order, so it never closes by itself.** Approving
+does not create anything the warehouse can receive against. The card also drops a request once it is
+approved, rejected or cancelled, so a finished timeline is only visible on Activity.
+
+**The fuller version, in the order to do it.** Goal: an approved request becomes a purchase order that
+Goods In can receive, and receiving it closes the request with no click from the office.
+
+1. **Link the two tables.** Add `po_number TEXT` to `order_requests` with `ensureColumn` in
+   `backend/src/db/init.js` (the pattern is already there for other columns).
+2. **Create the purchase order when the buyer raises it.** In the PATCH handler's `po_raised` step,
+   insert a `purchase_orders` row (`po_number`, `sku_id`, `ordered_qty` from the request, `order_date`
+   today, `eta` from the SKU's lead time, `status` open) and store its number on the request, in the
+   same transaction as the event. Decide first whether an unapproved order should be visible to Goods
+   In: the simplest answer is to insert it on `approved` instead, so the warehouse never sees an order
+   nobody has approved. Recommended: insert on `approved`.
+3. **Close the request from Goods In.** `POST /warehouse/inbound/receive` in
+   `backend/src/routes/warehouse.js` already finds the open order by `po_number` and marks it
+   `received` (around lines 145 to 177). Right after that update, look up the request with that
+   `po_number`, add a `received` event (actor: the operator) and set its status. Add `received` to
+   `REQUEST_ACTORS` handling (the actor comes from the operator, not the fixed map) and to the
+   Activity sentence map in `frontend/src/pages/Activity.jsx`.
+4. **Show finished requests.** Change the card to keep a request visible for a while after it ends
+   (or add a "recent" list) so a completed timeline, ending in "received", is seen on Inventory.
+5. **Add a check.** A script beside `test-signals.js` that walks a request through every step, receives
+   the order through the warehouse endpoint, and asserts the request closed and stock rose only at the
+   receipt. Prove it can fail: skip the approval and confirm the order never reaches Goods In.
+6. **Update the owners.** requirements.md (the endpoint line), this section, and the devlog.
+
+**Open design questions for Stan when that time comes.** Is a partial receipt its own step
+("part received") or does one receipt close the request, as the warehouse endpoint does today? Should
+approval depend on a spend threshold (a small order skips the manager), as real purchasing does? Does the
+manager step need its own screen once there is a login, instead of a button on the card?
+
+**Why it stays small for now.** The problem statement is about spotting shortages early; purchasing
+after the alert is the second half of the loop. The deadline work (deploy, video, PDF) comes first.
 
 ## Decisions already made
 

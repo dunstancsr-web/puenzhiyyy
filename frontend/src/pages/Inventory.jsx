@@ -20,6 +20,7 @@ import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { computeSkuAnalytics } from "../mock/analytics";
 import Modal, { ModalBtn } from "../components/Modal";
 import BulkEdit from "../components/BulkEdit";
+import OrderRequestsCard from "../components/OrderRequestsCard";
 
 const HEALTH_STATUSES = ["All", "RED", "ORANGE", "YELLOW", "GREEN"];
 const MOVEMENT_CLASSES = ["All", "Fast Moving", "Normal", "Slow Moving", "Idle"];
@@ -276,30 +277,9 @@ export default function Inventory() {
   const [orderError, setOrderError] = useState(null);
   const [orderDone, setOrderDone] = useState(false);
 
-  // Open buyer requests (Reorder Loop step 7). Shown as a card above the table
-  // so the office can see and act on what it has asked the buyer for. Loaded
-  // separately from the SKU list because acting on a request changes no stock,
-  // so there is nothing on a SKU row to refresh.
-  const [openRequests, setOpenRequests] = useState([]);
-  const [requestBusyId, setRequestBusyId] = useState(null);
-  const loadOpenRequests = useCallback(() => {
-    api.getOrderRequests({ status: "open" }).then(setOpenRequests).catch(() => setOpenRequests([]));
-  }, []);
-  useEffect(() => { loadOpenRequests(); }, [loadOpenRequests]);
-
-  const handleRequestStatus = async (id, status) => {
-    setRequestBusyId(id);
-    try {
-      await api.updateOrderRequest(id, status);
-      loadOpenRequests();
-    } catch {
-      // A failed transition (e.g. someone else already closed it) just refreshes
-      // the list so the stale row disappears rather than showing an error box.
-      loadOpenRequests();
-    } finally {
-      setRequestBusyId(null);
-    }
-  };
+  // The requests card loads its own list. Raising a request bumps this so the new one shows at once;
+  // no SKU row needs refreshing because a request changes no stock.
+  const [requestsVersion, setRequestsVersion] = useState(0);
 
   // Reorder Loop step 7: the Control Tower raises a request to the buyer. It
   // records intent for a manager to act on; it does NOT change stock. Stock
@@ -321,7 +301,7 @@ export default function Inventory() {
         reason: orderReason.trim() || null,
       });
       setOrderDone(true);
-      loadOpenRequests(); // the new request shows in the open-requests card
+      setRequestsVersion((v) => v + 1); // the new request shows in the requests card
     } catch (err) {
       setOrderError(err.message || "Failed to raise the request");
     } finally {
@@ -417,38 +397,8 @@ export default function Inventory() {
         <Select value={originFilter}   onChange={setOriginFilter}   options={ORIGINS}          placeholder="Origin" />
       </div>
 
-      {/* ── Open buyer requests (Reorder Loop step 7) ──
-          The office half of the separated duties: what the Control Tower has
-          asked the buyer for, and the two ways to close it. Acting here changes
-          no stock; stock moves only when the warehouse receives a delivery.
-          Hidden entirely when there is nothing open, so it never adds empty
-          chrome to the page. */}
-      {openRequests.length > 0 && (
-        <div className="card" style={{ padding: "14px 16px", marginBottom: 16 }}>
-          <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 10 }}>
-            Open buyer requests
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {openRequests.map((r) => (
-              <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "var(--text-base)", fontWeight: 600 }}>
-                    {r.quantity_mt} MT · {r.sku_name || r.sku_id}
-                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 500 }}> · {r.request_no}</span>
-                  </div>
-                  {r.reason && (
-                    <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 2 }}>{r.reason}</div>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <ActionBtn label={requestBusyId === r.id ? "…" : "Mark ordered"} onClick={() => handleRequestStatus(r.id, "ordered")} />
-                  <ActionBtn label="Cancel" variant="ghost" onClick={() => handleRequestStatus(r.id, "cancelled")} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Requests waiting for the buyer, with each one's timeline. Owns its own data. */}
+      <OrderRequestsCard refreshKey={requestsVersion} />
 
       {/* ── Table ── */}
       <div
