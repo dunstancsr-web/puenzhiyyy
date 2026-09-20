@@ -27,10 +27,7 @@ Four deliverables. Status as of 20 Sep.
 
 ## Waiting for Stan's decision
 
-- **Ask about your data on the live URL** (needs a local model, which the container lacks): hide it on the deployed server (recommended) or route it to Sonnet behind the PIN.
-- **Keep or swap the misread Cambodia story** in the guide and video.
-
-Also decided earlier: The last three (At Risk bands, the seeded India event, market signals feeding order requests) were decided on 20 Sep and are in "Decisions already made" below.
+Nothing right now. Decided 20 Sep: The last three (At Risk bands, the seeded India event, market signals feeding order requests) were decided on 20 Sep and are in "Decisions already made" below.
 
 ## To do, not blocked
 
@@ -71,6 +68,8 @@ screen once there is a login, instead of a button on the card?
 
 ## Decisions already made
 
+- **Ask about your data is hidden on the live URL** (20 Sep): it needs a local model and the container has none, so the box appears only when the server reports one (`ActionItems.jsx`, `askAvailable`). It is shown in the video from a local run. A local model on Lightsail was ruled out: the Nano container's memory is far below what llama3.1:8b needs, and a size that could hold it costs credit for one feature.
+- **The misread Cambodia story stays** in the features guide and the video, as the honest human-in-the-loop example (20 Sep). The guide marks it as left in on purpose.
 | Decision | Choice | Why |
 |---|---|---|
 | Hosting | AWS Lightsail container service, Nano | the organizers' allowed platform; rubric item 7 scores Platform & Tooling Usage; Render's free tier sleeps |
