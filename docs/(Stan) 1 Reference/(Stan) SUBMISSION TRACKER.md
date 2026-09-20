@@ -19,7 +19,7 @@ Four deliverables. Status as of 20 Sep.
 
 ## Before submitting, in this order
 
-1. **Deploy** and run `node backend/scripts/check-deploy.js <url>` against the live service.
+1. **Deployed 20 Sep** to Lightsail (`container-service-1`, Nano x1, Singapore); every `check-deploy.js` check passed. **Redeploy needed** to pick up the inline PIN unlock (PR #20, main `2ec3481`): Lightsail, `container-service-1`, Deployments, Modify your deployment, change the image tag to `sha-2ec3481` (after its Actions run is green), retype `DEMO_PIN` and `LLM_GATEWAY_API_KEY` (the form does not keep them), Save and deploy, then `check-deploy.js <url>` and one Why? press (about USD 0.006). The console session expires after about an hour, so have both values ready.
 2. **Final paid check: done 20 Sep** (`sonnet-check.js --confirm-spend --features`, USD 0.0452, in the spend ledger). It found four wording problems, all fixed by rule and covered by `test-llm-sonnet.js`. A second paid run is only worth it if the model layer changes again; then rehearse free first (`--dry-run --features`).
 3. **Record the video**, following the recording checklist below.
 4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `docs/Submission/WRITEUP.md`.
@@ -27,7 +27,9 @@ Four deliverables. Status as of 20 Sep.
 
 ## Waiting for Stan's decision
 
-Nothing right now. Decided 20 Sep: The last three (At Risk bands, the seeded India event, market signals feeding order requests) were decided on 20 Sep and are in "Decisions already made" below.
+Nothing right now. Decided 21 Sep: **demo mode stays opt-in** (option a): writes on the live site are refused with a one-click "Join the demo", so judges see the populated live data first. A default demo would show an empty portfolio (the sandbox starts empty and its sample data has zeroed stock), and Exit ends the shared sandbox for everyone in it.
+
+Decided 20 Sep: The last three (At Risk bands, the seeded India event, market signals feeding order requests) were decided on 20 Sep and are in "Decisions already made" below.
 
 ## To do, not blocked
 
