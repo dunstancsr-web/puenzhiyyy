@@ -10,6 +10,7 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import WorkingNote from "../components/WorkingNote";
 import SegmentedTabs from "../components/SegmentedTabs";
+import UnlockAI from "../components/UnlockAI";
 import ActivityFeed, { EventRow } from "../components/ActivityFeed";
 import { api } from "../api/inventory";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
@@ -371,6 +372,8 @@ export default function Alerts() {
         </div>
       )}
 
+      {view !== "history" && <UnlockAI variant="banner" />}
+
       <div role="tabpanel" id="alerts-panel" aria-labelledby={`tab-alerts-panel-${view}`}>
         {view === "history" ? (
           <ActivityFeed skuId={skuFilter} refreshKey={refreshKey} activeAlertIds={activeIds} dismissedAlertIds={dismissedIds}
@@ -386,7 +389,7 @@ export default function Alerts() {
 
       {/* ── AI explanation modal ── */}
       {aiModal && (
-        <AiModal aiModal={aiModal} onClose={() => setAiModal(null)} />
+        <AiModal aiModal={aiModal} onClose={() => setAiModal(null)} onUnlocked={() => handleAskAI(aiModal.alert)} />
       )}
 
       {/* ── Approval modal ── */}
@@ -683,7 +686,7 @@ function AlertCard({ alert, onDismiss, onAskAI, onApprove, highlight = false }) 
 }
 
 // ── AI explanation modal ───────────────────────────────────────────────────────
-function AiModal({ aiModal, onClose }) {
+function AiModal({ aiModal, onClose, onUnlocked }) {
   const { alert, sections, degraded, narrative } = aiModal;
   useModalEscape(onClose);
   return (
@@ -735,8 +738,12 @@ function AiModal({ aiModal, onClose }) {
             button. Says what to do, not what went wrong. */}
         {narrative && !narrative.loading && narrative.locked && (
           <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 16 }}>
-            Paid summaries are locked. Enter the demo PIN in Settings to unlock them; the steps below need no PIN.
+            Paid summaries are locked; the steps below need no PIN.
           </div>
+        )}
+        {/* Asks in place instead of pointing at Settings: nothing here says an AI summary exists until the PIN is in. */}
+        {narrative && !narrative.loading && !narrative.available && (
+          <UnlockAI variant="inline" onUnlocked={onUnlocked} />
         )}
         {narrative && !narrative.loading && narrative.available && (
           <div style={{

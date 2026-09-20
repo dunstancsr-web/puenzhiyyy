@@ -15,7 +15,7 @@ const { EVENTS, logEvent, readEvents, eventCounts, diffFields } = require("../db
 const { addRequestEvent } = require("../db/requestEvents");
 const { buildAnalytics } = require("../engines/index");
 const { explainAlert, providerInfo, LlmUnavailable } = require("../llm/explain");
-const { explainActionItem } = require("../llm/explainActionItem");
+const { explainActionItem, ruleBasedExplanation } = require("../llm/explainActionItem");
 const { askDatabase } = require("../llm/askDatabase");
 const { listModes, getDefaultMode, resolveTier, plainReason } = require("../llm/provider");
 const demoAccess = require("../llm/demoAccess");
@@ -2254,7 +2254,10 @@ router.post("/action-items/explain", async (req, res) => {
       });
     } catch (err) {
       if (err instanceof LlmUnavailable) {
-        return res.json({ success: true, data: { available: false, reason: plainReason(err), ...providerInfo(tier) } });
+        return res.json({
+          success: true,
+          data: { available: false, reason: plainReason(err), ruleBased: ruleBasedExplanation({ kind, sku, item }), ...providerInfo(tier) },
+        });
       }
       throw err;
     }

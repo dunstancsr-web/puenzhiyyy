@@ -189,4 +189,11 @@ async function explainActionItem({ kind, sku, item, tier }) {
   return { ...out, cached: false };
 }
 
-module.exports = { explainActionItem };
+// The same system-written sentence the model's answer starts with, offered on its own when no model is answering
+// (rule-based tier, or a locked paid tier), so the Why? box is never an empty apology. It is computed from the
+// row's own figures and states no more than the row does.
+function ruleBasedExplanation({ kind, sku, item }) {
+  return openingSentence(kind, sku, item);
+}
+
+module.exports = { explainActionItem, ruleBasedExplanation };

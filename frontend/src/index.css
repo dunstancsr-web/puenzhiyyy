@@ -963,3 +963,10 @@ input[type="range"].sf-range:disabled {
 .working-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--blue); flex-shrink: 0; animation: working-pulse 1.1s ease-in-out infinite; }
 @keyframes working-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.1); } }
 @media (prefers-reduced-motion: reduce) { .working-dot { animation: none; opacity: 0.8; } }
+
+
+/* UnlockAI banner: on a phone the one-line title and the PIN field are enough; the sentence under the title
+   stacked the strip to about 330px and pushed the page's real content off the first screen. */
+@media (max-width: 768px) {
+  .unlock-ai__desc { display: none; }
+}
