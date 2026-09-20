@@ -50,7 +50,9 @@ function calmSentence(s) {
   out = out.replace(/(?<!\b(?:more|less|as|so|too))\s+quickly\b(?!\s+(?:enough|as))/gi, "");
   // leading "Immediately, ..." / "Urgently, ..."
   out = out.replace(/^(\s*)(?:immediately|urgently|swiftly),\s*(\w)/i, (m, sp, c) => sp + c.toUpperCase());
-  return out.replace(/\s{2,}/g, " ").replace(/\s+([.,;:!?])/g, "$1");
+  // Horizontal whitespace only. Collapsing every \s also swallowed line breaks, so a heading followed by a blank
+  // line and bullets ("Comparison:\n\n- ...") ran together as "Comparison: - ...". Found in the real Sonnet run.
+  return out.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+([.,;:!?])/g, "$1");
 }
 
 /**
@@ -125,6 +127,10 @@ function stripSelfCommentary(text) {
     // it entirely. Stripped first, so "Here's..." is then back at the start
     // for that rule to catch.
     .replace(/^\s*I apologi[sz]e for[^\n]*?\.\s*/i, "")
+    // A strong model narrates its own progress before answering: "Looking at the facts, I have comprehensive
+    // comparison data for both SKUs. I can now provide a complete answer." (real Sonnet run, 20 Sep). A whole
+    // opening paragraph of that kind says nothing to the reader, so it is dropped.
+    .replace(/^\s*(?:Looking at (?:the|these) (?:facts|data|figures)|Based on (?:the|these) (?:facts|data|figures)|(?:Now )?I (?:now )?(?:have|can)\s+(?:all|enough|now|comprehensive|the)\b)[^\n]*\n+/i, "")
     // Whack-a-mole by design: a small local model varies its preamble
     // wording every run ("my attempt at...", "the instructions:", "my
     // response:", "Based on the facts available, here is the final
@@ -142,4 +148,47 @@ function stripSelfCommentary(text) {
     .trim();
 }
 
-module.exports = { calmTone, stripSelfCommentary };
+// ─────────────────────────────────────────────────────────────────────────────
+// FORMATTING HABITS OF A STRONGER MODEL (20 Sep)
+//
+// llama3 rarely writes markdown; Claude Sonnet does, even when told not to: **bold** on the product name,
+// `code` around a placeholder, "•" bullets, and em dashes (which this app never shows). The prompts already
+// forbid all of it, and the project rule is that wording is fixed by a rule applied afterwards, not by more
+// prompt text. So this runs on every model answer BEFORE it is checked: a placeholder written as
+// **{product}** or `{product}` must still count as the placeholder it is.
+//
+// Placeholders keep their braces, digits are not touched (validateSlotted still bans them), and a plain "-"
+// bullet, which the action item prompt allows, is left as it is.
+// ─────────────────────────────────────────────────────────────────────────────
+function cleanFormatting(text) {
+  return String(text)
+    .replace(/```[a-z]*\n?/gi, "")
+    .replace(/\*\*([^*\n]+)\*\*/g, "$1")
+    .replace(/__([^_\n]+)__/g, "$1")
+    .replace(/(^|[\s(])\*([^*\s][^*\n]*?)\*(?=[\s).,;:!?]|$)/g, "$1$2")
+    .replace(/`([^`\n]*)`/g, "$1")
+    .replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, "")
+    .replace(/^[ \t]*[•*\u2013\u2014][ \t]+/gm, "- ")
+    .replace(/[ \t]*[\u2013\u2014][ \t]*/g, ", ")
+    .replace(/,\s*,/g, ",")
+    // A dash bullet run on after a colon or full stop ("It will last: - Current stock: 29 days"): put it on its
+    // own line, where the following bullets already are.
+    .replace(/([.:!?])[ \t]+-[ \t]+(?=[A-Z{])/g, "$1\n- ");
+}
+
+// A model answer that stops mid-sentence. The provider says so when the endpoint reports hitting the token
+// limit (`truncated`), and this catches the rest by the text itself: a finished answer ends on a full stop,
+// a closing bracket or quote, or a placeholder (whose value is a complete sentence). Checked on the raw
+// answer, so a placeholder counts as a finish.
+function looksCutOff(text) {
+  const t = String(text).trim();
+  return t.length > 0 && !/[.!?)"'\u201d\u2019}]$/.test(t);
+}
+
+/** Clean a provider result and say whether it was cut off. Never throws. */
+function tidy(result) {
+  const text = cleanFormatting(result.text).trim();
+  return { ...result, text, cutOff: !!result.truncated || looksCutOff(text) };
+}
+
+module.exports = { calmTone, stripSelfCommentary, cleanFormatting, looksCutOff, tidy };

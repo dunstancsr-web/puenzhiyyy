@@ -15,8 +15,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { chat, providerInfo, resolveTier, LlmUnavailable } = require("./provider");
-const { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble, triggerSentence } = require("./slots");
-const { calmTone } = require("./tone");
+const { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble, stripDoubledUnits, triggerSentence } = require("./slots");
+const { calmTone, tidy } = require("./tone");
 const { EVENTS, logEvent } = require("../db/audit");
 const { semanticIssues } = require("./semantic");
 
@@ -480,9 +480,20 @@ async function runExplanation({ sku, alert, callModel }) {
     spent.input_tokens += result.usage?.input_tokens || 0;
     spent.output_tokens += result.usage?.output_tokens || 0;
 
+    // Markdown, backticks and dashes are removed by rule before anything is checked, and an answer that
+    // stops mid-sentence is a failed attempt, never shown (tone.js, "formatting habits of a stronger model").
+    result = tidy(result);
+    if (result.cutOff) {
+      check = { ok: false, issues: ["the answer was cut off before it finished"] };
+      continue;
+    }
+
     if (mode === "slots") {
       // Structural check on the RAW output, before substitution. This is the
       // step that makes a wrong figure impossible rather than merely caught.
+      // A unit written after a placeholder that already carries one ("{lead_time} days") is fixed by rule, not
+      // retried: on the paid tier a retry is a second charge for a habit that is cosmetic.
+      result = { ...result, text: stripDoubledUnits(result.text, slots) };
       const structural = validateSlotted(result.text, slots, { requireFigures: !opening });
       if (!structural.ok) {
         check = structural;

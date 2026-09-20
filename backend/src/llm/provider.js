@@ -74,6 +74,11 @@ function cloudProvider() {
 }
 
 const MAX_TOKENS = Number(process.env.LLM_MAX_OUTPUT_TOKENS) || 280;
+// The paid tier gets more room, and only the paid tier. 280 was sized for llama3, whose answers were
+// measured by bench-models.js; changing it would move that benchmark. Claude writes longer, and an answer
+// cut off at the cap is wasted money (it is rejected and retried), so cloud calls have their own cap. The
+// spend ceiling is the daily call cap, not this number: 420 output tokens is about USD 0.006 at list price.
+const CLOUD_MAX_TOKENS = Number(process.env.LLM_CLOUD_MAX_OUTPUT_TOKENS) || 420;
 
 // Rolling call counter for the paid path only, applied to EVERY cloud backend.
 // It used to be checked inside callAnthropic alone, which left the gateway,
@@ -105,6 +110,19 @@ class LlmUnavailable extends Error {
   }
 }
 
+// What a person is told when the model could not give a checked answer. The pipelines' own messages are for the
+// audit trail and developers ("wrote figures directly instead of using placeholders: {two_history}{MONTHS}1:"),
+// and reached the screen verbatim until 20 Sep. Only the check-failure family is rewritten: an unreachable
+// model, rule-based mode, a spent daily cap or a locked pass already say something a person can act on.
+const CHECK_FAILURE = /failed the explanation checks|without ever successfully|Every lookup failed|checked answer within|could not produce a usable explanation/i;
+function plainReason(err, feature = "why") {
+  const message = String((err && err.message) || err || "");
+  if (!CHECK_FAILURE.test(message)) return message;
+  return feature === "ask"
+    ? 'no answer passed our checks, so none is shown. Try naming one product by its code, for example "How is TJ-25KG doing?".'
+    : "the summary did not pass our checks, so it is not shown. The figures and steps here are unaffected.";
+}
+
 // Standard Ollama /api/chat, shared by two callers.
 //
 //   LLM_PROVIDER=ollama    a local daemon, no auth
@@ -118,7 +136,7 @@ class LlmUnavailable extends Error {
 // requests (the starter kit's own client backs off 3s, 6s, 9s), which is a rate
 // limit wearing a permissions status code, so a 403 here is retried rather than
 // treated as an auth failure.
-async function callOllamaCompatible({ baseUrl, model, apiKey, retries, system, user, signal }) {
+async function callOllamaCompatible({ baseUrl, model, apiKey, retries, maxTokens = MAX_TOKENS, system, user, signal }) {
   const url = `${baseUrl.replace(/\/+$/, "")}/api/chat`;
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers["X-API-Key"] = apiKey;
@@ -133,7 +151,7 @@ async function callOllamaCompatible({ baseUrl, model, apiKey, retries, system, u
     think: false,
     // Nested under `options`, which is the Ollama wire format that LangChain's
     // ChatOllama sends and therefore what the gateway is built to accept.
-    options: { temperature: 0.2, num_predict: MAX_TOKENS },
+    options: { temperature: 0.2, num_predict: maxTokens },
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },
@@ -176,6 +194,9 @@ async function callOllamaCompatible({ baseUrl, model, apiKey, retries, system, u
       text,
       model,
       provider: apiKey ? "gateway" : "ollama",
+      // Ollama reports "length" when it stopped at num_predict. A gateway that does not send it is
+      // covered by looksCutOff in tone.js, which reads the text itself.
+      truncated: bodyJson.done_reason === "length",
       usage: {
         input_tokens: bodyJson.prompt_eval_count ?? null,
         output_tokens: bodyJson.eval_count ?? null,
@@ -208,6 +229,7 @@ function callGateway(args) {
     model: process.env.LLM_GATEWAY_MODEL || "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
     apiKey,
     retries: 3,
+    maxTokens: CLOUD_MAX_TOKENS,
     ...args,
   });
 }
@@ -233,7 +255,7 @@ async function callAnthropic({ system, user, signal }) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: MAX_TOKENS,
+        max_tokens: CLOUD_MAX_TOKENS,
         temperature: 0.2,
         system,
         messages: [{ role: "user", content: user }],
@@ -261,6 +283,7 @@ async function callAnthropic({ system, user, signal }) {
     text,
     model,
     provider: "anthropic",
+    truncated: body.stop_reason === "max_tokens",
     usage: {
       input_tokens: body.usage?.input_tokens ?? null,
       output_tokens: body.usage?.output_tokens ?? null,
@@ -369,7 +392,7 @@ function listModes(gate = { ok: true, reason: null, pinRequired: false }) {
         : !gate.ok
           ? gate.reason
           : cp === "gateway"
-            ? `${process.env.LLM_GATEWAY_MODEL || "Claude Sonnet 4.5"} through the hackathon gateway. Spends shared AWS credit.`
+            ? `${friendlyModel(process.env.LLM_GATEWAY_MODEL || "Claude Sonnet 4.5")} through the hackathon gateway. Spends shared AWS credit.`
             : `${process.env.ANTHROPIC_MODEL || "Claude Haiku"} through the Anthropic API. Spends shared credit.`,
       cost: "metered",
       available: cloudOk,
@@ -380,6 +403,14 @@ function listModes(gate = { ok: true, reason: null, pinRequired: false }) {
       usage: cloudOk ? { usedToday: paidCallsToday(), dailyLimit: DAILY_LIMIT || null } : null,
     },
   ];
+}
+
+// "global.anthropic.claude-sonnet-4-5-20250929-v1:0" -> "Claude Sonnet 4.5", for text a person reads (the Settings
+// line below). Kept alike with frontend/src/lib/modelName.js; the audit trail keeps the raw id for pricing.
+function friendlyModel(id) {
+  const m = String(id || "").match(/claude-(sonnet|haiku|opus)-(\d+)(?:-(\d{1,2}))?(?!\d)/i);
+  if (!m) return id;
+  return `Claude ${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} ${m[2]}${m[3] ? `.${m[3]}` : ""}`;
 }
 
 function paidCallsToday() {
@@ -409,4 +440,4 @@ function providerInfo(tier = DEFAULT_MODE) {
   };
 }
 
-module.exports = { chat, providerInfo, listModes, getDefaultMode, resolveTier, LlmUnavailable };
+module.exports = { chat, providerInfo, listModes, friendlyModel, plainReason, getDefaultMode, resolveTier, LlmUnavailable };

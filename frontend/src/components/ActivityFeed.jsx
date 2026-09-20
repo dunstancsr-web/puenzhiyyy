@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { modelLabel } from "../lib/modelName";
 import {
   PackagePlus, SlidersHorizontal, Truck, BellRing, BellOff,
   UserCheck, Cpu, ChevronRight, FileSearch, KeyRound, ShieldAlert,
@@ -322,7 +323,7 @@ export function describe(event) {
       }
       return {
         headline: `AI explanation generated for ${sku}`,
-        detail: i.model ? `Model: ${i.model}` : null,
+        detail: i.model ? `Model: ${modelLabel(i.model)}` : null,
       };
 
     case "LLM_UNLOCKED":

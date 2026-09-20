@@ -15,6 +15,7 @@ import { api } from "../api/inventory";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { buildExplanation } from "../lib/explain";
 import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier";
+import { modelLabel } from "../lib/modelName";
 
 // Escape-to-close + body-scroll-lock while a modal is open. Inventory.jsx's
 // Modal component already does this; AiModal/ApprovalModal below didn't -
@@ -749,7 +750,7 @@ function AiModal({ aiModal, onClose }) {
             }}>
               <Cpu size={12} /> Summary
               <span style={{ fontWeight: 500, textTransform: "none", letterSpacing: 0, color: "var(--text-muted)" }}>
-                {narrative.model}
+                {modelLabel(narrative.model)}
                 {/* Worth naming. In slot mode the model writes prose with named
                     placeholders and cannot emit a digit at all, so the figures
                     are inserted by the engine rather than typed by the model.

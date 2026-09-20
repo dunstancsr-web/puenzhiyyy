@@ -91,7 +91,8 @@
   "/onboarding",
   "/onboarding/catalog-fields",
   "/warehouse/inbound",
-  "/warehouse/outbound"
+  "/warehouse/outbound",
+  "/no-such-page"
  ],
  "states": [
   {

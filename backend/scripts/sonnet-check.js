@@ -7,6 +7,9 @@
 //   node scripts/sonnet-check.js --dry-run         the exact same run on free local llama3.
 //   node scripts/sonnet-check.js --confirm-spend   the real thing, on the paid gateway.
 //   add --only REORDER                             one alert type instead of all six.
+//   add --features                                 ALSO check Action Items "Why?" (stockout and blind spot)
+//                                                  and two "Ask about your data" questions, through the
+//                                  running server's own routes, so the PIN gate and error paths are exercised.
 //
 // It refuses to touch the paid tier without --confirm-spend, because the key
 // draws on the shared AWS credit that also pays for hosting, and Stan decides
@@ -26,6 +29,8 @@ const CONFIRM = args.includes("--confirm-spend");
 const DRY = args.includes("--dry-run");
 const onlyIdx = args.indexOf("--only");
 const ONLY = onlyIdx >= 0 ? args[onlyIdx + 1] : null;
+const FEATURES = args.includes("--features");
+const BASE = process.env.CHECK_BASE_URL || "http://localhost:4000";
 
 const { getDb } = require("../src/db/init");
 const { buildAnalytics } = require("../src/engines");
@@ -36,6 +41,56 @@ const { paidSpend } = require("../src/llm/spend");
 // Sonnet explanation costs about USD 0.0055 at list price.
 const USD_PER_CALL = 0.0055;
 const CALLS_PER_EXPLANATION = 1.06;
+
+
+// Action Items "Why?" and "Ask about your data", through the running server. Going through HTTP on purpose:
+// it is the path a visitor takes, so the tier, the PIN gate, the cache and the "never a 500" contract are all
+// exercised, which calling the functions directly would skip.
+async function checkFeatures(tier, skus) {
+  // The paid tier needs the same PIN pass a visitor gets. The PIN comes from this machine's own backend/.env and
+  // goes only to the local server; it is never printed or written anywhere. A failed unlock stops the feature
+  // checks before any call is made, so a misconfiguration cannot spend anything.
+  const headers = { "content-type": "application/json" };
+  if (tier === "cloud") {
+    const pin = (process.env.DEMO_PIN || "").trim();
+    let unlocked = null;
+    if (pin) {
+      const r = await fetch(BASE + "/api/llm/unlock", { method: "POST", headers, body: JSON.stringify({ pin }) }).catch(() => null);
+      unlocked = r && r.ok ? (await r.json()).data?.pass : null;
+    }
+    if (!unlocked) {
+      console.log(`## Action Items and Ask ... not run: could not unlock the paid tier on ${BASE} (is the server running, and DEMO_PIN set in backend/.env?). Nothing was spent on them.\n`);
+      return;
+    }
+    headers["X-Demo-Unlock"] = unlocked;
+  }
+  const post = async (route, body) => {
+    const res = await fetch(BASE + route, { method: "POST", headers, body: JSON.stringify({ ...body, tier }) });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  const show = (label, r) => {
+    const d = r.body?.data;
+    if (d?.available) console.log(`## ${label} ... ${d.provider}${d.cached ? ", cached (no call)" : ""}\n\n${String(d.explanation || d.answer).replace(/^/gm, "   ")}\n`);
+    else console.log(`## ${label} ... no usable answer: ${d?.reason || `HTTP ${r.status}`}${d?.locked ? " (PIN pass needed: unlock in Settings, or this server has no pass check)" : ""}\n`);
+  };
+  for (const kind of ["stockout", "blindspot"]) {
+    let done = false;
+    for (const s of skus) {
+      const r = await post("/api/action-items/explain", { sku_id: s.sku_id, kind });
+      if (r.status === 404) continue; // nothing to explain for this SKU
+      show(`Action Items ${kind} ${s.sku_id}`, r);
+      done = true;
+      break;
+    }
+    if (!done) console.log(`## Action Items ${kind} ... no SKU in this database has one, so not checked\n`);
+  }
+  const ids = skus.map((s) => s.sku_id);
+  const questions = [
+    `How is ${ids[0]} doing compared with ${ids[1] || ids[0]}?`,
+    `What has the recent demand for ${ids[2] || ids[0]} looked like?`,
+  ];
+  for (const q of questions) show(`Ask: ${q}`, await post("/api/ask-database", { question: q }));
+}
 
 (async () => {
   const db = getDb();
@@ -51,6 +106,11 @@ const CALLS_PER_EXPLANATION = 1.06;
   const missing = order.filter((t) => (!ONLY || t === ONLY) && !alerts.some((a) => a.alert_type === t));
   if (missing.length) console.log(`Not live in this database, so not checked: ${missing.join(", ")}`);
   console.log(`Estimated paid cost: about USD ${estimate.toFixed(3)} (worst case, every explanation retried twice: USD ${(picked.length * 3 * USD_PER_CALL).toFixed(3)})`);
+  if (FEATURES) {
+    // Two action item explanations (about one call each) and two Ask questions (a lookup then an answer, up to
+    // five calls each in the worst case, each carrying a longer prompt than an alert explanation).
+    console.log(`With --features: + 2 Action Items Why? and 2 Ask questions, about USD 0.05 more (worst case about USD 0.15).`);
+  }
 
   if (!CONFIRM && !DRY) {
     console.log("\nNo calls made. Add --dry-run to rehearse on free llama3, or --confirm-spend to use the paid gateway.");
@@ -73,12 +133,14 @@ const CALLS_PER_EXPLANATION = 1.06;
     }
   }
 
+  if (FEATURES) await checkFeatures(tier, skus);
+
   if (CONFIRM) {
     const rows = paidSpend(db).calls.slice(before);
     const usd = rows.reduce((a, r) => a + r.usd, 0);
     const calls = rows.reduce((a, r) => a + r.modelCalls, 0);
     console.log(`Paid this run: ${calls} model call(s) over ${rows.length} explanation(s), about USD ${usd.toFixed(4)}.`);
     console.log("Add these to docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md (SGT = UTC + 8):");
-    for (const r of rows) console.log(`  ${r.at} UTC | Sonnet check, ${r.sku} ${r.alert}${r.failed ? " (failed)" : ""} | ${r.modelCalls} | ${r.inputTokens} / ${r.outputTokens} | ${r.usd.toFixed(4)}`);
+    for (const r of rows) console.log(`  ${r.at} UTC | Sonnet check, ${r.sku || "any"} ${r.alert || ""}${r.failed ? " (failed)" : ""} | ${r.modelCalls} | ${r.inputTokens} / ${r.outputTokens} | ${r.usd.toFixed(4)}`);
   }
 })();

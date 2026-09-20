@@ -20,9 +20,7 @@ Four deliverables. Status as of 20 Sep.
 ## Before submitting, in this order
 
 1. **Deploy** and run `node backend/scripts/check-deploy.js <url>` against the live service.
-2. **Final paid check**: run `node backend/scripts/sonnet-check.js` first, which prints the alerts and
-   the estimated cost, then again with `--confirm-spend`. Add the rows to `(Stan) MODEL SPEND.md` in
-   this folder.
+2. **Final paid check: done 20 Sep** (`sonnet-check.js --confirm-spend --features`, USD 0.0452, in the spend ledger). It found four wording problems, all fixed by rule and covered by `test-llm-sonnet.js`. A second paid run is only worth it if the model layer changes again; then rehearse free first (`--dry-run --features`).
 3. **Record the video**, following the recording checklist below.
 4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `docs/Submission/WRITEUP.md`.
 5. **Submit**, then capture evidence of the live service before the lease ends.

@@ -11,6 +11,7 @@ import ForecastDetail from "./pages/ForecastDetail";
 import ForecastList from "./pages/ForecastList";
 import AuditTable from "./pages/AuditTable";
 import ActionItems from "./pages/ActionItems";
+import NotFound from "./pages/NotFound";
 import Inbound from "./warehouse/Inbound";
 import Outbound from "./warehouse/Outbound";
 import DemoModeBadge from "./components/DemoModeBadge";
@@ -79,6 +80,9 @@ export default function App() {
             Sep, explicit: "no deleting anything, just create a new tab"). */}
         <Route path="/action-items" element={<ActionItems />} />
       </Route>
+
+      {/* Anything else: a page that says so, not a blank one. */}
+      <Route path="*" element={<><DemoModeBadge /><NotFound /></>} />
     </Routes>
   );
 }
