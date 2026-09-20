@@ -144,13 +144,9 @@ Track how long inventory has been held.
 Per SKU (MVP 1 — no batch granularity yet):
 - last_received_date
 - inventory_age_days = today − last_received_date
-- ageing_status: Fresh (0–90d) | Normal (91–180d) | Ageing (181–270d) | At Risk (271d+)
+- ageing_status: Fresh, Normal, Ageing or At Risk, by the share of the SKU's own holding limit that its stock age has used (bands in design.md, "Supporting Formulas").
 
-Thresholds are configurable per SKU; defaults above apply if not set.
-
-**Open decision (15 Sep):** the code instead scales the bands to each SKU's holding limit (design.md,
-"Supporting Formulas"), which starts At Risk at 243 days for a 270 day limit. When Stan decides, the
-losing definition is removed and only design.md keeps the formula.
+The holding limit is configurable per SKU, and 270 days applies if not set. Decided 20 Sep (Stan): the bands scale to each product's own limit, so a short-life product warns earlier.
 
 ---
 
@@ -260,7 +256,7 @@ endpoint list**; this is the shape as of 15 Sep.
 - Order requests (Reorder Loop step 7, the Control Tower's one write, no stock change):
   `POST /api/order-requests`, `GET /api/order-requests` (status may be a comma list; each row carries its
   timeline), `PATCH /api/order-requests/:id` (one step forward: acknowledged, po_raised, approved,
-  rejected with a reason, or cancelled; anything else is 409; the actor is fixed by the step). Onboarding's
+  rejected with a reason, or cancelled; anything else is 409; the actor is fixed by the step). Approving creates the purchase order (`PO-<request no>`) that Goods In receives against, and `POST /api/warehouse/inbound/receive` on that order adds a `received` step and closes the request in the same transaction; stock moves only there. Onboarding's
   one-time first count: `POST /api/skus/opening-balance` (zero-stock products only, once each,
   movement type OPENING). (`POST /api/inventory/restock` was removed
   here when the duties were separated: the office no longer writes stock; stock moves only on the

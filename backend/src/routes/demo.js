@@ -106,6 +106,10 @@ function trimSampleCatalog(db) {
     db.prepare(`DELETE FROM ${t} WHERE sku_id NOT IN (${placeholders})`).run(...keep);
   }
   db.prepare(`DELETE FROM skus WHERE sku_id NOT IN (${placeholders})`).run(...keep);
+  // Sample data behaves like an upload: every product starts with nothing on the shelf (import-new's
+  // insertPos does the same), because history is context for demand, not a ledger that rebuilds a
+  // balance. Left at the seed's stock, the opening balance step refused every product ("already has stock").
+  db.prepare(`UPDATE inventory_positions SET on_hand_qty = 0, reserved_qty = 0, quality_hold_qty = 0, last_received_date = date('now')`).run();
 }
 
 // Fills the sandbox with the same 10-SKU dataset `npm run seed` builds for the

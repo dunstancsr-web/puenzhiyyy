@@ -128,6 +128,8 @@ replay of real past events and a live news scan (Google News RSS, read by a loca
 the open question about a seeded risk event: `design.md`, "Market Signals". Check with
 `node backend/scripts/test-signals.js`.
 
+**Order requests (20 Sep)** run the whole loop: request, acknowledge, purchase order, manager approval (which creates the order Goods In receives), then receipt at Goods In, which closes the request. Check with `node backend/scripts/test-order-loop.js`, which uses a throwaway database.
+
 ## History, in phases
 
 | Dates | Tasks | What happened |

@@ -12,6 +12,7 @@ const express = require("express");
 const router = express.Router();
 const { getDb } = require("../db/init");
 const { EVENTS, logEvent, readEvents, eventCounts, diffFields } = require("../db/audit");
+const { addRequestEvent } = require("../db/requestEvents");
 const { buildAnalytics } = require("../engines/index");
 const { explainAlert, providerInfo, LlmUnavailable } = require("../llm/explain");
 const { explainActionItem } = require("../llm/explainActionItem");
@@ -1570,10 +1571,6 @@ const REQUEST_ACTORS = {
   cancelled: "control tower",
 };
 
-function addRequestEvent(db, requestId, status, actor, note) {
-  db.prepare(`INSERT INTO order_request_events (request_id, status, actor, note) VALUES (?, ?, ?, ?)`)
-    .run(requestId, status, actor, note || null);
-}
 
 // Attach each request's timeline, oldest step first, in one query rather than one per request.
 function withEvents(db, rows) {
@@ -1699,10 +1696,23 @@ router.patch("/order-requests/:id", sandboxOnlyWhenPublic, (req, res) => {
     }
 
     const actor = REQUEST_ACTORS[status];
-    // The status change and its timeline row go in together or not at all.
+    let poNumber = null;
+    // The status change, its timeline row and (on approval) the purchase order go in together or not at all.
     db.transaction(() => {
       db.prepare(`UPDATE order_requests SET status = ? WHERE id = ?`).run(status, id);
       addRequestEvent(db, id, status, actor, note);
+      if (status === "approved") {
+        // The purchase order is created only now, so the warehouse never sees an order nobody approved. It
+        // becomes Expected Incoming, and Goods In receiving it is what closes this request (warehouse.js).
+        // Stock still does not move here.
+        const lead = db.prepare(`SELECT lead_time_days FROM skus WHERE sku_id = ?`).get(existing.sku_id)?.lead_time_days ?? 45;
+        const eta = new Date(Date.now() + lead * 86_400_000).toISOString().slice(0, 10);
+        poNumber = `PO-${existing.request_no}`;
+        db.prepare(`
+          INSERT INTO purchase_orders (po_number, sku_id, ordered_qty, order_date, eta, status)
+          VALUES (?, ?, ?, date('now'), ?, 'open')`).run(poNumber, existing.sku_id, existing.quantity_mt, eta);
+        db.prepare(`UPDATE order_requests SET po_number = ? WHERE id = ?`).run(poNumber, id);
+      }
     })();
 
     const updated = db.prepare(`
@@ -1715,7 +1725,7 @@ router.patch("/order-requests/:id", sandboxOnlyWhenPublic, (req, res) => {
     logEvent(EVENTS.ORDER_REQUEST_UPDATED, {
       skuId: existing.sku_id,
       input: { request_no: existing.request_no, quantity_mt: existing.quantity_mt, from: existing.status, actor, note },
-      output: { status },
+      output: { status, po_number: poNumber },
     });
 
     res.json({ success: true, data: withEvents(db, [updated])[0] });

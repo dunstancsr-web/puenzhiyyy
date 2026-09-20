@@ -5,7 +5,7 @@ for anyone meeting StockSense for the first time: judges, new teammates, and the
 the warehouse.
 
 > Screenshots come from the seeded demo data for the fictional client 四海米行 / Four Seas Rice
-> Trading, captured on 15 Sep 2026. They are a snapshot: figures in them will differ from what the app
+> Trading, captured on 15 and 20 Sep 2026. They are a snapshot: figures in them will differ from what the app
 > shows on another day. How each figure is calculated is in
 > [design.md](../../.kiro/specs/mvp1-inventory-visibility/design.md).
 
@@ -16,10 +16,11 @@ the warehouse.
 3. [Dispatcher: sending out an order (Goods Out)](#3-dispatcher-sending-out-an-order-goods-out)
 4. [Manager: the daily review (Dashboard)](#4-manager-the-daily-review-dashboard)
 5. [Manager: acting on alerts (Alerts)](#5-manager-acting-on-alerts-alerts)
-6. [Manager: keeping product settings right (Inventory)](#6-manager-keeping-product-settings-right-inventory)
-7. [Manager: checking what happened (Alerts, History)](#7-manager-checking-what-happened-alerts-history)
-8. [Anyone: settings](#8-anyone-settings)
-9. [How the roles connect](#9-how-the-roles-connect)
+6. [Manager: news that could hit your supply (Action Items)](#6-manager-news-that-could-hit-your-supply-action-items)
+7. [Manager: keeping product settings right (Inventory)](#7-manager-keeping-product-settings-right-inventory)
+8. [Manager: checking what happened (Alerts, History)](#8-manager-checking-what-happened-alerts-history)
+9. [Anyone: settings](#9-anyone-settings)
+10. [How the roles connect](#10-how-the-roles-connect)
 
 ---
 
@@ -97,7 +98,9 @@ damaged in transit, short shipped by the supplier, partial delivery, or a counti
 
 Stock updates for everyone immediately. The receipt gets a document number (a goods received note,
 GRN), the purchase order is closed, and the shortfall goes on record so purchasing can settle it with
-the supplier. The movement also appears in the manager's History view (section 7).
+the supplier. If the delivery came from an order request the office approved (section 7), receiving it
+closes that request as well, with no click from the office. The movement also appears in the manager's
+History view (section 8).
 
 ---
 
@@ -171,7 +174,7 @@ Clicking a bar, a colour or a cell filters Needs Attention to those products.
 
 ## 5. Manager: acting on alerts (Alerts)
 
-**Who:** the inventory manager. **Where:** Control Tower, Alerts. **Goal:** make a decision on each
+**Who:** the inventory manager. **Where:** Control Tower, Alerts, the **Needs action** view (the other view, **History**, is section 8). **Goal:** make a decision on each
 problem the system found, with the reasoning in front of you. **Nothing happens without a person
 deciding.**
 
@@ -202,7 +205,7 @@ Approve button names the quantity.
 happens if we do nothing, and what to do. These steps are built from the product's live figures by
 fixed rules, so they are always available and cost nothing.
 
-Depending on the explanation setting (section 8), a written summary from a language model can appear
+Depending on the explanation setting (section 9), a written summary from a language model can appear
 above them, marked **Summary** with the model's name. The model is never allowed to calculate
 anything: the figures in its summary are inserted by the system, every answer is checked, and a summary
 that fails the checks is never shown.
@@ -217,11 +220,46 @@ that fails the checks is never shown.
 
 A reason is always required. The decision is stored **beside what the system proposed**, so it is
 possible to see later how often, and by how much, managers override the recommendations.
-**Dismiss** hides an alert without a decision; it stays hidden even while the problem remains.
+**Dismiss** sets an alert aside without a decision. A bar at the top offers **Undo** straight away, and
+an alert dismissed by mistake can be brought back later with **Reopen alert** from the History view.
 
 ---
 
-## 6. Manager: keeping product settings right (Inventory)
+## 6. Manager: news that could hit your supply (Action Items)
+
+**Who:** the inventory manager or buyer. **Where:** Control Tower, Action Items, **Market signals**.
+**Goal:** when news could delay or tighten rice supply, see which of your products it would leave
+short, and by when you would have to order.
+
+![Market signals: a past event run against today's stock](images/20-market-signals.jpg)
+
+There are two ways in, chosen one at a time, and each keeps its own list:
+
+- **Live news** scans today's rice supply headlines for the countries you buy from. Choose how far back
+  to look (3 days to a month, or a number of your own). A local model reads each headline into a fixed
+  shape (country, kind of event, how serious, whether it tightens or eases supply), and a person can
+  correct that reading. The same story from several outlets becomes one signal with its sources listed.
+- **Past events** replays real 2022 to 2024 events, such as India's non-basmati export ban, against
+  today's stock. It is practice: it shows what the advice would have been and never changes a reorder
+  point.
+
+For each product an event touches, the card shows the days of stock cover against the supplier lead
+time, the suggested order (a low and a high figure), the latest day to order, and an urgency. **How many
+days an event costs comes from a visible table on the card, never from the article or a model.** Signals
+are grouped by what to do, and "no effect on your stock" is folded away, with **Acknowledge all** and an
+Undo.
+
+On a live signal a person can:
+
+- **Add a safety buffer**, which makes the reorder point tell you to order earlier for the affected
+  products (it can be withdrawn later); or
+- **Ask the buyer to order** for one product, with the quantity prefilled and editable. It goes to the
+  buyer's list on Inventory (section 7) and nothing is ordered until the buyer acts. If a request for
+  that product is already open, the card says so instead of sending a second.
+
+---
+
+## 7. Manager: keeping product settings right (Inventory)
 
 **Who:** the inventory manager. **Where:** Control Tower, Inventory. **Goal:** see every product's
 position and keep each one's settings (minimum, maximum, reorder point, lead time and so on) correct,
@@ -234,7 +272,24 @@ because every alert is judged against them.
 Each row shows the product's health, its **stock position** as a gauge (available stock against the
 reorder point and the maximum, with a note such as "142 MT below reorder point"), how long stock will
 last against the supplier lead time, and how fast it sells. Search and the filters narrow the list by
-health, movement or origin. **Restock** records stock added by hand; **Add SKU** creates a new product.
+health, movement or origin. **Request order** asks the buyer to order more (below); **Add SKU** creates a new product. Stock is never
+added from the office: it rises only when a delivery is received on the handheld.
+
+### Requests waiting for the buyer
+
+A request to the buyer, from **Request order** here or **Ask the buyer to order** in Market signals,
+appears in a card above the table and moves along a short timeline. Each step says who would do it in a
+real business (there is no login, so in the demo one person plays every role):
+
+1. **Buyer acknowledges** the request.
+2. **Buyer raises the purchase order** and sends it for approval.
+3. **Manager approves** (or **rejects**, which needs a reason). Approving creates the purchase order
+   that Goods In can receive against, so the warehouse never sees an order nobody approved.
+4. **The warehouse receives the delivery** (Goods In). That is the only step that moves stock, and it
+   closes the request by itself.
+
+A request can be cancelled before it ends. Finished requests stay on the card for a week, and every
+step is also in the History view. **Timeline** shows who did what and when.
 
 ### A product's overview
 
@@ -266,16 +321,19 @@ errors saves nothing. The same works for the 24 months of stock history.
 
 ---
 
-## 7. Manager: checking what happened (Alerts, History)
+## 8. Manager: checking what happened (Alerts, History)
 
-**Who:** the manager, or anyone auditing. **Where:** Control Tower, Alerts, History view (the old Activity page, which now redirects here). **Goal:** see everything
+**Who:** the manager, or anyone auditing. **Where:** Control Tower, Alerts, History view (this was the Activity page, which now redirects here). **Goal:** see everything
 the system did and every decision people made, in order, with the evidence.
 
 ![Activity: the audit trail as a timeline](images/18-activity.jpg)
 
 Every event is a plain-English line, newest first: alerts raised, deliveries received (with the
 operator and any shortfall), model explanations, manager decisions, dismissed alerts, setting changes,
-and paid-model unlocks. The chips along the top filter by type.
+and paid-model unlocks. The chips along the top filter by kind: alerts and decisions, orders and stock, market signals, products
+and data, AI and access. The **Product** menu narrows everything to one product, and a line about an
+alert offers **Open alert** (or **Reopen alert** if it was dismissed), so an alert and what happened to
+it are one click apart.
 
 **Show record** opens exactly what was stored: what the system saw, and what it did. For a manager
 decision, that is the system's proposal next to the manager's choice, the reason, and the difference
@@ -285,7 +343,7 @@ between the two quantities:
 
 ---
 
-## 8. Anyone: settings
+## 9. Anyone: settings
 
 **Where:** the settings button at the bottom of the Control Tower sidebar.
 
@@ -308,7 +366,7 @@ submission.
 
 ---
 
-## 9. How the roles connect
+## 10. How the roles connect
 
 The workspaces share one database, so one person's action is immediately another's information:
 

@@ -25,6 +25,7 @@ const router = express.Router();
 const { getDb } = require("../db/init");
 const { sandboxOnlyWhenPublic } = require("../middleware/sandboxGuard");
 const { EVENTS, logEvent } = require("../db/audit");
+const { addRequestEvent } = require("../db/requestEvents");
 const { buildAnalytics } = require("../engines/index");
 
 const nowIso = () => new Date().toISOString().replace("T", " ").slice(0, 19);
@@ -168,6 +169,7 @@ router.post("/warehouse/inbound/receive", sandboxOnlyWhenPublic, (req, res) => {
     // together or not at all. A receipt that raised stock without closing its PO
     // would leave the quantity counted twice, once on hand and once as expected
     // incoming.
+    let closedRequest = null;
     db.transaction(() => {
       db.prepare(`
         UPDATE inventory_positions
@@ -176,6 +178,13 @@ router.post("/warehouse/inbound/receive", sandboxOnlyWhenPublic, (req, res) => {
 
       db.prepare(`UPDATE purchase_orders SET status = 'received', actual_arrival = ? WHERE po_number = ?`)
         .run(today, po_number);
+
+      // An order that came from an approved request closes that request, so the office does not have to.
+      closedRequest = db.prepare(`SELECT id, request_no, quantity_mt FROM order_requests WHERE po_number = ? AND status = 'approved'`).get(po_number) || null;
+      if (closedRequest) {
+        db.prepare(`UPDATE order_requests SET status = 'received' WHERE id = ?`).run(closedRequest.id);
+        addRequestEvent(db, closedRequest.id, "received", op.name, `${qty} MT received, ${movementNo}`);
+      }
 
       db.prepare(`
         INSERT INTO goods_movements
@@ -202,6 +211,14 @@ router.post("/warehouse/inbound/receive", sandboxOnlyWhenPublic, (req, res) => {
         health_status: after ? after.health_status : null,
       },
     });
+
+    if (closedRequest) {
+      logEvent(EVENTS.ORDER_REQUEST_UPDATED, {
+        skuId: po.sku_id,
+        input: { request_no: closedRequest.request_no, quantity_mt: closedRequest.quantity_mt, from: "approved", actor: op.name, note: `${qty} MT received` },
+        output: { status: "received", po_number },
+      });
+    }
 
     res.status(201).json({
       success: true,

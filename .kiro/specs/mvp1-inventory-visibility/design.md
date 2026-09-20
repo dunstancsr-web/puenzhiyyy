@@ -595,10 +595,9 @@ carrying the variety scope) so every existing figure reflects it. `riskbuffer.js
 screen shows each product's buffer before and after. Withdrawing sets that row inactive. Nothing here creates
 an order.
 
-**Known gap, for Stan's decision.** The seeded event "India non-basmati export restriction (2023-style)" is
-unscoped, so it buffers the India basmati SKUs by 21 days although basmati was exempt. Scoping it with
-`affects_varieties = ["non-basmati"]` would drop those SKUs' buffer to 0 and change their displayed reorder
-points, so it was left as is.
+**Decided 20 Sep (Stan): scoped.** The seeded event "India non-basmati export restriction (2023-style)" now carries `affects_varieties = ["non-basmati"]`, so it no longer buffers the India basmati SKUs (their risk buffer is 0, and their displayed reorder points dropped by it). `check-formulas.js` applies the same scope in its own copy of the rule.
+
+**Past events are practice, and a signal can start an order request (20 Sep, Stan).** The decision route refuses `approve` on a signal whose origin is `replay` (400: "A past event is practice"), and the card offers only Acknowledge, with a line saying so, so a replay can never add a buffer to the real reorder points. On a live signal that tightens supply, each product row that is not just "Monitor" offers "Ask the buyer to order": the quantity is the low end of the suggested order (editable), the reason names the signal and the advice, and it calls the ordinary `POST /api/order-requests`. Before sending it looks for a request already open for that product and says so instead of sending a second. Nothing is ordered; the buyer's list on Inventory is where it goes on (`OrderRequestsCard`).
 
 **Live news (built 19 Sep).** `POST /api/market-signals/scan` fetches recent headlines and reads each into the
 fixed shape. Files: `signals/feed.js`, `signals/reader.js`, tests `test-signal-reader.js`, measurement
@@ -708,9 +707,7 @@ ageing_status      = Fresh    if inventory_age_days / holding_limit < 0.34   (or
                      Ageing   if < 0.90
                      At Risk  otherwise
 ```
-**Open decision:** requirements.md REQ-08 gives fixed day bands instead (Fresh 0 to 90, Normal 91 to
-180, Ageing 181 to 270, At Risk 271+). At the default 270 day limit the two agree except that the code
-starts At Risk at 243 days, not 271. See `backend/scripts/formula-decisions.json`.
+**Decided 20 Sep (Stan):** the bands scale to each product's own holding limit, so At Risk starts at 90% of it (day 243 at the default 270, day 162 for Brown Rice's 180). The fixed day bands once listed in REQ-08 are gone.
 
 **Per-SKU financials** (`financials.js`)
 ```

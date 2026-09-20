@@ -258,7 +258,8 @@ function initDb(targetDb) {
       sku_id        TEXT NOT NULL,
       quantity_mt   REAL NOT NULL,
       reason        TEXT,
-      status        TEXT NOT NULL DEFAULT 'open', -- open | ordered | cancelled
+      status        TEXT NOT NULL DEFAULT 'open', -- open | acknowledged | po_raised | approved | received | rejected | cancelled
+      po_number     TEXT,                        -- set when approved: the purchase order Goods In receives against
       requested_by  TEXT DEFAULT 'control tower',
       created_at    TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
@@ -498,6 +499,7 @@ function initDb(targetDb) {
   // Order requests used to end at 'ordered'. That step is now the approved purchase order, so a
   // database from before the timeline reads the same way. Idempotent: matches nothing afterwards.
   db.exec(`UPDATE order_requests SET status = 'approved' WHERE status = 'ordered'`);
+  ensureColumn(db, "order_requests", "po_number", "po_number TEXT");
   ensureColumn(db, "market_signals", "also_reported_by", "also_reported_by TEXT");
   ensureColumn(db, "risk_events", "affects_varieties", "affects_varieties TEXT");
   ensureColumn(db, "risk_events", "excludes_varieties", "excludes_varieties TEXT");

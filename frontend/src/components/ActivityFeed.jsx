@@ -233,12 +233,13 @@ export function describe(event) {
       const said = {
         acknowledged: "acknowledged by the buyer",
         po_raised: "turned into a purchase order by the buyer, waiting for manager approval",
-        approved: "approved by the buyer's manager",
+        approved: `approved by the buyer's manager${o.po_number ? `, purchase order ${o.po_number} is now expected at Goods In` : ""}`,
+        received: "received at Goods In, so the request is closed",
         rejected: "rejected by the buyer's manager",
         cancelled: "cancelled",
       }[o.status] || `moved to ${o.status}`;
-      const parts = [`Stock is unchanged.`];
-      if (i.note) parts.push(`${o.status === "rejected" ? "Reason given" : "Note"}: "${i.note}"`);
+      const parts = [o.status === "received" ? "Stock rose by the quantity received." : "Stock is unchanged."];
+      if (i.note && o.status !== "received") parts.push(`${o.status === "rejected" ? "Reason given" : "Note"}: "${i.note}"`);
       return {
         headline: `${i.request_no || "Request"} for ${sku} ${said}`,
         detail: parts.join(" "),
