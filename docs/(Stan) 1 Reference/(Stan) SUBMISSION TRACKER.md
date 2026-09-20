@@ -15,7 +15,7 @@ Four deliverables. Status as of 20 Sep.
 | 1 | GitHub repo | done, kept current | nothing |
 | 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Deploy now (Stan, 15 Sep: the lease can be extended, so there is no reason to wait): follow `(Stan) DEPLOY-LIGHTSAIL.md` in this folder |
 | 3 | YouTube demo video | script below, updated 15 Sep; `npm run demo:reset` checks the app is ready | Stan records, near the end, with the final paid check |
-| 4 | PDF write-up | `docs/Submission/WRITEUP.md` last refreshed 15 Sep, so it does not yet mention Action Items, Market signals, the merged Alerts and History tab or the order request loop (all built 19 and 20 Sep); refresh it before export | refresh the write-up with the newer features, then fill in the URL, PIN and spend figure **in the PDF only**, then export |
+| 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 20 Sep for forecasting, market signals, the order loop, Ask about your data and the merged Alerts tab; the three blanks (URL, PIN, spend) are still empty | fill in the URL, PIN and spend figure **in the PDF only**, then export (re-check the figures against a fresh seed first) |
 
 ## Before submitting, in this order
 

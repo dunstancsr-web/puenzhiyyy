@@ -41,8 +41,8 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 | Document | What is in it | Open it when |
 |---|---|---|
 | [`README.md`](../README.md) | GitHub's front page: what StockSense is, the reasoning loop, domain rules, architecture, how to run it, the API | Anyone visits the repository |
-| [Submission/WRITEUP.md](<Submission/WRITEUP.md>) | The source of the PDF write-up: problem, architecture, why deterministic first, the model layer and its safeguards, human in the loop, observability, deployment, roadmap. A snapshot for export; its figures are refreshed before each export | Before exporting the PDF |
-| every file in `docs/Submission/images/` | The write-up's three screenshots | Recapturing a screenshot |
+| [Submission/WRITEUP.md](<Submission/WRITEUP.md>) | The source of the PDF write-up: problem, architecture, what sits beyond the alerts (forecasting, market signals, order requests, Ask about your data), why deterministic first, the model layer and its safeguards, human in the loop, observability, deployment, roadmap. A snapshot for export; its figures are refreshed before each export | Before exporting the PDF |
+| every file in `docs/Submission/images/` | The write-up's five screenshots | Recapturing a screenshot |
 
 ## For AI agents (Kiro and Claude Code)
 

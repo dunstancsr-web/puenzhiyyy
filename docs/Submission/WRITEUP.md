@@ -6,15 +6,16 @@ AWS NUS-ISS SMYA 2026 Hackathon
 
 ---
 
-> **Note for Stan, delete before export.** This is the PDF write-up draft, refreshed on 15 Sep for
-> everything built since 13 Sep: the live model layer and its safeguards, the demo PIN, spend tracking,
-> the warehouse floor screens and the plain-English explanations. Three things to fill in, **in the
+> **Note for Stan, delete before export.** This is the PDF write-up draft, refreshed on 20 Sep for
+> everything built since 15 Sep: demand forecasting with backtests, market signals, the order request
+> loop, Ask about your data, and Alerts and History in one tab. Figures in it are a snapshot, refreshed
+> before each export. Three things to fill in, **in the
 > exported PDF only**:
 >
-> 1. **Live URL** in section 8, once the service is up.
-> 2. **The demo PIN** in section 8. Type it into the PDF, never into this file: the repository is
+> 1. **Live URL** in section 9, once the service is up.
+> 2. **The demo PIN** in section 9. Type it into the PDF, never into this file: the repository is
 >    public, and a PIN committed here is a PIN anyone can find.
-> 3. **The development spend figure** in section 3, after the final paid check near the deadline
+> 3. **The development spend figure** in section 4, after the final paid check near the deadline
 >    (`node scripts/spend.js` and `docs/(Stan) 1 Reference/(Stan) MODEL SPEND.md`).
 >
 > Export with any markdown to PDF tool (Typora, Pandoc, or VS Code's "Markdown PDF"),
@@ -68,7 +69,7 @@ groups on the dashboard.
                     ▼
          decision recorded, stock and
          policy updated, everything
-         written to the audit log ──────────►  /activity
+         written to the audit log ──────────►  Alerts, History view
 ```
 
 Every arrow in that diagram writes a row to `audit_log`.
@@ -84,7 +85,8 @@ rather than one navigation:
   expected, five short, damaged in transit" rather than "someone typed a number".
 - **Goods Out**, on the same handheld: pick a customer order, verify the SKU, count what leaves and
   confirm. Shipping more than is on hand is refused, and a short pick must carry a reason.
-- **The Control Tower**, on a desktop, for the manager: Dashboard, Inventory, Alerts and Activity.
+- **The Control Tower**, on a desktop, for the manager: Dashboard, Action Items, Forecast, Inventory,
+  Alerts (with a Needs action view and a History view, the audit trail) and Table.
 
 Floor operators sign in with a four digit PIN, because a shared rugged terminal on a charging cradle is
 used by whoever picks it up, and every movement still has to be attributed to a named person. Every
@@ -96,12 +98,12 @@ trail.
 React 18 and Vite on the front end, Express on the back, SQLite via better-sqlite3 for storage, Recharts
 for charts, and plain CSS custom properties for styling. Explanations come from Claude Sonnet 4.5 on
 Amazon Bedrock through the hackathon gateway, with a local llama3 for free development and a rule-based
-explanation that needs no model at all (section 3).
+explanation that needs no model at all (section 4).
 
 SQLite was chosen over PostgreSQL deliberately: one file, no server to provision, and the entire demo
 state is reproducible from a fixed random seed with a single command. For a hackathon handoff that
 matters more than horizontal scalability. The same property is what makes the deployment resilient, as
-section 8 explains.
+section 9 explains.
 
 There is no CSS framework. The type scale is deliberately sized up for older users and the contrast
 ratios are checked against WCAG AA rather than inherited from a framework's defaults.
@@ -112,16 +114,19 @@ ratios are checked against WCAG AA rather than inherited from a framework's defa
 backend/src/
   db/init.js       schema: skus, inventory_positions, sales_transactions,
                    purchase_orders, sales_orders, goods_movements, operators,
-                   inventory_history, alerts_log, decisions, audit_log
+                   inventory_history, alerts_log, decisions, audit_log,
+                   forecasts, risk_events, market_signals, order_requests
   db/seed.js       deterministic generator: 10 rice SKUs, 961 sales transactions,
                    24 months of balanced stock history
   db/audit.js      audit-log write path
-  engines/         the nine engines below, plus index.js as orchestrator
+  engines/         the nine engines below, four more for MVP 2 (forecast, risk buffer,
+                   market signals, onboarding suggestions), plus index.js as orchestrator
+  signals/         the live news scan: feed, reader, same-story detection
   llm/             the explanation layer: placeholders, checks, tiers, PIN gate
   routes/          the Control Tower API and the warehouse floor API
 
 frontend/src/
-  pages/           Home, Dashboard, Inventory, Alerts, Activity
+  pages/           Home, Dashboard, Action Items, Forecast, Inventory, Alerts, Table
   warehouse/       Goods In and operator sign-in, for the handheld
   components/      StockPositionBar (bullet graph), StatCard, HoverHint, ...
   api/             fetch client
@@ -156,9 +161,83 @@ projected_avail(d)  = available_qty - (avg_daily_usage_30d * d)
                       + sum of open-PO quantity landing on or before day d
 ```
 
+The nine above are the core. MVP 2 added four more, held to the same rule (no model computes a figure):
+`forecast` (four statistical demand models with a backtest), `riskbuffer` (extra days of stock while a
+risk event is active), `signals` (what a piece of news does to each product) and `onboardingSuggestions`
+(sensible starting settings for a new catalogue).
+
 ---
 
-## 3. Why deterministic first
+## 3. Beyond the alerts
+
+The alerts answer "what needs a decision today". Four things sit around them, and each keeps the same
+rule: the figure comes from a deterministic engine, a person decides, a model at most explains.
+
+### Forecasting, with a backtest a manager can read
+
+Demand is forecast per product by four statistical models (a seasonal average, a seasonal trend,
+Holt-Winters, and a damped Holt blended with a seasonal term). In automatic mode each product gets
+whichever model would have been most accurate on its own past, found by a rolling walk-forward backtest
+scored by weighted absolute percentage error, and that score is shown next to the choice. The forecast
+feeds the safety stock calculation and the reorder point, and the Forecast page lets a manager move the
+inputs and watch the suggestion change, through the same engines, never a second formula in the browser.
+None of it is generative: the backtest is checked to give the same answer twice, and the page says so
+in plain words. A suggested reorder point still ends on the Alerts page as approve, modify or reject.
+
+### Market signals: news, checked against your own stock
+
+A supply shock reaches a rice importer first as a headline. **Action Items, Market signals** turns one
+into what it does to each product and what to order, by a route that keeps the model away from every
+number. A signal is a fixed shape: country, kind of event, severity, whether it tightens or eases supply.
+How many days of supply an event costs is read from a visible table, not from the article. What those
+days do to each product is the existing projection engine run twice, with and without the delay,
+which gives the latest day to order and a suggested quantity.
+
+![Market signals: a real past event run against today's stock, with cover, suggested order and order-by date for each product it touches.](images/market-signals.jpg)
+
+*A real 2023 event run against today's stock. The table under the heading, not the article or a model,
+supplies "7 to 14 days".*
+
+There are two ways in, shown one at a time. **Live news** scans recent rice-supply headlines for the
+countries the business buys from, over a look-back window the manager chooses; a model running on the
+same machine reads each headline into the fixed shape (where there is no such model, a coarser keyword
+list does, and the paid tier is never used for this), and a person can correct the reading. The same story from several outlets is merged into one
+signal by comparing the headline text, with guards so that "bans exports" is never merged with "lifts the
+ban". **Past events** replays real 2022 to 2024 events, such as India's non-basmati export ban, against
+today's stock. That is practice: it can never change a reorder point. On a live signal a person can add
+a safety buffer, which makes the reorder point ask for stock earlier, or ask the buyer to order.
+
+### Order requests, from advice to a delivery
+
+A request to order is a short, audited chain, and only one link moves stock:
+
+1. **The office asks.** From Inventory or from a market signal, prefilled and editable.
+2. **The buyer acknowledges, then raises a purchase order.**
+3. **The buyer's manager approves or rejects** (a rejection needs a reason). Approving creates the
+   purchase order the warehouse can receive against, so the dock never sees an order nobody approved.
+4. **The warehouse receives the delivery** on the handheld. That receipt is the only step that changes
+   stock, and it closes the request in the same transaction, with no click from the office.
+
+Each step is stored with who did it and when, and the actor is fixed by the step on the server, so the
+timeline cannot be rewritten from the screen. A check walks the whole chain on a throwaway database and
+fails if an unapproved order ever reaches the dock.
+
+![Requests waiting for the buyer: each request with its next step, above the inventory table.](images/order-requests.jpg)
+
+*A request moves along its timeline; each step says who would do it in a real business.*
+
+### Ask about your data
+
+On Action Items a manager can ask an open question in plain language ("why is one product's cover so
+different from another's?"). A local model answers by calling a small set of read-only tools that fetch
+facts from the database. It reuses the placeholder guarantee from section 4: figures are inserted by the
+system, so the model cannot state one it did not fetch. It has no tool that writes. It needs that local
+model, so it is a feature of a developer's machine: where none is reachable, the app says so instead of
+guessing.
+
+---
+
+## 4. Why deterministic first
 
 Most "AI inventory" tools put a language model in the critical path and let it do the arithmetic.
 StockSense does not. Around ninety percent of the system is deterministic, and the language model is
@@ -253,7 +332,7 @@ Paid model spend across all of development: **USD [fill in] over [n] calls.**
 
 ---
 
-## 4. Domain modelling
+## 5. Domain modelling
 
 These are the distinctions the engines enforce, drawn from a rice-industry glossary maintained in
 `.kiro/specs/mvp1-inventory-visibility/reference/`. They are the difference between a dashboard that
@@ -279,7 +358,7 @@ having.
 
 ---
 
-## 5. Autonomy and human in the loop
+## 6. Autonomy and human in the loop
 
 **Nothing is ever auto-executed.** Every output of the alert engine is a recommendation carrying a
 quantity and a rationale, and every recommendation terminates at a human decision: approve, modify, or
@@ -298,7 +377,10 @@ learns the business's actual risk appetite, rather than assuming the textbook on
 The interaction is deliberately shaped so the human is deciding, not rubber-stamping. The alert states
 the measured value and the threshold it breached, so a manager can disagree with the reasoning rather
 than only with the conclusion. Modify is a first-class action rather than an escape hatch, because in
-practice the right answer is frequently "yes, but not that much."
+practice the right answer is frequently "yes, but not that much." A dismissed alert is not lost: it
+can be undone at once, or reopened later from History. The same shape holds elsewhere: a market
+signal only adds a buffer when a person says so, and an order request moves one step at a time, each
+step recorded against a named role.
 
 ![The Alerts page. Each alert states the measured value and the threshold it breached, names the decision the buttons act on, and terminates at approve, modify or reject.](images/alerts-human-in-the-loop.jpg)
 
@@ -308,13 +390,15 @@ once.*
 
 ---
 
-## 6. Observability
+## 7. Observability
 
-`audit_log` records eleven event types, each storing both the input the system saw and the output it
-produced:
+`audit_log` records sixteen live event types (two older ones are retired but still render), each storing
+both the input the system saw and the output it produced:
 
-`ALERT_TRIGGERED` · `ALERT_ACKNOWLEDGED` · `DECISION_RECORDED` · `RESTOCK` · `SKU_CREATED` ·
-`SKU_UPDATED` · `GOODS_RECEIVED` · `GOODS_ISSUED` · `LLM_CALL` · `LLM_UNLOCKED` · `LLM_UNLOCK_LOCKED_OUT`
+`ALERT_TRIGGERED` · `ALERT_ACKNOWLEDGED` · `ALERT_REOPENED` · `DECISION_RECORDED` · `SKU_CREATED` ·
+`SKU_UPDATED` · `GOODS_RECEIVED` · `GOODS_ISSUED` · `ORDER_REQUESTED` · `ORDER_REQUEST_UPDATED` ·
+`OPENING_BALANCE_SET` · `SALES_HISTORY_IMPORTED` · `SIGNAL_DECIDED` · `LLM_CALL` · `LLM_UNLOCKED` ·
+`LLM_UNLOCK_LOCKED_OUT`
 
 Four details make this an audit trail rather than a log file:
 
@@ -336,40 +420,41 @@ is read from this table, not estimated, and a PIN lockout on the paid tier is re
 Logging is best-effort by design: a failed audit insert is swallowed and reported to the server log
 only. An audit trail that can fail the restock it is recording is worse than no audit trail.
 
-The Activity page renders the whole trail as a chronological list of plain-English sentences, with the
-exact stored payload one click away. Raw JSON is not observability either; it is a prerequisite for it.
+The History view (in the Alerts tab) renders the whole trail as a chronological list of plain-English sentences, filterable by kind and by product, with the
+exact stored payload one click away, and a line about an alert links straight back to the alert. Raw JSON is not observability either; it is a prerequisite for it.
 
-![The Activity page with one record expanded, showing the stored input and output payloads side by side.](images/activity-audit-record.jpg)
+![The History view with one record expanded, showing the stored input and output payloads side by side.](images/activity-audit-record.jpg)
 
 *A manager cutting a suggested 591 MT stockout order to 500 MT, as the audit trail stored it: what the
 system proposed, what the manager did instead, the reason, and the delta between the two quantities.*
 
 ---
 
-## 7. What we deliberately did not build
+## 8. What we deliberately did not build
 
 Stating scope decisions with reasons is more honest than presenting a partial system as complete.
 
-**The model does not decide anything.** It explains a recommendation the engines already made. It
+**The model does not decide anything.** It explains a recommendation the engines already made, or reads a headline into a fixed shape that a person can correct. It
 cannot change a quantity, raise or clear an alert, or trigger an action, and its answer is checked
 before anyone reads it. Giving it more reach is a governance question, not a prompt, and it waits until
 the decisions table shows how far managers trust the engines themselves.
 
-**Scoped out of MVP 1 on purpose:**
+**Scoped out on purpose:**
 
 | Not built | Reason |
 |---|---|
 | Immutable movement ledger | Balances are a mutable snapshot rather than rebuildable from history. A real ledger is a Phase 2 data-model change, not a feature. |
 | Lot and batch genealogy | Ageing is tracked at SKU level. Batch-level tracking changes the grain of every table. |
 | Blocked / damaged / rejected stock statuses | The quality-hold field covers the common case; the full taxonomy needs warehouse process integration. |
-| Backtested demand forecasting | MVP 1 uses observed velocity, not a forecast. Presenting an unvalidated forecast as a number would be worse than not having one. |
+| Lead-time intelligence | Lead time is what the business enters. Measuring it needs closed purchase-order history, which the app does not yet have, so the forecast page says plainly that it is an input. |
+| Partial receipts and spend limits on orders | One receipt closes an order request, and every request goes to the manager. Real purchasing has part deliveries and small orders that skip approval; both are decisions for a login-based version. |
 | Agent execution governance | Nothing executes autonomously, so the governance layer that would constrain it is not yet needed. |
 
 The full list with rationale is in the spec's "Explicitly Deferred" section.
 
 ---
 
-## 8. Deployment
+## 9. Deployment
 
 The application deploys as a single service: the Express process serves both the API and the built
 front end from one origin. It runs as a container on AWS Lightsail. GitHub Actions builds the image for
@@ -395,10 +480,11 @@ sign-in screen.
 
 ---
 
-## 9. Roadmap
+## 10. Roadmap
 
-**MVP 2** adds demand forecasting with backtesting, lead-time intelligence derived from actual supplier
-performance rather than the configured value, and a fuller projected-stock curve.
+**MVP 2** is built: demand forecasting with backtesting, market signals, the order request loop and
+suggested settings for a new catalogue. What remains of it is lead-time intelligence derived from actual
+supplier performance rather than the configured value.
 
 **Phase 2** uses the accumulated `decisions` table as training data, so recommendations reflect the
 business's demonstrated risk appetite rather than a textbook service level.
