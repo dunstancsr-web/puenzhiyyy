@@ -10,8 +10,8 @@
 | --- | ---: |
 | AWS-sponsored credit, shared by hosting and model calls | 100.00 |
 | Hosting estimate, Lightsail Nano (USD 7 a month, billed hourly) for a 15 day lease | about 3.50 |
-| **Model calls to date (below)** | **0.0723** |
-| Left, approximately | about 96.42 |
+| **Model calls to date (below)** | **0.0783** |
+| Left, approximately | about 96.41 |
 
 **Why this matters beyond cost:** hosting and model calls draw on the same sponsored pool, and going
 over it may pause the AWS account and affect competition standing. A visitor spending model credit
@@ -52,6 +52,7 @@ organizers' figure for the team key is authoritative.
 | 12 | 20 Sep 17:28:48 | Final check, Ask: TJ-25KG compared with VF-10KG (one lookup, one answer) | Stan's Mac | 2 | 1544 / 339 | 0.0097 | 0.0620 |
 | 13 | 20 Sep 17:28:54 | Final check, Ask: recent demand for BM-5KG (one lookup, one answer) | Stan's Mac | 2 | 957 / 98 | 0.0043 | 0.0663 |
 | 14 | 20 Sep, late (estimate) | First live check on Lightsail: one Why? press, unlocked with the demo PIN | Lightsail container | 1 | not read | 0.006 (the check script's own estimate) | 0.0723 |
+| 15 | 21 Sep (estimate) | Second live check on Lightsail, after the delivery-gap fix: one Why? press on Action Items, TJ-25KG | Lightsail container | 1 | not read | 0.006 (the check script's own estimate) | 0.0783 |
 
 ## How to update this
 
