@@ -5,7 +5,7 @@ for anyone meeting StockSense for the first time: judges, new teammates, and the
 the warehouse.
 
 > Screenshots come from the seeded demo data for the fictional client 四海米行 / Four Seas Rice
-> Trading, captured on 15 and 20 Sep 2026. They are a snapshot: figures in them will differ from what the app
+> Trading, captured on 20 Sep 2026, in light theme, against the seeded demo data. They are a snapshot: figures in them will differ from what the app
 > shows on another day. How each figure is calculated is in
 > [design.md](../../.kiro/specs/mvp1-inventory-visibility/design.md).
 
@@ -20,7 +20,9 @@ the warehouse.
 7. [Manager: keeping product settings right (Inventory)](#7-manager-keeping-product-settings-right-inventory)
 8. [Manager: checking what happened (Alerts, History)](#8-manager-checking-what-happened-alerts-history)
 9. [Anyone: settings](#9-anyone-settings)
-10. [How the roles connect](#10-how-the-roles-connect)
+10. [Manager: planning ahead (Forecast)](#10-manager-planning-ahead-forecast)
+11. [Setting up a new client (Onboarding)](#11-setting-up-a-new-client-onboarding)
+12. [How the roles connect](#12-how-the-roles-connect)
 
 ---
 
@@ -28,7 +30,7 @@ the warehouse.
 
 **Who:** everyone. **Where:** the first screen, on any device.
 
-![Home: the three workspaces](images/01-home.jpg)
+![Home: the three workspaces, and Enter demo mode at the top right](images/01-home.jpg)
 
 Home asks one question: *where are you working today?* The people who use StockSense do different
 jobs in different places, so each has its own workspace instead of sharing one menu:
@@ -40,7 +42,9 @@ jobs in different places, so each has its own workspace instead of sharing one m
 | **Goods Out** | the dispatcher: picking and sending orders | handheld on the floor |
 
 The Control Tower is listed under "For this device" when you open Home on a computer. Every `?` icon
-opens a short explanation of what you are looking at.
+opens a short explanation of what you are looking at. **Enter demo mode** (top right) opens a private
+sandbox with sample data, so anyone can try every screen without touching the real database; an orange bar
+at the top says so, and **Exit** leaves it.
 
 ---
 
@@ -109,17 +113,42 @@ History view (section 8).
 **Who:** the dispatcher. **Where:** handheld, Goods Out. **Goal:** load the right stock onto the right
 truck and leave a record of what actually went.
 
-Sign in with a four digit PIN, then four steps, built the same way as Goods In:
+Sign in with a four digit PIN (a dispatcher's or an "either" operator's), then four steps, built the same
+way as Goods In:
 
-1. **Pick the order.** Open customer orders, earliest due first. An order the shelf cannot fully cover
-   says so before you walk to it.
-2. **Verify the SKU.** Scan the pallet label or key the code; it must match the order.
-3. **Count it.** Key in how many MT are leaving. The keypad refuses more than the customer ordered or
-   more than is physically on hand.
-4. **Confirm.** Review the summary. A short pick asks why, and confirming releases the reserved stock
-   and issues a delivery note (DN number) with the operator's name.
+### Step 1: pick the order
 
-_No screenshot yet; capture one with the other two stale guide screenshots._
+<img src="images/23-goods-out-pick.jpg" alt="Goods Out step 1, choose the customer order" width="320">
+
+Open customer orders, earliest due first, each with the product, quantity, due date and customer. An
+order the shelf cannot fully cover says so before you walk to it.
+
+### Step 2: verify the SKU
+
+<img src="images/24-goods-out-verify.jpg" alt="Goods Out step 2, verify the product code" width="320">
+
+Scan the pallet label or key the code; a green tick means it matches the order, which stops the right
+quantity leaving as the wrong product.
+
+### Step 3: count it
+
+<img src="images/25-goods-out-count.jpg" alt="Goods Out step 3, enter the quantity leaving" width="320">
+
+Key in how many MT are leaving. The keypad refuses more than the customer ordered or more than is
+physically on hand, and a short pick says so straight away.
+
+### Step 4: confirm, and the delivery note
+
+<img src="images/26-goods-out-confirm.jpg" alt="Goods Out step 4, review and give a reason for a short pick" width="320">
+
+A summary shows the order, customer, ordered against counted and the stock after. Because the pick is
+short, the dispatcher picks a reason (not enough stock on the shelf, damaged stock set aside, the customer
+accepted a partial delivery, or a counting correction). Confirming releases the reserved stock and issues a
+delivery note with the operator's name.
+
+<img src="images/27-goods-out-done.jpg" alt="Delivery note confirmed" width="320">
+
+The shortfall goes on record against the delivery note, so sales can follow up with the customer.
 
 ---
 
@@ -180,9 +209,10 @@ deciding.**
 
 ### The alert list
 
-![Alerts: one card per problem, with the decision buttons](images/15-alerts.jpg)
+![Alerts, Needs action view: one card per problem, grouped by severity, with the decision buttons](images/15-alerts.jpg)
 
-Counts across the top show how many alerts there are of each of the six types:
+Counts across the top show how many alerts there are of each of the seven types (the Needs action and
+History views, and a Product menu that narrows both to one product, sit above them):
 
 | Alert | Raised when |
 |---|---|
@@ -191,10 +221,12 @@ Counts across the top show how many alerts there are of each of the six types:
 | **Overstock** | stock on hand is above the product's maximum |
 | **Slow moving** | the product is selling, but there is far more stock than its demand needs |
 | **Idle stock** | no sales at all for 90 days while stock is sitting there |
-| **Ageing** | stock has been held long enough to approach its holding limit |
+| **Ageing** | stock has been held long enough to approach its holding limit, scaled to each product's own limit |
+| **Policy suggestion** | a product is set to use its forecast, and the forecast-based reorder point differs from the approved one by more than 10% (section 10) |
 
 Each card states the measured value, what it was compared against, and a recommended action, then
-offers **Approve**, **Modify**, **Reject**, **Why?** and **Dismiss**. When the action is an order, the
+offers **Approve**, **Modify**, **Reject**, **Why?** and **Dismiss**, and a **History** line that opens what has
+happened to that alert. When the action is an order, the
 Approve button names the quantity.
 
 ### Why? The reasoning behind an alert
@@ -225,9 +257,26 @@ an alert dismissed by mistake can be brought back later with **Reopen alert** fr
 
 ---
 
-## 6. Manager: news that could hit your supply (Action Items)
+## 6. Manager: what to do first (Action Items)
 
-**Who:** the inventory manager or buyer. **Where:** Control Tower, Action Items, **Market signals**.
+**Who:** the inventory manager or buyer. **Where:** Control Tower, Action Items. **Goal:** see what is
+most urgent for supply, ask a question in plain words, and check news that could delay stock.
+
+![Action Items: Ask about your data, the nearest stockout, and Market signals](images/28-action-items.jpg)
+
+- **Ask about your data** answers an open question in plain language ("how much stock does TJ-25KG
+  have, and how long will it last?"). A model looks the facts up with a few read-only tools and writes the
+  answer; the figures in it are inserted by the system, never typed by the model, and a slow answer shows
+  a working note with the seconds elapsed. It needs a model to be available: where none is reachable, it
+  says so instead of guessing.
+- **Nearest stockout** lists the products projected to run out or breach their safety stock, soonest
+  first, with whether an order already covers it, the quantity to order, and a **Why?** that explains the
+  row in short bullet points.
+- **Blind spots** (further down, when there are any) are products whose numbers cannot be trusted yet,
+  for example because they have no sales history.
+
+### Market signals: news that could hit your supply
+
 **Goal:** when news could delay or tighten rice supply, see which of your products it would leave
 short, and by when you would have to order.
 
@@ -295,8 +344,8 @@ step is also in the History view. **Timeline** shows who did what and when.
 
 ![Product detail: current position and 90-day projection](images/12-product-overview.jpg)
 
-**Edit** opens the product. The **Overview** tab shows the current position and a **90-day
-projection**: how stock will fall at the current rate of sales, stepping up when an open purchase order
+**Edit** opens the product. The **Overview** tab shows the current position, a **90-day
+projection** and a short **demand forecasting** summary with a link to the Forecast page (section 10): how stock will fall at the current rate of sales, stepping up when an open purchase order
 arrives. It marks the date stock would run out and the date the safety buffer is breached, against the
 reorder point and safety stock lines.
 
@@ -305,7 +354,8 @@ reorder point and safety stock lines.
 ![Policy tab: sliders with a live preview](images/13-product-policy.jpg)
 
 The **Policy** tab holds the settings that alerts are judged against: minimum, target and maximum stock,
-the approved reorder point, lead time, target service level, safety stock and minimum order quantity.
+the approved reorder point, lead time and how much it varies, target service level, safety stock and
+minimum order quantity.
 Each has a slider and a box. **After save** previews the effect before anything is saved, including the
 system's own suggested reorder point for comparison with the approved one. Every saved change is
 recorded with its before and after values. The **Details** tab holds the product's identity (variety,
@@ -315,9 +365,19 @@ origin, supplier and so on).
 
 ![Bulk edit: download and upload](images/14-bulk-edit.jpg)
 
-**Bulk edit** downloads every product's editable settings as a spreadsheet file, and uploads it back
-after editing. On upload, the changes are shown for review before anything is saved, and a file with
+**Bulk edit** offers three downloads and three uploads: every product's editable settings, 24 months of
+stock history, and individual sales transactions (new rows are added, nothing existing is changed). Each
+is downloaded as a spreadsheet file and uploaded back after editing. On upload, the changes are shown for review before anything is saved, and a file with
 errors saves nothing. The same works for the 24 months of stock history.
+
+### The audit table
+
+![Audit table: every product in one row, what was uploaded on the left and what the formulas produced on the right](images/29-audit-table.jpg)
+
+**Table** in the sidebar is a deliberately plain, one-screen view of every product: what was uploaded on
+the left, and what each formula produced from it on the right (movement class, open alerts, safety stock,
+reorder point and projected stock). It exists to check honestly whether the basic data is enough to feed the
+formulas, so an empty cell is a finding and nothing in it is estimated in the browser.
 
 ---
 
@@ -326,7 +386,7 @@ errors saves nothing. The same works for the 24 months of stock history.
 **Who:** the manager, or anyone auditing. **Where:** Control Tower, Alerts, History view (this was the Activity page, which now redirects here). **Goal:** see everything
 the system did and every decision people made, in order, with the evidence.
 
-![Activity: the audit trail as a timeline](images/18-activity.jpg)
+![History view: the audit trail as a timeline](images/18-activity.jpg)
 
 Every event is a plain-English line, newest first: alerts raised, deliveries received (with the
 operator and any shortfall), model explanations, manager decisions, dismissed alerts, setting changes,
@@ -349,8 +409,8 @@ between the two quantities:
 
 ![Settings: explanation source and theme](images/19-settings.jpg)
 
-**Explanations** chooses who writes the summary under **Why?**. The figures are the same in all three;
-only the wording changes.
+**Explanations** chooses who writes the summary under **Why?** on Alerts and on Action Items, and who
+answers **Ask about your data**. The figures are the same in all three; only the wording changes.
 
 | Option | What it is | Cost |
 |---|---|---|
@@ -364,9 +424,84 @@ submission.
 
 **Theme** switches between Auto (follows the device), Light and Dark.
 
+**Enter demo mode** opens the sandbox described in section 1, and **Preview the onboarding journey** runs
+the first-time setup (section 11) inside it, so the real data is never touched.
+
 ---
 
-## 10. How the roles connect
+## 10. Manager: planning ahead (Forecast)
+
+**Who:** the inventory manager. **Where:** Control Tower, Forecast. **Goal:** check whether a product's
+reorder point still suits how it actually sells, before approving a change.
+
+![Forecast overview: every product, its model, its accuracy score and current against suggested reorder point](images/22-forecast-overview.jpg)
+
+The overview lists every product with the model in use, its accuracy score (WMAPE, lower is better), the
+approved reorder point against the one the forecast suggests, the gap between them, and when it was last
+recomputed. **Not started** means no forecast has been run for that product yet; **Open** takes you in.
+
+![A product's forecast: what the data tells us, the four models with their scores, and the sales history](images/21-forecast-detail.jpg)
+
+A product's page opens with **What your data tells us**, in plain words: what the forecast found, what it
+suggests, how that compares with what is approved, and why the lead time and its variability are only as
+good as what was saved for the product. Below it:
+
+- **Model selection.** Four statistical models compete (a seasonal average, a seasonal trend, Holt-Winters,
+  and a damped Holt with a seasonal term). **Auto** picks the one that would have been most accurate on the
+  product's own past, and the score of each is shown; **Manual** lets you choose. **Recompute** runs it
+  again.
+- **Sales history and forecast**, a chart of 25 months and the next 6.
+- **What if**, sliders that change the inputs and show the suggestion changing, through the same engines
+  rather than a second formula in the browser.
+- **How the suggestion is built** (forecast demand times lead time, plus safety stock, plus any risk
+  buffer) and a **simulation** of how stock would move over time.
+
+None of this is generative: the models are ordinary statistics, checked to give the same answer twice, and
+the page says so. Nothing here changes a reorder point. A suggestion becomes a decision only on the Alerts
+page, as a **Policy suggestion** the manager approves, modifies or rejects.
+
+---
+
+## 11. Setting up a new client (Onboarding)
+
+**Who:** whoever sets StockSense up for a business. **Where:** the first screen for an empty catalogue, or
+**Preview the onboarding journey** in Settings. **Goal:** get from nothing to a working set of products with
+sensible starting numbers, in a few minutes.
+
+![Step 1 of 3: tell us what you stock](images/30-onboarding-catalog.jpg)
+
+It is a short story with **Back** and **Skip** at the top and three steps:
+
+1. **Your products.** Upload a spreadsheet (a blank template can be downloaded, and a "what does each
+   column mean" help explains every one), or add a product by hand. Only a product code and a name are
+   required; the rest can be filled in later. In demo mode **Try with sample data** loads a small set. A
+   sales-history file can be attached to the same upload.
+2. **Sales history.** Optional, and it improves demand figures and forecasts.
+3. **Suggested settings.** Every product is offered a target service level and target stock worked out from
+   its own data, each marked as measured or a default, with a confidence label. Untick anything to set by
+   hand later; everything stays editable.
+
+![What do you actually have on hand? One box per product, with an inferred figure to click](images/31-onboarding-opening-balance.jpg)
+
+After sample data, or a catalogue with no stock recorded, the app asks **what you actually have on hand**.
+The history explains demand, not the shelf today, so this is a count: type a quantity for any product you
+know, or click **Use ~X MT**, which is only an inference from the deliveries and sales you uploaded. Leave
+one blank and it is treated as unknown rather than guessed. This is the one time stock can be entered from
+the office: once per product, only where there is no stock yet, and recorded as an opening balance. From
+then on stock changes only when the warehouse receives or dispatches goods.
+
+![Your first quick read: fastest movers with cover, health and suggested order](images/32-onboarding-first-read.jpg)
+
+**Your first quick read** then shows the fastest movers with their days of cover, health and suggested
+order, computed the same way as everywhere else.
+
+![Step 3 of 3: suggested settings, each with its reasoning and a tick to apply it](images/33-onboarding-suggested-settings.jpg)
+
+Applying the suggestions (or skipping) lands on Home, and the Dashboard points once to the Forecast page.
+
+---
+
+## 12. How the roles connect
 
 The workspaces share one database, so one person's action is immediately another's information:
 
@@ -377,8 +512,12 @@ Receiver confirms a delivery (Goods In)
 The engines recalculate every figure
         │   cover, health, alerts; for example, a big delivery can raise an overstock alert
         ▼
-Manager reviews the Dashboard and Alerts
-        │   asks Why?, then approves, modifies or rejects, with a reason
+Manager reviews the Dashboard, Alerts and Action Items
+        │   asks Why?, then approves, modifies or rejects, with a reason,
+        │   or asks the buyer to order (request, purchase order, manager approval)
+        ▼
+The approved order arrives, and the receiver confirms it in Goods In
+        │   stock rises, and the request closes with no click from the office
         ▼
 Everything is in the Alerts tab, History view
             the delivery, the alert, the explanation, the decision and what it overrode
