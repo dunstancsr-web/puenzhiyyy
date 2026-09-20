@@ -27,7 +27,7 @@ Four deliverables. Status as of 20 Sep.
 
 ## Waiting for Stan's decision
 
-- **Demo mode for every visitor by default?** (asked 21 Sep). The demo sandbox starts empty and its sample data has zeroed stock (the onboarding story), so a default entry would show judges an empty portfolio instead of the populated live data, and Exit ends the shared sandbox for everyone in it. Options: (a) leave as is, writes are refused with a one-click "Join the demo"; (b) default everyone into the demo with the sample catalog; (c) keep the live data and let visitors write to a private copy of it (a bigger change). Not built.
+Nothing right now. Decided 21 Sep: **demo mode stays opt-in** (option a): writes on the live site are refused with a one-click "Join the demo", so judges see the populated live data first. A default demo would show an empty portfolio (the sandbox starts empty and its sample data has zeroed stock), and Exit ends the shared sandbox for everyone in it.
 
 Decided 20 Sep: The last three (At Risk bands, the seeded India event, market signals feeding order requests) were decided on 20 Sep and are in "Decisions already made" below.
 
