@@ -340,6 +340,8 @@ event. A person sees that at a glance from the headline, and dismisses it; had t
 mis-labelled, changing a menu recalculates the whole card at once, because everything below the four
 menus is arithmetic, not model output. That is the human-in-the-loop design in practice.
 
+> **Left in on purpose.** This misread is a real result from a real scan, kept here deliberately as the honest example of a person catching the model's mistake. Do not replace it with a cleaner one.
+
 **What it means for each product.** For every product the event touches (matched by country of origin or
 supplier, with the variety respected: a ban on non-basmati rice does not flag a basmati product) the card
 shows days of cover against lead time, the suggested order as a low and a high figure, the latest day to

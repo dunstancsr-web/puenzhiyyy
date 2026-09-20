@@ -1852,3 +1852,8 @@ Auto-generated session log for StockSense / Rice Inventory MVP.
 - **Branch:** docs/market-signals-guide (PR #17, docs only, not merged)
 - **Files changed:** docs/(Stan) 1 Reference/(Stan) SUBMISSION TRACKER.md
 - **Notes:** Stan added four allow rules (commit, push, gh pr create, the rehearsal script) through /permissions; `gh pr merge` stays on ask. Ran `rehearse-deploy.sh`: every site check passed (health, app served, seeded, rules tier default, local model not offered, paid tier PIN-gated, wrong PIN counted) and one failed: the GHCR image is private, so Lightsail cannot pull it. Tracker now says to make the package public before deploying. Open decisions for Stan: Ask on the live URL, and the Cambodia story.
+
+## Session: 2026-09-20 (Ask hidden on the live site)
+- **Branch:** feature/hide-ask-on-live
+- **Files changed:** frontend/src/pages/ActionItems.jsx, docs/Guide/FEATURES GUIDE.md, the submission tracker
+- **Notes:** Ask about your data runs on a local model, and the deployed container has none, so it would fail for every visitor. The box now renders only when GET /llm/mode reports the local tier available (`askAvailable`). Checked in a real browser both ways: a production-mode server with the local model blanked (as rehearse-deploy.sh does) shows no Ask box, the dev server shows it. Build passes. Not run: the UX audit, since the change only removes a card. Stan also decided to keep the misread Cambodia story in the guide; a callout there and a tracker decision say it is deliberate.

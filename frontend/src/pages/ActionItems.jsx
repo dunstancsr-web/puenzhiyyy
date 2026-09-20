@@ -96,6 +96,7 @@ export default function ActionItems() {
   // reads as broken.
   const [llmServer, setLlmServer] = useState(null);
   useEffect(() => { api.getLlmMode().then(setLlmServer).catch(() => setLlmServer(null)); }, []);
+  const askAvailable = !!llmServer?.modes?.find((m) => m.id === "local")?.available;
   const [aiModal, setAiModal] = useState(null);
 
   const askAI = (kind, sku, label) => {
@@ -189,6 +190,9 @@ export default function ActionItems() {
         </p>
       </div>
 
+      {/* Ask runs on a local model (askDatabase.js), and a deployed server has none. Shown only once the
+          server says a local model exists, so the live site never offers a box that cannot answer. */}
+      {askAvailable && (
       <div className="card" style={{ padding: "16px 20px", marginBottom: 20 }}>
         <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
           <Cpu size={15} /> Ask about your data
@@ -229,6 +233,7 @@ export default function ActionItems() {
           </div>
         )}
       </div>
+      )}
 
       <Section
         icon={Flame}
