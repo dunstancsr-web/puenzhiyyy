@@ -147,7 +147,10 @@ check("health_status", "Health Status", "RED / ORANGE / YELLOW / GREEN rules, fi
     const dos = s.days_of_cover;
     let h = "GREEN";
     if ((dos != null && dos < s.lead_time_days && !s.covered_by_po) || (s.inventory_age_days != null && s.inventory_age_days > s.max_holding_days) || (s.movement_class === "Idle" && s.available_qty > 0)) h = "RED";
-    else if ((dos != null && dos < s.lead_time_days + s.safety_stock_days && !s.covered_by_po) || s.on_hand_qty > s.max_stock) h = "ORANGE";
+    // ORANGE buffer includes risk_buffer_days (Reorder Loop step 9): the live
+    // market-signal buffer widens the band, so health tightens as the risk-
+    // adjusted reorder point shifts. Zero with no active signal, so unchanged then.
+    else if ((dos != null && dos < s.lead_time_days + s.safety_stock_days + (s.risk_buffer_days || 0) && !s.covered_by_po) || s.on_hand_qty > s.max_stock) h = "ORANGE";
     else if (s.movement_class === "Slow Moving" || (dos != null && s.target_days_of_cover != null && dos > s.target_days_of_cover)) h = "YELLOW";
     return [h, s.health_status];
   },

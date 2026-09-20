@@ -37,7 +37,10 @@ const num = (v, fallback = 0) => (Number.isFinite(+v) ? +v : fallback);
 // this used to silently diverge from the backend and was missing the max_holding_days trigger).
 export function deriveHealthStatus(s) {
   const dos = s.days_of_cover;
-  const ltSafety = num(s.lead_time_days, 45) + (s.safety_stock_days || 0);
+  // risk_buffer_days (Reorder Loop step 9): a live market-signal buffer widens
+  // the ORANGE band, mirroring backend/src/engines/health.js. Defaults to 0, so
+  // the mock (which mostly carries no risk buffer) is unchanged without a signal.
+  const ltSafety = num(s.lead_time_days, 45) + (s.safety_stock_days || 0) + (s.risk_buffer_days || 0);
 
   // RED
   if (dos != null && dos < num(s.lead_time_days, 45) && !s.covered_by_po) return "RED";
