@@ -225,14 +225,22 @@ export default function Home() {
   if (skuCount === 0 && !isDismissed()) return <Onboarding />;
 
   return (
-    <div style={{
+    <div className="home-page" style={{
       minHeight: "calc(100vh - var(--demo-banner-height))", background: "var(--bg)",
       // flex-start, not centre. Centring a short page in a tall viewport put
       // 214px of nothing above the first pixel of content, so the eye landed
-      // on empty space. clamp anchors it without crowding the top edge.
+      // on empty space. The top padding (clamp, in the stylesheet) anchors it without crowding the edge.
       display: "flex", justifyContent: "center", alignItems: "flex-start",
-      padding: "clamp(40px, 9vh, 96px) 20px 48px",
     }}>
+      {/* Entering demo mode is a presenter's action, not a workspace, so it sits apart from the workspaces, top
+          right, where the demo banner's Exit sits once you are in. In the page, not fixed: a floating control
+          always covers something (it once sat on top of Bulk edit). Hidden once in demo mode: the banner takes over. */}
+      {isDemo === false && (
+        <button type="button" className="home-demo-entry" onClick={() => enterDemoMode()}>
+          <PlayCircle size={14} aria-hidden />
+          Enter demo mode
+        </button>
+      )}
       <div className="home-shell">
 
         <div style={{
@@ -300,17 +308,6 @@ export default function Home() {
             </span>
           </div>
           <EventCredit align="center" inline />
-          {isDemo === false && (
-            <div style={{ textAlign: "center", marginTop: "var(--space-3)" }}>
-              <button type="button" onClick={() => enterDemoMode()} style={{
-                display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", minHeight: 44,
-                fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
-              }}>
-                <PlayCircle size={14} />
-                Enter demo mode
-              </button>
-            </div>
-          )}
           {isDemo && (
             <div style={{ textAlign: "center", marginTop: "var(--space-3)" }}>
               <Link to="/onboarding" style={{

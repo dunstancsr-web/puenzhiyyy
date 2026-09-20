@@ -77,9 +77,10 @@ backend/scripts/
   check-deploy.js   checks a live deployment, never calls the model
   rehearse-deploy.sh  runs the app like the container on a Mac, then runs check-deploy.js
 frontend/src/
-  pages/       Home, Dashboard, Action Items, Forecast, Inventory, Alerts, Activity, Table (the
-               Control Tower - order is Sidebar.jsx's own; Action Items and Table, both 19 Sep, are
-               additive, not replacements for Alerts or Activity)
+  pages/       Home, Dashboard, Action Items, Forecast, Inventory, Alerts, Table (the Control
+               Tower - order is Sidebar.jsx's own; Alerts holds Needs action and History, and History
+               is components/ActivityFeed.jsx, the old Activity page; Action Items and Table, both
+               19 Sep, are additive)
   warehouse/   Goods In, Goods Out and operator PIN sign-in (the handheld)
   lib/explain.js    the rule-based Why? explanation, four plain-English steps
 frontend/tuners/    Stan's design tuners: sliders over real components, he pastes back CSS

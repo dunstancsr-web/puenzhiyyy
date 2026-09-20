@@ -45,7 +45,7 @@
   "/action-items",
   "/inventory",
   "/alerts",
-  "/activity",
+  "/alerts?view=history",
   "/forecast",
   "/audit",
   "/onboarding",

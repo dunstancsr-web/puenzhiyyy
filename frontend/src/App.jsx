@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, Outlet } from "react-router-dom";
+import { Routes, Route, Outlet, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Onboarding from "./pages/Onboarding";
@@ -7,7 +7,6 @@ import CatalogFields from "./pages/CatalogFields";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Alerts from "./pages/Alerts";
-import Activity from "./pages/Activity";
 import ForecastDetail from "./pages/ForecastDetail";
 import ForecastList from "./pages/ForecastList";
 import AuditTable from "./pages/AuditTable";
@@ -70,7 +69,8 @@ export default function App() {
             from Inventory's header link. */}
         <Route path="/forecast" element={<ForecastList />} />
         <Route path="/alerts" element={<Alerts />} />
-        <Route path="/activity" element={<Activity />} />
+        {/* Activity is now the History view inside Alerts (20 Sep, Stan's call). The old address still works. */}
+        <Route path="/activity" element={<Navigate to="/alerts?view=history" replace />} />
         {/* On Sidebar's permanent nav as "Table" (Stan's call, 19 Sep) - a
             plain audit view built to check whether onboarding's basic
             columns are enough to feed the top-5 formulas. */}

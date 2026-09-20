@@ -25,7 +25,7 @@
              React + Vite, port 5173 in development (proxy to /api)
       Home          three workspaces
       Goods In/Out  handheld flows (frontend/src/warehouse/)
-      Control Tower Dashboard, Inventory, Alerts, Activity
+      Control Tower Dashboard, Inventory, Alerts (Needs action and History)
 ```
 
 All computation happens in the backend engines. The frontend renders, and never recomputes a figure
@@ -873,9 +873,24 @@ Summary count per alert type; alert cards on white, severity as the left stripe,
 each card states measured value and threshold, the recommended action, and Approve (with the quantity),
 Modify, Reject, Why? and Dismiss.
 
-### Activity Page
-The audit trail in plain-English sentences, filterable by event type, each with the stored input and
-output one click away.
+### Alerts tab: Needs action and History (merged 20 Sep)
+`/alerts` is one tab with two views chosen in the URL (`?view=history`), sharing a product filter
+(`?sku=`). `/activity` redirects to `/alerts?view=history`. They are two lists on purpose (a to-do list and
+a record are different things; interleaving them buries alerts under stock movements and model calls), joined
+at the item: an alert has a History strip (`GET /api/alerts/:id/history`: raised, dismissed, reopened, and
+decisions on the same product and type), and a History row can open its alert (`?alert=ID`) or reopen it.
+
+**Needs action** groups alerts by severity, with the six type tiles as the filter. Dismissing is permanent
+(`materializeAlerts` keeps any non-open alert suppressed), so it now has an undo: `POST /api/alerts/:id/reopen`
+(only from acknowledged; otherwise 409; audited as ALERT_REOPENED), used by a 12 second undo bar and by a
+Reopen button on the latest dismissal in History. `GET /api/alerts/handled` lists the non-open alerts so History
+knows which to offer it on.
+
+**History** is the audit trail in plain-English sentences under day headings, filtered by six categories
+(alerts and decisions, orders and stock, market signals, products and data, AI and access; 16 event types
+were 16 chips) and by product, 200 at a time with "Show older events", each row with the stored input and
+output one click away. `GET /api/audit` takes several event types separated by commas and counts scoped to
+the product.
 
 ### Forecast Detail Page (MVP2 Day 5, Data Story added 17 Sep)
 `frontend/src/pages/ForecastDetail.jsx`, at `/inventory/:skuId/forecast` — the one exception to "no

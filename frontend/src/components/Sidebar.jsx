@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, TrendingUp, PackageSearch, Bell, History, Home as HomeIcon, Table2, Flame } from "lucide-react";
+import { LayoutDashboard, TrendingUp, PackageSearch, Bell, Home as HomeIcon, Table2, Flame } from "lucide-react";
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 import EventCredit from "./EventCredit";
@@ -66,9 +66,9 @@ export default function Sidebar() {
     // in, decide-then-inspect rather than the other way round.
     { to: "/forecast", label: "Forecast", icon: TrendingUp, badge: null },
     { to: "/inventory", label: "Inventory", icon: PackageSearch, badge: null },
+    // Alerts holds both the queue and its history (Needs action | History, 20 Sep): Activity is no longer a
+    // separate item, so the two are read in one place.
     { to: "/alerts", label: "Alerts", icon: Bell, badge: alertCount },
-    // Last on purpose: Activity is a record to consult, not a queue to work.
-    { to: "/activity", label: "Activity", icon: History, badge: null },
     // Table (AuditTable.jsx, 19 Sep): Stan asked for this in the sidebar
     // directly, not held open pending sign-off the way Forecast was - one row
     // per SKU, uploaded columns beside what the top-5 formulas produce, built

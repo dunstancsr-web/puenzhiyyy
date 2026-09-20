@@ -1844,6 +1844,66 @@ router.post("/alerts/:id/acknowledge", (req, res) => {
   }
 });
 
+// POST /api/alerts/:id/reopen - the undo for a dismissal. Only an acknowledged alert can come back. If its
+// condition still holds it reappears in GET /api/alerts; if it has cleared since, it simply does not.
+// (A dismissal is otherwise permanent: materializeAlerts keeps any non-open alert suppressed.)
+router.post("/alerts/:id/reopen", (req, res) => {
+  try {
+    const db = getDb();
+    const row = db.prepare(`SELECT id, sku_id, alert_type, severity, status FROM alerts_log WHERE id = ?`).get(req.params.id);
+    if (!row) return res.status(404).json({ success: false, message: "Alert not found" });
+    if (row.status !== "acknowledged") {
+      return res.status(409).json({ success: false, message: "Only a dismissed alert can be reopened" });
+    }
+    db.prepare(`UPDATE alerts_log SET status = 'open', resolved_at = NULL WHERE id = ?`).run(row.id);
+    logEvent(EVENTS.ALERT_REOPENED, {
+      skuId: row.sku_id,
+      input: { alert_id: row.id, alert_type: row.alert_type, severity: row.severity },
+      output: { status: "open" },
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to reopen the alert" });
+  }
+});
+
+// GET /api/alerts/handled - alerts that are not open (dismissed or decided), so History can offer to reopen
+// the ones still dismissed. Ids and status only; the events themselves come from the audit log.
+router.get("/alerts/handled", (req, res) => {
+  try {
+    const rows = getDb().prepare(`SELECT id, sku_id, alert_type, status FROM alerts_log WHERE status != 'open'`).all();
+    res.json({ success: true, count: rows.length, data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load handled alerts" });
+  }
+});
+
+// GET /api/alerts/:id/history - what happened to this alert: raised, dismissed or reopened, and the decisions
+// recorded on the same product and alert type. Decision events name the product and trigger type, not the
+// alert id, so they are matched that way (good enough, not exact: an earlier alert of the same type on the
+// same product shares its decisions).
+router.get("/alerts/:id/history", (req, res) => {
+  try {
+    const db = getDb();
+    const alert = db.prepare(`SELECT id, sku_id, alert_type FROM alerts_log WHERE id = ?`).get(req.params.id);
+    if (!alert) return res.status(404).json({ success: false, message: "Alert not found" });
+    const rows = db.prepare(`
+      SELECT a.*, s.product_name AS sku_name FROM audit_log a
+        LEFT JOIN skus s ON s.sku_id = a.sku_id
+       WHERE (a.event_type = 'ALERT_TRIGGERED'    AND json_extract(a.output_data, '$.alert_id') = @id)
+          OR (a.event_type IN ('ALERT_ACKNOWLEDGED', 'ALERT_REOPENED') AND json_extract(a.input_data, '$.alert_id') = @id)
+          OR (a.event_type = 'DECISION_RECORDED' AND a.sku_id = @sku AND json_extract(a.input_data, '$.trigger_type') = @type)
+       ORDER BY a.id`).all({ id: alert.id, sku: alert.sku_id, type: alert.alert_type });
+    const parse = (raw) => { try { return raw == null ? null : JSON.parse(raw); } catch { return raw; } };
+    res.json({ success: true, count: rows.length, data: rows.map((r) => ({ ...r, input_data: parse(r.input_data), output_data: parse(r.output_data) })) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load the alert history" });
+  }
+});
+
 // ── Decisions (TASK-12) ──────────────────────────────────────────────────────
 // Manager Approve/Modify/Reject audit trail. Independent of the AI-explanation
 // layer (TASK-11, not yet wired) — a manager can decide on the rule-based
@@ -1976,7 +2036,7 @@ router.get("/audit", (req, res) => {
     // `counts` is nested inside `data` deliberately: the frontend client unwraps
     // responses to body.data, so anything at the top level next to it would be
     // dropped before a caller could see it.
-    res.json({ success: true, count: events.length, data: { events, counts: eventCounts() } });
+    res.json({ success: true, count: events.length, data: { events, counts: eventCounts({ skuId: req.query.sku_id }) } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to load audit log" });

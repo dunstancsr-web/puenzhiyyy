@@ -176,9 +176,11 @@ Read before making UI changes.
 - **Home**: the screen at `/` with the three workspaces (`frontend/src/pages/Home.jsx`). Briefly
   called the Launchpad; Stan renamed it because everyone already knows what Home means.
 - **The Control Tower**: the desktop side. The sidebar's own order (`Sidebar.jsx`): Dashboard, Action
-  Items, Forecast, Inventory, Alerts, Activity, Table. The only part with the sidebar. Action Items
-  and Table (both 19 Sep) are additive - Alerts keeps the approve/modify/reject workflow, Activity
-  keeps the audit record, neither was replaced.
+  Items, Forecast, Inventory, Alerts, Table. The only part with the sidebar. Alerts is one tab with two
+  views, **Needs action** and **History** (20 Sep, Stan's call: being in one tab makes an alert and what
+  happened to it easier to link). History is what used to be the Activity page; `/activity` redirects to
+  it. They stay two lists on purpose, joined at the item. Action Items and Table (both 19 Sep) are
+  additive.
 - **Goods In** and **Goods Out**: the handheld warehouse floor flows. Industry terms: inbound / goods
   receipt, outbound / goods issue.
 - **Key Metrics**: the top card on the Dashboard (hero value, baseline comparison, the Service &
