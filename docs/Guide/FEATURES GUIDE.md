@@ -391,7 +391,8 @@ the system did and every decision people made, in order, with the evidence.
 Every event is a plain-English line, newest first: alerts raised, deliveries received (with the
 operator and any shortfall), model explanations, manager decisions, dismissed alerts, setting changes,
 and paid-model unlocks. The chips along the top filter by kind: alerts and decisions, orders and stock, market signals, products
-and data, AI and access. The **Product** menu narrows everything to one product, and a line about an
+and data, AI and access; the **Type** menu at the right narrows to one exact kind of event (only deliveries
+received, only dismissed alerts, and so on). The **Product** menu narrows everything to one product, and a line about an
 alert offers **Open alert** (or **Reopen alert** if it was dismissed), so an alert and what happened to
 it are one click apart.
 
