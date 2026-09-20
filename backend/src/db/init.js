@@ -44,6 +44,15 @@ function isDemoModeActive() {
   return demoDb != null;
 }
 
+// Whether THIS request is currently running inside the demo context — not
+// just whether demo mode is active for someone else. The one thing allowed
+// to check this is a route that would otherwise be destructive if it ever
+// ran against the real database (see /demo/seed-sample) — it refuses instead
+// of trusting the caller's cookie alone.
+function isInDemoContext() {
+  return demoContext.getStore() != null;
+}
+
 // Wraps one request's handling in the demo database's async context. Called by
 // the middleware in index.js for any request carrying the demo cookie. If the
 // shared instance was dropped (someone else exited) since this cookie was set,
@@ -232,6 +241,47 @@ function initDb(targetDb) {
     );
 
     -- ================================================================
+    -- ORDER REQUESTS  (Reorder Loop step 7, "Separate the duties")
+    -- The one write the Control Tower is allowed to make: a request to the
+    -- buyer to order more of a SKU. It records INTENT for a buyer to act on;
+    -- it does NOT change stock. Stock only ever moves on the warehouse floor
+    -- (goods_movements), attributed to an operator, against an expected line.
+    --
+    -- This is why the office has no restock endpoint any more: the two duties
+    -- are separated, and this table is the office half of that split. A real
+    -- deployment would route these to a procurement system; here they are a
+    -- durable, auditable record that the request was raised.
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS order_requests (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_no    TEXT UNIQUE,                 -- REQ-0001
+      sku_id        TEXT NOT NULL,
+      quantity_mt   REAL NOT NULL,
+      reason        TEXT,
+      status        TEXT NOT NULL DEFAULT 'open', -- open | acknowledged | po_raised | approved | received | rejected | cancelled
+      po_number     TEXT,                        -- set when approved: the purchase order Goods In receives against
+      requested_by  TEXT DEFAULT 'control tower',
+      created_at    TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (sku_id) REFERENCES skus(sku_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_order_requests_sku ON order_requests(sku_id, status);
+
+    -- One row per step a request has been through, oldest first. order_requests.status
+    -- is only the latest step; this is the timeline. Append-only: a step is never edited.
+    -- actor is a role label ('control tower', 'buyer', 'buyer manager'); there is no
+    -- login yet, so in the demo a person plays each role and the label says so.
+    CREATE TABLE IF NOT EXISTS order_request_events (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_id  INTEGER NOT NULL,
+      status      TEXT NOT NULL,   -- open | acknowledged | po_raised | approved | rejected | cancelled
+      actor       TEXT NOT NULL,
+      note        TEXT,
+      created_at  TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (request_id) REFERENCES order_requests(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_order_request_events_req ON order_request_events(request_id, id);
+
+    -- ================================================================
     -- FORECASTS  (MVP2)
     -- One row per SKU per model per generation. is_active=1 marks the one row
     -- per sku_id currently feeding safetystock.js; older rows stay as history
@@ -278,6 +328,54 @@ function initDb(targetDb) {
       created_at        TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_risk_events_active ON risk_events(active);
+
+    -- ================================================================
+    -- MARKET SIGNALS
+    -- A news event read into a fixed shape, waiting for a person to accept
+    -- or dismiss it. Never a figure and never an action: the days it costs
+    -- come from engines/signals.js's playbook, and approving one only adds a
+    -- risk_events row (the buffer the reorder point already knows about).
+    --   origin        replay = a real past event loaded to show what the agent
+    --                 would say; live = read from the news feed
+    --   extracted_by  hand | rules | model:<name>, so a reader can tell how
+    --                 much to trust the classification
+    --   affects/excludes_varieties  JSON arrays; a NON-basmati ban must not
+    --                 flag a basmati SKU
+    --   fixture_id    makes loading the same replay twice a no-op
+    -- ================================================================
+    CREATE TABLE IF NOT EXISTS market_signals (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      headline           TEXT NOT NULL,
+      summary            TEXT,
+      source_name        TEXT,
+      source_url         TEXT,
+      published_at       TEXT,
+      country_of_origin  TEXT,
+      supplier           TEXT,
+      event_type         TEXT NOT NULL,
+      severity           TEXT NOT NULL,
+      direction          TEXT NOT NULL DEFAULT 'tightens',
+      affects_varieties  TEXT,
+      excludes_varieties TEXT,
+      origin             TEXT NOT NULL DEFAULT 'replay',
+      extracted_by       TEXT NOT NULL DEFAULT 'hand',
+      status             TEXT NOT NULL DEFAULT 'pending',
+      decided_at         TEXT,
+      decided_by         TEXT,
+      risk_event_id      INTEGER,
+      fixture_id         TEXT,
+      also_reported_by   TEXT,
+      created_at         TEXT DEFAULT (datetime('now'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_market_signals_fixture ON market_signals(fixture_id) WHERE fixture_id IS NOT NULL;
+
+    -- Every headline the news scan has already looked at, kept or not, so the same
+    -- story is never read twice (a model call each time otherwise).
+    CREATE TABLE IF NOT EXISTS signal_seen (
+      url_hash TEXT PRIMARY KEY,
+      verdict  TEXT NOT NULL,
+      seen_at  TEXT DEFAULT (datetime('now'))
+    );
 
     -- ================================================================
     -- OPERATORS  (warehouse floor staff, for handheld attribution)
@@ -396,6 +494,15 @@ function initDb(targetDb) {
   `);
 
   // Forward migrations for databases created before these columns existed.
+  // Variety scoping for risk events, so an approved market signal about NON-basmati
+  // rice does not buffer a basmati SKU. NULL keeps the old, unscoped behaviour.
+  // Order requests used to end at 'ordered'. That step is now the approved purchase order, so a
+  // database from before the timeline reads the same way. Idempotent: matches nothing afterwards.
+  db.exec(`UPDATE order_requests SET status = 'approved' WHERE status = 'ordered'`);
+  ensureColumn(db, "order_requests", "po_number", "po_number TEXT");
+  ensureColumn(db, "market_signals", "also_reported_by", "also_reported_by TEXT");
+  ensureColumn(db, "risk_events", "affects_varieties", "affects_varieties TEXT");
+  ensureColumn(db, "risk_events", "excludes_varieties", "excludes_varieties TEXT");
   ensureColumn(db, "skus", "warehouse", "warehouse TEXT DEFAULT 'MAIN'");
   ensureColumn(db, "skus", "lead_time_std_days", "lead_time_std_days REAL DEFAULT 0");
   ensureColumn(db, "skus", "target_service_level", "target_service_level REAL DEFAULT 0.95");
@@ -430,5 +537,5 @@ function initDb(targetDb) {
 
 module.exports = {
   getDb, initDb, ensureColumn, DB_PATH,
-  enterDemoMode, exitDemoMode, isDemoModeActive, runInDemoContext,
+  enterDemoMode, exitDemoMode, isDemoModeActive, isInDemoContext, runInDemoContext,
 };

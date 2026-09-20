@@ -1,0 +1,615 @@
+<title>Demo Glow Tuner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --ink:        #11161f;
+    --ink-2:      #47505f;
+    --ink-3:      #6b7484;
+    --ground:     #eceef2;
+    --chrome:     #f7f8fa;
+    --panel:      #ffffff;
+    --line:       #e0e4ea;
+    --line-soft:  #eceff4;
+    --accent:     #3b82f6;
+    --accent-ink: #1d4ed8;
+    --pass:       #15803d;
+    --pass-bg:    #eaf6ee;
+    --warn:       #a16207;
+    --warn-bg:    #fdf6e3;
+
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --preview-face: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --r: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eef1f6; --ink-2: #a9b3c2; --ink-3: #7c8697;
+      --ground: #0d1117; --chrome: #151b24; --panel: #1a212c;
+      --line: #2a3340; --line-soft: #222b37;
+      --accent: #60a5fa; --accent-ink: #93c5fd;
+      --pass: #4ade80; --pass-bg: #12261a; --warn: #fbbf24; --warn-bg: #2a2010;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #eef1f6; --ink-2: #a9b3c2; --ink-3: #7c8697;
+    --ground: #0d1117; --chrome: #151b24; --panel: #1a212c;
+    --line: #2a3340; --line-soft: #222b37;
+    --accent: #60a5fa; --accent-ink: #93c5fd;
+    --pass: #4ade80; --pass-bg: #12261a; --warn: #fbbf24; --warn-bg: #2a2010;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 28px 24px 72px; }
+
+  header { margin-bottom: 22px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 4px; text-wrap: balance; }
+  .sub { color: var(--ink-2); font-size: 13px; max-width: 68ch; margin: 0; }
+  .sub code { font-family: var(--mono); font-size: 12px; color: var(--accent-ink); }
+
+  .cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 980px) { .cols { grid-template-columns: 1fr; } }
+  .stack { position: sticky; top: 18px; display: flex; flex-direction: column; gap: 14px; }
+  @media (max-width: 980px) { .stack { position: static; } }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .card > .hd { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); }
+  .hd h2 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-3); }
+  .bd { padding: 14px; }
+
+  /* ── Preview stage: a small mock of the real app, so the glow is judged
+       against actual content, not an empty rectangle ── */
+  .stage {
+    position: relative; min-height: 400px; overflow: hidden;
+    font-family: var(--preview-face); display: flex;
+  }
+  .stage-side { width: 96px; flex-shrink: 0; padding: 16px 10px; border-right: 1px solid; }
+  .stage-side .sw { width: 100%; height: 9px; border-radius: 4px; margin-bottom: 10px; opacity: .55; }
+  .stage-side .sw.active { opacity: 1; }
+  .stage-main { flex: 1; padding: 18px 20px; }
+  .stage-h1 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+  .stage-card { border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid; }
+  .stage-k { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; opacity: .65; margin-bottom: 4px; }
+  .stage-v { font-size: 22px; font-weight: 700; }
+  .stage-row { display: flex; gap: 10px; }
+  .stage-row > div { flex: 1; }
+
+  /* The glow layer under test. Flat mode paints boxShadow directly on .glow
+     with opacity/animation; gradient mode masks .glow to a ring and rotates
+     .glow-inner underneath it. Either way only transform/opacity animate -
+     see the Performance panel for why that split matters. */
+  .glow { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .glow-inner { position: absolute; inset: -50%; }
+
+  .verdict-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .vbox { flex: 1; min-width: 120px; border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+  .vbox .k { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .vbox .v { font-family: var(--mono); font-size: 18px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 99px; margin-top: 8px; }
+  .b-pass { background: var(--pass-bg); color: var(--pass); }
+  .b-warn { background: var(--warn-bg); color: var(--warn); }
+  .note { font-size: 11.5px; color: var(--ink-3); line-height: 1.55; margin: 8px 0 0; }
+  .note strong { color: var(--ink-2); }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .preset { appearance: none; cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 500; background: var(--chrome); color: var(--ink); border: 1px solid var(--line); padding: 5px 11px; border-radius: 99px; }
+  .preset:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .preset:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .seg { display: flex; gap: 4px; background: var(--chrome); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+  .seg button { appearance: none; border: 0; background: transparent; cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--ink-2); padding: 5px 12px; border-radius: 6px; flex: 1; }
+  .seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); font-weight: 600; }
+  .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .grp { margin-top: 4px; }
+  .grp + .grp { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+  .grp-t { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 9px; }
+
+  .row { display: grid; grid-template-columns: 108px 26px minmax(0,1fr) 54px; gap: 9px; align-items: center; margin-bottom: 8px; }
+  .row.nocolor { grid-template-columns: 108px minmax(0,1fr) 54px; }
+  .row label { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row output { font-family: var(--mono); font-size: 11.5px; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+
+  input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; cursor: pointer; }
+  input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: var(--line); }
+  input[type="range"]::-moz-range-track { height: 4px; border-radius: 99px; background: var(--line); }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; margin-top: -5px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--panel); }
+  input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--panel); }
+  input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+
+  input[type="color"] { -webkit-appearance: none; appearance: none; width: 26px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: none; cursor: pointer; }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 3px; }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .toggle-row label { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+  .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; position: absolute; z-index: 1; }
+  .switch .track { position: absolute; inset: 0; background: var(--line); border-radius: 99px; transition: background .15s; }
+  .switch .thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+  .switch input:checked ~ .track { background: var(--accent); }
+  .switch input:checked ~ .thumb { transform: translateX(16px); }
+
+  .stops { display: flex; gap: 5px; margin-bottom: 4px; }
+  .stops span { flex: 1; height: 18px; border-radius: 4px; border: 1px solid var(--line-soft); }
+
+  .outwrap { margin-top: 20px; }
+  pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12px; line-height: 1.7; tab-size: 2; color: var(--ink); background: var(--chrome); border-top: 1px solid var(--line-soft); white-space: pre; }
+  .btn { appearance: none; cursor: pointer; border: 1px solid transparent; background: var(--accent); color: #fff; font-family: var(--sans); font-size: 12px; font-weight: 600; padding: 6px 13px; border-radius: 8px; }
+  .btn.ghost { background: transparent; color: var(--ink-2); border-color: var(--line); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hdbtns { display: flex; gap: 7px; align-items: center; }
+
+  .handoff { margin-top: 14px; padding: 12px 14px; border-radius: var(--r); border: 1px dashed var(--line); background: var(--chrome); font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
+  .handoff strong { color: var(--ink); font-weight: 600; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Demo Glow Tuner</h1>
+    <p class="sub">
+      Tunes the demo-mode screen-edge glow (<code>DemoModeBadge.jsx</code> in <code>frontend/src/components/</code>),
+      a diffused frame around the whole app rather than a hard blue line, without needing to describe "a bit more
+      spread" in words. Two looks: a flat breathing ring, or an Apple Intelligence-style rotating gradient. Move
+      things, then copy the block at the bottom back into the chat.
+    </p>
+  </header>
+
+  <div class="cols">
+    <!-- ══ LEFT: preview + verdict ══ -->
+    <div class="stack">
+      <section class="card">
+        <div class="hd"><h2>Preview (mock Control Tower behind the glow)</h2></div>
+        <div class="stage" id="stage">
+          <div class="stage-side" id="stageSide"></div>
+          <div class="stage-main">
+            <div class="stage-h1" id="stageH1">Inventory Dashboard</div>
+            <div class="stage-row">
+              <div class="stage-card" id="c1"><div class="stage-k">Total Inventory Value</div><div class="stage-v">SGD $3.71M</div></div>
+              <div class="stage-card" id="c2"><div class="stage-k">Stockout Risk</div><div class="stage-v" style="color:#ef4444">SGD $24.1K</div></div>
+            </div>
+            <div class="stage-card" id="c3" style="height:120px"></div>
+          </div>
+          <div class="glow" id="glow"><div class="glow-inner" id="glowInner"></div></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="hd"><h2>Cost check</h2></div>
+        <div class="bd">
+          <div class="verdict-row">
+            <div class="vbox">
+              <div class="k">Hosting / server load</div>
+              <div class="v" style="color:var(--pass)">None</div>
+            </div>
+            <div class="vbox">
+              <div class="k">What animates</div>
+              <div class="v" id="animTarget">opacity</div>
+            </div>
+          </div>
+          <p class="note" id="perfNote"></p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ══ RIGHT: controls ══ -->
+    <section class="card">
+      <div class="hd">
+        <h2>Controls</h2>
+        <div class="seg" id="styleSeg" role="group" aria-label="Glow style" style="width:160px"></div>
+      </div>
+      <div class="bd">
+        <div class="grp">
+          <div class="grp-t">Presets</div>
+          <div class="presets" id="presets"></div>
+        </div>
+
+        <div class="grp" id="flatShapeGrp">
+          <div class="grp-t">Shape, the fixed glow before any animation</div>
+          <div id="shapeRows"></div>
+        </div>
+        <div class="grp" id="gradShapeGrp" hidden>
+          <div class="grp-t">Shape, the fixed ring and gradient before rotation</div>
+          <div id="gradShapeRows"></div>
+        </div>
+
+        <div class="grp">
+          <div class="grp-t" id="breatheGrpT">Breathing</div>
+          <div class="toggle-row" id="animOnRow">
+            <label for="animOn">animate</label>
+            <span class="switch"><input type="checkbox" id="animOn" checked><span class="track"></span><span class="thumb"></span></span>
+          </div>
+          <div id="animRows"></div>
+          <div id="gradAnimRows" hidden></div>
+        </div>
+
+        <div class="grp" id="colorGrp">
+          <div class="grp-t">Colour &amp; theme</div>
+          <div id="colorRows"></div>
+        </div>
+        <div class="grp" id="stopsGrp" hidden>
+          <div class="grp-t">Colour &amp; theme</div>
+          <p class="note" style="margin-top:0">
+            Fixed to iOS's own system colour set for each mode, not an invented rainbow, so it reads as genuinely
+            Apple's rather than approximate.
+          </p>
+          <div class="stops" id="stopsLight"></div>
+          <div class="stops" id="stopsDark"></div>
+          <div class="toggle-row">
+            <label for="themeOnGrad">preview dark ground</label>
+            <span class="switch"><input type="checkbox" id="themeOnGrad"><span class="track"></span><span class="thumb"></span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ══ OUTPUT ══ -->
+  <section class="card outwrap">
+    <div class="hd">
+      <h2>Generated CSS, replace the glow block in DemoModeBadge.jsx</h2>
+      <div class="hdbtns">
+        <button class="btn ghost" id="resetBtn" type="button">Reset</button>
+        <button class="btn" id="copyBtn" type="button">Copy CSS</button>
+      </div>
+    </div>
+    <pre id="out"></pre>
+    <div class="bd" style="padding-top:0">
+      <div class="handoff">
+        <strong>Handing it back:</strong> paste this block into the chat. It's the exact JSX to drop into
+        <code>DemoModeBadge.jsx</code>'s glow section.
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var KEY = "stocksense-demo-glow-tuner-v2";
+
+  // iOS's own system colour sets, matching what's actually shipped in
+  // DemoModeBadge.jsx - not exposed as pickers, since the point is these are
+  // Apple's real palette, not a designer's guess at "rainbow."
+  var GLOW_STOPS = {
+    light: ["#007AFF", "#AF52DE", "#FF2D55", "#FF9500", "#FFCC00", "#34C759", "#5AC8FA", "#007AFF"],
+    dark:  ["#0A84FF", "#BF5AF2", "#FF375F", "#FF9F0A", "#FFD60A", "#32D74B", "#64D2FF", "#0A84FF"]
+  };
+
+  var DEFAULTS = {
+    theme: "light",
+    style: "gradient", // "flat" | "gradient" - which look is on top
+    color: "#2563eb",
+    ring: 3, blur: 34, spread: 6, baseA: 0.16, peakA: 0.42, duration: 3.6, animate: true,
+    gRing: 1.5, gBlur: 18, gRotate: 9, gBaseA: 0.55, gPeakA: 0.9, gBreathe: 5
+  };
+
+  var PRESETS = {
+    flat: {
+      "As shipped (static)": { ring: 3, blur: 28, spread: 2, baseA: 0.35, peakA: 0.35, duration: 3.6, animate: false },
+      "Diffused, breathing": { ring: 2, blur: 34, spread: 6, baseA: 0.16, peakA: 0.42, duration: 3.6, animate: true },
+      "Barely there":        { ring: 1, blur: 46, spread: 10, baseA: 0.08, peakA: 0.20, duration: 5.5, animate: true },
+      "Unmissable":          { ring: 4, blur: 40, spread: 14, baseA: 0.30, peakA: 0.60, duration: 2.4, animate: true }
+    },
+    gradient: {
+      "As shipped":         { gRing: 1.5, gBlur: 18, gRotate: 9, gBaseA: 0.55, gPeakA: 0.9, gBreathe: 5 },
+      "Slower, subtler":    { gRing: 1,   gBlur: 26, gRotate: 16, gBaseA: 0.3, gPeakA: 0.55, gBreathe: 8 },
+      "Fast, vivid":        { gRing: 2.5, gBlur: 12, gRotate: 5, gBaseA: 0.7, gPeakA: 1, gBreathe: 3 },
+      "Barely there":       { gRing: 1,   gBlur: 30, gRotate: 20, gBaseA: 0.15, gPeakA: 0.35, gBreathe: 9 }
+    }
+  };
+
+  var state = load();
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function load() {
+    var base = clone(DEFAULTS);
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return base;
+      var saved = JSON.parse(raw);
+      Object.keys(base).forEach(function (k) { if (saved[k] !== undefined) base[k] = saved[k]; });
+    } catch (e) { /* private mode, blocked storage: defaults are fine */ }
+    return base;
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* non-fatal */ } }
+
+  function hexToRgb(hex) {
+    var h = hex.replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  function rgba(hex, a) { var c = hexToRgb(hex); return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + round2(a) + ")"; }
+  function round2(n) { return Math.round(n * 100) / 100; }
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function sliderRow(parent, opts) {
+    var row = document.createElement("div");
+    row.className = "row" + (opts.color === undefined ? " nocolor" : "");
+    var lab = document.createElement("label");
+    lab.textContent = opts.label; lab.setAttribute("for", opts.id);
+    row.appendChild(lab);
+    var rng = document.createElement("input");
+    rng.type = "range"; rng.id = opts.id;
+    rng.min = opts.min; rng.max = opts.max; rng.step = opts.step;
+    rng.addEventListener("input", function () { opts.onValue(parseFloat(rng.value)); });
+    row.appendChild(rng);
+    var out = document.createElement("output"); out.setAttribute("for", opts.id);
+    row.appendChild(out);
+    parent.appendChild(row);
+    return { range: rng, out: out };
+  }
+
+  var shapeRefs = {}, animRefs = {}, gradShapeRefs = {}, gradAnimRefs = {};
+
+  shapeRefs.ring = sliderRow($("shapeRows"), { id: "ring", label: "ring", min: 0, max: 8, step: 0.5, onValue: function (v) { state.ring = v; apply(); } });
+  shapeRefs.blur = sliderRow($("shapeRows"), { id: "blur", label: "diffusion", min: 0, max: 90, step: 1, onValue: function (v) { state.blur = v; apply(); } });
+  shapeRefs.spread = sliderRow($("shapeRows"), { id: "spread", label: "thickness", min: 0, max: 40, step: 1, onValue: function (v) { state.spread = v; apply(); } });
+
+  animRefs.baseA = sliderRow($("animRows"), { id: "baseA", label: "opacity min", min: 0, max: 1, step: 0.01, onValue: function (v) { state.baseA = v; apply(); } });
+  animRefs.peakA = sliderRow($("animRows"), { id: "peakA", label: "opacity max", min: 0, max: 1, step: 0.01, onValue: function (v) { state.peakA = v; apply(); } });
+  animRefs.duration = sliderRow($("animRows"), { id: "duration", label: "cycle length", min: 1, max: 8, step: 0.1, onValue: function (v) { state.duration = v; apply(); } });
+
+  gradShapeRefs.ring = sliderRow($("gradShapeRows"), { id: "gRing", label: "ring", min: 0, max: 6, step: 0.5, onValue: function (v) { state.gRing = v; apply(); } });
+  gradShapeRefs.blur = sliderRow($("gradShapeRows"), { id: "gBlur", label: "diffusion", min: 0, max: 60, step: 1, onValue: function (v) { state.gBlur = v; apply(); } });
+  gradShapeRefs.rotate = sliderRow($("gradShapeRows"), { id: "gRotate", label: "rotation speed", min: 2, max: 30, step: 0.5, onValue: function (v) { state.gRotate = v; apply(); } });
+
+  gradAnimRefs.baseA = sliderRow($("gradAnimRows"), { id: "gBaseA", label: "opacity min", min: 0, max: 1, step: 0.01, onValue: function (v) { state.gBaseA = v; apply(); } });
+  gradAnimRefs.peakA = sliderRow($("gradAnimRows"), { id: "gPeakA", label: "opacity max", min: 0, max: 1, step: 0.01, onValue: function (v) { state.gPeakA = v; apply(); } });
+  gradAnimRefs.breathe = sliderRow($("gradAnimRows"), { id: "gBreathe", label: "breathe length", min: 1, max: 12, step: 0.1, onValue: function (v) { state.gBreathe = v; apply(); } });
+
+  $("animOn").addEventListener("change", function () { state.animate = $("animOn").checked; apply(); });
+
+  var colorRow = document.createElement("div");
+  colorRow.className = "row";
+  colorRow.innerHTML = '<label for="colorPick">colour</label>';
+  var colorPick = document.createElement("input");
+  colorPick.type = "color"; colorPick.id = "colorPick";
+  colorPick.addEventListener("input", function () { state.color = colorPick.value; apply(); });
+  colorRow.appendChild(colorPick);
+  var colorSpacer = document.createElement("div");
+  var colorOut = document.createElement("output");
+  colorRow.appendChild(colorSpacer); colorRow.appendChild(colorOut);
+  $("colorRows").appendChild(colorRow);
+
+  var themeRow = document.createElement("div");
+  themeRow.className = "toggle-row";
+  themeRow.innerHTML = '<label for="themeOn">preview dark ground</label>';
+  var themeSwitch = document.createElement("span");
+  themeSwitch.className = "switch";
+  themeSwitch.innerHTML = '<input type="checkbox" id="themeOn"><span class="track"></span><span class="thumb"></span>';
+  themeRow.appendChild(themeSwitch);
+  $("colorRows").appendChild(themeRow);
+  $("themeOn").addEventListener("change", function () { state.theme = $("themeOn").checked ? "dark" : "light"; apply(); });
+  $("themeOnGrad").addEventListener("change", function () { state.theme = $("themeOnGrad").checked ? "dark" : "light"; apply(); });
+
+  GLOW_STOPS.light.slice(0, -1).forEach(function (c) {
+    var s = document.createElement("span"); s.style.background = c; $("stopsLight").appendChild(s);
+  });
+  GLOW_STOPS.dark.slice(0, -1).forEach(function (c) {
+    var s = document.createElement("span"); s.style.background = c; $("stopsDark").appendChild(s);
+  });
+
+  function buildSeg(host, items, getActive, onPick) {
+    host.innerHTML = "";
+    items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = it.label;
+      b.setAttribute("aria-pressed", String(getActive() === it.id));
+      b.addEventListener("click", function () { onPick(it.id); });
+      host.appendChild(b);
+    });
+  }
+  function refreshStyleSeg() {
+    buildSeg($("styleSeg"), [{ id: "flat", label: "Flat" }, { id: "gradient", label: "Gradient" }],
+      function () { return state.style; },
+      function (id) { state.style = id; apply(); });
+  }
+
+  function renderPresets() {
+    var host = $("presets"); host.innerHTML = "";
+    Object.keys(PRESETS[state.style]).forEach(function (name) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "preset"; b.textContent = name;
+      b.addEventListener("click", function () {
+        var p = PRESETS[state.style][name];
+        Object.keys(p).forEach(function (k) { state[k] = p[k]; });
+        apply();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  $("resetBtn").addEventListener("click", function () { var s = state.style; state = clone(DEFAULTS); state.style = s; apply(); });
+
+  $("copyBtn").addEventListener("click", function () {
+    var text = $("out").textContent;
+    var done = function () {
+      var b = $("copyBtn"); var old = b.textContent;
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = old; }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else { fallback(); }
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { /* user can select manually */ }
+      document.body.removeChild(ta);
+    }
+  });
+
+  var styleTag = document.createElement("style");
+  document.head.appendChild(styleTag);
+
+  function apply() {
+    refreshStyleSeg();
+    renderPresets();
+
+    var dark = state.theme === "dark";
+    var gradient = state.style === "gradient";
+
+    var stage = $("stage");
+    stage.style.background = dark ? "#0d1117" : "#f3f4f6";
+    $("stageSide").style.borderColor = dark ? "#2a3340" : "#e5e7eb";
+    ["c1", "c2", "c3"].forEach(function (id) {
+      $(id).style.background = dark ? "#1a212c" : "#ffffff";
+      $(id).style.borderColor = dark ? "#2a3340" : "#e5e7eb";
+      $(id).style.color = dark ? "#eef1f6" : "#111827";
+    });
+    $("stageH1").style.color = dark ? "#eef1f6" : "#111827";
+    var side = $("stageSide"); side.innerHTML = "";
+    var sideAccent = gradient ? GLOW_STOPS[state.theme][0] : state.color;
+    for (var i = 0; i < 5; i++) {
+      var sw = document.createElement("div");
+      sw.className = "sw" + (i === 0 ? " active" : "");
+      sw.style.background = i === 0 ? sideAccent : (dark ? "#2a3340" : "#e5e7eb");
+      side.appendChild(sw);
+    }
+
+    var glow = $("glow"), glowInner = $("glowInner");
+    var keyframes = "";
+
+    if (gradient) {
+      glow.style.padding = state.gRing + "px";
+      glow.style.WebkitMask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)";
+      glow.style.webkitMaskComposite = "xor";
+      glow.style.mask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)";
+      glow.style.maskComposite = "exclude";
+      glow.style.boxShadow = "none";
+      glow.style.opacity = "";
+      glow.style.animation = "demoGlowBreatheG " + state.gBreathe + "s ease-in-out infinite";
+
+      glowInner.style.display = "block";
+      glowInner.style.background = "conic-gradient(from 0deg, " + GLOW_STOPS[state.theme].join(", ") + ")";
+      glowInner.style.filter = "blur(" + state.gBlur + "px)";
+      glowInner.style.animation = "demoGlowRotate " + state.gRotate + "s linear infinite";
+
+      keyframes =
+        "@keyframes demoGlowRotate { to { transform: rotate(360deg); } }\n" +
+        "@keyframes demoGlowBreatheG { 0%, 100% { opacity: " + state.gBaseA + "; } 50% { opacity: " + state.gPeakA + "; } }";
+    } else {
+      glow.style.padding = "0";
+      glow.style.WebkitMask = "none"; glow.style.mask = "none";
+      glowInner.style.display = "none"; glowInner.style.animation = "none";
+
+      var shapeShadow = "inset 0 0 0 " + state.ring + "px COLOR, inset 0 0 " + state.blur + "px " + state.spread + "px COLOR";
+      glow.style.boxShadow = shapeShadow.split("COLOR").join(rgba(state.color, 1));
+      glow.style.opacity = state.animate ? "" : String(state.peakA);
+      glow.style.animation = state.animate ? "demoGlowBreathe " + state.duration + "s ease-in-out infinite" : "none";
+
+      keyframes = "@keyframes demoGlowBreathe { 0%, 100% { opacity: " + state.baseA + "; } 50% { opacity: " + state.peakA + "; } }";
+    }
+    styleTag.textContent = keyframes;
+
+    // group visibility
+    $("flatShapeGrp").hidden = gradient;
+    $("gradShapeGrp").hidden = !gradient;
+    $("colorGrp").hidden = gradient;
+    $("stopsGrp").hidden = !gradient;
+    $("animRows").hidden = gradient;
+    $("animOnRow").hidden = gradient;
+    $("gradAnimRows").hidden = !gradient;
+    $("breatheGrpT").textContent = gradient ? "Breathing (rotation is always on)" : "Breathing";
+
+    // sync controls
+    shapeRefs.ring.range.value = state.ring; shapeRefs.ring.out.textContent = state.ring + "px";
+    shapeRefs.blur.range.value = state.blur; shapeRefs.blur.out.textContent = state.blur + "px";
+    shapeRefs.spread.range.value = state.spread; shapeRefs.spread.out.textContent = state.spread + "px";
+    animRefs.baseA.range.value = state.baseA; animRefs.baseA.out.textContent = round2(state.baseA).toFixed(2);
+    animRefs.peakA.range.value = state.peakA; animRefs.peakA.out.textContent = round2(state.peakA).toFixed(2);
+    animRefs.duration.range.value = state.duration; animRefs.duration.out.textContent = state.duration.toFixed(1) + "s";
+    $("animOn").checked = state.animate;
+    colorPick.value = state.color; colorOut.textContent = state.color;
+    $("themeOn").checked = dark;
+    $("themeOnGrad").checked = dark;
+
+    gradShapeRefs.ring.range.value = state.gRing; gradShapeRefs.ring.out.textContent = state.gRing + "px";
+    gradShapeRefs.blur.range.value = state.gBlur; gradShapeRefs.blur.out.textContent = state.gBlur + "px";
+    gradShapeRefs.rotate.range.value = state.gRotate; gradShapeRefs.rotate.out.textContent = state.gRotate.toFixed(1) + "s";
+    gradAnimRefs.baseA.range.value = state.gBaseA; gradAnimRefs.baseA.out.textContent = round2(state.gBaseA).toFixed(2);
+    gradAnimRefs.peakA.range.value = state.gPeakA; gradAnimRefs.peakA.out.textContent = round2(state.gPeakA).toFixed(2);
+    gradAnimRefs.breathe.range.value = state.gBreathe; gradAnimRefs.breathe.out.textContent = state.gBreathe.toFixed(1) + "s";
+
+    $("animTarget").textContent = gradient ? "transform + opacity (cheap)" : (state.animate ? "opacity (cheap)" : "nothing (static)");
+
+    $("perfNote").innerHTML = gradient
+      ? "<strong>Zero hosting cost</strong>: pure client-side CSS, never touches the API, database or the Lightsail " +
+        "container. The rotating gradient, the mask and the blur are all static once drawn; only <strong>transform</strong> " +
+        "(the rotation) and <strong>opacity</strong> (the breathe) animate, the two properties a browser composites on the " +
+        "GPU with no repaint or layout, so this costs the same per frame as the flat version despite looking more " +
+        "elaborate. The mask itself (two gradient layers, XOR'd) is the standard \"gradient border\" CSS trick, not " +
+        "something bespoke or expensive."
+      : "<strong>Zero hosting cost</strong>: this is pure client-side CSS on an element already in the page; " +
+        "it never calls the API, the database, or the Lightsail container, so it can't add server load no matter " +
+        "how it's tuned. The only real cost is on the visitor's own device, and it's kept near-zero by animating " +
+        "<strong>opacity only</strong>: the diffused shape (ring, diffusion, thickness) is fixed once drawn, and " +
+        "opacity is one of the few CSS properties a browser can animate on the compositor thread (no repaint, " +
+        "no layout, GPU-composited every frame). Animating the blur or spread values directly instead would force a " +
+        "repaint of the whole viewport-sized shadow on every frame, which is the actual industry line between a " +
+        "\"free\" pulsing indicator and a laggy one.";
+
+    $("out").textContent = emit();
+    save();
+  }
+
+  function emit() {
+    if (state.style === "gradient") {
+      return (
+        "// Paste into DemoModeBadge.jsx, replacing the existing glow section.\n" +
+        "// GLOW_STOPS goes at module scope (once), the rest replaces the {active && (...)} block.\n" +
+        "const GLOW_STOPS = {\n" +
+        "  light: \"" + GLOW_STOPS.light.join(", ") + "\",\n" +
+        "  dark:  \"" + GLOW_STOPS.dark.join(", ") + "\",\n" +
+        "};\n\n" +
+        "<style>{`\n" +
+        "  @keyframes demoGlowRotate { to { transform: rotate(360deg); } }\n" +
+        "  @keyframes demoGlowBreathe { 0%, 100% { opacity: " + state.gBaseA + "; } 50% { opacity: " + state.gPeakA + "; } }\n" +
+        "`}</style>\n" +
+        "<div aria-hidden=\"true\" style={{\n" +
+        "  position: \"fixed\", inset: 0, zIndex: 199, pointerEvents: \"none\",\n" +
+        "  padding: " + state.gRing + ",\n" +
+        "  WebkitMask: \"linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)\",\n" +
+        "  WebkitMaskComposite: \"xor\",\n" +
+        "  mask: \"linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)\",\n" +
+        "  maskComposite: \"exclude\",\n" +
+        "  overflow: \"hidden\",\n" +
+        "  animation: \"demoGlowBreathe " + state.gBreathe + "s ease-in-out infinite\",\n" +
+        "}}>\n" +
+        "  <div style={{\n" +
+        "    position: \"absolute\", inset: \"-50%\",\n" +
+        "    background: `conic-gradient(from 0deg, ${GLOW_STOPS[resolved]})`,\n" +
+        "    filter: \"blur(" + state.gBlur + "px)\",\n" +
+        "    animation: \"demoGlowRotate " + state.gRotate + "s linear infinite\",\n" +
+        "  }} />\n" +
+        "</div>"
+      );
+    }
+    var shapeShadow = "inset 0 0 0 " + state.ring + "px " + rgba(state.color, 1) + ", inset 0 0 " + state.blur + "px " + state.spread + "px " + rgba(state.color, 1);
+    return (
+      "// Paste into DemoModeBadge.jsx, replacing the existing glow <div>'s style\n" +
+      "// and adding the keyframes once at module scope (or in index.css).\n" +
+      "<style>{`\n" +
+      "  @keyframes demoGlowBreathe {\n" +
+      "    0%, 100% { opacity: " + state.baseA + "; }\n" +
+      "    50% { opacity: " + state.peakA + "; }\n" +
+      "  }\n" +
+      "`}</style>\n" +
+      "<div aria-hidden=\"true\" style={{\n" +
+      "  position: \"fixed\", inset: 0, zIndex: 199, pointerEvents: \"none\",\n" +
+      "  boxShadow: \"" + shapeShadow + "\",\n" +
+      (state.animate
+        ? "  animation: \"demoGlowBreathe " + state.duration + "s ease-in-out infinite\",\n"
+        : "  opacity: " + state.peakA + ",\n") +
+      "}} />"
+    );
+  }
+
+  apply();
+})();
+</script>

@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Deliberately broken. Every defect below is one the audit must report. If a check stops
+     catching its defect, selftest.mjs fails. No lang, no title, no viewport meta: X2. -->
+<html>
+<body style="margin:0;font-family:sans-serif;background:#fff;color:#111">
+  <!-- L4 + L3 + L2: a fixed banner with a fixed height and a sentence too long for it, and a
+       fixed nav at top:0 that ignores the banner, so the two overlap and the banner overflows -->
+  <div id="banner" style="position:fixed;top:0;left:0;width:320px;height:30px;background:#fa0;z-index:10">
+    DEMO MODE. Sandbox data only, nothing here is real and nothing you do here touches the live database, ever.
+  </div>
+  <nav style="position:fixed;top:0;left:0;right:0;height:50px;background:#eee;z-index:5"><a href="#" style="padding:8px">Home</a> <a href="#">Reports</a></nav>
+
+  <main style="padding-top:20px">
+    <h1>Report</h1>
+    <!-- T1: 10px text -->
+    <p style="font-size:10px">Tiny footnote text that nobody can read on a phone.</p>
+    <!-- T2: light grey on white -->
+    <p style="color:#bbb">Low contrast paragraph that fails AA badly.</p>
+    <!-- I2: a button with no name and no text; I1: small targets -->
+    <button style="width:16px;height:16px"></button>
+    <button style="width:20px;height:20px;font-size:12px">x</button>
+    <!-- I2/I3: image with no alt and a broken src -->
+    <img src="missing-image.png" width="40" height="40">
+    <!-- X1: duplicate ids -->
+    <div id="dup">a</div><div id="dup">b</div>
+    <!-- L1 + L6: wider than the viewport -->
+    <div style="width:1500px;height:20px;background:#cde">a wide block (wider than any phone, and than the 980px a page without a viewport tag gets)</div>
+    <!-- L5: an overflow:hidden parent clipping a child that grew -->
+    <div style="height:30px;overflow:hidden;border:1px solid #999"><div style="height:80px">grown child</div></div>
+    <!-- K1: a focusable control with the focus ring removed -->
+    <button id="noring" style="outline:none;border:1px solid #999;background:#fff;padding:14px 20px">No focus ring</button>
+    <!-- T3: a forbidden dash -->
+    <p>Loading &mdash; please wait</p>
+  </main>
+</body>
+</html>

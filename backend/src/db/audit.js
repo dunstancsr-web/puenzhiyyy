@@ -24,9 +24,24 @@ const { getDb } = require("./init");
 const EVENTS = Object.freeze({
   SKU_CREATED: "SKU_CREATED",
   SKU_UPDATED: "SKU_UPDATED",
+  // RESTOCK is retired: the Control Tower's office restock was removed when the
+  // duties were separated (Reorder Loop step 7). Kept in the set so older rows
+  // still read and the constant never becomes an unknown string.
   RESTOCK: "RESTOCK",
+  // Reorder Loop step 7: the Control Tower's one write, a request to the buyer.
+  // Records intent, never a stock change.
+  ORDER_REQUESTED: "ORDER_REQUESTED",
+  // The follow-through on that request: a buyer marks it ordered (it became a
+  // real order) or cancelled. Still no stock change - stock only moves when the
+  // warehouse later receives against the resulting order.
+  ORDER_REQUEST_UPDATED: "ORDER_REQUEST_UPDATED",
+  // Onboarding's one-time starting count for a product that has no stock yet. Audited and
+  // recorded as its own movement type (OPENING), so it is never mistaken for a delivery.
+  OPENING_BALANCE_SET: "OPENING_BALANCE_SET",
   ALERT_TRIGGERED: "ALERT_TRIGGERED",
   ALERT_ACKNOWLEDGED: "ALERT_ACKNOWLEDGED",
+  // The undo for a dismissal: the alert is back in the list waiting for a decision.
+  ALERT_REOPENED: "ALERT_REOPENED",
   DECISION_RECORDED: "DECISION_RECORDED",
   // Switching into or out of the metered model tier is a spending decision, so
   // it is recorded like any other decision rather than living only in memory.
@@ -49,6 +64,9 @@ const EVENTS = Object.freeze({
   // sales_transactions. One row per import, not one per sales row, since the
   // import as a whole is the auditable act.
   SALES_HISTORY_IMPORTED: "SALES_HISTORY_IMPORTED",
+  // A person accepting, dismissing or withdrawing a market signal. Accepting
+  // changes the risk buffer the reorder point uses, so it is a decision.
+  SIGNAL_DECIDED: "SIGNAL_DECIDED",
 });
 
 // JSON.stringify can throw (circular refs) and can return undefined (for a bare
@@ -112,8 +130,10 @@ function readEvents({ eventType, skuId, limit } = {}) {
   const where = [];
   const params = {};
   if (eventType) {
-    where.push("a.event_type = @eventType");
-    params.eventType = eventType;
+    // One type, or several separated by commas (the History view asks for a whole category at once).
+    const types = String(eventType).split(",").map((t) => t.trim()).filter(Boolean);
+    where.push(`a.event_type IN (${types.map((_, i) => `@et${i}`).join(",")})`);
+    types.forEach((t, i) => { params[`et${i}`] = t; });
   }
   if (skuId) {
     where.push("a.sku_id = @skuId");
@@ -143,10 +163,12 @@ function readEvents({ eventType, skuId, limit } = {}) {
 
 // Counts per event type across the whole table (not just the returned page), so
 // the UI can show filter chips with real totals instead of counting a slice.
-function eventCounts() {
+// Counts per event type, for the filter chips. Scoped to a product when one is chosen, so a chip's number
+// matches what clicking it shows.
+function eventCounts({ skuId } = {}) {
   const rows = getDb()
-    .prepare(`SELECT event_type, COUNT(*) AS count FROM audit_log GROUP BY event_type`)
-    .all();
+    .prepare(`SELECT event_type, COUNT(*) AS count FROM audit_log ${skuId ? "WHERE sku_id = @skuId" : ""} GROUP BY event_type`)
+    .all(skuId ? { skuId } : {});
   return Object.fromEntries(rows.map((r) => [r.event_type, r.count]));
 }
 

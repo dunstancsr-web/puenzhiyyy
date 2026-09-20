@@ -365,13 +365,21 @@ check("forecast_holt_damped_seasonal_bounds", "MVP2 forecast engine", "every for
   },
 });
 
-check("risk_buffer_mt", "MVP2 risk buffer", "SUM(matching risk_events.buffer_days_add), capped at 30 days, x the demand rate in force", {
+// Written out here on purpose, not imported from the engine: "basmati" must not match "Non-Basmati".
+const isKind = (variety, term) => new RegExp(`(?<!non[- ])\\b${term}\\b`, "i").test(String(variety || ""));
+const inScope = (json, variety, want) => {
+  const list = json ? JSON.parse(json) : null;
+  return !list || !list.length || list.some((t) => isKind(variety, t)) === want;
+};
+
+check("risk_buffer_mt", "MVP2 risk buffer", "SUM(matching risk_events.buffer_days_add, honouring affects/excludes varieties), capped at 30 days, x the demand rate in force", {
   tol: 0.1,
   perSku: (s) => {
     const events = db.prepare(`
-      SELECT buffer_days_add FROM risk_events
+      SELECT buffer_days_add, affects_varieties, excludes_varieties FROM risk_events
        WHERE active = 1 AND ((country_of_origin IS NOT NULL AND country_of_origin = @o) OR (supplier IS NOT NULL AND supplier = @sup))`
-    ).all({ o: s.country_of_origin || null, sup: s.supplier || null });
+    ).all({ o: s.country_of_origin || null, sup: s.supplier || null })
+      .filter((e) => inScope(e.affects_varieties, s.rice_variety, true) && inScope(e.excludes_varieties, s.rice_variety, false));
     const days = Math.min(30, events.reduce((a, e) => a + e.buffer_days_add, 0));
     const rate = s.forecast_avg_daily_demand ?? s.avg_daily_usage_30d;
     return [round1(days * rate), s.risk_buffer_mt];

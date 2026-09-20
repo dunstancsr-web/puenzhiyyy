@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, LabelList, ReferenceLine,
 } from "recharts";
@@ -13,6 +14,8 @@ import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import { useCollapsed } from "../hooks/useCollapsed";
 import { api } from "../api/inventory";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
+import { isNudgePending, dismissForecastNudge } from "../lib/forecastNudge";
 
 // The hand-set PRIOR baseline that used to live here is GONE (TASK-85). It was
 // eight constants driving every trend arrow on this page, and the dashboard now
@@ -38,12 +41,12 @@ function delta(cur, prev, { higherIsBetter = true, unit = "", pp = false } = {})
   return { dir, good, text, diff };
 }
 
-const HEALTH_COLORS = { GREEN: "#22c55e", YELLOW: "#f59e0b", ORANGE: "#f97316", RED: "#ef4444" };
+const HEALTH_COLORS = { GREEN: "#22c55e", YELLOW: "#f59e0b", ORANGE: "#f97316", RED: "#dc2626" };
 const HEALTH_LABEL = { RED: "Critical", ORANGE: "Action", YELLOW: "Watch", GREEN: "Healthy" };
 // The same four colours as tokens. HEALTH_COLORS feeds Recharts, which needs a
 // resolved value; this feeds the tag pills in Needs Attention, which derive
 // their background by appending "-light" and therefore need the token form.
-const HEALTH_TOKEN = { RED: "var(--red)", ORANGE: "var(--orange)", YELLOW: "var(--yellow)", GREEN: "var(--green)" };
+const HEALTH_TOKEN = { RED: "var(--red)", ORANGE: "var(--orange-text)", YELLOW: "var(--yellow-text)", GREEN: "var(--green-text)" };
 
 // Movement axis of the ABC x movement matrix. Must mirror MOVEMENT_COLS in
 // backend/src/engines/segmentation.js - the cell keys are built from these.
@@ -214,7 +217,7 @@ function buildNeedsAttention(skus) {
         value: s.eo_value_risk_adjusted,
         valueLabel: "risk-adj. value",
         tag: "IDLE STOCK",
-        tagColor: "var(--yellow)",
+        tagColor: "var(--yellow-text)",
       });
     });
 
@@ -252,7 +255,7 @@ function buildNeedsAttention(skus) {
         value: s.available_qty * (s.unit_price_sgd - s.unit_cost_sgd),
         valueLabel: "margin exposed",
         tag: "REORDER",
-        tagColor: "var(--yellow)",
+        tagColor: "var(--yellow-text)",
       });
     });
 
@@ -269,7 +272,7 @@ function buildNeedsAttention(skus) {
         value: s.inventory_value,
         valueLabel: "inventory value",
         tag: "SLOW MOVING",
-        tagColor: "var(--yellow)",
+        tagColor: "var(--yellow-text)",
       });
     });
 
@@ -311,7 +314,7 @@ function buildNeedsAttention(skus) {
           value: s.eo_value_risk_adjusted || 0,
           valueLabel: "risk-adj. value",
           tag: "AGEING",
-          tagColor: "var(--yellow)",
+          tagColor: "var(--yellow-text)",
         });
       }
     });
@@ -366,7 +369,7 @@ function buildNoActionRows(skus, attention) {
       // raise a row for, and painting it green here would have this table
       // contradict the health chart that filtered into it.
       tag: HEALTH_LABEL[s.health_status]?.toUpperCase() || "NO EXCEPTION",
-      tagColor: HEALTH_TOKEN[s.health_status] || "var(--green)",
+      tagColor: HEALTH_TOKEN[s.health_status] || "var(--green-text)",
     }))
     .sort((a, b) => b.value - a.value);
 }
@@ -478,6 +481,14 @@ export default function Dashboard() {
   // ones. Same reasoning as showAllAttention above.
   const [attentionScope, setAttentionScope] = useState("exceptions");
 
+  // One-time nudge, armed by Onboarding.jsx (and "Try with sample data") the
+  // moment real data actually goes in. Read once on mount, not on every
+  // render, so dismissing it doesn't need to fight a value that recomputes
+  // from the same now-cleared flag a second later.
+  const [showNudge, setShowNudge] = useState(false);
+  useEffect(() => { setShowNudge(isNudgePending()); }, []);
+  const hideNudge = useCallback(() => { dismissForecastNudge(); setShowNudge(false); }, []);
+
   // Needs Attention now sits ABOVE the charts that filter it, so clicking a
   // health colour or a matrix cell changes something off screen. Scrolling the
   // table back into view is what keeps that feedback visible, and it is the
@@ -509,6 +520,16 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Picks up goods in and out from the handheld without a reload. Unlike load(),
+  // it keeps what is on screen and the chart filter.
+  useLiveRefresh(() => {
+    Promise.all([api.getSkus(), api.getDashboardStats(), api.getDashboardHistory(36)])
+      .then(([skusData, statsData, historyData]) => {
+        setSkus(skusData); setStats(statsData); setHistory(historyData);
+      })
+      .catch(() => {});
+  });
 
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!skus || !stats) return <LoadingState label="Loading dashboard…" />;
@@ -566,6 +587,38 @@ export default function Dashboard() {
         title="Inventory Dashboard"
         subtitle={`${new Date().toLocaleDateString("en-SG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} · ${s.totalSkus} active SKUs · data as of ${new Date(s.asOf).toLocaleTimeString("en-SG", { hour: "2-digit", minute: "2-digit" })}`}
       />
+
+      {showNudge && (
+        <div className="card" style={{
+          display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 14px", padding: "16px 20px",
+          marginBottom: "var(--space-4)", borderLeft: "3px solid var(--blue)",
+        }}>
+          <TrendingUp size={22} color="var(--blue)" style={{ flexShrink: 0 }} />
+          {/* 220px basis: below that width the text wraps onto its own line above the link, instead
+              of being squeezed into a column a few words wide beside it. */}
+          <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+            <div style={{ fontSize: "var(--text-base)", fontWeight: 700 }}>
+              Your data is in: see what it's telling us
+            </div>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 2 }}>
+              Forecast Overview shows the demand pattern found in what you just added, and what it suggests for reorder points.
+            </div>
+          </div>
+          <Link to="/forecast" onClick={hideNudge} style={{
+            fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue-text)",
+            textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
+            display: "inline-flex", alignItems: "center", minHeight: 44,
+          }}>
+            View Forecast →
+          </Link>
+          <button onClick={hideNudge} aria-label="Dismiss" className="hit-44-icon" style={{
+            background: "none", border: "none", cursor: "pointer", padding: 2,
+            color: "var(--text-muted)", flexShrink: 0, display: "flex",
+          }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* ── KEY METRICS ────────────────────────────────────────────────────
           Stan's name for this block, and the one to use when talking about it:
@@ -751,7 +804,7 @@ export default function Dashboard() {
           {filter && (
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600,
-              background: "var(--blue-light)", color: "var(--blue)", padding: "4px 10px 4px 12px",
+              background: "var(--blue-light)", color: "var(--blue-text)", padding: "4px 10px 4px 12px",
               borderRadius: 99, marginBottom: "var(--space-3)",
             }}>
               Filtering by {filterLabel(filter, skuIndex)}
@@ -784,7 +837,7 @@ export default function Dashboard() {
                     style={{
                       padding: "7px 16px", borderRadius: 99, cursor: "pointer",
                       border: "1px solid var(--blue)", background: "var(--blue-light)",
-                      color: "var(--blue)", fontSize: "var(--text-sm)", fontWeight: 600,
+                      color: "var(--blue-text)", fontSize: "var(--text-sm)", fontWeight: 600,
                     }}>
                     Show {filterSkuCount === 1 ? "it" : "them"} anyway
                   </button>
@@ -983,7 +1036,7 @@ function HeroChart({ history }) {
                 padding: "3px 9px", borderRadius: 99, cursor: "pointer",
                 border: `1px solid ${on ? "var(--blue)" : "var(--border)"}`,
                 background: on ? "var(--blue-light)" : "transparent",
-                color: on ? "var(--blue)" : "var(--text-muted)",
+                color: on ? "var(--blue-text)" : "var(--text-muted)",
                 fontSize: "var(--text-xs)", fontWeight: on ? 700 : 500,
               }}>
               {w.label}
@@ -1085,18 +1138,18 @@ const MONTH_LABEL = (m) =>
 function HealthStack({ data, selected, onSelect }) {
   return (
     <div>
-      <div style={{ display: "flex", height: 34, borderRadius: 6, overflow: "hidden", gap: 2 }}>
+      <div className="health-stack" style={{ display: "flex", height: 34, borderRadius: 6, overflow: "hidden", gap: 2 }}>
         {data.filter((d) => d.pct > 0).map((d) => (
           <HoverHint key={d.status} content={`${HEALTH_LABEL[d.status]}: ${fmt$(d.value)} · ${d.pct}% · ${d.count} SKU${d.count === 1 ? "" : "s"} - click to filter`}>
-            <button type="button" onClick={() => onSelect(d.status)}
+            <button type="button" className="touch-44" onClick={() => onSelect(d.status)}
               aria-label={`${HEALTH_LABEL[d.status]}: ${d.pct}% of inventory value`}
               style={{
                 width: `${d.pct}%`, background: HEALTH_COLORS[d.status], border: "none", cursor: "pointer", padding: 0,
-                outline: selected === d.status ? "2px solid var(--text-primary)" : "none", outlineOffset: -2,
+                outline: selected === d.status ? "2px solid var(--text-primary)" : undefined, outlineOffset: -2,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 opacity: selected && selected !== d.status ? 0.55 : 1,
               }}>
-              {d.pct > 12 && <span style={{ color: "#fff", fontSize: "var(--text-xs)", fontWeight: 700 }}>{d.pct}%</span>}
+              {d.pct > 12 && <span style={{ color: d.status === "RED" ? "#fff" : "#1f2937", fontSize: "var(--text-xs)", fontWeight: 700 }}>{d.pct}%</span>}
             </button>
           </HoverHint>
         ))}
@@ -1162,7 +1215,7 @@ function AbcMovementMatrix({ matrix, selected, onSelect }) {
                     <div style={{ fontSize: "var(--text-base)", fontWeight: 800, color: cell.count ? "var(--text-primary)" : "var(--text-muted)" }}>
                       {cell.count}
                     </div>
-                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{cell.value > 0 ? fmt$(cell.value) : "-"}</div>
+                    <div style={{ fontSize: "var(--text-xs)", color: cell.value > 0 ? "var(--text-primary)" : "var(--text-muted)" }}>{cell.value > 0 ? fmt$(cell.value) : "-"}</div>
                   </button>
                 </HoverHint>
               );
@@ -1213,7 +1266,7 @@ function CoverageBullets({ data, selected, onSelect }) {
           : `${gap}d buffer`;
         return (
           <HoverHint key={d.sku_id} content={`${d.name}: ${d.coverage}d cover vs ${d.threshold}d lead+safety - ${gapText}${d.onOrder > 0 ? ` · ${d.onOrder} MT on order (ETA ${d.eta}d)` : ""}`}>
-            <button type="button" onClick={() => onSelect(d.sku_id)}
+            <button type="button" className="touch-44" onClick={() => onSelect(d.sku_id)}
               aria-label={`${d.name}: ${d.coverage} days of cover vs ${d.threshold} days needed`}
               style={{
                 display: "grid", gridTemplateColumns: "128px 1fr 68px", gap: "var(--space-3)", alignItems: "center",
@@ -1281,7 +1334,7 @@ function RevealButton({ showAll, count, onToggle, floating = false }) {
         background: "var(--card-bg)",
         border: "1px solid var(--border)",
         borderRadius: 99, cursor: "pointer",
-        color: "var(--blue)", fontSize: "var(--text-sm)", fontWeight: 600,
+        color: "var(--blue-text)", fontSize: "var(--text-sm)", fontWeight: 600,
         // Floating needs the shadow to read as ABOVE the row it covers rather
         // than as another faded table element.
         boxShadow: floating ? "var(--shadow-md)" : "none",
@@ -1326,7 +1379,7 @@ function ScopeToggle({ value, onChange, counts }) {
               padding: "3px 10px", borderRadius: 99, cursor: "pointer", whiteSpace: "nowrap",
               border: `1px solid ${on ? "var(--blue)" : "var(--border)"}`,
               background: on ? "var(--blue-light)" : "transparent",
-              color: on ? "var(--blue)" : "var(--text-muted)",
+              color: on ? "var(--blue-text)" : "var(--text-muted)",
               fontSize: "var(--text-xs)", fontWeight: on ? 700 : 500,
             }}>
             {o.label}
@@ -1375,7 +1428,7 @@ function Section({ title, subtitle, children, hint, badge = null, badgeTone = nu
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
         {actions && open && actions}
         {collapsible && (
-          <button type="button" onClick={() => setStoredOpen((v) => !v)} aria-expanded={open}
+          <button type="button" className="hit-44-icon" onClick={() => setStoredOpen((v) => !v)} aria-expanded={open}
             aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
             style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", padding: 2, flexShrink: 0 }}>
             <ChevronDown size={15} style={{ transform: open ? "none" : "rotate(-90deg)", transition: "transform 0.15s" }} />

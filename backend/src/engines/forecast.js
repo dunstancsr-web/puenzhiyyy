@@ -109,10 +109,17 @@ function linearTrendForecast(series, targetPeriods) {
   // A month with a zero seasonal baseline (never sold in that calendar month)
   // would divide the series by zero; floor it at 1 rather than skip the
   // point, since a deseasonalized ratio of "qty / 1" still fits the trend
-  // line sensibly for an otherwise-idle month.
+  // line sensibly for an otherwise-idle month. seasonalBaseline is also
+  // called for TARGET (future) months below, which byMonth was never built
+  // from — with under ~12 months of history, every target month is one of
+  // these and byMonth.get(m) is undefined, not just empty; that undefined
+  // case crashed here (TypeError on .reduce) until this fallback to the
+  // series' own overall average, same one naiveSeasonalForecast already uses
+  // for the identical "month never seen" case a few lines up.
+  const overallAvg = series.length ? series.reduce((s, r) => s + r.qty, 0) / series.length : 0;
   const seasonalBaseline = (m) => {
     const values = byMonth.get(m);
-    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const avg = values?.length ? values.reduce((a, b) => a + b, 0) / values.length : overallAvg;
     return avg > 0 ? avg : 1;
   };
 

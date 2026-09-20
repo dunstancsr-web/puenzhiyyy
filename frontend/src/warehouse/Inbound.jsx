@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/inventory";
 import Login from "./Login";
-import { HandheldHeader, Instruction, Keypad, Fact, HowThisWorks, FloorError } from "./Handheld";
+import { HandheldHeader, Instruction, Keypad, Fact, HowThisWorks, FloorError, JoinDemo } from "./Handheld";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GOODS IN: RECEIVING (TASK-47)
@@ -63,6 +63,7 @@ export default function Inbound() {
   const [reason, setReason] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [needsDemo, setNeedsDemo] = useState(false);
   const [receipt, setReceipt] = useState(null);
 
   const loadDeliveries = useCallback(() => {
@@ -72,7 +73,7 @@ export default function Inbound() {
 
   useEffect(() => { if (operator) loadDeliveries(); }, [operator, loadDeliveries]);
 
-  if (!operator) return <Login purpose="receiving" onSignedIn={setOperator} />;
+  if (!operator) return <Login purpose="receiving" duty="receipt" onSignedIn={setOperator} />;
 
   const reset = () => {
     setPo(null); setScan(""); setQty(""); setReason(""); setError(null); setReceipt(null); setStep(1);
@@ -90,6 +91,7 @@ export default function Inbound() {
   const confirm = async () => {
     setBusy(true);
     setError(null);
+    setNeedsDemo(false);
     try {
       const out = await api.receiveGoods({
         po_number: po.po_number,
@@ -100,6 +102,7 @@ export default function Inbound() {
       setReceipt(out);
     } catch (e) {
       setError(e.message);
+      setNeedsDemo(!!e.needsDemo);
     } finally {
       setBusy(false);
     }
@@ -309,7 +312,7 @@ export default function Inbound() {
             </div>
 
             {wrong && (
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginTop: 9, lineHeight: 1.5 }}>
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--red-text)", marginTop: 9, lineHeight: 1.5 }}>
                 That code is not {po.sku_id}. If the pallet really is a different product, go back and
                 pick the delivery that matches it.
               </div>
@@ -428,7 +431,7 @@ export default function Inbound() {
                     minHeight: 48, fontSize: "var(--text-sm)", textAlign: "left", padding: "0 14px",
                     borderColor: reason === r ? "var(--blue)" : "var(--border)",
                     background: reason === r ? "var(--blue-light)" : "var(--card-bg)",
-                    color: reason === r ? "var(--blue)" : "var(--text-primary)",
+                    color: reason === r ? "var(--blue-text)" : "var(--text-primary)",
                   }}>
                   {r}
                 </button>
@@ -441,6 +444,7 @@ export default function Inbound() {
         )}
 
         <FloorError message={error} />
+        <JoinDemo show={needsDemo} />
 
         <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
           <button className="hh-tap hh-tap--primary" disabled={!canConfirm} onClick={confirm}>

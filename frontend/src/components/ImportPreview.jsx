@@ -17,7 +17,7 @@ import { AlertTriangle, Check, ChevronRight } from "lucide-react";
 export function ImportPreview({ preview }) {
   if (preview.dataset === "salesHistory") return <SalesHistoryPreview preview={preview} />;
 
-  const { fileName, rows, changed, unchanged, errors, warnings, ignoredColumns } = preview;
+  const { fileName, rows, changed, unchanged, errors, warnings, warningBody, ignoredColumns } = preview;
   const halt = errors.length > 0;
 
   return (
@@ -49,7 +49,7 @@ export function ImportPreview({ preview }) {
 
       {warnings?.length > 0 && (
         <Panel tone="warn" icon={AlertTriangle} title="Worth checking, but not blocking"
-          body="These rows can be saved. The newest month no longer matches the stock recorded as being on hand today, which is expected if you are correcting the months first and the position afterwards.">
+          body={warningBody || "These rows can be saved. The newest month no longer matches the stock recorded as being on hand today, which is expected if you are correcting the months first and the position afterwards."}>
           <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: "var(--text-sm)", lineHeight: 1.6 }}>
             {warnings.slice(0, 8).map((w, i) => <li key={i}>{w}</li>)}
           </ul>
@@ -81,9 +81,25 @@ export function ImportPreview({ preview }) {
                   <code style={{ fontFamily: "ui-monospace, Menlo, monospace", color: "var(--text-muted)" }}>{field}</code>
                   <span style={{ textDecoration: "line-through", opacity: 0.7 }}>{String(d.from) || "empty"}</span>
                   <ChevronRight size={12} style={{ color: "var(--text-muted)" }} />
-                  <b style={{ color: "var(--blue)" }}>{String(d.to)}</b>
+                  <b style={{ color: "var(--blue-text)" }}>{String(d.to)}</b>
                 </div>
               ))}
+              {/* New products only (c.assumed is undefined on an update row):
+                  the two fields left blank get a non-zero default rather than
+                  0, so it's shown here as an assumption, not left silent - see
+                  ASSUMPTION_LABELS, backend/src/routes/inventory.js. */}
+              {c.assumed?.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                  {c.assumed.map((a) => (
+                    <span key={a} style={{
+                      fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--yellow)",
+                      background: "var(--yellow-light)", borderRadius: 99, padding: "2px 8px",
+                    }}>
+                      Assumed {a}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -105,7 +121,7 @@ export function ImportPreview({ preview }) {
 // this would mean showing every new row as N empty-to-value diffs, which is
 // noise, not review.
 export function SalesHistoryPreview({ preview }) {
-  const { fileName, rows, changed, errors, unknownSkus, dateRange, skuBreakdown, ignoredColumns } = preview;
+  const { fileName, rows, changed, errors, unknownSkus, dateRange, skuBreakdown, sampleRows, sampleRowsTruncated, ignoredColumns } = preview;
   const halt = errors.length > 0;
 
   return (
@@ -168,6 +184,48 @@ export function SalesHistoryPreview({ preview }) {
               </div>
             ))}
           </div>
+
+          {sampleRows?.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-muted)", marginBottom: 8 }}>
+                {sampleRowsTruncated ? `Earliest 5 and latest 5 of ${changed} rows` : "Every row"}
+              </div>
+              <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden", fontSize: "var(--text-xs)" }}>
+                <div style={{
+                  display: "flex", gap: 12, padding: "6px 13px",
+                  borderBottom: "1px solid var(--border)", background: "var(--surface-2)",
+                  color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em",
+                }}>
+                  <span style={{ minWidth: 78 }}>Date</span>
+                  <span style={{ minWidth: 90 }}>SKU</span>
+                  <span style={{ minWidth: 56 }}>Qty</span>
+                  <span>Channel</span>
+                </div>
+                {sampleRows.map((r, i) => (
+                  <React.Fragment key={`${r.sku_id}-${r.sale_date}-${i}`}>
+                    {/* A blank divider row marks the jump from the earliest 5
+                        to the latest 5, so it doesn't read as one continuous
+                        run of consecutive dates. */}
+                    {sampleRowsTruncated && i === 5 && (
+                      <div style={{ padding: "4px 13px", color: "var(--text-muted)", background: "var(--surface-2)", textAlign: "center" }}>
+                        ⋯
+                      </div>
+                    )}
+                    <div style={{
+                      display: "flex", gap: 12, padding: "8px 13px",
+                      borderBottom: i === sampleRows.length - 1 ? "none" : "1px solid var(--border)",
+                      color: "var(--text-secondary)",
+                    }}>
+                      <span style={{ color: "var(--text-muted)", minWidth: 78 }}>{r.sale_date}</span>
+                      <span style={{ fontWeight: 600, color: "var(--text-primary)", minWidth: 90 }}>{r.sku_id}</span>
+                      <span style={{ minWidth: 56 }}>{r.quantity_mt} MT</span>
+                      <span style={{ color: "var(--text-muted)" }}>{r.channel}{r.status === "lost" ? " · lost" : ""}</span>
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -181,7 +239,7 @@ export function SalesHistoryPreview({ preview }) {
 }
 
 export function Stat({ n, label, tone }) {
-  const color = tone === "bad" ? "var(--red)" : tone === "blue" ? "var(--blue)" : "var(--text-muted)";
+  const color = tone === "bad" ? "var(--red)" : tone === "blue" ? "var(--blue-text)" : "var(--text-muted)";
   return (
     <div style={{
       flex: "1 1 110px", padding: "10px 12px", borderRadius: "var(--radius)",
@@ -232,7 +290,7 @@ export function Toast({ tone, message, onDismiss }) {
       fontSize: "var(--text-sm)", fontWeight: 600,
       color: tone === "bad" ? "var(--red)" : "var(--text-primary)",
     }}>
-      {tone === "bad" ? <AlertTriangle size={15} /> : <Check size={15} style={{ color: "var(--green)" }} />}
+      {tone === "bad" ? <AlertTriangle size={15} /> : <Check size={15} style={{ color: "var(--green-text)" }} />}
       {message}
     </div>,
     document.body

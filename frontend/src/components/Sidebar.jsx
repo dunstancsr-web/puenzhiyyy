@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Bell, History, Home as HomeIcon } from "lucide-react";
+import { LayoutDashboard, TrendingUp, PackageSearch, Bell, Home as HomeIcon, Table2, Flame } from "lucide-react";
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 import EventCredit from "./EventCredit";
@@ -11,8 +11,17 @@ import AppMark from "./AppMark";
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTROL TOWER NAVIGATION (TASK-49)
 //
-// Two presentations of the same four destinations.
+// Two presentations of the same five destinations.
 //
+// Forecast was a fifth destination reachable only from a link on Inventory's
+// header for months: design.md called that deliberate, "MVP2 is still a
+// feature branch," pending Stan's own sign-off before committing to a
+// permanent 5th tab. He gave it (17 Sep), specifically alongside a decision
+// to route the actual approve/modify/reject action through Alerts only, not
+// duplicate it here: Forecast stays a place to SEE the recommendation and
+// its reasoning, Alerts stays the one place a policy value gets changed.
+//
+
 // DESKTOP, a left panel carrying navigation and nothing else. The settings that
 // used to sit expanded below the links (three explanation tiers, a caption, two
 // theme buttons) now live behind one entry at the bottom, which is where
@@ -46,10 +55,25 @@ export default function Sidebar() {
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
+    // Right after Dashboard, first guess at placement (19 Sep, additive -
+    // Alerts/Activity untouched): "what needs a decision from me, soonest
+    // first" reads as the natural next step after "how are we doing
+    // overall," ahead of the deeper Forecast/Inventory screens. Reorder
+    // freely once it's been used for real.
+    { to: "/action-items", label: "Action Items", icon: Flame, badge: null },
+    // Between Dashboard and Inventory: right after "how are we doing", right
+    // before "what do we hold". Matches the order a manager actually reasons
+    // in, decide-then-inspect rather than the other way round.
+    { to: "/forecast", label: "Forecast", icon: TrendingUp, badge: null },
     { to: "/inventory", label: "Inventory", icon: PackageSearch, badge: null },
+    // Alerts holds both the queue and its history (Needs action | History, 20 Sep): Activity is no longer a
+    // separate item, so the two are read in one place.
     { to: "/alerts", label: "Alerts", icon: Bell, badge: alertCount },
-    // Last on purpose: Activity is a record to consult, not a queue to work.
-    { to: "/activity", label: "Activity", icon: History, badge: null },
+    // Table (AuditTable.jsx, 19 Sep): Stan asked for this in the sidebar
+    // directly, not held open pending sign-off the way Forecast was - one row
+    // per SKU, uploaded columns beside what the top-5 formulas produce, built
+    // to check whether onboarding's basic columns are actually enough.
+    { to: "/audit", label: "Table", icon: Table2, badge: null },
   ];
 
   return (
@@ -69,7 +93,7 @@ export default function Sidebar() {
           flexShrink: 0,
           position: "sticky",
           top: 0,
-          height: "100vh",
+          height: "calc(100vh - var(--demo-banner-height))", // see index.css's :root note on this token
           // The panel gained a masthead, a section header and a larger exit
           // control, so it is taller than it was. It fits a 929px viewport
           // with room to spare, but a 13 inch laptop in landscape is nearer
@@ -189,7 +213,9 @@ export default function Sidebar() {
             color: "var(--text-primary)", fontSize: "var(--text-sm)", fontWeight: 600, padding: "0 4px",
           }}>
             <HomeIcon size={19} />
-            Home
+            {/* Hidden on phones by a class (see index.css): the icon and the aria-label
+                carry it, and the 50px it frees is what lets the tabs be tappable. */}
+            <span className="topbar-home-label">Home</span>
           </Link>
         </div>
 
@@ -199,8 +225,8 @@ export default function Sidebar() {
               style={({ isActive }) => ({
                 flex: 1, minWidth: 0,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "9px 6px", borderRadius: 999, textDecoration: "none",
-                background: isActive ? "var(--blue)" : "transparent",
+                padding: "9px 6px", minHeight: 44, borderRadius: 999, textDecoration: "none",
+                background: isActive ? "var(--blue-strong)" : "transparent",
                 color: isActive ? "#fff" : "var(--text-secondary)",
                 transition: "background 0.15s, color 0.15s",
               })}>
@@ -211,7 +237,7 @@ export default function Sidebar() {
                     {badge > 0 && !isActive && (
                       <span style={{
                         position: "absolute", top: -4, right: -6,
-                        background: "var(--red)", color: "#fff",
+                        background: "var(--red-text)", color: "#fff",
                         fontSize: "var(--text-xs)", fontWeight: 700, minWidth: 18, height: 18,
                         borderRadius: 99, display: "flex", alignItems: "center",
                         justifyContent: "center", padding: "0 3px",

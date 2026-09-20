@@ -50,6 +50,7 @@ export default function ColHint({ label, what, how, term }) {
       {({ open }) => (
         <button
           type="button"
+          className="hit-44-icon"
           aria-label={`About ${label}`}
           onClick={(e) => e.stopPropagation()}
           style={{

@@ -144,13 +144,9 @@ Track how long inventory has been held.
 Per SKU (MVP 1 — no batch granularity yet):
 - last_received_date
 - inventory_age_days = today − last_received_date
-- ageing_status: Fresh (0–90d) | Normal (91–180d) | Ageing (181–270d) | At Risk (271d+)
+- ageing_status: Fresh, Normal, Ageing or At Risk, by the share of the SKU's own holding limit that its stock age has used (bands in design.md, "Supporting Formulas").
 
-Thresholds are configurable per SKU; defaults above apply if not set.
-
-**Open decision (15 Sep):** the code instead scales the bands to each SKU's holding limit (design.md,
-"Supporting Formulas"), which starts At Risk at 243 days for a 270 day limit. When Stan decides, the
-losing definition is removed and only design.md keeps the formula.
+The holding limit is configurable per SKU, and 270 days applies if not set. Decided 20 Sep (Stan): the bands scale to each product's own limit, so a short-life product warns earlier.
 
 ---
 
@@ -223,7 +219,9 @@ Features:
 - Sort by: any column
 - Inline stock bar showing on-hand vs max stock
 - Health status badge (colour-coded)
-- Restock modal (add quantity)
+- Request-order modal (raise a request to the buyer; records intent, never changes stock — Reorder
+  Loop step 7. Replaced the earlier Restock modal, which added stock from the office and was removed
+  when the warehouse-write vs Control-Tower-read duties were separated)
 - Add new SKU form
 
 ---
@@ -254,7 +252,15 @@ endpoint list**; this is the shape as of 15 Sep.
   `GET /api/skus/history/export` and `POST /api/skus/history/import`
 - Dashboard: `GET /api/dashboard/stats`, `GET /api/dashboard/history`
 - Alerts and decisions: `GET /api/alerts`, `POST /api/alerts/:id/acknowledge`, `GET /api/decisions`,
-  `POST /api/decisions`, `POST /api/inventory/restock`
+  `POST /api/decisions`
+- Order requests (Reorder Loop step 7, the Control Tower's one write, no stock change):
+  `POST /api/order-requests`, `GET /api/order-requests` (status may be a comma list; each row carries its
+  timeline), `PATCH /api/order-requests/:id` (one step forward: acknowledged, po_raised, approved,
+  rejected with a reason, or cancelled; anything else is 409; the actor is fixed by the step). Approving creates the purchase order (`PO-<request no>`) that Goods In receives against, and `POST /api/warehouse/inbound/receive` on that order adds a `received` step and closes the request in the same transaction; stock moves only there. Onboarding's
+  one-time first count: `POST /api/skus/opening-balance` (zero-stock products only, once each,
+  movement type OPENING). (`POST /api/inventory/restock` was removed
+  here when the duties were separated: the office no longer writes stock; stock moves only on the
+  warehouse floor.)
 - Explanations: `POST /api/alerts/explain`, `GET /api/llm/mode`, `POST /api/llm/unlock`
 - Audit: `GET /api/audit`
 - Warehouse floor: `POST /api/warehouse/login`, `GET /api/warehouse/operators`,
@@ -350,7 +356,7 @@ Receiving and picking on a handheld, attributed to a named operator.
   as a prototype affordance)
 - **Goods In**: receive against an open purchase order in four steps (pick the delivery, verify the
   SKU, count, confirm). Adds to `on_hand_qty` and closes the PO
-- **Goods Out** (API built; handheld screens not yet, shown as "Coming soon" on Home): pick against
+- **Goods Out** (handheld: pick order, verify SKU, count, confirm; a short pick needs a reason): pick against
   an open sales order. Removes from `on_hand_qty` and `reserved_qty`;
   cannot ship more than is physically on hand
 - A quantity different from the expected one is allowed (short and over deliveries happen) but must
@@ -414,6 +420,27 @@ Receiving and picking on a handheld, attributed to a named operator.
 - Status of the live service: the submission tracker, not this document
 
 ---
+
+### REQ-25 - Market signals (news that affects supply) ✅ replay built 2026-09-19
+
+Serves the problem statement's "identify potential shortages early".
+
+- A market signal is a news event in a fixed shape (origin or supplier, event type, severity, direction,
+  optional variety scope), with its source link and date.
+- For each affected SKU the system shows, deterministically, the stock-out date if supply slips, how many
+  days the SKU would be empty, the latest date to order, and the quantity to order at least. Formulas: design.md,
+  "Market Signals".
+- The days an event costs come from a visible table, never from a model or the article.
+- A signal that does not affect a SKU (wrong origin, or an exempt variety) does not flag it, and the screen
+  says which SKUs were spared and why.
+- A SKU already short before the news is shown as such, not blamed on the news.
+- A person accepts, dismisses or withdraws a signal; accepting adds a buffer to the reorder point and is
+  recorded in the audit log. The system never creates an order.
+- Past real events can be replayed against current stock.
+- A person can scan recent news. A headline is read into the fixed shape by a local model (else a keyword
+  list), checked against fixed lists, shown with who read it, and editable by a person; the same story from
+  several outlets is one signal. A paid model is never used for this.
+- On a public server, changes (scan, accept, dismiss, correct) are accepted only in the demo sandbox.
 
 ## Explicitly Deferred (Phase 2/3)
 

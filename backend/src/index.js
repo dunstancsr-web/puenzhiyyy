@@ -47,6 +47,7 @@ seedIfEmpty();
 const productRoutes = require("./routes/products");
 const inventoryRoutes = require("./routes/inventory");
 const warehouseRoutes = require("./routes/warehouse");
+const signalRoutes = require("./routes/signals");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -83,7 +84,8 @@ app.use((req, res, next) => {
 app.use("/api/products", productRoutes); // legacy in-memory demo store, unrelated to the SQLite schema below
 app.use("/api", demoRoutes);
 app.use("/api", inventoryRoutes);
-app.use("/api", warehouseRoutes);       // warehouse floor: goods receipt and goods issue        // real schema: /api/skus, /api/dashboard/stats, /api/alerts, /api/inventory/restock
+app.use("/api", signalRoutes);          // market signals: news events assessed against stock, approved by a person
+app.use("/api", warehouseRoutes);       // warehouse floor: goods receipt and goods issue
 
 // Health check
 app.get("/api/health", (req, res) => {

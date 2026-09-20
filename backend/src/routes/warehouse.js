@@ -23,7 +23,9 @@
 const express = require("express");
 const router = express.Router();
 const { getDb } = require("../db/init");
+const { sandboxOnlyWhenPublic } = require("../middleware/sandboxGuard");
 const { EVENTS, logEvent } = require("../db/audit");
+const { addRequestEvent } = require("../db/requestEvents");
 const { buildAnalytics } = require("../engines/index");
 
 const nowIso = () => new Date().toISOString().replace("T", " ").slice(0, 19);
@@ -37,6 +39,43 @@ function nextMovementNo(db, type) {
   ).get(type);
   const n = row ? Number(String(row.movement_no).split("-")[1]) + 1 : 1;
   return `${prefix}-${String(n).padStart(4, "0")}`;
+}
+
+// ── Duty separation (Reorder Loop step 7) ────────────────────────────────────
+//
+// Only the warehouse floor may change what is physically in the building. That
+// rule is now enforced here rather than assumed: the operators.role column,
+// which was read and returned by /warehouse/login but never checked, finally
+// decides whether a given operator may post a given movement.
+//
+//   receiving | both  -> may confirm a goods RECEIPT
+//   dispatch  | both  -> may confirm a goods ISSUE
+//
+// This is deliberately a per-action check on the operator already attached to
+// the movement, not a session or a token: the model stays the shared-device,
+// PIN-per-person pattern the rest of warehouse.js is built on (see the note in
+// db/init.js). A real deployment hardens the credential, not this shape.
+//
+// Returns the operator row on success, or null after having already written the
+// 401/403 response, so callers do `if (!op) return;`.
+function requireOperatorRole(db, res, operatorId, action) {
+  const op = db.prepare(`SELECT id, name, role FROM operators WHERE id = ? AND active = 1`).get(operatorId);
+  if (!op) {
+    res.status(401).json({ success: false, message: `Sign in before confirming a ${action}` });
+    return null;
+  }
+  const allowed = action === "receipt"
+    ? ["receiving", "both"]
+    : ["dispatch", "both"];
+  if (!allowed.includes(op.role)) {
+    const duty = action === "receipt" ? "receive stock" : "dispatch stock";
+    res.status(403).json({
+      success: false,
+      message: `${op.name} is not cleared to ${duty}. Ask a ${allowed[0]} operator to confirm this.`,
+    });
+    return null;
+  }
+  return op;
 }
 
 // ── Authentication ───────────────────────────────────────────────────────────
@@ -93,7 +132,7 @@ router.get("/warehouse/inbound", (req, res) => {
 // Over and under receipt are both allowed, because both happen: a short
 // container and an over-shipped pallet are facts, not input errors. What the
 // system insists on is that a variance is explained.
-router.post("/warehouse/inbound/receive", (req, res) => {
+router.post("/warehouse/inbound/receive", sandboxOnlyWhenPublic, (req, res) => {
   const { po_number, received_qty, operator_id, variance_reason } = req.body || {};
   const qty = Number(received_qty);
 
@@ -107,8 +146,8 @@ router.post("/warehouse/inbound/receive", (req, res) => {
     const po = db.prepare(`SELECT * FROM purchase_orders WHERE po_number = ? AND status = 'open'`).get(po_number);
     if (!po) return res.status(404).json({ success: false, message: `No open delivery ${po_number}` });
 
-    const op = db.prepare(`SELECT id, name FROM operators WHERE id = ? AND active = 1`).get(operator_id);
-    if (!op) return res.status(401).json({ success: false, message: "Sign in before confirming a receipt" });
+    const op = requireOperatorRole(db, res, operator_id, "receipt");
+    if (!op) return; // 401/403 already sent
 
     const variance = +(qty - po.ordered_qty).toFixed(2);
     if (variance !== 0 && !String(variance_reason || "").trim()) {
@@ -130,6 +169,7 @@ router.post("/warehouse/inbound/receive", (req, res) => {
     // together or not at all. A receipt that raised stock without closing its PO
     // would leave the quantity counted twice, once on hand and once as expected
     // incoming.
+    let closedRequest = null;
     db.transaction(() => {
       db.prepare(`
         UPDATE inventory_positions
@@ -138,6 +178,13 @@ router.post("/warehouse/inbound/receive", (req, res) => {
 
       db.prepare(`UPDATE purchase_orders SET status = 'received', actual_arrival = ? WHERE po_number = ?`)
         .run(today, po_number);
+
+      // An order that came from an approved request closes that request, so the office does not have to.
+      closedRequest = db.prepare(`SELECT id, request_no, quantity_mt FROM order_requests WHERE po_number = ? AND status = 'approved'`).get(po_number) || null;
+      if (closedRequest) {
+        db.prepare(`UPDATE order_requests SET status = 'received' WHERE id = ?`).run(closedRequest.id);
+        addRequestEvent(db, closedRequest.id, "received", op.name, `${qty} MT received, ${movementNo}`);
+      }
 
       db.prepare(`
         INSERT INTO goods_movements
@@ -164,6 +211,14 @@ router.post("/warehouse/inbound/receive", (req, res) => {
         health_status: after ? after.health_status : null,
       },
     });
+
+    if (closedRequest) {
+      logEvent(EVENTS.ORDER_REQUEST_UPDATED, {
+        skuId: po.sku_id,
+        input: { request_no: closedRequest.request_no, quantity_mt: closedRequest.quantity_mt, from: "approved", actor: op.name, note: `${qty} MT received` },
+        output: { status: "received", po_number },
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -230,7 +285,7 @@ router.get("/warehouse/outbound", (req, res) => {
 // The asymmetry with receiving: you cannot ship stock that is not there, so an
 // over pick is refused outright rather than recorded as a variance. A short
 // pick is allowed but must be explained.
-router.post("/warehouse/outbound/pick", (req, res) => {
+router.post("/warehouse/outbound/pick", sandboxOnlyWhenPublic, (req, res) => {
   const { so_number, picked_qty, operator_id, short_reason } = req.body || {};
   const qty = Number(picked_qty);
 
@@ -244,8 +299,8 @@ router.post("/warehouse/outbound/pick", (req, res) => {
     const so = db.prepare(`SELECT * FROM sales_orders WHERE so_number = ? AND status = 'open'`).get(so_number);
     if (!so) return res.status(404).json({ success: false, message: `No open order ${so_number}` });
 
-    const op = db.prepare(`SELECT id, name FROM operators WHERE id = ? AND active = 1`).get(operator_id);
-    if (!op) return res.status(401).json({ success: false, message: "Sign in before confirming a pick" });
+    const op = requireOperatorRole(db, res, operator_id, "issue");
+    if (!op) return; // 401/403 already sent
 
     const pos = db.prepare(`SELECT on_hand_qty, reserved_qty FROM inventory_positions WHERE sku_id = ?`).get(so.sku_id);
     if (!pos) return res.status(404).json({ success: false, message: "SKU has no inventory position" });

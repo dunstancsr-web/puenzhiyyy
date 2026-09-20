@@ -35,14 +35,14 @@ const inputStyle = (error) => ({
   color: "var(--text-primary)",
 });
 
-const errorStyle = { fontSize: "var(--text-xs)", color: "var(--red)", marginTop: 3 };
+const errorStyle = { fontSize: "var(--text-xs)", color: "var(--red-text)", marginTop: 3 };
 
 export function TextField({ label, value, onChange, placeholder, required, half, error }) {
   return (
     <div style={wrapStyle(half)}>
       <label style={labelStyle}>
         {label}
-        {required && <span style={{ color: "var(--red)" }}> *</span>}
+        {required && <span style={{ color: "var(--red-text)" }}> *</span>}
       </label>
       <input
         type="text"

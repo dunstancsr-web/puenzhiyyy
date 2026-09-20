@@ -1,0 +1,44 @@
+{
+  "$comment": "Copy to your project, edit, then: node .claude/skills/ui-ux-audit/scripts/run-audit.mjs --config ux-audit.config.json",
+  "baseUrl": "http://localhost:3000",
+  "widths": [1440, 1024, 768, 390],
+  "settleMs": 900,
+  "themes": [
+    { "name": "light", "colorScheme": "light" },
+    { "name": "dark", "colorScheme": "dark", "localStorage": { "theme": "dark" } }
+  ],
+  "modes": [
+    { "name": "default" }
+  ],
+  "routes": ["/", "/settings"],
+  "states": [
+    {
+      "name": "checkout-step-2",
+      "route": "/checkout",
+      "widths": [1440, 390],
+      "steps": [
+        { "fill": { "selector": "input[name=email]", "value": "test@example.com" } },
+        { "click": "text=Continue" },
+        { "waitFor": "text=Payment" }
+      ]
+    },
+    {
+      "name": "delete-confirm-dialog",
+      "route": "/items",
+      "steps": [{ "click": "button[aria-label='Delete'] >> nth=0" }, { "waitFor": "role=dialog" }],
+      "keyboard": true
+    }
+  ],
+  "audit": {
+    "typeScale": null,
+    "minFontPx": 12,
+    "touchMinPx": 44,
+    "pointerMinPx": 24,
+    "forbidText": [],
+    "relaxedTargetSelector": "nav"
+  },
+  "keyboard": { "enabled": true, "widths": [1440, 390], "maxTabs": 40 },
+  "ignore": [
+    { "check": "T1", "match": "chart", "reason": "example: chart axis labels are intentionally small" }
+  ]
+}
