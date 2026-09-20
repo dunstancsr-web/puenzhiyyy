@@ -8,6 +8,7 @@ import Modal from "../components/Modal";
 import MarketSignals from "../components/MarketSignals";
 import WorkingNote from "../components/WorkingNote";
 import UnlockAI from "../components/UnlockAI";
+import { modelLabel } from "../lib/modelName";
 import { api } from "../api/inventory";
 import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier";
 
@@ -340,9 +341,16 @@ export default function ActionItems() {
           {aiModal.loading ? (
             <WorkingNote label="Writing a plain English explanation" />
           ) : aiModal.available ? (
-            <div style={{ fontSize: "var(--text-base)", lineHeight: 1.7, whiteSpace: "pre-line" }}>
-              {aiModal.explanation}
-            </div>
+            <>
+              <div style={{ fontSize: "var(--text-base)", lineHeight: 1.7, whiteSpace: "pre-line" }}>
+                {aiModal.explanation}
+              </div>
+              {/* Says who wrote it and who computed the figures, as the Alerts box does. */}
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 12 }}>
+                Written by {modelLabel(aiModal.model)} from the figures the engines computed. The opening sentence is the engines' own.
+                {aiModal.cached ? " Reused from a recent answer." : ""}
+              </div>
+            </>
           ) : (
             <>
               {/* The rule-based sentence is the answer when no model is answering; the apology is only the
