@@ -92,13 +92,39 @@ function buildSlots(kind, sku, item) {
   return slots;
 }
 
+// Backstop for the prompt line above (a rule applied afterwards beats more prompt text, rules.md): when a delivery gap
+// exists, a bullet that promises new stock arrives before or in time is removed. Bullets that say it arrives AFTER are
+// true and stay; so does "your stock lasts about N days before ...", which promises nothing about delivery.
+const TIMING_PROMISE = /\b(arrive[sd]?|arrival|deliver\w*|new stock|get here)\b[^.\n]*\b(before|in time)\b/i;
+// "Order more to avoid running out" says the same thing in fewer words, and is just as false once a gap exists.
+const AVOIDS_STOCKOUT = /\bavoid\w*\s+(a\s+|the\s+)?(running\s+(out|low|short)|stock\s?outs?|shortages?)\b/i;
+function dropTimingPromises(text) {
+  return text.split("\n").filter((line) => !TIMING_PROMISE.test(line) && !AVOIDS_STOCKOUT.test(line)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 // System-written opening, same move as explain.js's triggerSentence: the
 // COMPARISON that produces "28 days" is stated by code, never by the model,
 // so the model cannot pair the wrong two numbers together.
+// The days by which an order placed today would arrive AFTER the stock has run out, or null when it would arrive in
+// time (or an order already placed is due). Computed here, never by the model: a live answer once told a manager to
+// "order now so the new stock arrives before you run low" beside a 45 day delivery and 28 days of stock, which
+// cannot be true and reads as advice.
+function timingGap(kind, sku, item) {
+  if (kind !== "stockout" || sku.covered_by_po) return null;
+  const days = Number(item.nearest?.days);
+  const lead = Number(sku.lead_time_days);
+  if (item.nearest?.days == null || !Number.isFinite(days) || !Number.isFinite(lead) || !(lead > days)) return null;
+  return Math.round(lead - days);
+}
+
 function openingSentence(kind, sku, item) {
   if (kind === "stockout" && item.nearest?.days != null) {
     const what = item.isStockout ? "run out" : "breach its safety stock";
-    return `${sku.product_name} is projected to ${what} in ${item.nearest.days} days: it sells about ${sku.avg_daily_usage_30d} MT a day, ${sku.available_qty} MT is available now, and the supplier needs ${sku.lead_time_days} days to deliver more.`;
+    const gap = timingGap(kind, sku, item);
+    const gapLine = gap
+      ? ` An order placed today would arrive about ${gap} days after it ${item.isStockout ? "runs out" : "breaches its safety stock"}, so the suggested order shortens that gap rather than avoiding it.`
+      : "";
+    return `${sku.product_name} is projected to ${what} in ${item.nearest.days} days: it sells about ${sku.avg_daily_usage_30d} MT a day, ${sku.available_qty} MT is available now, and the supplier needs ${sku.lead_time_days} days to deliver more.${gapLine}`;
   }
   if (kind === "blindspot" && item.reason) {
     return `${sku.product_name}: ${item.reason.whatsMissing}.`;
@@ -110,7 +136,7 @@ function cacheKey(kind, sku, item, tier) {
   const bucket = (n, step) => (Number.isFinite(Number(n)) ? Math.round(Number(n) / step) * step : "n");
   return [
     tier, kind, sku.sku_id,
-    bucket(sku.avg_daily_usage_30d, 1), bucket(sku.available_qty, 10),
+    bucket(sku.avg_daily_usage_30d, 1), bucket(sku.available_qty, 10), sku.lead_time_days ?? "n",
     item.nearest?.days ?? "n", item.reason?.whatsMissing ?? "n",
   ].join("|");
 }
@@ -132,7 +158,10 @@ async function explainActionItem({ kind, sku, item, tier }) {
   const user = `Here is the situation.\n\nPlaceholders available to you:\n${describeSlots(slots)}\n\n` +
     `The opening fact is already written and will appear before your text:\n"${opening}"\n\n` +
     `Do not restate that fact or its figures. In short bullet points, explain what it means for a small ` +
-    `business owner and what they should do about it, if anything.`;
+    `business owner and what they should do about it, if anything.` +
+    (timingGap(kind, sku, item) != null
+      ? ` Say nothing about when an order would arrive or whether ordering now helps in time; the opening fact already says so.`
+      : "");
 
   let rendered = null;
   let check = { ok: true, issues: [] };
@@ -175,7 +204,8 @@ async function explainActionItem({ kind, sku, item, tier }) {
   // Urgency stays allowed only for a real stockout, same URGENT_OK gate
   // tone.js already applies to Alerts - a data gap should never sound urgent.
   rendered = calmTone(stripPreamble(rendered), { alert_type: kind === "stockout" ? "STOCKOUT_RISK" : "BLIND_SPOT" }, slots).text;
-  if (opening) rendered = `${opening}\n\n${rendered}`;
+  if (timingGap(kind, sku, item) != null) rendered = dropTimingPromises(rendered);
+  if (opening) rendered = rendered ? `${opening}\n\n${rendered}` : opening;
 
   const out = { text: rendered, provider: result.provider, model: result.model, mode: "slots" };
 
