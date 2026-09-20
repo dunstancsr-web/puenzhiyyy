@@ -537,7 +537,7 @@ lead_time_days_suggested = lead_time_days   -- honestly NOT suggested from data:
 RED    if days_of_cover < lead_time_days, UNLESS covered_by_po
        OR inventory_age_days > max_holding_days
        OR movement_class = "Idle" AND available_qty > 0
-ORANGE if days_of_cover < (lead_time_days + safety_stock_days), UNLESS covered_by_po
+ORANGE if days_of_cover < (lead_time_days + safety_stock_days + risk_buffer_days), UNLESS covered_by_po
        OR on_hand_qty > max_stock
 YELLOW if movement_class = "Slow Moving"
        OR days_of_cover > target_days_of_cover
@@ -545,6 +545,16 @@ GREEN  otherwise
 ```
 `covered_by_po` softens the RED and ORANGE triggers when supply is already inbound, so a real but
 non-emergency gap does not over-alarm. Its exact definition is in "Supporting Formulas" below.
+
+`risk_buffer_days` was added to the ORANGE band on 2026-09-20 (Reorder Loop step 9): it is the
+temporary buffer a live market signal adds at a SKU's origin or supplier (the same term behind
+`reorder_point_suggested_with_risk`; see "Forecast-Driven Demand & Risk Buffer"). Including it is what
+makes health tighten as the risk-adjusted reorder point shifts, rather than lagging it. It stays a
+separate, visible addend, never folded into the King's-formula variance math, so with no active signal
+`risk_buffer_days` is 0 and health is unchanged. Deliberately scoped to health only: `coverage_band`
+below still keys off `lead_time_days + safety_stock_days`, so a SKU can read `coverage_band = in` yet
+`health = ORANGE` when a signal is live. The check in `check-formulas.js` re-derives the same band, and
+the frontend mock (`analytics.js`) mirrors it.
 
 ### Movement Classification (velocity — kept separate from the ABC value classification below)
 ```
