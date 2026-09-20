@@ -1028,6 +1028,24 @@ Each explanation writes one `LLM_CALL` row with tier, provider, model, tokens in
 model calls and the issues found, failed explanations included. `llm/spend.js` prices paid rows at
 list price; `backend/scripts/spend.js` prints them for the spend ledger.
 
+### Wording habits of a stronger model (20 Sep)
+Every model answer, on all three features (Why? on an alert, Action Items Why?, Ask about your data), passes
+the same rule-based clean-up before it is checked, because the project rule is that wording is fixed by a
+rule applied afterwards and not by more prompt text. `tone.js` `cleanFormatting` removes markdown (bold,
+italics, backticks, headings, "•" and "*" bullets, code fences) and replaces em and en dashes; a placeholder
+written as `**{product}**` still counts as the placeholder it is. `slots.js` `stripDoubledUnits` removes a unit
+the model adds after a value that already carries one ("{lead_time} days", "{demand_rate} a day"), so a
+cosmetic habit does not cost a paid retry. An answer that stops mid-sentence (`tone.js` `looksCutOff`, or the
+endpoint reporting a token-limit stop, `truncated` in `provider.js`) is a failed attempt: it is retried and
+never shown. The paid tier has its own output cap (`LLM_CLOUD_MAX_OUTPUT_TOKENS`, 420) so a longer Claude answer
+is not cut off; the local cap (280) is untouched because the benchmark measures it. A paid Ask that fails after
+billed calls writes a failed `LLM_CALL` row with the provider and model, as the other two features already did,
+so `spend.js` sees it. Names shown to people say "Claude Sonnet 4.5", not the gateway's id (the audit trail keeps
+the id, which spend.js prices by). Proven without spending anything by `backend/scripts/test-llm-sonnet.js`
+(fake Ollama and gateway servers, scripted Sonnet-style answers, mutation-tested).
+
+**What the real Sonnet run added (20 Sep).** `calmTone` now collapses horizontal whitespace only (it used to swallow line breaks). `stripSelfCommentary` drops an opening paragraph in which the model narrates its own progress. OVERSTOCK is not offered `capital_tied_up` (the value of all the stock, misread as the value of the excess). "a A class" becomes "an A class". A check failure reaches the screen as plain words through `provider.js` `plainReason`; the technical reason stays in the audit row. The paid run cost USD 0.0452 for 9 explanations; per-call figures are in the spend ledger.
+
 ### Measuring changes
 `backend/scripts/bench-models.js` runs `runExplanation` with only the model call swapped for local
 Ollama: first-try acceptance, calls per explanation, contradictions, and each attempt's rejection

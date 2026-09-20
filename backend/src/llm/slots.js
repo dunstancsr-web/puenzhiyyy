@@ -79,9 +79,12 @@ const TRIGGERS = {
     // quantity that matters, which the recommended action already states.
     withhold: ["inventory_position", "reorder_point", "available_stock", "on_hand_stock", "max_stock", "reserved_stock", "min_order", "safety_stock"],
   },
+  // capital_tied_up is withheld here (20 Sep): it is the cost value of ALL the stock on hand, and the real Sonnet run
+  // wrote "SGD $568K locked in excess inventory" when the excess was only 220 MT of 620. The excess-specific
+  // figure is carrying_cost, which stays.
   OVERSTOCK: {
     clause: (s, a, f) => `its on-hand stock of ${f.mt(s.on_hand_qty)} is ${f.mt(s.overstock_qty)} above the maximum stock level of ${f.mt(s.max_stock)}`,
-    withhold: ["on_hand_stock", "max_stock", "overstock_amount", "available_stock", "reserved_stock", "reorder_point", "suggested_order", "min_order"],
+    withhold: ["capital_tied_up", "on_hand_stock", "max_stock", "overstock_amount", "available_stock", "reserved_stock", "reorder_point", "suggested_order", "min_order"],
   },
   IDLE: {
     clause: (s, a, f) => `it has had no sales for ${s.days_since_last_sale_text || "over 90 days"} while ${f.mt(s.available_qty)} is still in stock`,
@@ -278,6 +281,9 @@ function renderSlots(raw, slots) {
   // prompt mentions rewriting, which the correction pass always does.
   out = stripPreamble(out);
 
+  // "Thai Jasmine is a A class item": the class letter is a value, the article is the model's. (real Sonnet run)
+  out = out.replace(/\ba (?=A[\s-]class\b)/g, "an ");
+
   // Slot values are complete sentences ending in a full stop, so a model that
   // adds its own produces "...can arrive..". Cosmetic, but it reads as broken.
   out = out.replace(/\.\s*\./g, ".").replace(/\.\s*,/g, ",").replace(/\.\s*:\s*/g, ". ");
@@ -303,4 +309,32 @@ function renderSlots(raw, slots) {
   return out.trim();
 }
 
-module.exports = { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble, triggerSentence };
+// Shared by all three model features (moved here from askDatabase.js, 20 Sep, so Why? and Action Items get it too).
+// Caught live (19 Sep): by far the dominant failure across repeated runs
+// against real llama3/llama3.1 was "{one_days_of_cover} days" - the model
+// adding a unit word after a placeholder whose value already reads "12
+// days" or "45 days". validateSlotted correctly rejects this every time (so
+// it never reached an owner), but on some questions it happened on every
+// retry, using up the whole budget for one repeated habit. Auto-corrected
+// here instead, the same "collapse a known artifact" move renderSlots
+// already makes for doubled periods and a repeated product-name prefix:
+// strip the trailing unit word ONLY when the placeholder's own value
+// already ends with that exact unit, so a placeholder that DOESN'T already
+// carry a unit (a plain number, say) is left alone for validateSlotted to
+// judge normally.
+function stripDoubledUnits(raw, slots) {
+  const fixedUnits = raw.replace(
+    /\{([a-z_]+)\}(\s*)('?s?\s*)(days?|months?|weeks?|years?|MT|SGD|tonnes?)\b/gi,
+    (whole, name, sp, poss, unit) => {
+      const slot = slots[name];
+      if (!slot) return whole;
+      const already = new RegExp(`${unit}s?$`, "i").test(String(slot.value).trim());
+      return already ? `{${name}}` : whole;
+    }
+  );
+  // A rate value ("5.58 MT per day") followed by "a day" or "per day" of the model's own.
+  return fixedUnits.replace(/\{([a-z_]+)\}\s+(?:a|per|each|every)\s+day\b/gi, (whole, name) =>
+    slots[name] && /\bper day$/i.test(String(slots[name].value).trim()) ? `{${name}}` : whole);
+}
+
+module.exports = { buildSlots, describeSlots, validateSlotted, renderSlots, stripPreamble, stripDoubledUnits, triggerSentence };

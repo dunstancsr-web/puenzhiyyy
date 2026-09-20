@@ -17,7 +17,7 @@ const { buildAnalytics } = require("../engines/index");
 const { explainAlert, providerInfo, LlmUnavailable } = require("../llm/explain");
 const { explainActionItem } = require("../llm/explainActionItem");
 const { askDatabase } = require("../llm/askDatabase");
-const { listModes, getDefaultMode, resolveTier } = require("../llm/provider");
+const { listModes, getDefaultMode, resolveTier, plainReason } = require("../llm/provider");
 const demoAccess = require("../llm/demoAccess");
 const { projectInventory } = require("../engines/projection");
 const { toCsv, parseCsv } = require("../db/csv");
@@ -2163,7 +2163,7 @@ router.post("/alerts/explain", async (req, res) => {
       });
     } catch (err) {
       if (err instanceof LlmUnavailable) {
-        return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo(tier) } });
+        return res.json({ success: true, data: { available: false, reason: plainReason(err), ...providerInfo(tier) } });
       }
       throw err;
     }
@@ -2254,7 +2254,7 @@ router.post("/action-items/explain", async (req, res) => {
       });
     } catch (err) {
       if (err instanceof LlmUnavailable) {
-        return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo(tier) } });
+        return res.json({ success: true, data: { available: false, reason: plainReason(err), ...providerInfo(tier) } });
       }
       throw err;
     }
@@ -2301,7 +2301,7 @@ router.post("/ask-database", async (req, res) => {
     });
   } catch (err) {
     if (err instanceof LlmUnavailable) {
-      return res.json({ success: true, data: { available: false, reason: err.message, ...providerInfo(tier) } });
+      return res.json({ success: true, data: { available: false, reason: plainReason(err, "ask"), ...providerInfo(tier) } });
     }
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to answer the question" });

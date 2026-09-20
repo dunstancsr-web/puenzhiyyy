@@ -172,6 +172,7 @@ node backend/scripts/bench-models.js llama3 --repeat 4 --scenario reorder   # af
 node backend/scripts/check-formulas.js   # after ANY engine change: do the formulas still match design.md?
 npm run ux:audit                         # after UI changes: overlap, contrast, touch size, keyboard (skill: .claude/skills/ui-ux-audit)
 node backend/scripts/test-tone.js        # after editing backend/src/llm/tone.js
+node backend/scripts/test-llm-sonnet.js  # after any change to the model layer: no spend, Sonnet-style answers, three features
 sh backend/scripts/rehearse-deploy.sh    # run the app like the Lightsail container, then check it
 python3 docs/Guide/build-pdf.py          # rebuild the features guide PDF into ~/Downloads
 node backend/scripts/sonnet-check.js # plan and cost only; PAID with --confirm-spend

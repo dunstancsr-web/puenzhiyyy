@@ -25,9 +25,9 @@
 // parses placeholders - the whole answer, not a line buried in prose.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { chat, resolveTier, LlmUnavailable } = require("./provider");
-const { validateSlotted, renderSlots, stripPreamble } = require("./slots");
-const { calmTone, stripSelfCommentary } = require("./tone");
+const { chat, resolveTier, providerInfo, LlmUnavailable } = require("./provider");
+const { validateSlotted, renderSlots, stripPreamble, stripDoubledUnits } = require("./slots");
+const { calmTone, stripSelfCommentary, tidy } = require("./tone");
 const { EVENTS, logEvent } = require("../db/audit");
 const { TOOLS, runTool } = require("./tools");
 const { FIELD_GLOSSARY } = require("./fieldGlossary");
@@ -126,30 +126,6 @@ function describeSlotList(slots) {
   return Object.entries(slots).map(([k, v]) => `  {${k}} ${v.describes}`).join("\n");
 }
 
-// Caught live (19 Sep): by far the dominant failure across repeated runs
-// against real llama3/llama3.1 was "{one_days_of_cover} days" - the model
-// adding a unit word after a placeholder whose value already reads "12
-// days" or "45 days". validateSlotted correctly rejects this every time (so
-// it never reached an owner), but on some questions it happened on every
-// retry, using up the whole budget for one repeated habit. Auto-corrected
-// here instead, the same "collapse a known artifact" move renderSlots
-// already makes for doubled periods and a repeated product-name prefix:
-// strip the trailing unit word ONLY when the placeholder's own value
-// already ends with that exact unit, so a placeholder that DOESN'T already
-// carry a unit (a plain number, say) is left alone for validateSlotted to
-// judge normally.
-function stripDoubledUnits(raw, slots) {
-  return raw.replace(
-    /\{([a-z_]+)\}(\s*)('?s?\s*)(days?|months?|weeks?|years?|MT|SGD|tonnes?)\b/gi,
-    (whole, name, sp, poss, unit) => {
-      const slot = slots[name];
-      if (!slot) return whole;
-      const already = new RegExp(`${unit}s?$`, "i").test(String(slot.value).trim());
-      return already ? `{${name}}` : whole;
-    }
-  );
-}
-
 async function askDatabase({ question, db, analytics, tier }) {
   tier = resolveTier(tier);
   const slots = {};
@@ -199,6 +175,7 @@ async function askDatabase({ question, db, analytics, tier }) {
     spent.input_tokens += result.usage?.input_tokens || 0;
     spent.output_tokens += result.usage?.output_tokens || 0;
 
+    result = tidy(result); // markdown and dashes removed by rule; see tone.js
     const text = result.text.trim();
     // Searches ANYWHERE in the text, not anchored to the whole response.
     // Caught live (19 Sep): llama3 wrote "To find out why... I'll use the
@@ -294,6 +271,8 @@ async function askDatabase({ question, db, analytics, tier }) {
 
     const cleanedText = stripDoubledUnits(text, slots);
     const structural = validateSlotted(cleanedText, slots, { requireFigures: false });
+    // A final answer that stops mid-sentence is a failed attempt like any other, never shown.
+    if (result.cutOff) structural.ok = false, structural.issues.push("the answer was cut off before it finished");
     if (!structural.ok) {
       if (attemptsAtAnswer >= MAX_ANSWER_ATTEMPTS) {
         throw Object.assign(new LlmUnavailable(
@@ -319,4 +298,25 @@ async function askDatabase({ question, db, analytics, tier }) {
   throw Object.assign(new LlmUnavailable("Could not reach a checked answer within the tool-call budget."), { spent });
 }
 
-module.exports = { askDatabase, MAX_TOOL_CALLS };
+// Every model call is billed on the paid tier whether or not the answer is used, and the spend ledger reads the
+// audit trail. A question that fails after calls were made must therefore leave a row, the way explain.js and
+// explainActionItem.js already do; before this a failed Ask was invisible to spend.js.
+async function askDatabaseLogged(args) {
+  try {
+    return await askDatabase(args);
+  } catch (err) {
+    if (err && err.spent && err.spent.model_calls > 0) {
+      try {
+        logEvent(EVENTS.LLM_CALL, {
+          skuId: null,
+          // provider and model are what spend.js keys on; without them a failed paid Ask would still be unseen.
+          input: { item_type: "ask_database", question: args.question, provider: providerInfo(args.tier).provider, model: providerInfo(args.tier).model },
+          output: { failed: true, reason: String(err.message).slice(0, 300), ...err.spent },
+        });
+      } catch { /* logging is best effort; the caller still gets the original error */ }
+    }
+    throw err;
+  }
+}
+
+module.exports = { askDatabase: askDatabaseLogged, MAX_TOOL_CALLS };

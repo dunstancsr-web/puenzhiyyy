@@ -24,8 +24,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { chat, providerInfo, resolveTier, LlmUnavailable } = require("./provider");
-const { validateSlotted, renderSlots, describeSlots, stripPreamble } = require("./slots");
-const { calmTone, stripSelfCommentary } = require("./tone");
+const { validateSlotted, renderSlots, describeSlots, stripPreamble, stripDoubledUnits } = require("./slots");
+const { calmTone, stripSelfCommentary, tidy } = require("./tone");
 const { EVENTS, logEvent } = require("../db/audit");
 const { FIELD_GLOSSARY } = require("./fieldGlossary");
 
@@ -150,6 +150,10 @@ async function explainActionItem({ kind, sku, item, tier }) {
     spent.input_tokens += result.usage?.input_tokens || 0;
     spent.output_tokens += result.usage?.output_tokens || 0;
 
+    result = tidy(result); // markdown and dashes removed by rule; see tone.js
+    if (result.cutOff) { check = { ok: false, issues: ["the answer was cut off before it finished"] }; continue; }
+
+    result = { ...result, text: stripDoubledUnits(result.text, slots) }; // a doubled unit is fixed by rule, not retried
     const structural = validateSlotted(result.text, slots, { requireFigures: !opening });
     if (!structural.ok) { check = structural; continue; }
     rendered = stripSelfCommentary(renderSlots(result.text, slots));
