@@ -50,10 +50,10 @@ This is the cycle the app implements, and the one the audit trail records:
                     ▼
          decision recorded, stock and
          policy updated, everything
-         written to the audit log ──────────►  Activity page
+         written to the audit log ──────────►  Alerts, History view
 ```
 
-Every arrow in that diagram writes a row to `audit_log`. The Activity page renders that table as a
+Every arrow in that diagram writes a row to `audit_log`. The History view of the Alerts tab renders that table as a
 plain-English timeline, with the exact input and output of each step one click away.
 
 ---
@@ -78,7 +78,7 @@ Three workspaces share one database, because the people doing the work are in di
   - **Alerts.** Six alert types (stockout risk, reorder, overstock, slow moving, idle, ageing), each with
     the measured value, the threshold it breached and a recommended action. Approve, modify or reject,
     with a reason. **Why?** shows the reasoning.
-  - **Activity.** The audit trail: every alert raised, policy changed, stock movement, model call and
+  - **Alerts, History view.** The audit trail: every alert raised, policy changed, stock movement, model call and
     manager decision, with what the system had proposed.
 
 ---
@@ -124,7 +124,7 @@ backend/src/
   db/         schema, deterministic seed, audit log
 backend/scripts/   formula check, demo reset, deploy rehearsal and check, model benchmark
 frontend/src/
-  pages/      Home, Dashboard, Inventory, Alerts, Activity
+  pages/      Home, Dashboard, Inventory, Alerts (Needs action and History)
   warehouse/  Goods In, Goods Out and operator sign-in
   index.css   the design system: plain CSS custom properties, a six step type scale, light and dark
 ```

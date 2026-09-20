@@ -165,6 +165,11 @@ export const api = {
   // Alerts
   getAlerts: () => request("/alerts"),
   acknowledgeAlert: (id) => request(`/alerts/${id}/acknowledge`, { method: "POST" }),
+  // Undo for a dismissal, the alerts that are not open (so History can offer to reopen the dismissed ones),
+  // and what happened to one alert.
+  reopenAlert: (id) => request(`/alerts/${id}/reopen`, { method: "POST" }),
+  getHandledAlerts: () => request("/alerts/handled"),
+  getAlertHistory: (id) => request(`/alerts/${id}/history`),
 
   // Decisions (TASK-12) - Approve/Modify/Reject audit trail
   getDecisions: () => request("/decisions"),

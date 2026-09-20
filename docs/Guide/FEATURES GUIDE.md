@@ -17,7 +17,7 @@ the warehouse.
 4. [Manager: the daily review (Dashboard)](#4-manager-the-daily-review-dashboard)
 5. [Manager: acting on alerts (Alerts)](#5-manager-acting-on-alerts-alerts)
 6. [Manager: keeping product settings right (Inventory)](#6-manager-keeping-product-settings-right-inventory)
-7. [Manager: checking what happened (Activity)](#7-manager-checking-what-happened-activity)
+7. [Manager: checking what happened (Alerts, History)](#7-manager-checking-what-happened-alerts-history)
 8. [Anyone: settings](#8-anyone-settings)
 9. [How the roles connect](#9-how-the-roles-connect)
 
@@ -97,7 +97,7 @@ damaged in transit, short shipped by the supplier, partial delivery, or a counti
 
 Stock updates for everyone immediately. The receipt gets a document number (a goods received note,
 GRN), the purchase order is closed, and the shortfall goes on record so purchasing can settle it with
-the supplier. The movement also appears on the manager's Activity page (section 7).
+the supplier. The movement also appears in the manager's History view (section 7).
 
 ---
 
@@ -266,9 +266,9 @@ errors saves nothing. The same works for the 24 months of stock history.
 
 ---
 
-## 7. Manager: checking what happened (Activity)
+## 7. Manager: checking what happened (Alerts, History)
 
-**Who:** the manager, or anyone auditing. **Where:** Control Tower, Activity. **Goal:** see everything
+**Who:** the manager, or anyone auditing. **Where:** Control Tower, Alerts, History view (the old Activity page, which now redirects here). **Goal:** see everything
 the system did and every decision people made, in order, with the evidence.
 
 ![Activity: the audit trail as a timeline](images/18-activity.jpg)
@@ -322,7 +322,7 @@ The engines recalculate every figure
 Manager reviews the Dashboard and Alerts
         │   asks Why?, then approves, modifies or rejects, with a reason
         ▼
-Everything is on the Activity page
+Everything is in the Alerts tab, History view
             the delivery, the alert, the explanation, the decision and what it overrode
 ```
 

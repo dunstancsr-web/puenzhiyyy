@@ -389,6 +389,17 @@ input, select, textarea {
    Declared as classes, never as inline style props. An inline
    grid-template-columns beats a stylesheet rule without !important, so the
    breakpoint could never reach it. That has shipped as a real bug here before. */
+/* The Home page frame. The top padding is here, not inline, so phones can change it: the demo entry sits
+   top right, and on a narrow screen it needs its own strip above the logo. */
+.home-page { position: relative; padding: clamp(40px, 9vh, 96px) 20px 48px; }
+.home-demo-entry {
+  position: absolute; top: 10px; right: 16px; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px;
+  background: none; border: none; border-radius: var(--radius); cursor: pointer;
+  font-size: var(--text-xs); font-weight: 600; color: var(--text-muted);
+}
+.home-demo-entry:hover, .home-demo-entry:focus-visible { color: var(--text-primary); background: var(--surface-2); }
+@media (max-width: 640px) { .home-page { padding-top: 64px; } }
+
 .home-shell { width: 100%; max-width: 780px; margin: 0 auto; text-align: center; }
 .home-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 

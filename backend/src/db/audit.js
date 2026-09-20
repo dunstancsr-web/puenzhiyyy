@@ -40,6 +40,8 @@ const EVENTS = Object.freeze({
   OPENING_BALANCE_SET: "OPENING_BALANCE_SET",
   ALERT_TRIGGERED: "ALERT_TRIGGERED",
   ALERT_ACKNOWLEDGED: "ALERT_ACKNOWLEDGED",
+  // The undo for a dismissal: the alert is back in the list waiting for a decision.
+  ALERT_REOPENED: "ALERT_REOPENED",
   DECISION_RECORDED: "DECISION_RECORDED",
   // Switching into or out of the metered model tier is a spending decision, so
   // it is recorded like any other decision rather than living only in memory.
@@ -128,8 +130,10 @@ function readEvents({ eventType, skuId, limit } = {}) {
   const where = [];
   const params = {};
   if (eventType) {
-    where.push("a.event_type = @eventType");
-    params.eventType = eventType;
+    // One type, or several separated by commas (the History view asks for a whole category at once).
+    const types = String(eventType).split(",").map((t) => t.trim()).filter(Boolean);
+    where.push(`a.event_type IN (${types.map((_, i) => `@et${i}`).join(",")})`);
+    types.forEach((t, i) => { params[`et${i}`] = t; });
   }
   if (skuId) {
     where.push("a.sku_id = @skuId");
@@ -159,10 +163,12 @@ function readEvents({ eventType, skuId, limit } = {}) {
 
 // Counts per event type across the whole table (not just the returned page), so
 // the UI can show filter chips with real totals instead of counting a slice.
-function eventCounts() {
+// Counts per event type, for the filter chips. Scoped to a product when one is chosen, so a chip's number
+// matches what clicking it shows.
+function eventCounts({ skuId } = {}) {
   const rows = getDb()
-    .prepare(`SELECT event_type, COUNT(*) AS count FROM audit_log GROUP BY event_type`)
-    .all();
+    .prepare(`SELECT event_type, COUNT(*) AS count FROM audit_log ${skuId ? "WHERE sku_id = @skuId" : ""} GROUP BY event_type`)
+    .all(skuId ? { skuId } : {});
   return Object.fromEntries(rows.map((r) => [r.event_type, r.count]));
 }
 

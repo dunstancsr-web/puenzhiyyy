@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, XCircle, TrendingUp, TrendingDown,
-  RefreshCw, X, CheckCircle, Clock, Cpu, History, Target,
+  RefreshCw, X, CheckCircle, Clock, Cpu, History, Target, Bell, Check, Pencil, ChevronRight, ChevronDown,
 } from "lucide-react";
 import Badge from "../components/Badge";
 import ColHint from "../components/ColHint";
 import LoadingState from "../components/LoadingState";
 import ErrorState from "../components/ErrorState";
 import WorkingNote from "../components/WorkingNote";
+import SegmentedTabs from "../components/SegmentedTabs";
+import ActivityFeed, { EventRow } from "../components/ActivityFeed";
 import { api } from "../api/inventory";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { buildExplanation } from "../lib/explain";
@@ -116,38 +118,62 @@ const TYPE_HINTS = {
 // SKU cannot be matched, saying so when it does.
 
 // ── Main component ─────────────────────────────────────────────────────────────
+// ONE tab for alerts and their history (20 Sep, Stan's call: being in the same tab makes it easier to link
+// what needs doing with what already happened). Two views, Needs action and History, chosen in the URL
+// (?view=history) so a link can land on either. They stay two lists on purpose: a to-do list and a record
+// are different things, and interleaving them would bury the alerts under stock movements and model calls.
+// The tab joins them at the item instead: an alert shows its own history, and a history row opens its alert.
+// The product filter (?sku=) applies to both views.
+const SEVERITY_LABEL = { critical: "Critical", warning: "Warning", info: "Info" };
+
+const PAGE_HELP = {
+  what: "Things the system thinks need a decision, worst first, and the permanent record of everything that happened to them.",
+  how: "Needs action is your to-do list: approve, change or reject each recommendation, or dismiss it. History is the record, and nothing in it can be edited or deleted. Pick a product to see just its alerts and its history.",
+};
+
 export default function Alerts() {
+  const [sp, setSp] = useSearchParams();
+  const view = sp.get("view") === "history" ? "history" : "needs";
+  const skuFilter = sp.get("sku") || "";
+  const focusId = Number(sp.get("alert")) || null;
+  const setParams = useCallback((changes) => {
+    const next = new URLSearchParams(sp);
+    for (const [k, v] of Object.entries(changes)) { if (v == null || v === "") next.delete(k); else next.set(k, v); }
+    setSp(next, { replace: true });
+  }, [sp, setSp]);
+
   const [alerts, setAlerts] = useState(null);
+  const [handled, setHandled] = useState([]);   // alerts that are not open: dismissed or decided
   const [loadError, setLoadError] = useState(null);
   const [filter, setFilter] = useState("ALL");
   const [aiModal, setAiModal] = useState(null);       // { alert, explanation }
   const [approvalModal, setApprovalModal] = useState(null); // alert
-  const [decisions, setDecisions] = useState([]);
   // Needed by the explanation builder: alerts carry the conclusion, the SKU
   // carries the inputs the conclusion was derived from.
   const [skus, setSkus] = useState([]);
+  const [notice, setNotice] = useState(null);   // { text, tone, action? } : one line under the controls
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [highlightId, setHighlightId] = useState(null);
+  const noticeTimer = useRef(null);
 
+  const fetchAll = useCallback(() => Promise.all([api.getAlerts(), api.getSkus(), api.getHandledAlerts()])
+    .then(([a, k, h]) => { setAlerts(a); setSkus(k || []); setHandled(h || []); }), []);
   const loadAlerts = useCallback(() => {
     setLoadError(null);
-    setAlerts(null);
-    Promise.all([api.getAlerts(), api.getDecisions(), api.getSkus()])
-      .then(([alertsData, decisionsData, skuData]) => {
-        setAlerts(alertsData); setDecisions(decisionsData); setSkus(skuData || []);
-      })
-      .catch((err) => setLoadError(err.message || "Failed to load alerts"));
-  }, []);
-
+    fetchAll().catch((err) => setLoadError(err.message || "Failed to load alerts"));
+  }, [fetchAll]);
   useEffect(() => { loadAlerts(); }, [loadAlerts]);
+  // A receipt can clear an alert and a pick can raise one. Alert ids are stable database ids, so an open
+  // Why? panel keeps its place across a refresh. Refreshing never replaces the page with a spinner.
+  useLiveRefresh(() => { fetchAll().catch(() => {}); });
+  const refreshQuietly = () => { fetchAll().then(() => setRefreshKey((k) => k + 1)).catch(() => {}); };
 
-  // A receipt can clear an alert and a pick can raise one. Alert ids are stable
-  // database ids, so an open Why? panel keeps its place across a refresh.
-  useLiveRefresh(() => {
-    Promise.all([api.getAlerts(), api.getDecisions(), api.getSkus()])
-      .then(([alertsData, decisionsData, skuData]) => {
-        setAlerts(alertsData); setDecisions(decisionsData); setSkus(skuData || []);
-      })
-      .catch(() => {});
-  });
+  const say = (text, { tone = "info", action = null } = {}) => {
+    clearTimeout(noticeTimer.current);
+    setNotice({ text, tone, action });
+    noticeTimer.current = setTimeout(() => setNotice(null), tone === "error" ? 9000 : 12000);
+  };
+  useEffect(() => () => clearTimeout(noticeTimer.current), []);
 
   // Which tiers this server can offer, so a choice it cannot honour (an
   // expired pass, a local model that does not exist on a host) falls back
@@ -155,34 +181,75 @@ export default function Alerts() {
   const [llmServer, setLlmServer] = useState(null);
   useEffect(() => { api.getLlmMode().then(setLlmServer).catch(() => setLlmServer(null)); }, []);
 
+  // Opening an alert from a History row: go to Needs action, clear the filters that could hide it, scroll to
+  // the card and mark it for a moment. If it is no longer open, say so instead of doing nothing.
+  useEffect(() => {
+    if (!focusId || !alerts) return;
+    if (view !== "needs") { setParams({ view: null }); return; }
+    setFilter("ALL");
+    const found = alerts.find((a) => a.id === focusId);
+    if (found && skuFilter && found.sku_id !== skuFilter) { setParams({ sku: null }); return; }
+    if (found) {
+      setTimeout(() => {
+        document.getElementById(`alert-${focusId}`)?.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        setHighlightId(focusId);
+        setTimeout(() => setHighlightId(null), 2500);
+      }, 60);
+    } else {
+      say("That alert is no longer open. Its record is in History.");
+    }
+    setParams({ alert: null });
+  }, [focusId, alerts]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loadError) return <ErrorState message={loadError} onRetry={loadAlerts} />;
   if (!alerts) return <LoadingState label="Loading alerts…" />;
 
   // ── Filtering + sorting ──────────────────────────────────────────────────────
   // The API already excludes acknowledged alerts (routes/inventory.js materializes
   // against alerts_log) - no client-side "active" filter needed any more.
-  const active = alerts;
-  const filtered = active
+  const forProduct = skuFilter ? alerts.filter((a) => a.sku_id === skuFilter) : alerts;
+  const filtered = forProduct
     .filter((a) => filter === "ALL" || a.alert_type === filter)
     .sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3));
-
-  const counts = active.reduce((acc, a) => {
+  const counts = forProduct.reduce((acc, a) => {
     acc[a.alert_type] = (acc[a.alert_type] || 0) + 1;
     return acc;
   }, {});
+  const activeIds = new Set(alerts.map((a) => a.id));
+  const dismissedIds = new Set(handled.filter((h) => h.status === "acknowledged").map((h) => h.id));
+  const critical = forProduct.filter((a) => a.severity === "critical").length;
 
   // ── Actions ──────────────────────────────────────────────────────────────────
-  // acknowledge/dismiss and decisions are both wired to the real backend
-  // (alerts_log.status / the decisions table - TASK-10 / TASK-12). handleAskAI
-  // stays local-only for now - Ask AI needs an LLM API key that isn't set up
-  // yet (TASK-11); buildFallbackExplanation is the known placeholder until then.
-  const acknowledge = async (id) => {
+  const acknowledge = async (alert) => {
     try {
-      await api.acknowledgeAlert(id);
-      setAlerts((prev) => prev.filter((a) => a.id !== id));
+      await api.acknowledgeAlert(alert.id);
+      setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
+      return true;
     } catch (err) {
-      console.error("Failed to acknowledge alert:", err);
+      say(`Could not dismiss that alert: ${err.message || "please try again"}.`, { tone: "error" });
+      return false;
     }
+  };
+  // Dismissing is permanent (the alert never returns, even if its condition still holds), so it comes with
+  // an undo, and History keeps a Reopen button on it.
+  const undoDismiss = async (id) => {
+    setNotice(null);
+    try { await api.reopenAlert(id); await fetchAll(); setRefreshKey((k) => k + 1); }
+    catch (err) { say(`Could not undo: ${err.message || "please try again"}.`, { tone: "error" }); }
+  };
+  const dismiss = async (alert) => {
+    if (!(await acknowledge(alert))) return;
+    say(`Dismissed the ${TYPE_META[alert.alert_type]?.label || "alert"} on ${alert.sku_name}.`, { action: { label: "Undo", run: () => undoDismiss(alert.id) } });
+    fetchAll().catch(() => {});
+    setRefreshKey((k) => k + 1);
+  };
+  const reopenFromHistory = async (id) => {
+    try {
+      await api.reopenAlert(id);
+      await fetchAll();
+      setRefreshKey((k) => k + 1);
+      say("Alert reopened. If its condition still holds, it is back in Needs action.", { action: { label: "View", run: () => setParams({ view: null }) } });
+    } catch (err) { say(`Could not reopen it: ${err.message || "please try again"}.`, { tone: "error" }); }
   };
 
   // Opens immediately with the deterministic trace, then fills in the model
@@ -222,7 +289,7 @@ export default function Alerts() {
   // closed the modal unconditionally - a failed save looked identical to a
   // successful one.
   const handleDecision = async (alert, action, qty, reason) => {
-    const created = await api.createDecision({
+    await api.createDecision({
       sku_id: alert.sku_id,
       alert_type: alert.alert_type,
       ai_recommendation: alert.recommended_action,
@@ -231,123 +298,90 @@ export default function Alerts() {
       manager_quantity: qty,
       manager_reason: reason,
     });
-    setDecisions((prev) => [created, ...prev]);
-    await acknowledge(alert.id);
+    await acknowledge(alert);
+    fetchAll().catch(() => {});
+    setRefreshKey((k) => k + 1);
   };
+
+  const subtitle = view === "history"
+    ? (skuFilter ? "Everything recorded for this product, newest first" : "Everything recorded, newest first")
+    : forProduct.length === 0
+      ? "Nothing needs action"
+      : `${forProduct.length} need${forProduct.length === 1 ? "s" : ""} action${critical ? `, ${critical} critical` : ""}${skuFilter ? " for this product" : ""}`;
+
+  const selectStyle = {
+    fontSize: "var(--text-sm)", padding: "9px 12px", borderRadius: 10, border: "1px solid var(--border)",
+    background: "var(--card-bg)", color: "var(--text-primary)", maxWidth: "100%",
+  };
+
   return (
     <div>
       {/* ── Header ── */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
         <div>
-          <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>Alerts</h1>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4 }}>
-            {filter === "ALL"
-              ? `${active.length} active alert${active.length === 1 ? "" : "s"}`
-              : `${filtered.length} of ${active.length} alert${active.length === 1 ? "" : "s"}`} · sorted by severity
-          </p>
+          {/* ColHint renders the icon trigger ONLY: its label is the aria label, not visible text, so the h1
+              carries the words itself. */}
+          <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}>
+            Alerts
+            <ColHint label="Alerts and history" what={PAGE_HELP.what} how={PAGE_HELP.how} />
+          </h1>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4 }}>{subtitle}</p>
         </div>
-        <button
-          onClick={loadAlerts}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--card-bg)", fontSize: "var(--text-sm)", color: "var(--text-secondary)", cursor: "pointer" }}
-        >
+        <button type="button" onClick={refreshQuietly} aria-label="Refresh" title="Refresh" className="ms-btn" style={{
+          display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", flexShrink: 0,
+          border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--card-bg)",
+          fontSize: "var(--text-sm)", color: "var(--text-secondary)", cursor: "pointer",
+        }}>
           <RefreshCw size={13} /> Refresh
         </button>
       </div>
 
-      {/* ── Summary tiles - these ARE the filter control (click to filter,
-          click again to clear); a separate row of filter pills used to sit
-          right below repeating the exact same counts and the exact same
-          click target, which was the same "two widgets, one job" pattern
-          fixed on the Dashboard (visual-consistency pass, 2026-09). ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
-        {Object.entries(TYPE_META).map(([type, meta]) => {
-          const Icon = meta.icon;
-          const count = counts[type] || 0;
-          const isActive = filter === type;
-          return (
-            <button key={type} type="button" onClick={() => setFilter(isActive ? "ALL" : type)}
-              aria-pressed={isActive}
-              // A zero tile is still a useful filter target, but it should not
-              // compete with the categories that actually have something in
-              // them. Recede it rather than removing it, so the row stays a
-              // stable, predictable set of six.
-              style={{
-                background: isActive ? meta.bg : "var(--card-bg)",
-                border: `1px solid ${isActive ? meta.color : "var(--border)"}`,
-                borderRadius: "var(--radius-lg)", padding: "14px 16px",
-                cursor: "pointer", transition: "all 0.15s", textAlign: "left", font: "inherit",
-                opacity: count === 0 && !isActive ? 0.55 : 1,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-                <Icon size={14} color={count > 0 ? meta.color : "var(--text-muted)"} />
-                <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: count > 0 ? meta.color : "var(--text-muted)" }}>{meta.label}</span>
-                <ColHint label={meta.label} what={TYPE_HINTS[type].what} how={TYPE_HINTS[type].how} />
-              </div>
-              <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: count > 0 ? meta.color : "var(--text-muted)" }}>
-                {count}
-              </div>
-            </button>
-          );
-        })}
+      {/* ── Which view, and which product ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <SegmentedTabs
+          ariaLabel="Alerts views" panelId="alerts-panel" value={view}
+          onChange={(id) => setParams({ view: id === "history" ? "history" : null })}
+          tabs={[
+            { id: "needs", label: "Needs action", Icon: Bell, badge: alerts.length },
+            { id: "history", label: "History", Icon: History },
+          ]}
+        />
+        <label style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", gap: 8 }}>
+          Product
+          <select className="ms-select" value={skuFilter} onChange={(e) => setParams({ sku: e.target.value })} style={selectStyle}>
+            <option value="">All products</option>
+            {skus.map((k) => <option key={k.sku_id} value={k.sku_id}>{k.product_name} ({k.sku_id})</option>)}
+          </select>
+        </label>
       </div>
 
-      {filter !== "ALL" && (
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600,
-          background: "var(--blue-light)", color: "var(--blue-text)", padding: "4px 10px 4px 12px",
-          borderRadius: 99, marginBottom: 18,
+      {notice && (
+        <div role={notice.tone === "error" ? "alert" : "status"} style={{
+          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16, padding: "9px 14px", borderRadius: 10,
+          background: notice.tone === "error" ? "var(--red-light)" : "var(--surface-2)",
+          color: notice.tone === "error" ? "var(--red-text)" : "var(--text-primary)", fontSize: "var(--text-sm)",
         }}>
-          Filtering by {TYPE_META[filter]?.label}
-          <button type="button" onClick={() => setFilter("ALL")} aria-label="Clear filter"
-            style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", display: "flex", padding: 2 }}>
-            <X size={13} />
-          </button>
+          <span>{notice.text}</span>
+          {notice.action && (
+            <button type="button" onClick={notice.action.run} className="ms-btn" style={{ padding: "2px 4px", background: "none", border: "none", cursor: "pointer", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--blue-text)" }}>
+              {notice.action.label}
+            </button>
+          )}
         </div>
       )}
 
-      {/* ── Alert cards ── */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 32 }}>
-        {filtered.length === 0 ? (
-          <div className="card" style={{ padding: 48, textAlign: "center", color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
-            {active.length === 0 ? "✓ No active alerts - all inventory levels are healthy." : "No alerts match this filter."}
-          </div>
+      <div role="tabpanel" id="alerts-panel" aria-labelledby={`tab-alerts-panel-${view}`}>
+        {view === "history" ? (
+          <ActivityFeed skuId={skuFilter} refreshKey={refreshKey} activeAlertIds={activeIds} dismissedAlertIds={dismissedIds}
+            onOpenAlert={(id) => setParams({ view: null, alert: id })} onReopenAlert={reopenFromHistory} />
         ) : (
-          filtered.map((alert) => (
-            <AlertCard
-              key={alert.id}
-              alert={alert}
-              onAcknowledge={acknowledge}
-              onAskAI={handleAskAI}
-              onApprove={setApprovalModal}
-            />
-          ))
+          <NeedsAction
+            allCount={alerts.length} forProduct={forProduct} filtered={filtered} counts={counts}
+            filter={filter} setFilter={setFilter} skuFilter={skuFilter} clearProduct={() => setParams({ sku: null })}
+            onDismiss={dismiss} onAskAI={handleAskAI} onApprove={setApprovalModal} highlightId={highlightId}
+          />
         )}
       </div>
-
-      {/* The Decision Log table lived here and has moved to /activity.
-          It was a strict subset of what the audit trail already records
-          (DECISION_RECORDED events), rendered as a second, worse view: seven
-          columns of the same rows, growing forever, at the bottom of a page
-          whose job is the opposite one. Alerts is a work queue, things leave it
-          when handled. Activity is the permanent record, nothing ever leaves.
-          Keeping both meant the page that should shrink as you work also grew
-          as you worked. */}
-      {decisions.length > 0 && (
-        <div style={{ marginTop: 4, marginBottom: 24 }}>
-          <Link to="/activity" style={{
-            display: "inline-flex", alignItems: "center", gap: 7,
-            fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)",
-            textDecoration: "none", padding: "8px 14px",
-            border: "1px solid var(--border)", borderRadius: "var(--radius)",
-            background: "var(--card-bg)",
-          }}>
-            <History size={13} />
-            {decisions.length} decision{decisions.length === 1 ? "" : "s"} recorded
-            <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>View in Activity</span>
-          </Link>
-        </div>
-      )}
 
       {/* ── AI explanation modal ── */}
       {aiModal && (
@@ -364,6 +398,133 @@ export default function Alerts() {
           onClose={() => setApprovalModal(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ── Needs action ──────────────────────────────────────────────────────────────
+// The queue: type tiles that double as the filter, then the alerts grouped by severity. Things leave this
+// list when handled (a decision or a dismissal); the record of them is the History view.
+function NeedsAction({ allCount, forProduct, filtered, counts, filter, setFilter, skuFilter, clearProduct, onDismiss, onAskAI, onApprove, highlightId }) {
+  const groups = ["critical", "warning", "info"]
+    .map((sev) => ({ sev, items: filtered.filter((a) => a.severity === sev) }))
+    .concat([{ sev: "other", items: filtered.filter((a) => !SEVERITY_ORDER.hasOwnProperty(a.severity)) }])
+    .filter((g) => g.items.length > 0);
+
+  return (
+    <div>
+      {/* ── Summary tiles - these ARE the filter control (click to filter, click again to clear); a separate
+          row of filter pills used to sit right below repeating the exact same counts and the exact same
+          click target, which was the same "two widgets, one job" pattern fixed on the Dashboard. ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 12 }}>
+        {Object.entries(TYPE_META).map(([type, meta]) => {
+          const Icon = meta.icon;
+          const count = counts[type] || 0;
+          const isActive = filter === type;
+          return (
+            <button key={type} type="button" onClick={() => setFilter(isActive ? "ALL" : type)} aria-pressed={isActive}
+              // A zero tile is still a useful filter target, but it should not compete with the categories
+              // that actually have something in them. Recede it rather than removing it, so the row stays a
+              // stable, predictable set of six.
+              style={{
+                background: isActive ? meta.bg : "var(--card-bg)",
+                border: `1px solid ${isActive ? meta.color : "var(--border)"}`,
+                borderRadius: "var(--radius-lg)", padding: "12px 14px",
+                cursor: "pointer", transition: "all 0.15s", textAlign: "left", font: "inherit",
+                opacity: count === 0 && !isActive ? 0.55 : 1,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                <Icon size={14} color={count > 0 ? meta.color : "var(--text-muted)"} />
+                <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: count > 0 ? meta.color : "var(--text-muted)" }}>{meta.label}</span>
+                <ColHint label={meta.label} what={TYPE_HINTS[type].what} how={TYPE_HINTS[type].how} />
+              </div>
+              <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: count > 0 ? meta.color : "var(--text-muted)" }}>{count}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {filter !== "ALL" && (
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600,
+          background: "var(--blue-light)", color: "var(--blue-text)", padding: "4px 10px 4px 12px",
+          borderRadius: 99, marginBottom: 14,
+        }}>
+          Filtering by {TYPE_META[filter]?.label}
+          <button type="button" onClick={() => setFilter("ALL")} aria-label="Clear filter" className="hit-44-icon"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", display: "flex", padding: 2 }}>
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div className="card" style={{ padding: 44, textAlign: "center" }}>
+          <CheckCircle size={26} color={forProduct.length === 0 ? "var(--green-text)" : "var(--text-muted)"} />
+          <div style={{ fontSize: "var(--text-base)", fontWeight: 600, marginTop: 10 }}>
+            {allCount === 0 ? "Nothing needs action" : forProduct.length === 0 ? "No alerts for this product" : "No alerts match this filter"}
+          </div>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 6 }}>
+            {allCount === 0
+              ? "All inventory levels are healthy. Everything handled so far is in History."
+              : forProduct.length === 0
+                ? `The other ${allCount === 1 ? "alert is" : `${allCount} alerts are`} on different products.`
+                : "Clear the filter to see the rest."}
+          </div>
+          {(filter !== "ALL" || (skuFilter && allCount > 0)) && (
+            <button type="button" onClick={() => { setFilter("ALL"); if (skuFilter) clearProduct(); }} className="ms-btn" style={{
+              marginTop: 14, padding: "8px 16px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--card-bg)",
+              fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer",
+            }}>Clear filters</button>
+          )}
+        </div>
+      ) : (
+        groups.map((g, gi) => (
+          <section key={g.sev} aria-label={`${SEVERITY_LABEL[g.sev] || "Other"} alerts`} style={{ marginTop: gi === 0 ? 4 : 22 }}>
+            <h2 style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)", margin: "0 0 10px" }}>
+              {SEVERITY_LABEL[g.sev] || "Other"} · {g.items.length}
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {g.items.map((alert) => (
+                <AlertCard key={alert.id} alert={alert} highlight={highlightId === alert.id}
+                  onDismiss={onDismiss} onAskAI={onAskAI} onApprove={onApprove} />
+              ))}
+            </div>
+          </section>
+        ))
+      )}
+    </div>
+  );
+}
+
+// What happened to one alert, read from the audit log (raised, dismissed or reopened, and decisions on the
+// same product and type), oldest first.
+function AlertHistory({ id }) {
+  const [events, setEvents] = useState(null);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    let live = true;
+    api.getAlertHistory(id).then((d) => live && setEvents(d)).catch((e) => live && setError(e.message));
+    return () => { live = false; };
+  }, [id]);
+  return (
+    <div style={{ marginTop: 10 }}>
+      {error && <div role="alert" style={{ fontSize: "var(--text-xs)", color: "var(--red-text)" }}>Could not load the history: {error}</div>}
+      {!error && events === null && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Loading…</div>}
+      {!error && events && events.length === 0 && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>No history recorded yet.</div>}
+      {!error && events && events.map((e, i) => (
+        // The alert's own text is on the card right above, so "raised" says only when and how badly.
+        <EventRow key={e.id} event={e} isLast={i === events.length - 1} timeStyle="exact"
+          override={e.event_type === "ALERT_TRIGGERED"
+            ? { headline: "Raised", detail: [
+              `${SEVERITY_LABEL[e.output_data?.severity] || "An"} alert.`,
+              e.input_data?.triggered_value != null
+                ? `Measured ${e.input_data.triggered_value}${e.input_data.threshold_value != null ? ` against a threshold of ${e.input_data.threshold_value}` : ""}.`
+                : null,
+            ].filter(Boolean).join(" ") }
+            : null} />
+      ))}
     </div>
   );
 }
@@ -406,7 +567,8 @@ function ActionButton({ onClick, children, variant = "quiet", title }) {
   );
 }
 
-function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
+function AlertCard({ alert, onDismiss, onAskAI, onApprove, highlight = false }) {
+  const [showHistory, setShowHistory] = useState(false);
   const meta = TYPE_META[alert.alert_type] || TYPE_META.REORDER;
   const Icon = meta.icon;
 
@@ -430,10 +592,12 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
   // `overflow: hidden` matters. The severity stripe is a 3px left border, and
   // without it the stripe squares off the card's rounded top and bottom corners.
   return (
-    <div className="card" style={{
+    <div className="card" id={`alert-${alert.id}`} style={{
       padding: 0,
       overflow: "hidden",
       borderLeft: `3px solid ${SEVERITY_STRIPE[alert.severity] || "var(--border)"}`,
+      // The card a History row just opened is marked for a moment so the eye finds it.
+      boxShadow: highlight ? "0 0 0 3px var(--blue)" : undefined, transition: "box-shadow 0.3s ease",
     }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 20px" }}>
         <div style={{
@@ -486,10 +650,19 @@ function AlertCard({ alert, onAcknowledge, onAskAI, onApprove }) {
               <Cpu size={12} /> Why?
             </ActionButton>
             <span aria-hidden style={{ width: 1, height: 18, background: "var(--border)", margin: "0 3px" }} />
-            <ActionButton onClick={() => onAcknowledge(alert.id)} title="Dismiss without recording a decision">
+            <ActionButton onClick={() => onDismiss(alert)} title="Dismiss without recording a decision. You can undo it right after, or reopen it from History.">
               <CheckCircle size={12} /> Dismiss
             </ActionButton>
           </div>
+
+          {/* What has happened to this alert, one click away, so the queue and the record are read together. */}
+          <button type="button" onClick={() => setShowHistory((v) => !v)} aria-expanded={showHistory} className="touch-44" style={{
+            display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, padding: "6px 0", border: "none", background: "none", cursor: "pointer",
+            fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
+          }}>
+            {showHistory ? <ChevronDown size={12} /> : <ChevronRight size={12} />} History
+          </button>
+          {showHistory && <AlertHistory id={alert.id} />}
         </div>
 
         {/* The metric, quieter than before. At 24px bold in the type colour it
@@ -515,7 +688,7 @@ function AiModal({ aiModal, onClose }) {
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "var(--modal-bg)", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: 560, maxHeight: "85vh", overflowY: "auto", boxShadow: "var(--shadow-md)" }}>
+      <div role="dialog" aria-modal="true" aria-label="Why this was flagged" style={{ background: "var(--modal-bg)", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: "min(560px, calc(100vw - 32px))", maxHeight: "85vh", overflowY: "auto", boxShadow: "var(--shadow-md)" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -527,7 +700,7 @@ function AiModal({ aiModal, onClose }) {
               <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{alert.sku_name} · {alert.alert_type.replace(/_/g, " ")}</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="hit-44-icon" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
         </div>
 
         {/* Disclaimer - was "AI-generated analysis", which overstated what
@@ -535,12 +708,15 @@ function AiModal({ aiModal, onClose }) {
             fields, not a live model call (TASK-11 needs an API key that
             isn't available yet). Corrected to say so plainly rather than
             claim a capability that doesn't exist yet. */}
-        <div style={{ padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--yellow-text)", marginBottom: 18 }}>
-          {degraded
-            ? "\u26A0\uFE0F This SKU's current figures could not be loaded, so only the alert's own text is shown. Reopen after a refresh for the full reasoning."
-            : narrative?.available
-              ? "\u26A0\uFE0F The summary is written by a model from the figures below, which the engines computed. The model is told never to calculate anything itself, so every number is checkable against the Inventory page. All recommendations require manager approval before action is taken."
-              : "\u26A0\uFE0F Traced from this SKU's computed figures by the rules in design.md. Every number below can be checked against the Inventory page. All recommendations require manager approval before action is taken."}
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 12px", background: "var(--yellow-light)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-xs)", color: "var(--yellow-text)", marginBottom: 18 }}>
+          <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden />
+          <span>
+            {degraded
+              ? "This SKU's current figures could not be loaded, so only the alert's own text is shown. Reopen after a refresh for the full reasoning."
+              : narrative?.available
+                ? "The summary is written by a model from the figures below, which the engines computed. The model is told never to calculate anything itself, so every number is checkable against the Inventory page. All recommendations require manager approval before action is taken."
+                : "Traced from this SKU's computed figures by the rules in design.md. Every number below can be checked against the Inventory page. All recommendations require manager approval before action is taken."}
+          </span>
         </div>
 
         {/* Model written summary, above the trace it was built from. Shown
@@ -675,10 +851,10 @@ function ApprovalModal({ alert, sku, preAction = "approved", onDecide, onClose }
   return (
     <div onClick={(e) => e.target === e.currentTarget && onClose()}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "var(--modal-bg)", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: 480, boxShadow: "var(--shadow-md)" }}>
+      <div role="dialog" aria-modal="true" aria-label="Manager decision" style={{ background: "var(--modal-bg)", borderRadius: "var(--radius-lg)", padding: "28px 30px", width: "min(480px, calc(100vw - 32px))", maxHeight: "90vh", overflowY: "auto", boxShadow: "var(--shadow-md)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>Manager Decision</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="hit-44-icon" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}><X size={18} /></button>
         </div>
 
         {/* Context */}
@@ -720,18 +896,20 @@ function ApprovalModal({ alert, sku, preAction = "approved", onDecide, onClose }
             <label style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8 }}>Decision</label>
             <div style={{ display: "flex", gap: 8 }}>
               {[
-                { value: "approved", label: "✓ Approve", activeColor: "var(--green)", activeBg: "var(--green-light)" },
-                { value: "modified", label: "✏ Modify",  activeColor: "var(--yellow)", activeBg: "var(--yellow-light)" },
-                { value: "rejected", label: "✕ Reject",  activeColor: "var(--red)", activeBg: "var(--red-light)" },
+                { value: "approved", label: "Approve", Icon: Check,  activeColor: "var(--green)", activeBg: "var(--green-light)" },
+                { value: "modified", label: "Modify",  Icon: Pencil, activeColor: "var(--yellow)", activeBg: "var(--yellow-light)" },
+                { value: "rejected", label: "Reject",  Icon: X,      activeColor: "var(--red)", activeBg: "var(--red-light)" },
               ].map((opt) => (
                 <button key={opt.value} type="button" onClick={() => setAction(opt.value)}
+                  aria-pressed={action === opt.value}
                   style={{
                     flex: 1, padding: "8px", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", fontWeight: 600, cursor: "pointer",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
                     border: `1px solid ${action === opt.value ? opt.activeColor : "var(--border)"}`,
                     background: action === opt.value ? opt.activeBg : "var(--surface)",
                     color: action === opt.value ? opt.activeColor : "var(--text-secondary)",
                   }}>
-                  {opt.label}
+                  <opt.Icon size={14} aria-hidden /> {opt.label}
                 </button>
               ))}
             </div>
@@ -774,7 +952,9 @@ function ApprovalModal({ alert, sku, preAction = "approved", onDecide, onClose }
           </div>
 
           {submitError && (
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--red-text)", marginBottom: 12 }}>⚠ {submitError}</div>
+            <div role="alert" style={{ display: "flex", gap: 6, alignItems: "center", fontSize: "var(--text-xs)", color: "var(--red-text)", marginBottom: 12 }}>
+              <AlertTriangle size={13} aria-hidden /> {submitError}
+            </div>
           )}
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>

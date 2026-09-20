@@ -42,6 +42,7 @@ Four deliverables. Status as of 15 Sep.
   (the table before the Edit button fix) and `16-why.jpg` (the summary before urgency wording was
   removed). Then rebuild the PDF: `python3 docs/Guide/build-pdf.py`.
 - **Check the merged app once in a browser** (20 Sep): Onboarding's opening balance step (new route, tested on a scratch database only), then reseed. The sample-data button and the requests card were checked on 20 Sep.
+- **Recapture the features guide's Activity screenshot** (`docs/Guide/images/18-activity.jpg`): Activity is now the History view inside Alerts (20 Sep), so the picture shows the old page. Then rebuild the PDF.
 - **Order requests, the fuller version** (next step for that feature, when there is time): see the section below. Do not start it before the deploy is done.
 - **Show Tawmo the merge** (PR #5, 20 Sep): if she wants changes, fix on a new branch; undo is `git revert -m 1 15153c4`.
 
@@ -106,6 +107,7 @@ after the alert is the second half of the loop. The deadline work (deploy, video
 | Urgency in model summaries | removed by a rule after the model answers, not by retries (15 Sep) | free and predictable; design.md, "Explanation Layer", Tone |
 | How documents and rules are kept | filed by reader, listed in `docs/DIRECTORY.md`, every rule in `.kiro/steering/rules.md`, one owner per fact (15 Sep) | `.kiro/steering/rules.md` |
 | Duties split and opening balance (20 Sep) | the office writes no stock; stock moves on the warehouse floor. Onboarding's first count uses one audited, once-per-product action (OB-0001, movement type OPENING) allowed only where on hand is 0 | keeps the office from topping up live stock while still letting a new catalogue start; requirements.md, REQ-11 |
+| Alerts and Activity in one tab (20 Sep) | one Alerts tab with two views, Needs action and History; two lists, joined at the item; dismissing an alert can be undone | Stan asked for one tab so an alert and its history can be read together. Industry keeps the to-do list and the record separate and links them at the item, so the lists were not interleaved; design.md, "Alerts tab" |
 | Public-server writes (20 Sep) | stock movements, order requests, signal decisions and opening balances are accepted only in the demo sandbox unless ALLOW_LIVE_WAREHOUSE_WRITES=1 | `backend/src/middleware/sandboxGuard.js` |
 | Onboarding shape | sequential, story-style (progress bar, Back, Skip advances/exits); no "minimize and resume from anywhere" chip (17 Sep) | reversed an earlier decision in the same feature branch; nothing to resume into once a skip just means finishing setup later through Inventory or Bulk edit like any other data entry |
 | Onboarding order: catalog before sales, never the reverse (17 Sep) | catalog-first stays; someone with both files ready can attach sales to the SAME upload instead of a separate step | a sales row has no product_name, variety, origin, packaging or supplier to build a catalog row FROM - reversing the order would mean SKUs created with a reorder policy and safety stock of 0, which reads as healthy everywhere, not as unconfigured |
