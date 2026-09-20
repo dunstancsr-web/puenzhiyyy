@@ -1112,6 +1112,7 @@ router.post("/skus/import", (req, res) => {
 const { runForecast, backtest, monthlySeries, getActiveForecast, MODEL_IDS } = require("../engines/forecast");
 const { computeSafetyStock } = require("../engines/safetystock");
 const { computeRiskBuffer } = require("../engines/riskbuffer");
+const { suggestSettings, REVIEW_PERIOD_DAYS } = require("../engines/onboardingSuggestions");
 
 // GET /api/forecast/models — the shortlist + auto, shaped like GET /api/llm/mode
 // so the frontend picker follows the same convention as the explanation tiers.
@@ -1317,7 +1318,6 @@ router.get("/skus/:id/inventory-history", (req, res) => {
 // preview, not a save. Requires an active forecast (Recompute first): this
 // page's whole premise is "what would forecast-driven policy look like,"
 // which has no answer before a forecast exists.
-const REVIEW_PERIOD_DAYS = 30; // assumed periodic review cycle; not yet tracked per SKU by this app
 router.post("/skus/:id/forecast/preview", (req, res) => {
   const b = req.body || {};
   try {
@@ -1369,6 +1369,53 @@ router.post("/skus/:id/forecast/preview", (req, res) => {
   }
 });
 const round1 = (n) => Math.round(n * 10) / 10;
+
+// ── Onboarding suggested settings (MVP2 Day 8) ─────────────────────────────
+// GET returns a suggestion per active SKU (never writes). POST applies the
+// values the manager kept, through applySkuUpdate — the same function PUT
+// /api/skus/:id uses, so a batch accept and a hand edit go through one path.
+router.get("/onboarding/suggested-settings", (req, res) => {
+  try {
+    const { skus } = getAnalytics();
+    res.json({ success: true, data: suggestSettings(skus) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to compute suggested settings" });
+  }
+});
+
+router.post("/onboarding/suggested-settings/apply", (req, res) => {
+  const b = req.body || {};
+  const skuUpdates = Array.isArray(b.skus) ? b.skus : [];
+  if (!skuUpdates.length) return res.status(400).json({ success: false, message: "skus must be a non-empty array" });
+
+  for (const u of skuUpdates) {
+    if (!u.sku_id) return res.status(400).json({ success: false, message: "Each sku update must include sku_id" });
+    const numericError = validateNumericFields(u);
+    if (numericError) return res.status(400).json({ success: false, message: `${u.sku_id}: ${numericError}` });
+  }
+
+  try {
+    const db = getDb();
+    // Checked before the transaction starts, not inside it: applySkuUpdate silently
+    // updates 0 rows for an unknown sku_id, which would otherwise report success
+    // for a SKU that was never touched (client/server state mismatch).
+    for (const u of skuUpdates) {
+      const known = db.prepare(`SELECT 1 FROM skus WHERE sku_id = ? AND active = 1`).get(u.sku_id);
+      if (!known) return res.status(404).json({ success: false, message: `SKU not found: ${u.sku_id}` });
+    }
+    db.transaction(() => {
+      for (const u of skuUpdates) {
+        const { sku_id, ...fields } = u;
+        applySkuUpdate(db, sku_id, fields);
+      }
+    })();
+    res.json({ success: true, applied: skuUpdates.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to apply suggested settings" });
+  }
+});
 
 // POST /api/skus/import-new — CREATE SKUs from a spreadsheet (MVP2 onboarding)
 //

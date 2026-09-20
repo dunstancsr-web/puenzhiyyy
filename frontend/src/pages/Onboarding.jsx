@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Upload, TrendingUp, Sparkles, X, ChevronLeft, Info } from "lucide-react";
+import { Package, Upload, TrendingUp, Sparkles, X, ChevronLeft, Info, Settings2, Check } from "lucide-react";
 import { api } from "../api/inventory";
 import { ImportPreview, Toast } from "../components/ImportPreview";
+import { SuggestedSettingsReview } from "../components/SuggestedSettingsReview";
 import Modal, { ModalBtn } from "../components/Modal";
 import ColHint from "../components/ColHint";
 import { Seal, CLIENT_EN } from "../components/Tenant";
 import { dismissOnboarding, clearDismissal } from "../lib/onboardingResume";
 import { armForecastNudge } from "../lib/forecastNudge";
 
-const TOTAL_STEPS = 2;
+const TOTAL_STEPS = 3;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ONBOARDING (MVP2 step 1), the real build of the "Day Zero" mockup Stan
@@ -133,28 +134,74 @@ function pickNeedsAttention(skus) {
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1 = catalog, 2 = sales history
+  const [step, setStep] = useState(1); // 1 = catalog, 2 = sales history, 3 = review suggested settings
   // A full reload, not navigate("/"): reachable from Home's OWN inline render
   // of this component when the catalog is empty, so we're already at "/" and
   // a client-side navigate to the same path never re-renders Home to notice
   // the new isDismissed() value (same reasoning as trySampleData below).
   const exitOnboarding = useCallback(() => { dismissOnboarding(); window.location.href = "/"; }, []);
-  // Story-style: Skip moves to the next step, and on the last one there's
-  // nowhere further to go, so it means the same thing as closing.
-  const skipStep = useCallback(() => {
-    if (step < TOTAL_STEPS) setStep(step + 1);
-    else exitOnboarding();
-  }, [step, exitOnboarding]);
   const backStep = useCallback(() => setStep((s) => Math.max(1, s - 1)), []);
   const [skuCount, setSkuCount] = useState(null);
   const [addedSkus, setAddedSkus] = useState(null); // { count, names } after a catalog upload this session
 
-  const [busy, setBusy] = useState(null); // "read" | "apply" | "export" | "sample"
+  const [busy, setBusy] = useState(null); // "read" | "apply" | "export" | "sample" | "suggestions"
   const [error, setError] = useState(null);
   const [preview, setPreview] = useState(null);
   const [csv, setCsv] = useState(null);
   const datasetRef = useRef("skus");
   const fileRef = useRef(null);
+
+  // Step 3 state, loaded once on entering the step (not eagerly, since it's
+  // a real query over the whole portfolio via getAnalytics()).
+  const [suggestions, setSuggestions] = useState(null);
+  const [included, setIncluded] = useState(new Set());
+  const enterReviewStep = useCallback(() => {
+    setStep(3);
+    setBusy("suggestions"); setError(null);
+    api.getSuggestedSettings()
+      .then((data) => {
+        setSuggestions(data);
+        setIncluded(new Set(data.map((s) => s.sku_id)));
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setBusy(null));
+  }, []);
+  // Story-style: Skip moves to the next step, and on the last one there's
+  // nowhere further to go, so it means the same thing as closing.
+  const skipStep = useCallback(() => {
+    if (step === 2) enterReviewStep();          // loads the suggestions the last step shows
+    else if (step < TOTAL_STEPS) setStep(step + 1);
+    else exitOnboarding();
+  }, [step, exitOnboarding, enterReviewStep]);
+  const toggleIncluded = useCallback((skuId) => {
+    setIncluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(skuId)) next.delete(skuId); else next.add(skuId);
+      return next;
+    });
+  }, []);
+  const applySuggestions = useCallback(async () => {
+    setBusy("apply"); setError(null);
+    try {
+      const payload = suggestions
+        .filter((s) => included.has(s.sku_id))
+        .map((s) => ({
+          sku_id: s.sku_id,
+          target_service_level: s.target_service_level.suggested,
+          target_stock: s.target_stock.suggested,
+          lead_time_days: s.lead_time_days.suggested,
+        }));
+      if (payload.length) await api.applySuggestedSettings(payload);
+      // A full reload, not navigate("/"), for the same reason as exitOnboarding above.
+      clearDismissal();
+      window.location.href = "/";
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }, [suggestions, included]);
+
 
   // A second, optional file attached to the SAME catalog review, so someone
   // with both spreadsheets ready doesn't have to sit through two separate
@@ -364,16 +411,10 @@ export default function Onboarding() {
       if (which !== "skus") {
         // The standalone step 2 upload: sales on their own, catalog already done.
         setPreview(null); setCsv(null);
-        clearDismissal();
         armForecastNudge();
-        // A full reload, not navigate("/") - same reason as exitOnboarding
-        // above: reachable from Home's own inline render when the catalog was
-        // empty, so we're already at "/" and a client-side navigate to the
-        // same path never re-renders Home to notice the SKU count changed.
-        // Left as a plain navigate() here until now, so finishing sales from
-        // that entry point looked like nothing happened - the apply had
-        // genuinely gone through underneath, only the screen was stuck.
-        window.location.href = "/";
+        // Sales are in; the last step is reviewing the suggested settings. That step ends with the full
+        // reload home (see applySuggestions), which is what makes Home notice the new catalog.
+        enterReviewStep();
         return;
       }
 
@@ -406,7 +447,7 @@ export default function Onboarding() {
     } finally {
       setBusy(null);
     }
-  }, [csv, salesCsv, preview, loadCount, navigate, clearSalesAttachment]);
+  }, [csv, salesCsv, preview, loadCount, clearSalesAttachment, enterReviewStep]);
 
   const downloadTemplate = useCallback(async () => {
     setError(null); setBusy("export");
@@ -443,7 +484,7 @@ export default function Onboarding() {
 
   return (
     <div style={{ minHeight: "calc(100vh - var(--demo-banner-height))", background: "var(--bg)", display: "flex", justifyContent: "center", padding: "clamp(32px, 8vh, 80px) 20px 48px" }}>
-      <div style={{ width: "100%", maxWidth: 620 }}>
+      <div style={{ width: "100%", maxWidth: step === 3 ? 760 : 620 }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
           <Seal size={30} />
@@ -630,6 +671,34 @@ export default function Onboarding() {
               <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.6, borderTop: "1px solid var(--border)", paddingTop: 16, marginTop: 24 }}>
                 You can always come back to this from <Code>Bulk edit → Upload sales history</Code> once you're inside the app.
               </div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="card" style={{ padding: 36 }}>
+            <StepIcon icon={Settings2} bg="var(--blue-light)" fg="var(--blue)" />
+            <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, lineHeight: 1.2, margin: "0 0 10px" }}>
+              Start from sensible settings, not blank defaults.
+            </h1>
+            <p style={{ fontSize: "var(--text-base)", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 26px", maxWidth: "60ch" }}>
+              Every product below is suggested a target service level and target stock from its own data, instead of the raw defaults every new product starts with. Uncheck anything you'd rather set by hand later.
+            </p>
+
+            {busy === "suggestions" && (
+              <div style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)", padding: "20px 0" }}>Computing suggestions…</div>
+            )}
+
+            {suggestions && (
+              <SuggestedSettingsReview suggestions={suggestions} included={included} onToggle={toggleIncluded} />
+            )}
+
+            <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
+              <BigButton primary icon={Check}
+                label={busy === "apply" ? "Applying…" : `Apply to ${included.size} product${included.size === 1 ? "" : "s"}`}
+                disabled={busy === "apply" || !suggestions || included.size === 0}
+                onClick={applySuggestions} />
+              <BigButton label="Skip for now" onClick={exitOnboarding} />
             </div>
           </div>
         )}

@@ -1,5 +1,11 @@
 # Submission tracker
 
+> **This copy is stale (still 15 Sep).** The current tracker (17 Sep: MVP2 merge status, the
+> archived video script decision, the corrected engine count) lives on branch
+> `docs/mvp2-tracker-update` / PR #3, not yet merged to `main` as of 17 Sep. Read that version, not
+> this one, until the branches converge. This note exists so starting a fresh session on the wrong
+> branch doesn't mean trusting an out-of-date status.
+
 AWS NUS-ISS SMYA 2026 Hackathon. **Shortlisting deadline: 28 September 2026, 9:00am. Finale: 10 October.**
 
 Four deliverables. Status as of 20 Sep.
@@ -58,6 +64,7 @@ already open. Past events (practice) never offer it.
 request, as the warehouse endpoint does today (one receipt closes it)? Should approval depend on a spend
 threshold, so a small order skips the manager, as real purchasing does? Does the manager step need its own
 screen once there is a login, instead of a button on the card?
+- **Onboarding's last step, "Review suggested settings"** (PR #4, MVP2 Day 8) was brought up to date with `main` on 20 Sep: it now follows sales history in the story-style flow (Skip on sales leads into it, finishing reloads Home). Click it through once in demo mode before recording.
 
 ## Decisions already made
 
