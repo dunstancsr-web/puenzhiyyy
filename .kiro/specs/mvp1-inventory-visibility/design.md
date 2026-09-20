@@ -928,6 +928,8 @@ were 16 chips) and by product, 200 at a time with "Show older events", each row 
 output one click away. `GET /api/audit` takes several event types separated by commas and counts scoped to
 the product.
 
+**Filtering History (20 Sep).** The old Activity page had one chip per event type (15). The merged page groups them into five chips (fewer, clearer), and a **Type** menu beside them lists every type that has occurred, with its count, grouped by category, so the exact filter is still one click away. Choosing a type also selects its group chip; choosing a group chip clears the type. Filtering is on the server, so the older-events limit applies to the filtered set.
+
 ### Forecast Detail Page (MVP2 Day 5, Data Story added 17 Sep)
 `frontend/src/pages/ForecastDetail.jsx`, at `/inventory/:skuId/forecast` — the one exception to "no
 separate SKU detail page" (see Projected Inventory above). A plain-English "What your data tells us"

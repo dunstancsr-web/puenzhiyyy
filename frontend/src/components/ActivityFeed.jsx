@@ -479,11 +479,14 @@ export default function ActivityFeed({ skuId, activeAlertIds, dismissedAlertIds,
   const [events, setEvents] = useState([]);
   const [counts, setCounts] = useState({});
   const [category, setCategory] = useState("ALL");
+  // One exact event type, chosen from the Type menu (the old page had a chip per type; the five group chips
+  // are coarser, so this keeps the fine filter one click away). "" means every type in the chosen group.
+  const [typeFilter, setTypeFilter] = useState("");
   const [limit, setLimit] = useState(PAGE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const types = category === "ALL" ? undefined : CATEGORIES.find((c) => c.id === category)?.types.join(",");
+  const types = typeFilter || (category === "ALL" ? undefined : CATEGORIES.find((c) => c.id === category)?.types.join(","));
 
   // Filtering happens on the server so the limit applies to the filtered set, not to a page of mixed events
   // that might hold none of the chosen kind. `quiet` reloads without replacing the list with a spinner, so
@@ -506,7 +509,18 @@ export default function ActivityFeed({ skuId, activeAlertIds, dismissedAlertIds,
   useEffect(() => { if (refreshKey) load(true); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useLiveRefresh(() => { load(true); });
   // Changing the product or the category starts again from the first page.
-  useEffect(() => { setLimit(PAGE); }, [category, skuId]);
+  useEffect(() => { setLimit(PAGE); }, [category, typeFilter, skuId]);
+  // A group chip clears the exact type; picking a type selects its group so the chip shows where you are.
+  const chooseCategory = (id) => { setCategory(id); setTypeFilter(""); };
+  const chooseType = (t) => {
+    setTypeFilter(t);
+    if (t) setCategory(CATEGORIES.find((c) => c.types.includes(t))?.id || "ALL");
+  };
+  // Every type that has occurred, grouped by its category, for the Type menu.
+  const typeGroups = CATEGORIES
+    .map((c) => ({ ...c, present: c.types.filter((t) => counts[t] > 0) }))
+    .filter((c) => c.present.length > 0);
+  const typeOptionCount = typeGroups.reduce((n, c) => n + c.present.length, 0);
 
   const total = useMemo(() => Object.values(counts).reduce((a, b) => a + b, 0), [counts]);
   const chips = CATEGORIES
@@ -550,11 +564,11 @@ export default function ActivityFeed({ skuId, activeAlertIds, dismissedAlertIds,
     <div>
       {/* Only categories that have actually occurred get a chip: a row of zeroes is a legend pretending to be a control. */}
       {chips.length > 1 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }} role="group" aria-label="Filter the history">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16, alignItems: "center" }} role="group" aria-label="Filter the history">
           {[{ id: "ALL", label: "All", count: total }, ...chips].map((c) => {
             const isActive = category === c.id;
             return (
-              <button key={c.id} type="button" onClick={() => setCategory(c.id)} aria-pressed={isActive} className="ms-btn" style={{
+              <button key={c.id} type="button" onClick={() => chooseCategory(c.id)} aria-pressed={isActive} className="ms-btn" style={{
                 display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 13px", borderRadius: 99, cursor: "pointer",
                 fontSize: "var(--text-xs)", fontWeight: 600,
                 border: `1px solid ${isActive ? "var(--text-primary)" : "var(--border)"}`,
@@ -567,6 +581,19 @@ export default function ActivityFeed({ skuId, activeAlertIds, dismissedAlertIds,
               </button>
             );
           })}
+          {typeOptionCount > 1 && (
+            <select aria-label="Filter by exact event type" className="ms-select" value={typeFilter} onChange={(e) => chooseType(e.target.value)} style={{
+              marginLeft: "auto", padding: "6px 10px", borderRadius: "var(--radius)", border: "1px solid var(--border)",
+              background: "var(--card-bg)", color: "var(--text-secondary)", fontSize: "var(--text-xs)", fontWeight: 600, cursor: "pointer",
+            }}>
+              <option value="">Any type</option>
+              {typeGroups.map((g) => (
+                <optgroup key={g.id} label={g.label}>
+                  {g.present.map((t) => <option key={t} value={t}>{(TYPE_META[t]?.label || t)} ({counts[t]})</option>)}
+                </optgroup>
+              ))}
+            </select>
+          )}
         </div>
       )}
 
@@ -578,11 +605,11 @@ export default function ActivityFeed({ skuId, activeAlertIds, dismissedAlertIds,
           <div style={{ textAlign: "center", padding: "56px 20px" }}>
             <FileSearch size={26} color="var(--text-muted)" />
             <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--text-primary)", marginTop: 12 }}>
-              {skuId || category !== "ALL" ? "Nothing matches this filter" : "Nothing recorded yet"}
+              {skuId || category !== "ALL" || typeFilter ? "Nothing matches this filter" : "Nothing recorded yet"}
             </div>
             <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 6, maxWidth: 420, marginInline: "auto", lineHeight: 1.6 }}>
-              {skuId || category !== "ALL"
-                ? "Try another category, or choose All products."
+              {skuId || category !== "ALL" || typeFilter
+                ? "Try another category or type, or choose All products."
                 : "This record fills itself as the system runs. Alerts, decisions, stock movements and policy changes appear here as they happen."}
             </div>
           </div>
