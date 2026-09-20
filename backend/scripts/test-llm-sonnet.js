@@ -240,6 +240,24 @@ const reply = (res, content, extra = {}) => {
     assert.ok(/Decide what to order/.test(out.text));
   });
 
+  await check("a delivery gap is stated by the system, and a bullet promising new stock arrives in time is removed", async () => {
+    // The live answer that prompted this: 45 days to deliver, 28 days of stock, and Sonnet told the manager to order
+    // now "so the new stock arrives before you run low".
+    script("- Your supplier takes {lead_time} to deliver, so an order now arrives after you run out.\n- Order now so the new stock arrives before you run low.\n- You should order more to avoid running out.\n- Decide what to order.");
+    const out = await explainActionItem({ kind: "stockout", sku, item: { ...item, nearest: { days: 16 } }, tier: "cloud" });
+    assert.strictEqual(scripted.calls.length, 1);
+    assert.ok(/would arrive about \d+ days after it runs out/.test(out.text), out.text);
+    assert.ok(!/arrives before you run low|avoid running out/.test(out.text), out.text);
+    assert.ok(/arrives after you run out/.test(out.text) && /Decide what to order/.test(out.text), "the true bullets stay: " + out.text);
+    assert.ok(/Say nothing about when an order would arrive/.test(scripted.calls[0].user), "the prompt tells the model to leave timing to the system");
+  });
+  await check("with no delivery gap the same wording is true, so it stays and no gap sentence is added", async () => {
+    script("- Order now so the new stock arrives before you run low.\n- Decide what to order.");
+    const out = await explainActionItem({ kind: "stockout", sku: { ...sku, lead_time_days: 10 }, item: { ...item, nearest: { days: 61 } }, tier: "cloud" });
+    assert.ok(/arrives before you run low/.test(out.text), out.text);
+    assert.ok(!/would arrive about/.test(out.text), out.text);
+  });
+
   const { askDatabase } = require("../src/llm/askDatabase");
   const { paidSpend } = require("../src/llm/spend");
   const ask = (q) => askDatabase({ question: q, db, analytics, tier: "cloud" });
