@@ -15,21 +15,27 @@ import { api } from "../api/inventory";
 // names who would do it in a real business. The server fixes the actor from the step itself.
 // Hidden entirely when nothing is in progress, so it never adds empty chrome to the page.
 
-const ACTIVE = "open,acknowledged,po_raised";
+const ACTIVE = "open,acknowledged,po_raised,approved";
+const ENDED = "received,rejected,cancelled";
+const RECENT_DAYS = 7; // how long a finished request stays on the card, so a completed timeline can be seen
 
 // What each status means to a reader, and the one step that moves it forward.
 const STEP = {
   open:         { state: "Waiting for the buyer",       next: { status: "acknowledged", label: "Buyer acknowledges", who: "buyer" } },
   acknowledged: { state: "Buyer acknowledged",          next: { status: "po_raised", label: "Buyer raises purchase order", who: "buyer" } },
   po_raised:    { state: "Waiting for manager approval", next: { status: "approved", label: "Manager approves", who: "buyer's manager" } },
+  // No button: the next step is the warehouse receiving the delivery on the handheld (Goods In).
+  approved:     { state: "Approved, waiting for the delivery to arrive at Goods In", next: null },
 };
+const ENDED_STATE = { received: "Delivered and received", rejected: "Rejected by the manager", cancelled: "Cancelled" };
 
 // One line per timeline entry: what happened, in plain words.
 const EVENT_TEXT = {
   open: "Request sent to the buyer",
   acknowledged: "Buyer acknowledged the request",
   po_raised: "Buyer raised a purchase order and sent it for approval",
-  approved: "Buyer's manager approved the purchase order",
+  approved: "Buyer's manager approved the purchase order, now expected at Goods In",
+  received: "Delivery received at Goods In, request closed",
   rejected: "Buyer's manager rejected the purchase order",
   cancelled: "Request cancelled",
 };
@@ -72,7 +78,15 @@ export default function OrderRequestsCard({ refreshKey }) {
   const [error, setError] = useState(null);
 
   const load = useCallback(() => {
-    api.getOrderRequests({ status: ACTIVE }).then(setRequests).catch(() => setRequests([]));
+    Promise.all([api.getOrderRequests({ status: ACTIVE }), api.getOrderRequests({ status: ENDED })])
+      .then(([active, ended]) => {
+        const cutoff = Date.now() - RECENT_DAYS * 86_400_000;
+        const lastStep = (r) => Date.parse(`${String(r.events[r.events.length - 1]?.created_at || "").replace(" ", "T")}Z`);
+        // An approved request with no purchase order (approved before orders were created) has nothing to wait for.
+        const live = active.filter((r) => r.status !== "approved" || r.po_number);
+        setRequests([...live, ...ended.filter((r) => lastStep(r) >= cutoff).slice(0, 5)]);
+      })
+      .catch(() => setRequests([]));
   }, []);
   useEffect(() => { load(); }, [load, refreshKey]);
 
@@ -100,7 +114,7 @@ export default function OrderRequestsCard({ refreshKey }) {
         Requests waiting for the buyer
       </div>
       <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 12 }}>
-        In this demo you play each role. Every step says who would do it. Stock does not change until the delivery is received.
+        In this demo you play each role. Every step says who would do it. Stock does not change until the delivery is received at Goods In, which also closes the request. Finished ones stay for a week.
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -118,12 +132,13 @@ export default function OrderRequestsCard({ refreshKey }) {
                     <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 500 }}> · {r.request_no}</span>
                   </div>
                   <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 2 }}>
-                    {step ? step.state : r.status}
+                    {step ? step.state : ENDED_STATE[r.status] || r.status}
+                    {r.po_number ? ` · ${r.po_number}` : ""}
                     {r.reason ? ` · ${r.reason}` : ""}
                   </div>
                 </div>
 
-                {step && !rejecting && (
+                {step?.next && !rejecting && (
                   <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
                     <Btn primary disabled={busy} label={busy ? "…" : step.next.label} onClick={() => move(r.id, step.next.status)} />
                     {r.status === "po_raised" && (

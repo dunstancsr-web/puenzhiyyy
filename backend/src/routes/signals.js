@@ -287,6 +287,11 @@ router.post("/market-signals/:id/decision", sandboxOnlyWhenPublic, (req, res) =>
 
     if (decision === "approve") {
       if (sig.status !== "pending") return res.status(409).json({ success: false, message: `Already ${sig.status}` });
+      // A replayed past event is practice: it shows what a signal would have done, and a buffer must only ever
+      // come from news a person believes is happening now (Stan, 20 Sep).
+      if (sig.origin === "replay") {
+        return res.status(400).json({ success: false, message: "A past event is practice. It adds no buffer. Acknowledge it instead." });
+      }
       const range = sig.direction === "tightens" ? playbookDays(sig.event_type, sig.severity) : null;
       if (!range) {
         return res.status(400).json({ success: false, message: "This signal eases pressure, so there is no buffer to add. Acknowledge it instead." });

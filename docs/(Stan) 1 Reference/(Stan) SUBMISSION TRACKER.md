@@ -1,21 +1,15 @@
 # Submission tracker
 
-> **This copy is stale (still 15 Sep).** The current tracker (17 Sep: MVP2 merge status, the
-> archived video script decision, the corrected engine count) lives on branch
-> `docs/mvp2-tracker-update` / PR #3, not yet merged to `main` as of 17 Sep. Read that version, not
-> this one, until the branches converge. This note exists so starting a fresh session on the wrong
-> branch doesn't mean trusting an out-of-date status.
-
 AWS NUS-ISS SMYA 2026 Hackathon. **Shortlisting deadline: 28 September 2026, 9:00am. Finale: 10 October.**
 
-Four deliverables. Status as of 15 Sep.
+Four deliverables. Status as of 20 Sep.
 
 | # | Deliverable | Status | Next step, and who |
 |---|---|---|---|
 | 1 | GitHub repo | done, kept current | nothing |
 | 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Deploy now (Stan, 15 Sep: the lease can be extended, so there is no reason to wait): follow `(Stan) DEPLOY-LIGHTSAIL.md` in this folder |
 | 3 | YouTube demo video | script below, updated 15 Sep; `npm run demo:reset` checks the app is ready | Stan records, near the end, with the final paid check |
-| 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 15 Sep, all three screenshots current | fill in the URL, PIN and spend figure **in the PDF only**, then export |
+| 4 | PDF write-up | `docs/Submission/WRITEUP.md` last refreshed 15 Sep, so it does not yet mention Action Items, Market signals, the merged Alerts and History tab or the order request loop (all built 19 and 20 Sep); refresh it before export | refresh the write-up with the newer features, then fill in the URL, PIN and spend figure **in the PDF only**, then export |
 
 ## Before submitting, in this order
 
@@ -29,68 +23,41 @@ Four deliverables. Status as of 15 Sep.
 
 ## Waiting for Stan's decision
 
-| Question | Options | Where the detail is |
-|---|---|---|
-| When does stock become "At Risk"? | **A.** keep the code: bands scaled to each product's own holding limit (At Risk from 90% of the limit). **B.** follow requirements.md REQ-08: fixed day bands (At Risk from day 271 for every product). Nothing changes on today's data; it matters for short-life products (Brown Rice's 180 day limit: A warns at day 162, B at day 271) | design.md, "Supporting Formulas", ageing status |
-
-| Seeded "India non-basmati export restriction" risk event buffers basmati SKUs, unscoped | **A.** scope it to non-basmati (matches the real 2023 ban). **B.** leave it | design.md, "Market Signals" |
-| Should a market signal's "order at least X MT" feed an order request? | **A.** yes, prefilled for the buyer, person still sends. **B.** keep them separate | not built |
+Nothing right now. The last three (At Risk bands, the seeded India event, market signals feeding order requests) were decided on 20 Sep and are in "Decisions already made" below.
 
 ## To do, not blocked
 
-- **Recapture two features-guide screenshots** that show old versions: `docs/Guide/images/11-inventory.jpg`
-  (the table before the Edit button fix) and `16-why.jpg` (the summary before urgency wording was
-  removed). Then rebuild the PDF: `python3 docs/Guide/build-pdf.py`.
-- **Check the merged app once in a browser** (20 Sep): Onboarding's opening balance step (new route, tested on a scratch database only), then reseed. The sample-data button and the requests card were checked on 20 Sep.
-- **Recapture the features guide's Activity screenshot** (`docs/Guide/images/18-activity.jpg`): Activity is now the History view inside Alerts (20 Sep), so the picture shows the old page. Then rebuild the PDF.
-- **Order requests, the fuller version** (next step for that feature, when there is time): see the section below. Do not start it before the deploy is done.
 - **Show Tawmo the merge** (PR #5, 20 Sep): if she wants changes, fix on a new branch; undo is `git revert -m 1 15153c4`.
+- **Merge the open pull requests, in this order** (only when Stan says so, see rules.md): #8 (order request timeline), #9 (Market signals), #10 (Alerts and History in one tab), then the branch `feature/ageing-and-signal-decisions` once its pull request is opened. They are stacked, so each one after the first shrinks once the one before it merges. #3 (an old tracker copy) is superseded by this file and can be closed; #4 (onboarding suggested settings) is Stan's to decide.
+- **Remote branches already merged into main** can be deleted from GitHub when Stan says so: `chore/team-workflow-hooks`, `feature/market-signals`, `feature/mvp2-forecast-day1`, `feature/mvp2-separate-duties`, `feature/onboarding-demo-ux` (some may be Tawmo's, so ask her first).
 
-## Order requests: what is built and how to do the fuller version
+Done on 20 Sep and no longer to do: the features guide screenshots and PDF (rebuilt, with new sections for Action Items and the request timeline), the Onboarding opening-balance click-through (it found that the sample data left stock on the shelf, so every product refused an opening balance; fixed in `routes/demo.js`), the order request fuller version (below).
 
-**Built (20 Sep), the minimal timeline.** A request goes open, then acknowledged (buyer), then
-purchase order raised (buyer), then approved or rejected (buyer's manager); it can be cancelled before
-the end. Each step is a row in `order_request_events` (who, when, optional note), shown on the
-Inventory page's "Requests waiting for the buyer" card and as a line on Activity. There is no login, so
-one person plays every role in the demo; the server fixes the actor from the step. It changes no stock.
-Code: `backend/src/routes/inventory.js` (`REQUEST_TRANSITIONS`, `REQUEST_ACTORS`),
-`frontend/src/components/OrderRequestsCard.jsx`.
+## Order requests: what is built
 
-**Not built: the request never becomes a real purchase order, so it never closes by itself.** Approving
-does not create anything the warehouse can receive against. The card also drops a request once it is
-approved, rejected or cancelled, so a finished timeline is only visible on Activity.
+**Built (20 Sep), the whole loop.** A request goes open, then acknowledged (buyer), then purchase order
+raised (buyer), then approved or rejected (buyer's manager); it can be cancelled before the end. Approving
+creates the purchase order (`PO-REQ-000N`, quantity from the request, arrival from the product's lead
+time) and stores its number on the request, so the warehouse never sees an order nobody approved. When an
+operator receives that order at Goods In, the same transaction adds a `received` step and closes the
+request, with no click from the office. Stock moves only at that receipt. Each step is a row in
+`order_request_events` (who, when, optional note), shown on the Inventory page's "Requests waiting for the
+buyer" card (finished requests stay a week) and as a line on the History view. There is no login, so one
+person plays every role in the demo; the server fixes the actor from the step.
+Code: `backend/src/routes/inventory.js` (`REQUEST_TRANSITIONS`, `REQUEST_ACTORS`, the PATCH handler),
+`backend/src/routes/warehouse.js` (the receive route), `backend/src/db/requestEvents.js`,
+`frontend/src/components/OrderRequestsCard.jsx`. Check: `node backend/scripts/test-order-loop.js` (a
+throwaway database; it fails if an unapproved order reaches Goods In or the receipt does not close the
+request).
 
-**The fuller version, in the order to do it.** Goal: an approved request becomes a purchase order that
-Goods In can receive, and receiving it closes the request with no click from the office.
+A market signal can also start a request: "Ask the buyer to order" on a live signal's product row, quantity
+prefilled from the low end of the advice and editable, refused when a request for that product is
+already open. Past events (practice) never offer it.
 
-1. **Link the two tables.** Add `po_number TEXT` to `order_requests` with `ensureColumn` in
-   `backend/src/db/init.js` (the pattern is already there for other columns).
-2. **Create the purchase order when the buyer raises it.** In the PATCH handler's `po_raised` step,
-   insert a `purchase_orders` row (`po_number`, `sku_id`, `ordered_qty` from the request, `order_date`
-   today, `eta` from the SKU's lead time, `status` open) and store its number on the request, in the
-   same transaction as the event. Decide first whether an unapproved order should be visible to Goods
-   In: the simplest answer is to insert it on `approved` instead, so the warehouse never sees an order
-   nobody has approved. Recommended: insert on `approved`.
-3. **Close the request from Goods In.** `POST /warehouse/inbound/receive` in
-   `backend/src/routes/warehouse.js` already finds the open order by `po_number` and marks it
-   `received` (around lines 145 to 177). Right after that update, look up the request with that
-   `po_number`, add a `received` event (actor: the operator) and set its status. Add `received` to
-   `REQUEST_ACTORS` handling (the actor comes from the operator, not the fixed map) and to the
-   Activity sentence map in `frontend/src/pages/Activity.jsx`.
-4. **Show finished requests.** Change the card to keep a request visible for a while after it ends
-   (or add a "recent" list) so a completed timeline, ending in "received", is seen on Inventory.
-5. **Add a check.** A script beside `test-signals.js` that walks a request through every step, receives
-   the order through the warehouse endpoint, and asserts the request closed and stock rose only at the
-   receipt. Prove it can fail: skip the approval and confirm the order never reaches Goods In.
-6. **Update the owners.** requirements.md (the endpoint line), this section, and the devlog.
-
-**Open design questions for Stan when that time comes.** Is a partial receipt its own step
-("part received") or does one receipt close the request, as the warehouse endpoint does today? Should
-approval depend on a spend threshold (a small order skips the manager), as real purchasing does? Does the
-manager step need its own screen once there is a login, instead of a button on the card?
-
-**Why it stays small for now.** The problem statement is about spotting shortages early; purchasing
-after the alert is the second half of the loop. The deadline work (deploy, video, PDF) comes first.
+**Still open questions.** Is a partial receipt its own step ("part received") or does one receipt close the
+request, as the warehouse endpoint does today (one receipt closes it)? Should approval depend on a spend
+threshold, so a small order skips the manager, as real purchasing does? Does the manager step need its own
+screen once there is a login, instead of a button on the card?
 
 ## Decisions already made
 
@@ -108,6 +75,12 @@ after the alert is the second half of the loop. The deadline work (deploy, video
 | How documents and rules are kept | filed by reader, listed in `docs/DIRECTORY.md`, every rule in `.kiro/steering/rules.md`, one owner per fact (15 Sep) | `.kiro/steering/rules.md` |
 | Duties split and opening balance (20 Sep) | the office writes no stock; stock moves on the warehouse floor. Onboarding's first count uses one audited, once-per-product action (OB-0001, movement type OPENING) allowed only where on hand is 0 | keeps the office from topping up live stock while still letting a new catalogue start; requirements.md, REQ-11 |
 | Alerts and Activity in one tab (20 Sep) | one Alerts tab with two views, Needs action and History; two lists, joined at the item; dismissing an alert can be undone | Stan asked for one tab so an alert and its history can be read together. Industry keeps the to-do list and the record separate and links them at the item, so the lists were not interleaved; design.md, "Alerts tab" |
+| Ageing bands (20 Sep) | scaled to each product's own holding limit: At Risk from 90% of it (day 243 at the default 270, day 162 for a 180 day product). The fixed day bands in the old REQ-08 are gone | short-life products should warn earlier; design.md, "Supporting Formulas" |
+| Seeded India export event (20 Sep) | scoped to non-basmati, like the real 2023 ban, so it no longer buffers basmati SKUs | the risk buffer for the India basmati SKUs is now 0; design.md, "Market Signals" |
+| Past events are practice (20 Sep) | a replayed past event can be acknowledged but never adds a buffer, and never offers "Ask the buyer" | a buffer must only come from news a person believes is happening now; the server refuses it, not just the button |
+| Market signal to order request (20 Sep) | yes: "Ask the buyer to order" prefilled and editable; the person still sends and nothing is ordered until the buyer acts | one click from advice to the buyer's list, with a duplicate guard |
+| Market signals opens on Live news (20 Sep) | Live news first, Past events second | the real use comes first; the demo path is one tab away |
+| Demo banner's Exit stays offset from the entry button (20 Sep) | not pinned to the far right | a little offset avoids an accidental double click entering and exiting |
 | Public-server writes (20 Sep) | stock movements, order requests, signal decisions and opening balances are accepted only in the demo sandbox unless ALLOW_LIVE_WAREHOUSE_WRITES=1 | `backend/src/middleware/sandboxGuard.js` |
 | Onboarding shape | sequential, story-style (progress bar, Back, Skip advances/exits); no "minimize and resume from anywhere" chip (17 Sep) | reversed an earlier decision in the same feature branch; nothing to resume into once a skip just means finishing setup later through Inventory or Bulk edit like any other data entry |
 | Onboarding order: catalog before sales, never the reverse (17 Sep) | catalog-first stays; someone with both files ready can attach sales to the SAME upload instead of a separate step | a sales row has no product_name, variety, origin, packaging or supplier to build a catalog row FROM - reversing the order would mean SKUs created with a reorder policy and safety stock of 0, which reads as healthy everywhere, not as unconfigured |

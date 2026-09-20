@@ -175,6 +175,75 @@ function Exposure({ e }) {
   );
 }
 
+// "Ask the buyer": turns one product's advice into an order request, prefilled and editable. Sending is
+// still the person's act, and a request changes no stock (it only appears in the buyer's list on Inventory).
+// It first looks for a request already open for the product, so a second click cannot send a duplicate.
+// Not offered on a past event (practice) or when the signal eases pressure.
+function AskBuyer({ s, e }) {
+  const [open, setOpen] = useState(false);
+  const [qty, setQty] = useState(String(e.low.order_qty_mt));
+  const [state, setState] = useState({ busy: false, error: null, sent: null, existing: null });
+
+  const begin = async () => {
+    setState((x) => ({ ...x, busy: true, error: null }));
+    try {
+      const list = await api.getOrderRequests({ sku_id: e.sku_id, status: "open,acknowledged,po_raised" });
+      setState((x) => ({ ...x, busy: false, existing: list[0] || null }));
+      setOpen(true);
+    } catch (err) {
+      setState((x) => ({ ...x, busy: false, error: err.message || "Could not check for an open request" }));
+    }
+  };
+
+  const send = async () => {
+    const q = parseFloat(qty);
+    if (!q || q <= 0) { setState((x) => ({ ...x, error: "Enter a quantity greater than 0." })); return; }
+    setState((x) => ({ ...x, busy: true, error: null }));
+    try {
+      const made = await api.raiseOrderRequest({
+        sku_id: e.sku_id,
+        quantity: q,
+        reason: `From market signal #${s.id}: ${s.headline}. Advice: ${fmt(e.low.order_qty_mt)} to ${fmt(e.high.order_qty_mt)} MT, ${orderBy(e.high).toLowerCase()}.`,
+      });
+      setState({ busy: false, error: null, sent: made, existing: null });
+      setOpen(false);
+    } catch (err) {
+      setState((x) => ({ ...x, busy: false, error: err.message || "Failed to send the request" }));
+    }
+  };
+
+  const note = { fontSize: "var(--text-xs)", color: "var(--text-secondary)" };
+  if (state.sent) {
+    return <div style={{ ...note, padding: "0 0 10px" }} role="status">Sent to the buyer as {state.sent.request_no}. Follow it on Inventory, under Requests waiting for the buyer.</div>;
+  }
+  return (
+    <div style={{ padding: "0 0 12px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      {!open ? (
+        <Btn disabled={state.busy} onClick={begin}>{state.busy ? "Checking…" : "Ask the buyer to order"}</Btn>
+      ) : state.existing ? (
+        <>
+          <span style={note}>{state.existing.request_no} is already open for this product ({fmt(state.existing.quantity_mt)} MT). Follow that one on Inventory rather than sending a second.</span>
+          <Btn onClick={() => setOpen(false)}>Close</Btn>
+        </>
+      ) : (
+        <>
+          <label style={{ ...note, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            Order
+            <input type="number" min="0" step="any" value={qty} onChange={(ev) => setQty(ev.target.value)} disabled={state.busy}
+              aria-label={`Quantity to ask the buyer for, ${e.product_name}, in metric tonnes`} className="ms-select"
+              style={{ width: 96, fontSize: "var(--text-sm)", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-primary)" }} />
+            MT
+          </label>
+          <Btn disabled={state.busy} onClick={send}>{state.busy ? "Sending…" : "Send to the buyer"}</Btn>
+          <Btn disabled={state.busy} onClick={() => setOpen(false)}>Cancel</Btn>
+          <span style={note}>Prefilled with the low end of the advice. Nothing is ordered until the buyer acts.</span>
+        </>
+      )}
+      {state.error && <span role="alert" style={{ ...note, color: "var(--red-text)", fontWeight: 600 }}>{state.error}</span>}
+    </div>
+  );
+}
+
 // "Read as": the four fields the reader chose, editable while the signal is pending.
 // The reader is right about three headlines in four, so a person can fix it, and the
 // assessment below is arithmetic and recomputes at once.
@@ -299,6 +368,8 @@ function SignalCard({ s, busy, onDecide, onCorrect, meta, onCollapse }) {
   const affected = a.exposures.length;
   const worst = a.exposures.find((e) => e.high);
   const decided = s.status !== "pending";
+  // Real news that tightens supply, still live: a past event is practice and a withdrawn or dismissed one is settled.
+  const canAsk = !eases && s.origin !== "replay" && (s.status === "pending" || s.status === "approved");
 
   return (
     <div style={{
@@ -381,21 +452,31 @@ function SignalCard({ s, busy, onDecide, onCorrect, meta, onCollapse }) {
       {affected > 0 && (
         <div style={{ marginTop: 10 }}>
           {!eases && <ExposureHeader />}
-          {a.exposures.map((e) => <Exposure key={e.sku_id} e={e} />)}
+          {a.exposures.map((e) => (
+            <React.Fragment key={e.sku_id}>
+              <Exposure e={e} />
+              {canAsk && e.low && e.high.order_qty_mt > 0 && e.urgency !== "monitor" && <AskBuyer s={s} e={e} />}
+            </React.Fragment>
+          ))}
         </div>
       )}
 
       {s.status === "pending" && (
         <div style={{ display: "flex", gap: 10, marginTop: 14, alignItems: "center", flexWrap: "wrap" }}>
-          {!eases && a.playbook && affected > 0 && (
+          {!eases && a.playbook && affected > 0 && s.origin !== "replay" && (
             <Btn primary disabled={busy} onClick={() => onDecide(s.id, "approve")}>
               {busy ? "Saving…" : `Add a ${fmt((a.playbook[0] + a.playbook[1]) / 2)} day buffer`}
             </Btn>
           )}
           <Btn disabled={busy} onClick={() => onDecide(s.id, "dismiss")}>
-            {eases || affected === 0 ? "Acknowledge" : "Dismiss"}
+            {eases || affected === 0 || s.origin === "replay" ? "Acknowledge" : "Dismiss"}
           </Btn>
-          {!eases && affected > 0 && worst && (
+          {s.origin === "replay" && (
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+              Practice: this really happened, but it is not news, so it adds no buffer and changes nothing.
+            </span>
+          )}
+          {!eases && affected > 0 && worst && s.origin !== "replay" && (
             <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
               Adds to the reorder point for the products above. Nothing is ordered.
               <Help label="the safety buffer"
@@ -668,10 +749,10 @@ export default function MarketSignals() {
             ) : (
               <>
                 <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.5, maxWidth: 640, margin: 0 }}>
-                  Real 2022 to 2024 events, run against today's stock as if they were breaking news. It shows what the advice would have been.
+                  Real 2022 to 2024 events, run against today's stock as if they were breaking news. It shows what the advice would have been. Practice only: nothing here changes your reorder points.
                   <Help label="past events"
                     what="Real supply shocks from 2022 to 2024, like India's rice export ban. We treat one as if it just happened and run it against your stock as it is today."
-                    how={"It is a rehearsal, to see how the advice works. It does not mean the event is happening now.\nAdding a buffer from a past event changes your real reorder points, so choose Dismiss if you only want to look."} />
+                    how={"It is practice, to see how the advice works. It does not mean the event is happening now.\nA past event never adds a buffer, so you cannot change your real reorder points by mistake. Only live news can."} />
                 </p>
                 <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <select aria-label="Choose a past event" className="ms-select" value={pick} onChange={(e) => setPick(e.target.value)} disabled={busy || catalog.length === 0}

@@ -568,8 +568,8 @@ function seed() {
   // match paths rather than only the country one.
   const RISK_EVENTS = [
     { label: "India non-basmati export restriction (2023-style)", country_of_origin: "India", supplier: null,
-      severity: "high", buffer_days_add: 21,
-      notes: "India is roughly 40% of global rice exports; a restriction there is the textbook supply shock this buffer exists for." },
+      severity: "high", buffer_days_add: 21, affects_varieties: JSON.stringify(["non-basmati"]),
+      notes: "India is roughly 40% of global rice exports; a restriction there is the textbook supply shock this buffer exists for. Scoped to non-basmati, as the 2023 ban was (Stan, 20 Sep)." },
     { label: "Thailand port and logistics congestion", country_of_origin: "Thailand", supplier: null,
       severity: "medium", buffer_days_add: 10,
       notes: "Freight/berth delays at origin, not a production shortfall." },
@@ -581,17 +581,18 @@ function seed() {
       notes: "Supplier-keyed rather than country-keyed, to exercise both match paths in riskbuffer.js." },
   ];
   const insertRisk = db.prepare(`
-    INSERT INTO risk_events (label, country_of_origin, supplier, severity, buffer_days_add, active, is_illustrative, notes)
-    VALUES (@label, @country_of_origin, @supplier, @severity, @buffer_days_add, 1, 1, @notes)`);
-  for (const r of RISK_EVENTS) insertRisk.run(r);
+    INSERT INTO risk_events (label, country_of_origin, supplier, severity, buffer_days_add, affects_varieties, active, is_illustrative, notes)
+    VALUES (@label, @country_of_origin, @supplier, @severity, @buffer_days_add, @affects_varieties, 1, 1, @notes)`);
+  for (const r of RISK_EVENTS) insertRisk.run({ affects_varieties: null, ...r });
 
   // ── Order requests (Reorder Loop step 7) ────────────────────────────────────
   // The Control Tower's one write: a request to the buyer, recording intent and
   // never touching stock. Seeded so the feature is visible on a fresh demo
   // rather than an empty list. Keyed to real seeded SKUs. One is left 'open' so
   // there is a live request a demo can walk forward (acknowledge, raise the purchase
-  // order, approve or reject); one is already 'approved' so the lifecycle beyond 'open' shows without anyone
-  // having to click first. request_no continues the REQ-000N sequence the API
+  // order, approve or reject); one already waits for the manager ('po_raised'), so approving it (which creates the purchase order
+  // Goods In receives against) and then receiving it can be walked end to end. It is not seeded as
+  // 'approved' because an approved request owns a purchase order, and a new open one would change the figures. request_no continues the REQ-000N sequence the API
   // hands out. These change no stock, exactly like the runtime endpoint.
   const insertReq = db.prepare(`
     INSERT INTO order_requests (request_no, sku_id, quantity_mt, reason, status, requested_by)
@@ -600,13 +601,13 @@ function seed() {
     { request_no: "REQ-0001", sku_id: "VF-10KG", quantity_mt: 200, status: "open",
       reason: "Available below the approved reorder point; lead time from Vietnam trending up.",
       requested_by: "control tower" },
-    { request_no: "REQ-0002", sku_id: "PH-25KG", quantity_mt: 150, status: "approved",
+    { request_no: "REQ-0002", sku_id: "PH-25KG", quantity_mt: 150, status: "po_raised",
       reason: "Cover thin ahead of the festive period.", requested_by: "control tower" },
   ];
   for (const r of ORDER_REQUESTS) insertReq.run(r);
 
   // Each request's timeline. REQ-0001 has only its first step, so a demo can walk it forward;
-  // REQ-0002 has been through every step, with believable gaps, so a finished timeline shows
+  // REQ-0002 has been through the buyer's steps, with believable gaps, so a timeline shows
   // without anyone clicking first. Offsets are relative to the seed run, in SQLite's UTC form.
   const insertStep = db.prepare(`
     INSERT INTO order_request_events (request_id, status, actor, note, created_at)
@@ -616,7 +617,6 @@ function seed() {
     ["REQ-0002", "open", "control tower", "Cover thin ahead of the festive period.", "-52 hours"],
     ["REQ-0002", "acknowledged", "buyer", null, "-50 hours"],
     ["REQ-0002", "po_raised", "buyer", "Sent for approval.", "-27 hours"],
-    ["REQ-0002", "approved", "buyer manager", null, "-21 hours"],
   ];
   for (const st of STEPS) insertStep.run(...st);
 

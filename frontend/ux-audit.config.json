@@ -35,6 +35,46 @@
     {
      "method": "POST",
      "url": "/api/demo/seed-sample"
+    },
+    {
+     "method": "POST",
+     "url": "/api/skus/opening-balance",
+     "data": {
+      "sku_id": "TJ-25KG",
+      "quantity": 240
+     }
+    },
+    {
+     "method": "POST",
+     "url": "/api/skus/opening-balance",
+     "data": {
+      "sku_id": "VF-10KG",
+      "quantity": 820
+     }
+    },
+    {
+     "method": "POST",
+     "url": "/api/skus/opening-balance",
+     "data": {
+      "sku_id": "BM-5KG",
+      "quantity": 185
+     }
+    },
+    {
+     "method": "POST",
+     "url": "/api/skus/opening-balance",
+     "data": {
+      "sku_id": "JP-5KG",
+      "quantity": 78
+     }
+    },
+    {
+     "method": "POST",
+     "url": "/api/skus/opening-balance",
+     "data": {
+      "sku_id": "TJ-10KG",
+      "quantity": 310
+     }
     }
    ]
   }
