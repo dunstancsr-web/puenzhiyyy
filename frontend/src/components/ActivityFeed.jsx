@@ -40,7 +40,7 @@ const TYPE_META = {
   // kept here so any pre-existing audit rows still render rather than showing a
   // raw event code, the same reason LLM_MODE_CHANGED's renderer was kept.
   RESTOCK:            { icon: Truck,             color: "var(--green-text)",  label: "Stock received" },
-  SKU_UPDATED:        { icon: SlidersHorizontal, color: "var(--yellow)", label: "Policy changed" },
+  SKU_UPDATED:        { icon: SlidersHorizontal, color: "var(--yellow-text)", label: "Policy changed" },
   SKU_CREATED:        { icon: PackagePlus,       color: "var(--purple-text)", label: "SKU added" },
   ALERT_ACKNOWLEDGED: { icon: BellOff,           color: "var(--text-muted)", label: "Alert dismissed" },
   ALERT_REOPENED:     { icon: RotateCcw,         color: "var(--blue-text)",  label: "Alert reopened" },
@@ -52,7 +52,7 @@ const TYPE_META = {
   GOODS_ISSUED:       { icon: ArrowUpFromLine,   color: "var(--orange-text)", label: "Goods out" },
   // TASK-90. Unlocking is a spending decision and reads like one; a lockout is
   // the only security event in this log, so it takes the alarm colour.
-  LLM_UNLOCKED:          { icon: KeyRound,    color: "var(--yellow)", label: "Paid AI unlocked" },
+  LLM_UNLOCKED:          { icon: KeyRound,    color: "var(--yellow-text)", label: "Paid AI unlocked" },
   LLM_UNLOCK_LOCKED_OUT: { icon: ShieldAlert, color: "var(--red-text)",    label: "PIN lockout" },
   // MVP2 step 1: the onboarding sales-history upload.
   SALES_HISTORY_IMPORTED: { icon: FileSearch, color: "var(--blue-text)", label: "Sales history uploaded" },

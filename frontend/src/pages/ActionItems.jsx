@@ -7,6 +7,7 @@ import ColHint from "../components/ColHint";
 import Modal from "../components/Modal";
 import MarketSignals from "../components/MarketSignals";
 import WorkingNote from "../components/WorkingNote";
+import UnlockAI from "../components/UnlockAI";
 import { api } from "../api/inventory";
 import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier";
 
@@ -190,6 +191,8 @@ export default function ActionItems() {
         </p>
       </div>
 
+      <UnlockAI variant="banner" />
+
       {/* Ask runs on a local model (askDatabase.js), and a deployed server has none. Shown only once the
           server says a local model exists, so the live site never offers a box that cannot answer. */}
       {askAvailable && (
@@ -341,10 +344,19 @@ export default function ActionItems() {
               {aiModal.explanation}
             </div>
           ) : (
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
-              AI explanation isn't available right now{aiModal.reason ? `: ${aiModal.reason}` : "."} The numbers in
-              the row above are the real, checked figures either way.
-            </div>
+            <>
+              {/* The rule-based sentence is the answer when no model is answering; the apology is only the
+                  fallback for a row the server could not build one for. */}
+              {aiModal.ruleBased ? (
+                <div style={{ fontSize: "var(--text-base)", lineHeight: 1.7, marginBottom: 14 }}>{aiModal.ruleBased}</div>
+              ) : null}
+              <UnlockAI variant="inline" onUnlocked={() => askAI(aiModal.kind, aiModal.sku, aiModal.label)} />
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
+                {aiModal.ruleBased
+                  ? "Worked out by rule from the row's own figures, with no model involved."
+                  : `AI explanation isn't available right now${aiModal.reason ? `: ${aiModal.reason}` : "."} The numbers in the row above are the real, checked figures either way.`}
+              </div>
+            </>
           )}
         </Modal>
       )}
