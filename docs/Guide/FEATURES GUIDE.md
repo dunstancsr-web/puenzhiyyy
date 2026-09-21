@@ -724,8 +724,8 @@ sensible starting numbers, in a few minutes.
 
 It is a short story with **Back** and **Skip** at the top and three steps:
 
-1. **Your products.** Upload a spreadsheet (a blank template can be downloaded, and a "what does each
-   column mean" help explains every one), or add a product by hand. Only a product code and a name are
+1. **Your products.** Upload a spreadsheet (a blank template can be downloaded, and a "What does each
+   column mean?" page explains every column of both spreadsheets), or add a product by hand. Only a product code and a name are
    required; the rest can be filled in later. In demo mode **Try with sample data** loads a small set. A
    sales-history file can be attached to the same upload.
 2. **Sales history.** Optional, and it improves demand figures and forecasts.
@@ -749,7 +749,45 @@ order, computed the same way as everywhere else.
 
 ![Step 3 of 3: suggested settings, each with its reasoning and a tick to apply it](images/33-onboarding-suggested-settings.jpg)
 
-Applying the suggestions (or skipping) lands on Home, and the Dashboard points once to the Forecast page.
+![What each column means: the catalog columns, then the sales history columns](images/48-column-help.jpg)
+
+The **What does each column mean?** link at the bottom of step 1 opens a reference page. It lists the five
+columns of the blank catalog template (two required), every other column the catalog upload accepts, the few
+values that are set after the upload rather than in it (stock on hand comes from the opening balance step),
+and the three required and three optional columns of the sales history spreadsheet.
+
+![The sales history columns at the bottom of the same page](images/49-column-help-sales.jpg)
+
+### The demo tour
+
+Applying the suggestions (or pressing **Done** on the first quick read) lands on Home. In demo mode a
+short tour starts by itself right there, so a visitor who has just loaded their data is not left on a screen
+that says nothing about what to do next.
+
+![Step 1 of the tour on Home: the Control Tower card is lit, with Skip tour, the close button and Next](images/46-tour-home.jpg)
+
+The page dims, one real control is lit, and a small card says what it is. There are five stops:
+
+1. **Home:** "Your data is in. Start here." lights the Control Tower.
+2. **Dashboard:** "This is the health of your stock today." lights Key Metrics, and says every figure comes
+   from fixed rules, never from AI.
+3. **Action Items:** "What can't wait." It explains that this page settles immediate concerns, from stock that
+   is about to run out to supply worries raised by the latest world news, which Market signals scans for you.
+4. **Alerts:** "Nothing happens without you." lights Approve, Modify and Reject.
+5. **Finish:** "You've seen the loop", with links to Forecast, Inventory and Goods In on a handheld.
+
+![Step 3 of the tour on Action Items: the Nearest stockout card is lit](images/47-tour-action-items.jpg)
+
+The card always carries three ways out, so it is easy to leave: the **X** at the top right, **Skip tour** at
+the bottom left, and the **Esc** key. **Back** and **Next** sit at the bottom right, with Next as the one
+primary button. Clicking the dimmed page does nothing, so a stray click cannot end the tour or press a
+button underneath it, but the lit control itself can be clicked instead of Next and the tour follows. If the
+element to light cannot be found, the card is shown in the middle with nothing lit rather than getting
+stuck. On a phone the card becomes a sheet at the bottom of the screen.
+
+The tour starts only in demo mode, and only after onboarding. It can be taken again at any time from
+**Settings, Take the tour**, on any screen. Once it has been finished or closed it does not come back by
+itself.
 
 ---
 

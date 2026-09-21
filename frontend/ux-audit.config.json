@@ -584,6 +584,138 @@
      "waitFor": "text=New stock movements"
     }
    ]
+  },
+  {
+   "name": "tour-step-1-home",
+   "route": "/dashboard",
+   "modes": [
+    "demo"
+   ],
+   "widths": [
+    1440,
+    768,
+    390
+   ],
+   "steps": [
+    {
+     "click": "button[aria-haspopup='dialog']:visible"
+    },
+    {
+     "click": "button:has-text('Take the tour')"
+    },
+    {
+     "waitFor": "text=Step 1 of 5"
+    },
+    {
+     "wait": 900
+    }
+   ]
+  },
+  {
+   "name": "tour-step-3-action-items",
+   "route": "/dashboard",
+   "modes": [
+    "demo"
+   ],
+   "widths": [
+    1440,
+    768,
+    390
+   ],
+   "steps": [
+    {
+     "click": "button[aria-haspopup='dialog']:visible"
+    },
+    {
+     "click": "button:has-text('Take the tour')"
+    },
+    {
+     "waitFor": "text=Step 1 of 5"
+    },
+    {
+     "wait": 900
+    },
+    {
+     "click": "[role='dialog'][aria-labelledby='tour-title'] button:has-text('Open it')"
+    },
+    {
+     "waitFor": "text=Step 2 of 5"
+    },
+    {
+     "wait": 1400
+    },
+    {
+     "click": "[role='dialog'][aria-labelledby='tour-title'] button:has-text('Next')"
+    },
+    {
+     "waitFor": "text=Step 3 of 5"
+    },
+    {
+     "wait": 1400
+    }
+   ]
+  },
+  {
+   "name": "tour-step-5-finish",
+   "route": "/dashboard",
+   "modes": [
+    "demo"
+   ],
+   "widths": [
+    1440,
+    768,
+    390
+   ],
+   "steps": [
+    {
+     "click": "button[aria-haspopup='dialog']:visible"
+    },
+    {
+     "click": "button:has-text('Take the tour')"
+    },
+    {
+     "waitFor": "text=Step 1 of 5"
+    },
+    {
+     "wait": 900
+    },
+    {
+     "click": "[role='dialog'][aria-labelledby='tour-title'] button:has-text('Open it')"
+    },
+    {
+     "waitFor": "text=Step 2 of 5"
+    },
+    {
+     "wait": 1400
+    },
+    {
+     "click": "[role='dialog'][aria-labelledby='tour-title'] button:has-text('Next')"
+    },
+    {
+     "waitFor": "text=Step 3 of 5"
+    },
+    {
+     "wait": 1400
+    },
+    {
+     "click": "[role='dialog'][aria-labelledby='tour-title'] button:has-text('Next')"
+    },
+    {
+     "waitFor": "text=Step 4 of 5"
+    },
+    {
+     "wait": 1400
+    },
+    {
+     "click": "[role='dialog'][aria-labelledby='tour-title'] button:has-text('Next')"
+    },
+    {
+     "waitFor": "text=Step 5 of 5"
+    },
+    {
+     "wait": 1400
+    }
+   ]
   }
  ],
  "audit": {
@@ -619,6 +751,21 @@
    "check": "L2",
    "match": "^\"New stock movements",
    "reason": "the refresh pill is a transient bottom overlay by design; it reserves 84px of page space so the last line stays reachable (NewDataPill.jsx)"
+  },
+  {
+   "check": "L2",
+   "match": "^\"div\\.tour-scrim\"",
+   "reason": "the demo tour dims the page behind its card by design while a step is open; every way out (X, Skip tour, Esc) is in the card (DemoTour.jsx)"
+  },
+  {
+   "check": "L2",
+   "match": "^\"Step \\d of 5",
+   "reason": "the demo tour's card is a popover placed beside the element it lights, and may sit over nearby content (DemoTour.jsx)"
+  },
+  {
+   "check": "L3",
+   "match": "tour-scrim|Step \\d of 5",
+   "reason": "the demo tour's dimming layer and card are a modal layer over the page, including the demo banner (DemoTour.jsx)"
   }
  ]
 }

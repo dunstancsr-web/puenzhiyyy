@@ -125,7 +125,7 @@ function Name({ m, size, muted }) {
 /** The workspace this device can actually use, as one wide card. */
 function Hero({ m }) {
   return (
-    <Link to={m.to} className="card home-card" style={{
+    <Link to={m.to} className="card home-card" data-tour={m.to === "/dashboard" ? "home-control-tower" : undefined} style={{
       display: "flex", alignItems: "center", gap: "var(--space-4)",
       padding: "var(--space-5)", textDecoration: "none", color: "inherit",
       textAlign: "left", borderColor: m.tint,

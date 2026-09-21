@@ -643,7 +643,7 @@ function AlertCard({ alert, onDismiss, onAskAI, onApprove, highlight = false }) 
               far edge by a flex spacer, which on a wide screen stranded it
               about a thousand pixels from its siblings. A plain separator
               carries "different kind of action" without the distance. */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+          <div data-tour="alert-actions" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 12, width: "fit-content", maxWidth: "100%" }}>
             <ActionButton variant="primary" onClick={() => onApprove(alert)}
               title={`Record approval: ${decision}`}>
               {alert.ai_recommendation_qty > 0 ? `Approve ${alert.ai_recommendation_qty} MT` : "Approve"}

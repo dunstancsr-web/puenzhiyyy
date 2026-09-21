@@ -243,6 +243,7 @@ export default function ActionItems() {
         icon={Flame}
         iconColor="var(--red)"
         title="Nearest stockout"
+        dataTour="action-nearest"
         count={stockoutRows.length}
         empty="Nothing projected to run out or breach safety stock right now."
       >
@@ -384,9 +385,9 @@ function WhyButton({ onClick }) {
   );
 }
 
-function Section({ icon: Icon, iconColor, title, titleTip, count, empty, children }) {
+function Section({ icon: Icon, iconColor, title, titleTip, count, empty, children, dataTour }) {
   return (
-    <div className="card" style={{ padding: "18px 20px" }}>
+    <div className="card" data-tour={dataTour} style={{ padding: "18px 20px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: count > 0 ? 14 : 4 }}>
         <Icon size={18} color={iconColor} />
         <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
