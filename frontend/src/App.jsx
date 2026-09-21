@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Onboarding from "./pages/Onboarding";
 import CatalogFields from "./pages/CatalogFields";
+import DemoTour from "./components/DemoTour";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import Alerts from "./pages/Alerts";
@@ -38,6 +39,8 @@ function ControlTower() {
 
 export default function App() {
   return (
+    <>
+    <DemoTour />
     <Routes>
       {/* Home is the front door: goods in, goods out, or the tower. */}
       <Route path="/" element={<><DemoModeBadge /><Home /></>} />
@@ -84,5 +87,6 @@ export default function App() {
       {/* Anything else: a page that says so, not a blank one. */}
       <Route path="*" element={<><DemoModeBadge /><NotFound /></>} />
     </Routes>
+    </>
   );
 }

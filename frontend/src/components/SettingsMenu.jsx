@@ -5,6 +5,7 @@ import { Settings, Cpu, Calculator, Cloud, AlertTriangle, Sun, Moon, Monitor, Ch
 import { useTheme, THEMES } from "../context/ThemeContext";
 import { api } from "../api/inventory";
 import { enterDemoMode } from "../lib/demoMode";
+import { startTour } from "../lib/tour";
 import { useLlmTier, effectiveTier, setTierChoice, setPass, clearPass } from "../lib/llmTier";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -380,6 +381,14 @@ export default function SettingsMenu({ align = "up", compact = false }) {
                 Enter demo mode (a sandbox, real data untouched)
               </button>
             )}
+            <button onClick={() => { setOpen(false); startTour(); navigate("/"); }} style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%",
+              padding: "7px 2px", background: "none", border: "none", cursor: "pointer",
+              fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
+            }}>
+              <PlayCircle size={14} style={{ flexShrink: 0 }} />
+              Take the tour (five stops through the app)
+            </button>
             <button onClick={() => { setOpen(false); navigate("/onboarding"); }} style={{
               display: "flex", alignItems: "center", gap: 8, width: "100%",
               padding: "7px 2px", background: "none", border: "none", cursor: "pointer",

@@ -634,7 +634,7 @@ export default function Dashboard() {
           being the first thing on the page, but a name you can only find in a
           source comment is not much of a shared name: seeing "Key Metrics" on
           screen is what makes it usable in conversation. ── */}
-      <div className="card" style={{ marginBottom: "var(--space-5)" }}>
+      <div className="card" data-tour="dashboard-metrics" style={{ marginBottom: "var(--space-5)" }}>
         {/* Matches the Section heading treatment exactly, so this card reads as
             a peer of Needs Attention and the rest rather than as a different
             kind of object. No subtitle: the two group labels inside already

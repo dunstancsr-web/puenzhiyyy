@@ -1,3 +1,4 @@
+import { queueTourAfterOnboarding } from "../lib/tour";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Package, Upload, TrendingUp, Sparkles, X, ChevronLeft, Info, Settings2, Check } from "lucide-react";
@@ -66,41 +67,7 @@ const IMPORTERS = {
   salesHistory: (csv, apply) => api.importSalesHistoryCsv(csv, apply),
 };
 
-// Two built-in CSVs for "try an example" below (demo mode only), so the two
-// ends of CatalogFields.jsx's "required vs. has a default" story - the actual
-// minimum and a fully filled-in one - are one click away instead of a file
-// someone has to go find or build first.
-//
-// "bare" matches MINIMAL_TEMPLATE_COLUMNS (backend/src/routes/inventory.js):
-// sku_id and product_name are the only two the database requires, plus
-// lead_time_days/reorder_point_policy/target_stock, the three that make the
-// reorder math mean something rather than resting entirely on defaults.
-// Narrowed from a 21-column sheet after checking Stan's own domain expert
-// source document (reference/rice-inventory-technical-spec.md) against
-// requirements.md's REQ-02 and finding the two disagreed - the source
-// document's own "minimum fields" table is this short, and treats reorder
-// policy/lead time as a later planning concern, not master data; REQ-02 had
-// merged the two into one flat "required" list that was never actually the
-// source's minimum. Everything else (variety, grade, origin, brand,
-// packaging, supplier, costs, min/max stock, safety stock %, MOQ) still
-// exists and is still editable from Inventory or Bulk edit - narrower here
-// on purpose, not gone from the app.
-const EXAMPLE_CSVS = {
-  bare: {
-    fileName: "example-bare-minimum.csv",
-    csv: "sku_id,product_name,lead_time_days,reorder_point_policy,target_stock\n"
-      + "EXAMPLE-BARE-01,Bare Minimum Rice,45,300,500\n"
-      + "EXAMPLE-BARE-02,Second Bare Minimum Rice,32,190,360\n",
-  },
-  full: {
-    fileName: "example-fully-detailed.csv",
-    csv: "sku_id,product_name,rice_variety,grade,country_of_origin,brand,supplier,packaging_size,min_order_qty,reorder_point_policy,min_stock,target_stock,max_stock,safety_stock_pct,lead_time_days,unit_cost_sgd,unit_price_sgd\n"
-      + "EXAMPLE-FULL-01,Full Detail Jasmine 25KG,Thai Hom Mali,Grade A,Thailand,Golden Elephant,Supplier ABC Thailand,25KG,20,300,280,500,700,20,45,1350,1620\n"
-      + "EXAMPLE-FULL-02,Full Detail Basmati 5KG,Basmati,Premium,India,Royal Basmati,Supplier GHI India,5KG,5,85,70,150,220,20,52,2100,2560\n",
-  },
-};
-
-// Step 2's example, unlike step 1's two above, can't be a fixed string - see
+// Step 2's example can't be a fixed string - see
 // trySalesExample's comment for why. Deterministic (seeded on the sku_id, not
 // Math.random) so re-clicking "try an example" against the same catalog shows
 // the same numbers rather than a new random set every time, which would read
@@ -194,6 +161,7 @@ export default function Onboarding() {
       if (payload.length) await api.applySuggestedSettings(payload);
       // A full reload, not navigate("/"), for the same reason as exitOnboarding above.
       clearDismissal();
+      queueTourAfterOnboarding();
       window.location.href = "/";
     } catch (err) {
       setError(err.message);
@@ -306,6 +274,7 @@ export default function Onboarding() {
 
   const finishFlow = useCallback(() => {
     armForecastNudge();
+    queueTourAfterOnboarding();
     window.location.href = "/"; // whole database changed under us; reload, don't navigate
   }, []);
 
@@ -329,8 +298,8 @@ export default function Onboarding() {
 
   const openPicker = (which) => { datasetRef.current = which; fileRef.current?.click(); };
 
-  // Shared by a real file pick (onFile) and the two "try an example" buttons
-  // below (EXAMPLE_CSVS) - same preview call either way, so the review modal
+  // Shared by a real file pick (onFile) and step 2's built-in sales example
+  // below - same preview call either way, so the review modal
   // behaves identically whether the CSV came from disk or was built in.
   const previewText = useCallback(async (text, fileName, which) => {
     setError(null); setBusy("read");
@@ -353,10 +322,6 @@ export default function Onboarding() {
     previewText(text, file.name, datasetRef.current);
   }, [previewText]);
 
-  const tryExample = useCallback((key) => {
-    const ex = EXAMPLE_CSVS[key];
-    previewText(ex.csv, ex.fileName, "skus");
-  }, [previewText]);
 
   // Step 2's "try an example" can't ship a fixed CSV like step 1's does: a
   // sales row's sku_id has to match a REAL product already in the catalog
@@ -562,32 +527,6 @@ export default function Onboarding() {
                   disabled={busy === "sample"} onClick={openSamplePreview} />
               )}
             </div>
-
-            {/* Demo-mode only, same gate as "Try with sample data" above -
-                loads a BUILT-IN example straight into the same review modal a
-                real upload would show (previewText/EXAMPLE_CSVS), so someone
-                can see the "Assumed" badges (or their absence) without first
-                needing a spreadsheet of their own to test with. Text links,
-                not BigButtons: this is a secondary, exploratory action next to
-                the page's one real primary action (Upload). */}
-            {isDemo && !skuCount && (
-              <div style={{ textAlign: "center", marginTop: 10, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-                Or try an example:{" "}
-                <button onClick={() => tryExample("bare")} disabled={busy === "read"} style={{
-                  background: "none", border: "none", cursor: "pointer", padding: 0,
-                  fontSize: "inherit", color: "var(--blue-text)", fontWeight: 600,
-                }}>
-                  bare minimum
-                </button>
-                {" · "}
-                <button onClick={() => tryExample("full")} disabled={busy === "read"} style={{
-                  background: "none", border: "none", cursor: "pointer", padding: 0,
-                  fontSize: "inherit", color: "var(--blue-text)", fontWeight: 600,
-                }}>
-                  everything filled in
-                </button>
-              </div>
-            )}
 
             <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
               <button onClick={downloadTemplate} disabled={busy === "export"} style={{

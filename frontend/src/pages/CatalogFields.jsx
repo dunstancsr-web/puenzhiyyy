@@ -3,26 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CATALOG FIELDS REFERENCE, linked from Onboarding step 1's "Download a blank
-// template" button.
+// WHAT EACH COLUMN MEANS, linked from Onboarding's "What does each column mean?".
 //
-// Trimmed 18 Sep (Stan's call) from a full column-by-column breakdown of all
-// 21 template columns down to just the five the blank template now asks for.
-// The earlier version treated "has a default" as license to explain all 21
-// fields at once, which read as MORE work, not less - the fix wasn't
-// wordier defaults, it was showing fewer columns in the first place. See
-// MINIMAL_TEMPLATE_COLUMNS in backend/src/routes/inventory.js for where that
-// five-column line is actually drawn, and Onboarding.jsx's EXAMPLE_CSVS.bare
-// comment for why: requirements.md's REQ-02 (16 "required" fields) turned out
-// to disagree with Stan's own domain-expert source document, whose own
-// "minimum fields" table is this short.
+// Covers both spreadsheets the setup asks for: the catalog (step 1) and the sales history (step 2).
 //
-// Every other column (variety, grade, origin, brand, packaging, supplier,
-// costs, min/max stock, safety stock %, MOQ, stock-on-hand adjustments) still
-// exists in the schema, still works if filled in, and is still explained
-// briefly below - just not as five separate detailed sections anymore. Add
-// them from a product's own page in Inventory once it exists, or via Bulk
-// edit's fuller spreadsheet.
+// The catalog part was trimmed 18 Sep (Stan's call) from a breakdown of all 21 template columns to the five
+// the blank template asks for, because explaining every column read as MORE work, not less. Refreshed 21 Sep
+// so the lists match what the upload really accepts, read from backend/src/routes/inventory.js:
+//   the blank template ....... MINIMAL_TEMPLATE_COLUMNS (five columns)
+//   the catalog upload ....... CREATE_COLUMNS (REQUIRED, CORE and ALSO_ACCEPTED below)
+//   set after the upload ..... LATER_ONLY (not read from a first upload: SKU_TABLE_FIELDS minus CREATE_COLUMNS,
+//                              plus stock on hand, which the opening balance step sets)
+//   the sales history ........ SALES_KEY and SALES_OPTIONAL
+// If a column is added to any of those lists, add it here in the same change.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const REQUIRED = [
@@ -41,22 +34,41 @@ const CORE = [
     what: "What a healthy stock level looks like day to day." },
 ];
 
-const LATER = [
-  { field: "rice_variety", label: "Rice variety" },
-  { field: "grade", label: "Grade" },
-  { field: "country_of_origin", label: "Country of origin" },
-  { field: "brand", label: "Brand" },
-  { field: "supplier", label: "Supplier" },
-  { field: "packaging_size", label: "Packaging size" },
-  { field: "min_order_qty", label: "Min order qty" },
-  { field: "min_stock", label: "Min stock" },
-  { field: "max_stock", label: "Max stock" },
-  { field: "safety_stock_pct", label: "Safety stock %" },
-  { field: "unit_cost_sgd", label: "Unit cost" },
-  { field: "unit_price_sgd", label: "Unit price" },
-  { field: "on_hand_qty", label: "On hand qty" },
-  { field: "lead_time_std_days", label: "Lead time variability" },
-  { field: "target_service_level", label: "Target service level" },
+// Accepted in the catalog upload, all optional. Costs and prices are per MT.
+const ALSO_ACCEPTED = [
+  { field: "rice_variety", label: "Rice variety", what: "The type of rice, for example Thai Hom Mali or Basmati." },
+  { field: "grade", label: "Grade", what: "The quality grade, for example Grade A or Premium." },
+  { field: "country_of_origin", label: "Country of origin", what: "Where it is grown, for example Thailand." },
+  { field: "brand", label: "Brand", what: "The brand on the pack." },
+  { field: "supplier", label: "Supplier", what: "Who you buy it from." },
+  { field: "packaging_size", label: "Packaging size", what: "The pack size, for example 25KG." },
+  { field: "min_order_qty", label: "Min order qty", unit: "MT", what: "The smallest order the supplier will accept." },
+  { field: "min_stock", label: "Min stock", unit: "MT", what: "A floor the stock should not fall below." },
+  { field: "max_stock", label: "Max stock", unit: "MT", what: "A ceiling. Stock above it is flagged as overstock." },
+  { field: "safety_stock_pct", label: "Safety stock %", unit: "%", what: "Extra stock held as a buffer, as a percentage." },
+  { field: "unit_cost_sgd", label: "Unit cost", unit: "SGD per MT", what: "What one MT costs you. Used to value stock and to size the cost of holding too much." },
+  { field: "unit_price_sgd", label: "Unit price", unit: "SGD per MT", what: "What you sell one MT for. Used to size the sales lost when a product runs out." },
+];
+
+// NOT read from a first upload. Set them afterwards, from a product's own page in Inventory or in Bulk edit.
+const LATER_ONLY = [
+  { field: "on_hand_qty", label: "Stock on hand", what: "Every product starts at zero. You enter what is on the shelf in the opening balance step after the upload." },
+  { field: "reserved_qty", label: "Reserved", what: "Stock already promised to an order, so it is not available to sell." },
+  { field: "quality_hold_qty", label: "On quality hold", what: "Stock set aside for inspection." },
+  { field: "lead_time_std_days", label: "Lead time variability", what: "How much the supplier's delivery time swings, in days. Sharpens the safety stock." },
+  { field: "target_service_level", label: "Target service level", what: "How often you want to have stock when a customer orders, for example 95%." },
+];
+
+// The sales history spreadsheet (setup step 2).
+const SALES_REQUIRED = [
+  { field: "sku_id", label: "SKU ID", example: "TJ-25KG", what: "Must match a product in your catalog." },
+  { field: "quantity_mt", label: "Quantity", example: "12.5", unit: "MT", what: "How much was sold on that day." },
+  { field: "sale_date", label: "Sale date", example: "2026-08-14", what: "The day of the sale, written year-month-day." },
+];
+const SALES_OPTIONAL = [
+  { field: "customer", label: "Customer", what: "Who bought it." },
+  { field: "channel", label: "Channel", what: "How it was sold, for example wholesale or retail." },
+  { field: "status", label: "Status", what: "Either fulfilled or lost. Lost means an order you could not fill. Only fulfilled sales count as demand." },
 ];
 
 export default function CatalogFields() {
@@ -78,8 +90,8 @@ export default function CatalogFields() {
           Five columns, two required
         </h1>
         <p style={{ fontSize: "var(--text-base)", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 30px", maxWidth: "50ch" }}>
-          That's the whole template. Everything past these five is optional and can be added later,
-          once you're inside the app.
+          That's the whole catalog template. Everything past these five is optional and can be added later,
+          once you're inside the app. The sales history spreadsheet is explained at the bottom.
         </p>
 
         <Section title="Required" intro="Every row needs both, or the row is rejected.">
@@ -90,27 +102,29 @@ export default function CatalogFields() {
           {CORE.map((f) => <FieldRow key={f.field} f={f} />)}
         </Section>
 
-        <div className="card" style={{ padding: "18px 22px" }}>
-          <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginBottom: 8 }}>
-            Everything else: add later, not now
-          </div>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.6, margin: "0 0 10px" }}>
-            Variety, grade, supplier, costs, min/max stock and a few statistical tuning fields. All real,
-            all optional, none of them block anything today. Set them from a product's own page in
-            Inventory, or upload a fuller spreadsheet from Bulk edit once you're ready.
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {LATER.map((f) => (
-              <span key={f.field} style={{
-                fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-muted)",
-                background: "var(--surface-2)", border: "1px solid var(--border)",
-                borderRadius: 99, padding: "4px 10px",
-              }}>
-                {f.label}
-              </span>
-            ))}
-          </div>
-        </div>
+        <Section title="Also accepted, all optional" intro="You can fill these in the upload, or leave them blank and add them later from a product's own page in Inventory or in Bulk edit. Blank means the default, not zero.">
+          {ALSO_ACCEPTED.map((f) => <FieldRow key={f.field} f={f} />)}
+        </Section>
+
+        <Section title="Set after the upload, not in it" intro="A first upload does not read these. They are set once the products exist.">
+          {LATER_ONLY.map((f) => <FieldRow key={f.field} f={f} />)}
+        </Section>
+
+        <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, margin: "34px 0 6px" }}>
+          The sales history spreadsheet
+        </h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.5, margin: "0 0 18px", maxWidth: "56ch" }}>
+          The second setup step asks for past sales, one row per sale. It is how the app learns how fast each product
+          moves. Three columns are required and three are optional.
+        </p>
+
+        <Section title="Required" intro="Every row needs all three, or the row is rejected.">
+          {SALES_REQUIRED.map((f) => <FieldRow key={f.field} f={f} required />)}
+        </Section>
+
+        <Section title="Optional">
+          {SALES_OPTIONAL.map((f) => <FieldRow key={f.field} f={f} />)}
+        </Section>
 
       </div>
     </div>
@@ -138,7 +152,7 @@ function Section({ title, intro, children }) {
 function FieldRow({ f, required }) {
   return (
     <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)", display: "flex", gap: 16, alignItems: "flex-start" }}>
-      <div style={{ minWidth: 168, flexShrink: 0 }}>
+      <div style={{ width: 200, maxWidth: "42%", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <code style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-primary)" }}>
             {f.field}
@@ -165,13 +179,15 @@ function FieldRow({ f, required }) {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           <span style={{
             fontSize: "var(--text-xs)", fontWeight: 600,
-            color: required ? "var(--red)" : "var(--text-muted)",
+            color: required ? "var(--red-text)" : "var(--text-muted)",
           }}>
-            {required ? "Required" : `Default if blank: ${f.defaultValue ?? "blank"}`}
+            {required ? "Required" : f.defaultValue != null ? `Default if blank: ${f.defaultValue}` : "Optional"}
           </span>
-          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-            · Example: <code style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>{f.example}{f.unit ? ` ${f.unit}` : ""}</code>
-          </span>
+          {f.example != null && (
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+              {" \u00b7 "}Example: <code style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>{f.example}{f.unit ? ` ${f.unit}` : ""}</code>
+            </span>
+          )}
         </div>
       </div>
     </div>
