@@ -144,9 +144,11 @@ provisions the HTTPS certificate.
 
    It does submit one wrong PIN, which uses one of five tries for your address for 15 minutes.
 
-3. **By hand, once:** open the site → **Alerts** → **Settings** (bottom of the sidebar) → **AWS Bedrock**
-   → enter the PIN → **Why?** on any alert. A purple Summary from Claude Sonnet 4.5 means the gateway
-   works. It is one paid call: add it to the spend ledger.
+3. **By hand, once:** open the site → **Action Items** → **Why?** on a row → type the PIN in the
+   **"Want it in plainer words?"** field → **Unlock**. It unlocks the tab and writes the answer at once
+   (Settings → AWS Bedrock still works too). An answer ending "Written by Claude Sonnet 4.5" means the
+   gateway works. It is one paid call: add it to the spend ledger. If you see an orange DEMO MODE strip,
+   press **Exit** first: the demo sandbox is empty, so it has no rows to press Why? on.
 
 ---
 
@@ -163,13 +165,53 @@ The submission asks for "Deployment evidence/URL", and the lease will eventually
 
 ## Updating to a newer build
 
-1. Push to `main` and wait for the Actions run to go green. Note the new commit.
-2. Lightsail → the service → **Deployments** → **Modify your deployment**.
-3. Change the image tag to the new `sha-<commit>`. Everything else stays.
-4. **Save and deploy**.
+This is the path used on 21 Sep, twice, and it took about five minutes each time.
 
-If the new deployment fails, Lightsail keeps the previous one running, so a bad build never takes the
-site down. Every redeploy resets the database to the seeded demo data.
+1. Merge to `main` and wait for the Actions run to go green (about 90 seconds). Note the commit. The
+   image tag is `sha-` plus the first seven characters of that commit, and the tag exists on GHCR only
+   after the build's tests pass.
+2. Sign in through the AWS access portal (the hackathon sign-in), open Lightsail → **Containers** → the
+   service → **Deployments** → **Modify your deployment**.
+3. **The form is already filled in with your existing settings, PIN and gateway key included, so
+   nothing needs retyping.** Change only the image tag to the new `sha-<commit>`. The environment
+   values are visible on that form: do not screenshot it, and do not paste it anywhere.
+4. **Save and deploy**. A new version starts while the old one keeps serving, so there is no outage.
+   It takes about three minutes, and the public address may answer 404 or 503 for part of that.
+5. Confirm it is the new build, then run `check-deploy.js <url>`. Every line must be `PASS`.
+6. If the new deployment fails its health check, Lightsail keeps the previous one running, and every
+   save is a version you can roll back to from **Deployment versions**.
+
+Things that behave differently from what you might expect:
+
+- **The paid-call counter and the database reset on every redeploy.** The container's own audit trail
+  is lost, so a live paid call must be written into the spend ledger by hand the same day.
+- **The console session expires after roughly an hour.** An unsaved form is lost when it does, and you
+  sign in again. Do the edit in one sitting.
+- **A blank first deployment form is not the same as Modify.** The very first deployment on a new
+  service is an empty form and needs every value typed, including the PIN and key. After that, Modify
+  keeps them.
+
+---
+
+## What the first deploy actually looked like (20 Sep)
+
+Recorded because the console does not always match the checklist above.
+
+- **The service name.** The service was created as `container-service-1`, not `four-seas-stocksense`,
+  and Lightsail cannot rename it. The name is in the public address only. Keep it.
+- **A quota message on the first Create.** The first Create click, with a full form, answered "You've
+  reached the quota for container services... isn't adjustable". A second attempt from a fresh form
+  created the service. The account may allow only one service, so do not click Create again once one
+  exists. The Service Quotas page is closed to the sandbox role, so the limit cannot be read.
+- **Create, then deploy, are two steps.** Creating the service builds an empty one (status Pending, then
+  Ready in a few minutes). The container, port, health check and variables go in a separate first
+  deployment on the **Deployments** tab.
+- **Do not press Save while values are half typed.** Type the two secret values yourself (Claude will
+  not enter a PIN or key), then save.
+- **Timing.** First deployment: about three and a half minutes from Save to serving. Redeploys: about
+  three.
+- **Public image.** GHCR packages are private until you change them. Only the package needs to be
+  public, not the repository (package page → Package settings → Change visibility).
 
 ---
 
