@@ -5,11 +5,13 @@ for anyone meeting StockSense for the first time: judges, new teammates, and the
 the warehouse.
 
 > Screenshots come from the seeded demo data for the fictional client 四海米行 / Four Seas Rice
-> Trading, captured on 20 Sep 2026, in light theme, against the seeded demo data. They are a snapshot: figures in them will differ from what the app
-> shows on another day. How each figure is calculated is in
+> Trading, captured on 20 and 21 Sep 2026, in light theme, against the seeded demo data. They are a snapshot: figures in them will differ from what the app
+> shows on another day. Where a screenshot shows an AI answer, its caption says which model wrote it. How each figure is calculated is in
 > [design.md](../../.kiro/specs/mvp1-inventory-visibility/design.md).
 
 **Contents**
+
+**Start here if you cannot open the app:** [The AI features at a glance](#the-ai-features-at-a-glance)
 
 1. [Getting started: Home](#1-getting-started-home)
 2. [Receiver: taking in a delivery (Goods In)](#2-receiver-taking-in-a-delivery-goods-in)
@@ -23,6 +25,122 @@ the warehouse.
 10. [Manager: planning ahead (Forecast)](#10-manager-planning-ahead-forecast)
 11. [Setting up a new client (Onboarding)](#11-setting-up-a-new-client-onboarding)
 12. [How the roles connect](#12-how-the-roles-connect)
+
+---
+
+## The AI features at a glance
+
+**Who this is for:** anyone reading this without the app in front of them, including judges who have
+no PIN. It explains what the AI does in StockSense, what it never does, what it looks like, and what
+you need to switch it on.
+
+### The one rule
+
+**The engines compute every figure. A person approves every action. The model only explains.**
+StockSense never lets a language model calculate a number, raise an alert, or place an order. Stock
+levels, days of cover, reorder points and suggested quantities come from fixed, documented rules
+(checked against the design by an automated test). The model's job is the last step: putting what the
+rules found into plain English for a person who does not want to read a spreadsheet, and reading
+news that no rule could read.
+
+### Four places the AI appears
+
+| Feature | Where | What it does | Which model |
+|---|---|---|---|
+| **Why? on an alert** | Alerts | Explains in plain English why an alert was raised and what to do, above four rule-based steps | Claude or a local model, else none |
+| **Why? on Action Items** | Action Items | Explains the nearest stockout or a blind spot in short bullet points, after a sentence the engines wrote | Claude or a local model, else none |
+| **Ask about your data** | Action Items | Answers an open question ("How is TJ-25KG doing?") by looking facts up with read-only tools | A local model (development only) |
+| **Market signals** | Action Items | Reads rice-supply news, works out what it means for each product, and waits for a person to decide (section 6) | A local model, else a keyword list |
+
+Why? and Market signals have a fallback that needs no model, so the app is complete without the AI. Ask
+says plainly that it cannot answer, instead of guessing. The AI makes the app easier to read; it does not
+make it work.
+
+### What an AI answer looks like
+
+![A real answer from Claude Sonnet 4.5 on the live site: the opening sentence is written by the engines, the bullets by the model](images/43-ai-action-why-sonnet.jpg)
+
+*A real answer from Claude Sonnet 4.5 on the deployed site, for Thai Jasmine 25KG.* Read it in three
+parts, because each has a different author:
+
+1. **The opening sentence is written by the engines.** "Projected to run out in 28 days: it sells about
+   5.58 MT a day, 160 MT is available now, and the supplier needs 45 days to deliver more." Every figure
+   in it comes from the database. The engines also work out the gap: the supplier is slower than the
+   stock lasts, so an order placed today would arrive about 17 days after it runs out. The model is not
+   allowed to say anything about timing, so it cannot contradict this.
+2. **The bullets are written by the model,** in plain words, from a menu of figures it may refer to by
+   name. It cannot type a number: the figures are put in by the system afterwards. If a bullet claimed
+   a delivery would arrive in time when the engines know it will not, a rule removes it.
+3. **The label says so:** "Written by Claude Sonnet 4.5 from the figures the engines computed. The
+   opening sentence is the engines' own."
+
+Every answer is checked before it is shown: for invented figures, for wording that sounds urgent when
+the situation is not, and for answers that were cut off. An answer that fails is retried, and if it
+still fails, the rule-based explanation is shown instead. Nothing is shown that did not pass.
+
+### What you need to switch it on: the demo PIN
+
+The paid model (Claude Sonnet 4.5 on Amazon Bedrock) spends shared AWS credit, so it is locked behind
+a **demo PIN**. **Without the PIN, every screen works and every explanation is still there** in its
+rule-based form; only the model's wording is missing.
+
+![Action Items with the AI explanations banner and a PIN field at the top](images/28-action-items.jpg)
+
+The prompt appears where you would want the AI, so there is nothing to hunt for:
+
+- **A banner at the top** of Alerts and Action Items says "AI explanations are off" and takes the PIN.
+- **Inside a Why? box,** a "Want it in plainer words?" field does the same and writes the answer as soon
+  as the PIN is accepted.
+- **Settings** (section 9) has the same unlock, and lets you choose the tier.
+
+![The Action Items Why? box with no PIN: the rule-based sentence, and the field to unlock the AI](images/42-ai-action-why-locked.jpg)
+
+*Without a PIN, the Why? box still explains the row: this sentence is computed by the engines from the
+row's own figures, with no model involved. The field below it is the way in to the AI.*
+
+![The Alerts Why? box with no PIN: four rule-based steps, and the field to unlock the AI](images/44-ai-alerts-why-locked.jpg)
+
+*On Alerts, the four rule-based steps are always there. The PIN adds a written summary above them.*
+
+What the PIN does and does not do:
+
+- A correct PIN unlocks the paid model **for that browser tab for two hours.** Closing the tab locks it
+  again, so a shared laptop does not stay unlocked.
+- Wrong guesses are counted and locked out after five, so the PIN cannot be guessed.
+- The server stops paid answers after 200 a day, whatever anyone does.
+- **Judges receive the PIN with the submission.** Each answer costs under one US cent.
+
+### The same answer from a local model
+
+The paid model is not the only tier. During development the app runs a free model on the computer
+itself, and the screenshots below come from that. The same guards apply.
+
+![The Why? box on an alert, with a summary written by a local model above the four steps](images/16-why.jpg)
+
+*The summary above the four steps is written by a local model (llama3), marked with its name and "figures
+inserted by the engine". The steps below it are the rule-based reasoning.*
+
+![Ask about your data: a plain-language question and its answer](images/45-ai-ask-answer.jpg)
+
+*Ask about your data, answered by a local model that looked the figures up with read-only tools. Ask
+runs only on the local model, so it is shown in the demo video and is hidden on the public site, where
+there is no local model to run it.* When the model's answer does not pass the checks, Ask says so
+("no answer passed our checks, so none is shown") and suggests a better question, rather than guessing.
+
+### The AI that watches the news
+
+**Market signals** is the part of StockSense that acts like an agent: it scans real rice-supply news,
+reads each story, works out which products it puts at risk and by how many days, and proposes what to
+order and by when, then **stops and waits for a person.** It never orders anything by itself. Section 6
+walks through it step by step, including a case where it misread a headline and a person caught it.
+
+### Where each tier runs
+
+| Tier | What it is | Where | Cost |
+|---|---|---|---|
+| **Rule-based** | no model, four reasoning steps | everywhere, the default on the public site | free |
+| **Local model** | a model on the computer itself | development laptops and the demo video | free |
+| **Claude Sonnet 4.5 (Amazon Bedrock)** | the paid model, through the hackathon gateway | the public site, after the PIN | shared AWS credit |
 
 ---
 
@@ -237,10 +355,12 @@ Approve button names the quantity.
 happens if we do nothing, and what to do. These steps are built from the product's live figures by
 fixed rules, so they are always available and cost nothing.
 
-Depending on the explanation setting (section 9), a written summary from a language model can appear
-above them, marked **Summary** with the model's name. The model is never allowed to calculate
-anything: the figures in its summary are inserted by the system, every answer is checked, and a summary
-that fails the checks is never shown.
+A written summary from a language model can appear above them, marked **Summary** with the model's name,
+once the AI is switched on. The paid model needs the demo PIN: with no PIN, a **Want it in plainer
+words?** field sits under the yellow note (screenshot in [The AI features at a glance](#the-ai-features-at-a-glance)),
+and the four steps are the whole explanation. The model is never allowed to calculate anything: the
+figures in its summary are inserted by the system, every answer is checked, and a summary that fails the
+checks is never shown.
 
 ### Recording a decision
 
@@ -264,14 +384,20 @@ most urgent for supply, ask a question in plain words, and check news that could
 
 ![Action Items: Ask about your data, the nearest stockout, and Market signals](images/28-action-items.jpg)
 
+- **An AI explanations banner** at the top says whether the paid model is switched on. Without the demo
+  PIN it offers a field to enter it; with it, the banner disappears.
 - **Ask about your data** answers an open question in plain language ("how much stock does TJ-25KG
   have, and how long will it last?"). A model looks the facts up with a few read-only tools and writes the
   answer; the figures in it are inserted by the system, never typed by the model, and a slow answer shows
-  a working note with the seconds elapsed. It needs a model to be available: where none is reachable, it
-  says so instead of guessing.
+  a working note with the seconds elapsed. It runs on the local model, so it appears only where one is
+  available (development and the demo video) and is hidden on the public site. Where the model's answer
+  does not pass the checks, it says so instead of guessing.
 - **Nearest stockout** lists the products projected to run out or breach their safety stock, soonest
   first, with whether an order already covers it, the quantity to order, and a **Why?** that explains the
-  row in short bullet points.
+  row. The first sentence is always written by the engines, including, when the supplier is slower than
+  the stock lasts, how many days late an order placed today would arrive. With the AI switched on, short
+  bullet points from the model follow it, labelled with the model's name; without it, that sentence is
+  the explanation, and the box offers a PIN field.
 - **Blind spots** (further down, when there are any) are products whose numbers cannot be trusted yet,
   for example because they have no sales history.
 
@@ -545,7 +671,8 @@ answers **Ask about your data**. The figures are the same in all three; only the
 
 AWS Bedrock asks for the **demo PIN** first, because it spends shared credit. A correct PIN unlocks it
 for that browser tab for 2 hours; wrong guesses are limited. Judges receive the PIN with the
-submission.
+submission. The same PIN field also appears in a banner on Alerts and Action Items and inside every
+**Why?** box, so it can be entered where the AI is wanted instead of here.
 
 **Theme** switches between Auto (follows the device), Light and Dark.
 
