@@ -466,6 +466,16 @@ router.get("/dashboard/history", (req, res) => {
         // Only the current month is partial now. History rows are whole
         // months by construction, so the old first-month edge case is gone.
         partial: r.period === thisMonth,
+        // Illustrative regulatory-buffer proxy (22 Sep, for the Inventory page's
+        // monthly chart), same formula and same honesty label as Compliance
+        // Position's snapshot version (engines/financials.js's portfolioStats:
+        // "2 months of throughput", using demand as a stand-in for real import-
+        // receipt history this project does not have). Applied here PER MONTH
+        // using that month's own issues_qty_mt as the demand proxy, rather than
+        // today's 30-day average applied uniformly backwards, so a historical
+        // month's bar reflects what was actually moving that month. NOT the
+        // authoritative rule; pending governance approval, same as the snapshot.
+        compliance_required_qty_mt: Math.round(r.issues_qty_mt * 2 * 10) / 10,
       };
     });
 

@@ -202,7 +202,8 @@ export default function ForecastDetail() {
 
       <div style={{ textAlign: "center", fontSize: "var(--text-sm)", color: "var(--text-secondary)", padding: "8px 0 24px" }}>
         A policy-change suggestion for this SKU appears on{" "}
-        <Link to="/alerts" style={{ color: "var(--blue-text)", fontWeight: 600 }}>Alerts</Link>{" "}
+        {/* whiteSpace: nowrap - see ActionItems.jsx's identical link for why. */}
+        <Link to="/alerts" style={{ color: "var(--blue-text)", fontWeight: 600, whiteSpace: "nowrap" }}>Actions Needed</Link>{" "}
         once the gap between approved and suggested is large enough. Approve, amend, or reject it there.
       </div>
     </div>
@@ -244,7 +245,7 @@ function ForecastHeader({ sku, forecast, onBack, onRecompute, recomputing }) {
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Stat label="Current reorder pt" tip={{
             what: "The approved reorder point - the value alerts and health status actually key off today.",
-            how: "Changed on Alerts, by approving a policy-change suggestion, or from Inventory directly. Never changes just from looking at this page.",
+            how: "Changed on Actions Needed, by approving a policy-change suggestion, or from Inventory directly. Never changes just from looking at this page.",
           }} value={`${Math.round(sku.reorder_point_policy)} MT`} />
           <span style={{ color: "var(--text-muted)", fontSize: 20 }}>&rarr;</span>
           <Stat
@@ -721,7 +722,7 @@ function ReasoningChain({ sku, preview, hasForecast, onUseForecast, modelRef }) 
           How this becomes the suggested reorder point
           <ColHint label="How this becomes the suggested reorder point"
             what="None of this is generative AI. Forecast demand comes from a statistical forecast model (Naive seasonal, Linear trend, Holt-Winters, or Holt damped + seasonal) - traditional or predictive AI, backtested against real sales history, always producing the same output for the same inputs. Everything after it is a fixed formula (King's formula) applied on top."
-            how="The tags below say which is which: SALES HISTORY is a plain historical average (no model behind it yet), YOUR INPUT is something you (or your supplier) told the system, STATISTICAL FORECAST is a model's own output, and no tag means fixed arithmetic on top of those. AI only appears elsewhere in this app, on Alerts's Why? button, and only to explain a number, never to calculate one." />
+            how="The tags below say which is which: SALES HISTORY is a plain historical average (no model behind it yet), YOUR INPUT is something you (or your supplier) told the system, STATISTICAL FORECAST is a model's own output, and no tag means fixed arithmetic on top of those. AI only appears elsewhere in this app, on Actions Needed's Why? button, and only to explain a number, never to calculate one." />
         </h2>
         {hasForecast && (
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--text-secondary)", cursor: "pointer" }}>

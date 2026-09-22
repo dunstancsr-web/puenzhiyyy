@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Newspaper, ExternalLink, History, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { Newspaper, ExternalLink, History, ChevronRight, ChevronDown, ChevronUp, Search, ShieldCheck } from "lucide-react";
 import { api } from "../api/inventory";
 import ColHint from "./ColHint";
 import WorkingNote from "./WorkingNote";
@@ -35,6 +35,10 @@ const URGENCY = {
 
 const DIRECTION_LABEL = { tightens: "Tightens supply", eases: "Eases supply", neutral: "No clear effect" };
 const SEVERITY_LABEL = { low: "Low", medium: "Medium", high: "High" };
+// How sure the READING is, not how bad the event is: a plain "Confidence" label,
+// deliberately not colour-coded the alarming way severity is, since a low
+// confidence reading is a prompt to check, not a bad outcome in itself.
+const CONFIDENCE_LABEL = { low: "Low", medium: "Medium", high: "High" };
 
 // Who classified the headline, in words a manager can weigh. A person's correction
 // is shown as such, because it is the most trustworthy reading on the screen.
@@ -408,6 +412,22 @@ function SignalCard({ s, busy, onDecide, onCorrect, meta, onCollapse }) {
         </a>
       )}
 
+      {/* Accuracy signals (22 Sep): what a person needs to judge how much to trust a
+          reading, none of them changing the reading itself. Confidence and source
+          come from reader.js/feed.js; corroboration is 1 + also_reported_by.length,
+          the same count that block below lists by name. */}
+      {(s.confidence || s.source_reputable || s.corroboration_count > 1) && (
+        <div style={{ marginTop: 6, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+          {s.confidence && <span>{CONFIDENCE_LABEL[s.confidence] || s.confidence} confidence</span>}
+          {s.source_reputable && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+              <ShieldCheck size={12} /> Recognized source
+            </span>
+          )}
+          {s.corroboration_count > 1 && <span>Reported by {s.corroboration_count} outlets</span>}
+        </div>
+      )}
+
       {s.also_reported_by.length > 0 && (
         <details style={{ marginTop: 6 }}>
           <summary className="ms-summary" style={{ cursor: "pointer", fontSize: "var(--text-xs)", color: "var(--text-secondary)", fontWeight: 600 }}>
@@ -503,53 +523,95 @@ function SignalCard({ s, busy, onDecide, onCorrect, meta, onCollapse }) {
   );
 }
 
-// Two ways to add a signal, chosen one at a time. A segmented control (not two rows of buttons)
-// because they are alternatives for the same job, and showing both at once read as two steps of one
+// Three ways to add a signal, chosen one at a time. A segmented control (not rows of buttons)
+// because they are alternatives for the same job, and showing them all at once read as steps of one
 // process. The control also decides which signals are listed below it: real headlines and rehearsals
 // of past events are different things and must not share one list, or a rehearsal reads as news. A
 // blue count on a tab is how many signals in it still wait for a decision, so nothing hides in the
 // other tab.
+//
+// Renamed 22 Sep, after Stan and his team decided what to build now versus later: "Live news" became
+// "RSS News Feed" (accurate about what it actually reads, a Google News RSS search, not overselling
+// how live or how agentic it is), "Past events" became "Replay" (its own long-standing meaning: a
+// real historical event run against today's stock, for practice - unrelated to the RSS feed's
+// freshness). "Deep Search" is new and deliberately NOT built yet: reading the full article behind
+// each headline, not just its title, is a real, larger piece of work (following Google's redirect
+// links, extracting article text from arbitrary sites, a much bigger untrusted-text surface than a
+// headline, and a cost that needs benchmarking, not guessing, before it can be shown to anyone). The
+// team's call was to scaffold the tab now, so the shape of the feature is visible and the future work
+// has a place to land, without spending the days before submission building it.
 const MODES = [
-  { id: "live", label: "Live news", Icon: Newspaper },
-  { id: "past", label: "Past events", Icon: History },
+  {
+    id: "live", label: "RSS News Feed", Icon: Newspaper,
+    what: "Searches Google News for rice supply headlines about the countries you buy from, and reads each one with a local AI model (or a keyword list when none is available). Reputable sources are read first when there is more to get through than time allows.",
+    how: "Free and always on. Each card shows how confident the reading is, whether the source is a recognized outlet, and how many outlets reported the same story, so you can judge how much to trust it before deciding.",
+  },
+  {
+    id: "past", label: "Replay", Icon: History,
+    what: "Real supply shocks from 2022 to 2024, run against your stock as if they happened today, so you can see what the advice would have been.",
+    how: "Practice only. It never changes your real reorder points, so a rehearsal can never be mistaken for something actually happening.",
+  },
+  {
+    id: "deep", label: "Deep Search", Icon: Search, comingSoon: true,
+    what: "Would read the full article behind each headline instead of just its title, for a more accurate reading than the news feed alone can give.",
+    how: "Not built yet, on purpose: the team decided to rely on the news feed for now and build this once there is time after submission. It will need its own real cost estimate, shown before you run it, once it exists.",
+  },
 ];
 
 function ModeSwitch({ mode, onChange, disabled, waiting }) {
+  const selectable = MODES.filter((m) => !m.comingSoon).map((m) => m.id);
   const move = (e) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
-    onChange(mode === "live" ? "past" : "live");
+    const i = selectable.indexOf(mode);
+    const next = selectable[(i + (e.key === "ArrowRight" ? 1 : -1) + selectable.length) % selectable.length];
+    onChange(next);
   };
   return (
     <div role="tablist" aria-label="How to add a signal" onKeyDown={disabled ? undefined : move} style={{
       display: "inline-flex", padding: 3, gap: 2, borderRadius: 11, background: "var(--surface-2)", maxWidth: "100%",
     }}>
-      {MODES.map(({ id, label, Icon }) => {
+      {MODES.map(({ id, label, Icon, comingSoon, what, how }) => {
         const on = mode === id;
+        const off = disabled || comingSoon;
         return (
-          <button key={id} type="button" role="tab" id={`ms-tab-${id}`} aria-selected={on} aria-controls="ms-panel"
-            tabIndex={on ? 0 : -1} disabled={disabled} onClick={() => onChange(id)} className="ms-btn" style={{
-              display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, border: "none",
-              fontSize: "var(--text-sm)", fontWeight: 600, cursor: disabled ? "default" : "pointer",
-              background: on ? "var(--card-bg)" : "transparent",
-              color: on ? "var(--text-primary)" : "var(--text-secondary)",
-              boxShadow: on ? "var(--shadow)" : "none", opacity: disabled && !on ? 0.6 : 1,
-            }}>
-            <Icon size={15} /> {label}
-            {waiting[id] > 0 && (
-              <span aria-label={`${waiting[id]} waiting for your decision`} style={{
-                minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "var(--blue-strong)", color: "#fff",
-                fontSize: "var(--text-xs)", fontWeight: 700, lineHeight: "18px", textAlign: "center",
-              }}>{waiting[id]}</span>
-            )}
-          </button>
+          // The Help bubble is a SIBLING of the tab button, not nested inside it: ColHint
+          // renders its own button, and a button inside a button is invalid markup and
+          // breaks screen reader navigation. This still reads as "one tab" visually.
+          <span key={id} style={{ display: "inline-flex", alignItems: "center" }}>
+            <button type="button" role="tab" id={`ms-tab-${id}`} aria-selected={on} aria-controls="ms-panel"
+              tabIndex={on ? 0 : -1} disabled={off} onClick={() => onChange(id)} className="ms-btn"
+              title={comingSoon ? "Coming later, not built yet" : undefined}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, border: "none",
+                fontSize: "var(--text-sm)", fontWeight: 600, cursor: off ? "default" : "pointer",
+                background: on ? "var(--card-bg)" : "transparent",
+                color: on ? "var(--text-primary)" : "var(--text-secondary)",
+                boxShadow: on ? "var(--shadow)" : "none", opacity: off && !on ? 0.6 : 1,
+              }}>
+              <Icon size={15} /> {label}
+              {comingSoon && (
+                <span style={{
+                  fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
+                  letterSpacing: "0.03em",
+                }}>Soon</span>
+              )}
+              {waiting[id] > 0 && (
+                <span aria-label={`${waiting[id]} waiting for your decision`} style={{
+                  minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "var(--blue-strong)", color: "#fff",
+                  fontSize: "var(--text-xs)", fontWeight: 700, lineHeight: "18px", textAlign: "center",
+                }}>{waiting[id]}</span>
+              )}
+            </button>
+            <Help label={`how ${label} works`} what={what} how={how} />
+          </span>
         );
       })}
     </div>
   );
 }
 
-export default function MarketSignals() {
+export default function MarketSignals({ roleTag }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -677,9 +739,16 @@ export default function MarketSignals() {
 
   return (
     <div className="card" style={{ padding: "18px 20px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <Newspaper size={20} color="var(--blue-strong)" />
         <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700 }}>Market signals</h2>
+        {/* Optional, set by ActionItems.jsx's role filter (22 Sep). Rendered inside this
+            card's own header, next to the heading a UX-audit fixture scrolls to, rather
+            than as a separate block above the card: an element sitting just outside a
+            scroll target's own card can end up under the fixed top bar once a minimal
+            scrollIntoView lands the target, which is exactly what happened when this was
+            first tried as a sibling block (found by re-running the audit, not guessed). */}
+        {roleTag}
         <ColHint label="market signals"
           what="Rice supply news, like an export ban or a port strike, checked against your stock. StockSense works out which products it could leave short, and by when."
           how={"1. Add a signal, from live news or a past event.\n2. Read what it means for each product.\n3. Decide: add a safety buffer, or dismiss it.\nNothing is ordered for you."} />

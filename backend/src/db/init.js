@@ -501,6 +501,15 @@ function initDb(targetDb) {
   db.exec(`UPDATE order_requests SET status = 'approved' WHERE status = 'ordered'`);
   ensureColumn(db, "order_requests", "po_number", "po_number TEXT");
   ensureColumn(db, "market_signals", "also_reported_by", "also_reported_by TEXT");
+  // Accuracy signals for a person reviewing a live signal (22 Sep): confidence
+  // is the reader's own self-rating (low/medium/high, see engines/signals.js's
+  // EVENT_TYPES-style fixed lists in signals/reader.js); source_reputable says
+  // whether the outlet is on the small, editable allow-list in signals/feed.js.
+  // Both are informational, never computed into a figure: a low-confidence or
+  // unrecognized-source signal still gets exactly the same assessment, just a
+  // flag for a person to weigh, the same spirit as country_inferred.
+  ensureColumn(db, "market_signals", "confidence", "confidence TEXT");
+  ensureColumn(db, "market_signals", "source_reputable", "source_reputable INTEGER");
   ensureColumn(db, "risk_events", "affects_varieties", "affects_varieties TEXT");
   ensureColumn(db, "risk_events", "excludes_varieties", "excludes_varieties TEXT");
   ensureColumn(db, "skus", "warehouse", "warehouse TEXT DEFAULT 'MAIN'");

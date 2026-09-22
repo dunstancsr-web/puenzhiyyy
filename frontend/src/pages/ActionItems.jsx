@@ -6,11 +6,87 @@ import ErrorState from "../components/ErrorState";
 import ColHint from "../components/ColHint";
 import Modal from "../components/Modal";
 import MarketSignals from "../components/MarketSignals";
+import OrderRequestsCard from "../components/OrderRequestsCard";
 import WorkingNote from "../components/WorkingNote";
 import UnlockAI from "../components/UnlockAI";
 import { modelLabel } from "../lib/modelName";
 import { api } from "../api/inventory";
 import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROLE PILLS AND THE ROLE FILTER (22 Sep)
+//
+// For the competition only, per Stan: there is no login in this demo, so one
+// person plays every role, but the app is DESIGNED around separated duties
+// (see OrderRequestsCard's own comment and the Reorder Loop in design.md).
+// This makes that separation visible on the one page that mixes sections for
+// different roles, rather than leaving it something a judge has to take on
+// faith from the code. Every section already belongs to a role in how it
+// behaves; this only labels what was already true and lets it be filtered.
+//
+// Nothing here changes what data loads or what any button does. It is a
+// display filter over sections that already render unconditionally; picking
+// a role never hides a number from the figures underneath, it hides SECTIONS
+// that role would not need to look at.
+// shortLabel is for the filter buttons only, which need to fit four options on
+// one row even at phone width; RoleTag pills always use the full label, since
+// there is only ever one pill row and clarity matters more there than there.
+const ROLE_META = {
+  manager:         { label: "Manager", color: "var(--blue-text)" },
+  buyer:           { label: "Buyer", color: "var(--purple-text)" },
+  buyers_manager:  { label: "Buyer's manager", shortLabel: "Buyer mgr", color: "var(--orange-text)" },
+};
+const ROLE_ORDER = ["manager", "buyer", "buyers_manager"];
+
+/** The small pill row shown above a section, naming who it is for. */
+function RoleTag({ roles }) {
+  if (!roles || !roles.length) return null;
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+      <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>For:</span>
+      {roles.map((r) => (
+        <span key={r} style={{
+          fontSize: "var(--text-xs)", fontWeight: 700, color: ROLE_META[r]?.color || "var(--text-muted)",
+          background: "var(--surface-2)", borderRadius: 99, padding: "2px 9px",
+        }}>
+          {ROLE_META[r]?.label || r}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The segmented filter next to the page title: All, or one role at a time. */
+function RoleFilter({ value, onChange }) {
+  const options = [{ id: "all", label: "All" }, ...ROLE_ORDER.map((r) => ({ id: r, label: ROLE_META[r].shortLabel || ROLE_META[r].label }))];
+  return (
+    // A single, non-wrapping row on purpose, even at phone width: this sits in the
+    // page header above every card, so if it wraps to a second line it pushes
+    // everything below it down, which can leave a card further down the page
+    // resting under the fixed top bar the next time something scrolls it into
+    // view (found by the UX audit, not guessed - see the devlog for 22 Sep).
+    <div role="tablist" aria-label="Show sections for" style={{
+      display: "inline-flex", padding: 3, gap: 2, borderRadius: 11, background: "var(--surface-2)",
+      overflowX: "auto", maxWidth: "100%",
+    }}>
+      {options.map((o) => {
+        const on = value === o.id;
+        return (
+          <button key={o.id} type="button" role="tab" aria-selected={on} onClick={() => onChange(o.id)} className="ms-btn" style={{
+            padding: "7px 12px", borderRadius: 9, border: "none", fontSize: "var(--text-sm)", fontWeight: 600,
+            cursor: "pointer", background: on ? "var(--card-bg)" : "transparent", whiteSpace: "nowrap",
+            color: on ? "var(--text-primary)" : "var(--text-secondary)", boxShadow: on ? "var(--shadow)" : "none",
+          }}>
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A section is shown when "All" is picked, or the filter names one of its roles. */
+const roleVisible = (filter, roles) => filter === "all" || (roles || []).includes(filter);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ACTION ITEMS (19 Sep) - additive, not a replacement. Alerts and Activity are
@@ -41,7 +117,7 @@ import { effectiveTier, getTierChoice, getPass, clearPass } from "../lib/llmTier
 // deliberately NOT on this page yet - they're a real, computed, third kind
 // of thing (working-capital risk, not time-boxed fulfilment risk), and
 // forcing them into one of the two groups above would misrepresent what
-// each group means. They stay visible on Alerts. See the devlog for the
+// each group means. They stay visible on Actions Needed. See the devlog for the
 // open question this leaves.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -88,7 +164,9 @@ function fmtDate(iso) {
 export default function ActionItems() {
   const [skus, setSkus] = useState(null);
   const [projectionBySkuId, setProjectionBySkuId] = useState({});
+  const [alertBySkuId, setAlertBySkuId] = useState({});
   const [error, setError] = useState(null);
+  const [roleFilter, setRoleFilter] = useState("all");
 
   // "Why?" (19 Sep) - same tier/pass machinery Alerts already uses, so a
   // demo PIN unlocked in Settings works here too rather than needing its own
@@ -155,6 +233,26 @@ export default function ActionItems() {
         setProjectionBySkuId(byId);
       })
       .catch((err) => setError(err.message || "Failed to load"));
+    // Nearest Stockout below is projection-based (it can flag a SKU before any
+    // alert has fired, which is the point of it), but once Alerts HAS raised a
+    // real STOCKOUT_RISK or REORDER row for that SKU, the row's "Order" link
+    // should go straight to that alert (Alerts.jsx already deep-links and
+    // highlights via ?alert=), not to a blind /alerts jump the manager then has
+    // to re-find it on. One alert per SKU here: STOCKOUT_RISK wins over REORDER
+    // when a SKU somehow has both open, matching alerts.js's own TYPE_PRIORITY.
+    api.getAlerts()
+      .then((openAlerts) => {
+        const bySku = {};
+        for (const a of openAlerts) {
+          if (a.alert_type !== "STOCKOUT_RISK" && a.alert_type !== "REORDER") continue;
+          const existing = bySku[a.sku_id];
+          if (!existing || (a.alert_type === "STOCKOUT_RISK" && existing.alert_type !== "STOCKOUT_RISK")) {
+            bySku[a.sku_id] = a;
+          }
+        }
+        setAlertBySkuId(bySku);
+      })
+      .catch(() => {}); // Non-critical: the link just falls back to a plain /alerts jump.
   };
   useEffect(load, []);
 
@@ -183,23 +281,37 @@ export default function ActionItems() {
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>Action Items</h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4, maxWidth: "72ch" }}>
-          What needs a decision from you, soonest first. Overstock and policy gaps still live on{" "}
-          <Link to="/alerts" style={{ color: "var(--blue-text)", fontWeight: 600 }}>Alerts</Link> for now. This page is
-          fulfilment risk, and how much you can trust the numbers below it.
-        </p>
+      <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>Next Steps</h1>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4, maxWidth: "72ch" }}>
+            What needs a decision from you, soonest first. Overstock and policy gaps still live on{" "}
+            {/* whiteSpace: nowrap - "Alerts" was short enough to never wrap mid-word; "Actions
+                Needed" is two words and wrapped across the line break at 768px/390px, which read
+                oddly AND made the audit measure one giant two-line bounding box as a single
+                undersized tap target (found 23 Sep, after the rename). Kept together instead of
+                chasing the measurement artifact with an ignore rule. */}
+            <Link to="/alerts" style={{ color: "var(--blue-text)", fontWeight: 600, whiteSpace: "nowrap" }}>Actions Needed</Link> for now. This page is
+            fulfilment risk, and how much you can trust the numbers below it.
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          <RoleFilter value={roleFilter} onChange={setRoleFilter} />
+          <ColHint label="the role filter"
+            what="There is no login in this demo, so one person plays every role."
+            how="This shows only the sections that role would actually need to see. Every figure underneath is unaffected either way." />
+        </div>
       </div>
 
       <UnlockAI variant="banner" />
 
       {/* Ask runs on a local model (askDatabase.js), and a deployed server has none. Shown only once the
           server says a local model exists, so the live site never offers a box that cannot answer. */}
-      {askAvailable && (
+      {askAvailable && roleVisible(roleFilter, ["manager"]) && (
       <div className="card" style={{ padding: "16px 20px", marginBottom: 20 }}>
-        <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <Cpu size={15} /> Ask about your data
+          <RoleTag roles={["manager"]} />
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <input
@@ -239,6 +351,7 @@ export default function ActionItems() {
       </div>
       )}
 
+      {roleVisible(roleFilter, ["manager"]) && (
       <Section
         icon={Flame}
         iconColor="var(--red)"
@@ -246,10 +359,13 @@ export default function ActionItems() {
         dataTour="action-nearest"
         count={stockoutRows.length}
         empty="Nothing projected to run out or breach safety stock right now."
+        roles={["manager"]}
       >
         {stockoutRows.length > 0 && (
           <Table columns={["Product", "Health", "Stockout in", "Covered?", "Action", ""]}>
-            {stockoutRows.map(({ sku: s, proj, nearest, isStockout }) => (
+            {stockoutRows.map(({ sku: s, proj, nearest, isStockout }) => {
+            const openAlert = alertBySkuId[s.sku_id];
+            return (
               <tr key={s.sku_id} style={{ borderBottom: "1px solid var(--border)" }}>
                 <Td>
                   <div style={{ fontWeight: 600 }}>{s.product_name}</div>
@@ -275,31 +391,65 @@ export default function ActionItems() {
                 </Td>
                 <Td>
                   {s.suggested_order_qty > 0 ? (
-                    <Link to="/alerts" style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue-text)", display: "inline-block", padding: "6px 0" }}>
-                      Order {s.suggested_order_qty} MT →
-                    </Link>
+                    <div>
+                      {/* touch-44: at 768px and below this is the row's only tap target, and
+                          6px of padding around one line of text measured 35px tall (found by
+                          the UX audit, 23 Sep) - under the 44px minimum every other control in
+                          the app already gets. */}
+                      <Link to={openAlert ? `/alerts?alert=${openAlert.id}` : "/alerts"}
+                        title={openAlert ? "Open this SKU's alert to approve, modify or reject it" : "No open alert yet for this SKU; see Actions Needed"}
+                        className="touch-44"
+                        style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--blue-text)", display: "inline-flex", alignItems: "center", padding: "6px 0" }}>
+                        Order {s.suggested_order_qty} MT →
+                      </Link>
+                      {/* Names what the link actually opens, so "Order ... ->" doesn't read as if
+                          this page can record the decision itself - Actions Needed stays the one place that happens. */}
+                      {openAlert && (
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Awaiting your decision on Actions Needed</div>
+                      )}
+                    </div>
                   ) : (
-                    <Link to={`/inventory/${s.sku_id}/forecast`} style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-secondary)", display: "inline-block", padding: "6px 0" }}>
+                    <Link to={`/inventory/${s.sku_id}/forecast`} className="touch-44"
+                      style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", padding: "6px 0" }}>
                       Watch →
                     </Link>
                   )}
                 </Td>
                 <Td><WhyButton onClick={() => askAI("stockout", s, `${s.product_name}: ${nearest.days} days to ${isStockout ? "stockout" : "safety breach"}`)} /></Td>
               </tr>
-            ))}
+            );})}
           </Table>
         )}
       </Section>
+      )}
+
+      {roleVisible(roleFilter, ["manager"]) && (
+      <>
+      <div style={{ height: 20 }} />
+      <MarketSignals roleTag={<RoleTag roles={["manager"]} />} />
+      </>
+      )}
+
+      {roleVisible(roleFilter, ["buyer", "buyers_manager"]) && (
+      <>
+      <div style={{ height: 20 }} />
+      {/* Reorder Loop step 7: what the office asked the buyer for, and where each
+          request has got to. Moved here from Inventory (22 Sep) since it is a
+          request WAITING ON someone else, the same shape as everything else on
+          this page, not a property of the catalog. It spans two roles at
+          different steps (the buyer acknowledges and raises the purchase
+          order, the buyer's manager approves it), so it carries both tags. */}
+      <OrderRequestsCard roleTag={<RoleTag roles={["buyer", "buyers_manager"]} />} />
+      </>
+      )}
 
       <div style={{ height: 20 }} />
 
-      <MarketSignals />
-
-      <div style={{ height: 20 }} />
-
+      {roleVisible(roleFilter, ["manager"]) && (
       <Section
         icon={EyeOff}
         iconColor="var(--purple)"
+        roles={["manager"]}
         title="Blind spots"
         titleTip={{
           what: "SKUs where a figure elsewhere in the app can't be trusted yet - either there isn't enough history, or an onboarded field was left blank.",
@@ -333,6 +483,7 @@ export default function ActionItems() {
           </Table>
         )}
       </Section>
+      )}
 
       {aiModal && (
         <Modal title="Why?" onClose={() => setAiModal(null)}>
@@ -385,10 +536,10 @@ function WhyButton({ onClick }) {
   );
 }
 
-function Section({ icon: Icon, iconColor, title, titleTip, count, empty, children, dataTour }) {
+function Section({ icon: Icon, iconColor, title, titleTip, count, empty, children, dataTour, roles }) {
   return (
     <div className="card" data-tour={dataTour} style={{ padding: "18px 20px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: count > 0 ? 14 : 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: count > 0 ? 14 : 4, flexWrap: "wrap" }}>
         <Icon size={18} color={iconColor} />
         <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
           {title}
@@ -400,6 +551,9 @@ function Section({ icon: Icon, iconColor, title, titleTip, count, empty, childre
         }}>
           {count}
         </span>
+        {/* Inside this card's own header, not a sibling above it: see the note on
+            MarketSignals's roleTag prop for why that placement matters here too. */}
+        <RoleTag roles={roles} />
       </div>
       {count === 0 ? (
         <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>{empty}</div>

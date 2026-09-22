@@ -78,6 +78,16 @@ function countryInferred(title, country) {
 
 const ALLOWED_VARIETIES = Object.freeze(["basmati", "non-basmati", "jasmine", "japonica", "glutinous", "brown", "parboiled", "broken"]);
 
+// The model's OWN rating of how sure it is, not a measure of the event's
+// severity (that is a separate field). Optional and soft, unlike every other
+// field validateRead checks: a model that omits it or answers with something
+// unrecognized still gets its reading kept, just at the coarse default
+// ("medium"), the same way rulesRead is coarse on purpose. Confidence is
+// informational for a person to weigh, exactly like country_inferred; it is
+// never read by engines/signals.js and never changes an assessment.
+const CONFIDENCE_LEVELS = Object.freeze(["low", "medium", "high"]);
+const DEFAULT_CONFIDENCE = "medium";
+
 const RICE_WORDS = /\b(rice|paddy|basmati|jasmine|japonica|sinandomeng|hom mali)\b/i;
 const MOVERS = /\b(ban|bans|banned|curb|curbs|restrict\w*|duty|duties|tariff|quota|quotas|halt\w*|suspend\w*|embargo|floor price|minimum export|export price|lift\w*|scrap\w*|eas(?:e|es|ed|ing)|relax\w*|strike|port|congestion|shipping|freight|container|flood\w*|typhoon|drought|monsoon|harvest|shortage|surge|record|import plan|stockpil\w*|price\w*)\b/i;
 
@@ -124,9 +134,12 @@ function validateRead(raw, ctx) {
     if (v.some((x) => !ALLOWED_VARIETIES.includes(x))) return { ok: false, why: "unknown variety" };
     varieties = v.length ? v : null;
   }
+  // Soft on purpose (see CONFIDENCE_LEVELS above): an unrecognized or missing
+  // value falls back to the coarse default rather than failing the whole read.
+  const confidence = CONFIDENCE_LEVELS.includes(raw.confidence) ? raw.confidence : DEFAULT_CONFIDENCE;
   return {
     ok: true, relevant: true,
-    read: { country_of_origin: country, event_type: raw.event_type, severity: raw.severity, direction: raw.direction, affects_varieties: varieties },
+    read: { country_of_origin: country, event_type: raw.event_type, severity: raw.severity, direction: raw.direction, affects_varieties: varieties, confidence },
   };
 }
 
@@ -153,6 +166,7 @@ Fields:
                  low     a minor delay, a forecast or a warning, a small price move, or an easing of an earlier restriction
   "direction"  "tightens" if supply becomes harder to get or costs more, "eases" if it becomes easier or prices fall, "neutral" otherwise
   "varieties"  a list drawn only from the allowed varieties if the headline names a specific kind of rice, else null
+  "confidence" your own rating of this reading, not of the event: "high" when the headline directly names the origin and the event is unambiguous, "medium" when you inferred the origin (a buyer-side headline, or general wording) or the wording is a little unclear, "low" when you are guessing at country, event type or severity from thin or vague wording
 
 If relevant is false, the other fields may be null.`;
 
@@ -242,7 +256,11 @@ function rulesRead(item, ctx) {
   const affects = /\bnon[- ]basmati\b/i.test(t) ? ["non-basmati"] : /\bbasmati\b/i.test(t) ? ["basmati"] : null;
   return {
     ok: true, relevant: true, by: "rules",
-    read: { country_of_origin: country, event_type, severity: "medium", direction, affects_varieties: affects },
+    // A wordlist match is coarser than a good model read, so it gets the same
+    // coarse default confidence the model falls back to when it gives none,
+    // never rules' own judgment call: consistency with DEFAULT_CONFIDENCE
+    // matters more than a wordlist inventing a finer distinction it cannot make.
+    read: { country_of_origin: country, event_type, severity: "medium", direction, affects_varieties: affects, confidence: DEFAULT_CONFIDENCE },
   };
 }
 
@@ -264,6 +282,6 @@ async function readHeadline(item, ctx, deps) {
 }
 
 module.exports = {
-  ALLOWED_VARIETIES, MAX_CORRECTIONS, contextFrom, candidateFilter, validateRead, extractJson,
+  ALLOWED_VARIETIES, MAX_CORRECTIONS, CONFIDENCE_LEVELS, DEFAULT_CONFIDENCE, contextFrom, candidateFilter, validateRead, extractJson,
   modelRead, rulesRead, readHeadline, correctionsSection, neutralize, countryInferred, SYSTEM, userPrompt,
 };

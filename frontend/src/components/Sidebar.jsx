@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, TrendingUp, PackageSearch, Bell, Home as HomeIcon, Table2, Flame } from "lucide-react";
+import { LayoutDashboard, TrendingUp, PackageSearch, Home as HomeIcon, Table2, Flame, ListChecks } from "lucide-react";
 import { api } from "../api/inventory";
 import SettingsMenu from "./SettingsMenu";
 import EventCredit from "./EventCredit";
@@ -53,27 +53,40 @@ export default function Sidebar() {
     api.getAlerts().then((data) => setAlertCount(data.length)).catch(() => {});
   }, [location.pathname]);
 
+  // Reordered and grouped (23 Sep, Stan's call): Table now reads as "a closer
+  // look at Dashboard's own catalog" and Forecast as "a closer look at
+  // Inventory's own numbers", so each sits directly under the screen it
+  // drills into rather than in one flat list where that relationship was only
+  // implicit. `indent: true` is a desktop-sidebar-only visual cue (see the
+  // narrow topbar strip below, which stays a flat row - indentation has no
+  // meaning in a horizontal strip of icons); the route order itself changed
+  // for both layouts, since that also decides narrow-strip left-to-right
+  // order and keyboard tab order.
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
-    // Right after Dashboard, first guess at placement (19 Sep, additive -
-    // Alerts/Activity untouched): "what needs a decision from me, soonest
-    // first" reads as the natural next step after "how are we doing
-    // overall," ahead of the deeper Forecast/Inventory screens. Reorder
-    // freely once it's been used for real.
-    { to: "/action-items", label: "Action Items", icon: Flame, badge: null },
-    // Between Dashboard and Inventory: right after "how are we doing", right
-    // before "what do we hold". Matches the order a manager actually reasons
-    // in, decide-then-inspect rather than the other way round.
-    { to: "/forecast", label: "Forecast", icon: TrendingUp, badge: null },
-    { to: "/inventory", label: "Inventory", icon: PackageSearch, badge: null },
-    // Alerts holds both the queue and its history (Needs action | History, 20 Sep): Activity is no longer a
-    // separate item, so the two are read in one place.
-    { to: "/alerts", label: "Alerts", icon: Bell, badge: alertCount },
     // Table (AuditTable.jsx, 19 Sep): Stan asked for this in the sidebar
     // directly, not held open pending sign-off the way Forecast was - one row
     // per SKU, uploaded columns beside what the top-5 formulas produce, built
     // to check whether onboarding's basic columns are actually enough.
-    { to: "/audit", label: "Table", icon: Table2, badge: null },
+    { to: "/audit", label: "Table", icon: Table2, badge: null, indent: true },
+    { to: "/inventory", label: "Inventory", icon: PackageSearch, badge: null },
+    // Between Dashboard and Inventory no longer: now Inventory's own
+    // deeper-dive screen, same reasoning as Table under Dashboard above.
+    { to: "/forecast", label: "Forecast", icon: TrendingUp, badge: null, indent: true },
+    // Alerts holds both the queue and its history (Needs action | History, 20 Sep): Activity is no longer a
+    // separate item, so the two are read in one place.
+    // Renamed from "Alerts" to "Actions Needed" (23 Sep, Stan's call), with
+    // Flame (formerly Next Steps' own icon) rather than Bell: this is the one
+    // page a decision actually gets recorded on, so both the label and the
+    // icon now say "something is waiting on you" rather than "here is a
+    // notification".
+    { to: "/alerts", label: "Actions Needed", icon: Flame, badge: alertCount },
+    // Renamed from "Action Items" (23 Sep, Stan's call): the page decides
+    // nothing itself, it lists what a manager should do next, so the label
+    // says that directly. Icon swapped from Flame to ListChecks (a
+    // prioritised checklist) since Flame moved to Actions Needed above,
+    // where the urgency it signals actually lives.
+    { to: "/action-items", label: "Next Steps", icon: ListChecks, badge: null },
   ];
 
   return (
@@ -150,17 +163,24 @@ export default function Sidebar() {
         </div>
 
         <nav style={{ flex: 1, paddingTop: 6 }}>
-          {navItems.map(({ to, label, icon: Icon, badge }) => (
+          {navItems.map(({ to, label, icon: Icon, badge, indent }) => (
             // All styling is in .nav-item (index.css). NavLink's own `active`
             // class carries the selected state, so the hover rule can sit
             // beside it in the cascade instead of losing to an inline prop.
+            // `indent` (Table under Dashboard, Forecast under Inventory)
+            // pushes the row in with extra left padding and a slightly
+            // smaller icon rather than a box, line or a second colour -
+            // hierarchy from spacing alone, matching the rest of the app
+            // (rules.md, "Apple aesthetics").
             <NavLink key={to} to={to}
+              style={indent ? { paddingLeft: 34 } : undefined}
               className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}>
               {({ isActive }) => (
                 <>
                   {/* 20px, up from 17. Home's glyphs grew and the two screens
-                      should scale alike. */}
-                  <Icon size={20} />
+                      should scale alike. Indented rows get 17px, matching the
+                      same "one step quieter" reasoning as the extra padding. */}
+                  <Icon size={indent ? 17 : 20} />
                   <span style={{ flex: 1 }}>{label}</span>
                   {badge > 0 && (
                     <span style={{

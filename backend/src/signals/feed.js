@@ -13,10 +13,48 @@
 // UI.
 //
 // Network access is injected (`fetchImpl`) so tests never touch the internet.
+//
+// SOURCE REPUTATION (22 Sep): a small, editable allow-list of established wire
+// services and the major business outlets for the origins this portfolio
+// actually buys from, used two ways, both soft: routes/signals.js reads
+// reputable sources FIRST within the scan's model-read budget, so a limited
+// number of reads goes to outlets worth reading first; and an unrecognized
+// source is flagged (sourceReputable() returning false), never rejected, the
+// same "surface it, do not decide for the person" spirit as
+// reader.js's country_inferred. A small blog covering a real story is not
+// wrong for being unlisted, and this list will always be incomplete: add to
+// it as real scans turn up outlets worth trusting.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DAY_MS = 86_400_000;
 const MAX_ITEM_AGE_DAYS = 21;
+
+const REPUTABLE_SOURCES = Object.freeze([
+  // Wire services and global business press
+  "reuters", "reuters.com", "bloomberg", "bloomberg.com", "associated press", "ap news", "apnews.com",
+  "afp", "agence france-presse", "financial times", "ft.com", "the economist", "cnbc", "cnbc.com",
+  "channel news asia", "cna", "south china morning post", "scmp", "nikkei asia", "nikkei",
+  // India
+  "the hindu", "the hindu businessline", "businessline", "livemint", "mint", "economic times",
+  "financial express", "business standard", "the times of india", "hindustan times",
+  // Thailand
+  "bangkok post", "the nation thailand", "the nation", "thai pbs world",
+  // Vietnam
+  "vnexpress", "vietnam news", "vietnam plus", "vietnamnet", "tuoi tre news",
+  // Philippines
+  "philippine star", "manila bulletin", "rappler", "inquirer", "business world", "businessworld",
+  // Japan
+  "japan times", "kyodo news", "nhk", "asahi shimbun", "japan today",
+  // Cambodia (a real signal this session came from here)
+  "khmer times", "phnom penh post",
+]);
+
+/** A soft check, never a rejection: is `source` on the small allow-list above? */
+function sourceReputable(source) {
+  if (!source) return false;
+  const s = String(source).trim().toLowerCase();
+  return REPUTABLE_SOURCES.some((r) => s === r || s.includes(r));
+}
 
 const ENTITIES = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&apos;": "'", "&nbsp;": " " };
 const decode = (s) =>
@@ -88,4 +126,4 @@ async function fetchHeadlines(queries, { fetchImpl = fetch, now = Date.now(), pa
   return { items, errors };
 }
 
-module.exports = { buildQueries, parseRss, fetchHeadlines, rssUrl, decode, MAX_ITEM_AGE_DAYS };
+module.exports = { buildQueries, parseRss, fetchHeadlines, rssUrl, decode, MAX_ITEM_AGE_DAYS, REPUTABLE_SOURCES, sourceReputable };

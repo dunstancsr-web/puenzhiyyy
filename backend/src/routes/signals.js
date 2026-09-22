@@ -26,7 +26,7 @@ const { MAX_BUFFER_DAYS } = require("../engines/riskbuffer");
 const { REPLAY_EVENTS } = require("../db/replayEvents");
 const crypto = require("crypto");
 const { sandboxOnlyWhenPublic } = require("../middleware/sandboxGuard");
-const { buildQueries, fetchHeadlines } = require("../signals/feed");
+const { buildQueries, fetchHeadlines, sourceReputable } = require("../signals/feed");
 const { contextFrom, readHeadline } = require("../signals/reader");
 const { planQueries, MAX_ROUNDS } = require("../signals/planner");
 const { findSameStory, MAX_DAYS_APART } = require("../signals/twins");
@@ -60,12 +60,20 @@ const parseList = (raw) => {
   if (!raw) return null;
   try { const v = JSON.parse(raw); return Array.isArray(v) ? v : null; } catch { return null; }
 };
-const toRow = (r) => ({
-  ...r,
-  affects_varieties: parseList(r.affects_varieties),
-  excludes_varieties: parseList(r.excludes_varieties),
-  also_reported_by: parseList(r.also_reported_by) || [],
-});
+const toRow = (r) => {
+  const alsoReportedBy = parseList(r.also_reported_by) || [];
+  return {
+    ...r,
+    affects_varieties: parseList(r.affects_varieties),
+    excludes_varieties: parseList(r.excludes_varieties),
+    also_reported_by: alsoReportedBy,
+    // How many outlets reported this, counting the original: 1 means only one
+    // source so far, which is not itself a reason to doubt it, just a fact for
+    // a person weighing the signal alongside confidence and source_reputable.
+    corroboration_count: 1 + alsoReportedBy.length,
+    source_reputable: !!r.source_reputable,
+  };
+};
 const round1 = (n) => Math.round(n * 10) / 10;
 
 // The system's own memory of the reader's past mistakes (22 Sep): every time a
@@ -134,14 +142,20 @@ router.post("/market-signals/replay", sandboxOnlyWhenPublic, (req, res) => {
     db.prepare(`
       INSERT OR IGNORE INTO market_signals
         (headline, summary, source_name, source_url, published_at, country_of_origin, supplier,
-         event_type, severity, direction, affects_varieties, excludes_varieties, origin, extracted_by, fixture_id)
+         event_type, severity, direction, affects_varieties, excludes_varieties, origin, extracted_by, fixture_id,
+         confidence, source_reputable)
       VALUES (@headline, @summary, @source_name, @source_url, @published_at, @country_of_origin, @supplier,
-              @event_type, @severity, @direction, @affects_varieties, @excludes_varieties, 'replay', 'hand', @fixture_id)
+              @event_type, @severity, @direction, @affects_varieties, @excludes_varieties, 'replay', 'hand', @fixture_id,
+              'high', @source_reputable)
     `).run({
       supplier: null,
       ...fixture,
       affects_varieties: fixture.affects_varieties ? JSON.stringify(fixture.affects_varieties) : null,
       excludes_varieties: fixture.excludes_varieties ? JSON.stringify(fixture.excludes_varieties) : null,
+      // A real, hand-entered historical event is confidence 'high' by definition: a
+      // person verified it, not a model. source_reputable follows the same allow-list
+      // as a live scan, so the flag means the same thing wherever it appears.
+      source_reputable: sourceReputable(fixture.source_name) ? 1 : 0,
     });
     res.status(201).json({ success: true, data: listSignals(db) });
   } catch (err) {
@@ -192,16 +206,24 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
     }
 
     const fixedQueries = buildQueries(ctx.origins, days);
-    const { items, errors } = await fetchHeadlines(fixedQueries, { maxAgeDays: days + 7 });
+    const { items: fetched, errors } = await fetchHeadlines(fixedQueries, { maxAgeDays: days + 7 });
+    // Reputable sources first (22 Sep): the model-read budget is limited (maxModelReads),
+    // so within one scan, an outlet on feed.js's small allow-list is read before an
+    // unrecognized one, stable otherwise (a JS sort is stable, so ties keep the feed's
+    // own newest-first order). Nothing is ever dropped for being unrecognized, only
+    // read later, and only when the budget is actually tight enough for order to matter.
+    const items = [...fetched].sort((a, b) => Number(sourceReputable(b.source)) - Number(sourceReputable(a.source)));
     const hash = (it) => crypto.createHash("sha1").update(it.link).digest("hex").slice(0, 16);
     const seenStmt = db.prepare(`SELECT 1 FROM signal_seen WHERE url_hash = ?`);
     const markSeen = db.prepare(`INSERT OR IGNORE INTO signal_seen (url_hash, verdict) VALUES (?, ?)`);
     const insert = db.prepare(`
       INSERT OR IGNORE INTO market_signals
         (headline, summary, source_name, source_url, published_at, country_of_origin, supplier,
-         event_type, severity, direction, affects_varieties, excludes_varieties, origin, extracted_by, fixture_id)
+         event_type, severity, direction, affects_varieties, excludes_varieties, origin, extracted_by, fixture_id,
+         confidence, source_reputable)
       VALUES (@headline, NULL, @source_name, @source_url, @published_at, @country_of_origin, NULL,
-              @event_type, @severity, @direction, @affects_varieties, NULL, 'live', @extracted_by, @fixture_id)`);
+              @event_type, @severity, @direction, @affects_varieties, NULL, 'live', @extracted_by, @fixture_id,
+              @confidence, @source_reputable)`);
 
     const findTwin = db.prepare(`
       SELECT id, also_reported_by FROM market_signals
@@ -266,6 +288,8 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
             direction: r.read.direction,
             affects_varieties: r.read.affects_varieties ? JSON.stringify(r.read.affects_varieties) : null,
             extracted_by: r.by, fixture_id: `live:${h}`,
+            confidence: r.read.confidence || null,
+            source_reputable: sourceReputable(it.source) ? 1 : 0,
           });
           tally.added++;
           if (String(r.by).startsWith("model")) tally.by_model++; else tally.by_rules++;
