@@ -18,13 +18,26 @@ import { useLlmTier, setPass, setTierChoice } from "../lib/llmTier";
 // server with no gateway key, never sees a prompt that could not work.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** True when the paid tier exists on this server and this visitor still needs the PIN for it. */
-export function useAiLocked() {
+/**
+ * The whole picture a feature needs to offer its own paid option (22 Sep,
+ * first used by Market Signals' cloud-scan toggle): whether the server can
+ * offer the cloud tier at all, whether THIS visitor still needs the PIN for
+ * it, and the pass itself, ready to send. One fetch, shared by useAiLocked
+ * below so nothing duplicates the server call.
+ */
+export function useAiAvailability() {
   const [server, setServer] = useState(null);
   const { pass } = useLlmTier();
   useEffect(() => { api.getLlmMode().then(setServer).catch(() => setServer(null)); }, []);
   const cloud = server?.modes?.find((m) => m.id === "cloud");
-  return !!(cloud?.available && cloud.requiresPin && !pass);
+  const available = !!cloud?.available;
+  const locked = available && !!cloud.requiresPin && !pass;
+  return { available, locked, pass };
+}
+
+/** True when the paid tier exists on this server and this visitor still needs the PIN for it. */
+export function useAiLocked() {
+  return useAiAvailability().locked;
 }
 
 /**

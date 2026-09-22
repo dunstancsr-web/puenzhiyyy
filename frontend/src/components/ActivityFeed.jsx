@@ -58,6 +58,9 @@ const TYPE_META = {
   SALES_HISTORY_IMPORTED: { icon: FileSearch, color: "var(--blue-text)", label: "Sales history uploaded" },
   // A person accepting, dismissing or withdrawing a market signal.
   SIGNAL_DECIDED: { icon: Newspaper, color: "var(--blue-text)", label: "Market signal" },
+  // The system's own news scan, including what its search planner chose to look
+  // for beyond the usual headlines and why.
+  SIGNAL_SCAN: { icon: FileSearch, color: "var(--purple-text)", label: "News scan" },
 };
 
 // The filter chips, grouped. There are 16 event types and a row of 16 chips is a legend, not a control;
@@ -66,7 +69,7 @@ const TYPE_META = {
 const CATEGORIES = [
   { id: "alerts",   label: "Alerts and decisions", types: ["ALERT_TRIGGERED", "ALERT_ACKNOWLEDGED", "ALERT_REOPENED", "DECISION_RECORDED"] },
   { id: "orders",   label: "Orders and stock",     types: ["ORDER_REQUESTED", "ORDER_REQUEST_UPDATED", "GOODS_RECEIVED", "GOODS_ISSUED", "OPENING_BALANCE_SET", "RESTOCK"] },
-  { id: "signals",  label: "Market signals",       types: ["SIGNAL_DECIDED"] },
+  { id: "signals",  label: "Market signals",       types: ["SIGNAL_DECIDED", "SIGNAL_SCAN"] },
   { id: "products", label: "Products and data",    types: ["SKU_UPDATED", "SKU_CREATED", "SALES_HISTORY_IMPORTED"] },
   { id: "ai",       label: "AI and access",        types: ["LLM_CALL", "LLM_UNLOCKED", "LLM_UNLOCK_LOCKED_OUT"] },
 ];
@@ -120,6 +123,7 @@ const ALERT_LABEL = {
 const alertLabel = (type) => ALERT_LABEL[type] || String(type || "alert").replace(/_/g, " ").toLowerCase();
 
 const num = (n) => Number(n).toLocaleString("en-SG", { maximumFractionDigits: 2 });
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 // Alert copy from the engines already ends in a full stop, so composing it into
 // a sentence here produced "consider a targeted promotion..". Trim whatever
@@ -279,6 +283,18 @@ export function describe(event) {
           i.decision === "reopen" ? "It is back in the list, waiting for a decision." : null,
         ].filter(Boolean).join(" ") || null,
       };
+    }
+
+    case "SIGNAL_SCAN": {
+      const rounds = o.agent_rounds || [];
+      const queries = rounds.flatMap((r) => r.queries || []);
+      const detail = [
+        `Checked ${num(o.fetched)} headlines: ${num(o.added)} new (${num(o.by_model)} read by a model, ${num(o.by_rules)} by the wordlist) in ${o.seconds}s.`,
+        queries.length
+          ? `Its own search planner ran ${plural(rounds.length, "extra round")}, searching for ${queries.map((q) => `"${q.query}" (${unpunctuated(q.reason)})`).join("; ")}, finding ${num(o.agent_fetched)} more headline${o.agent_fetched === 1 ? "" : "s"}.`
+          : "Its own search planner found nothing worth searching for beyond the usual headlines.",
+      ].join(" ");
+      return { headline: "News scan ran", detail };
     }
 
     case "GOODS_ISSUED": {

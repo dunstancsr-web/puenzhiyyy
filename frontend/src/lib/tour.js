@@ -40,7 +40,7 @@ export const TOUR_STEPS = [
     route: "/action-items",
     targets: ['[data-tour="action-nearest"]'],
     title: "What can't wait",
-    body: "Action Items is for settling your immediate concerns, from stock that is about to run out to supply worries raised by the latest world news, which Market signals scans for you. Press Why? on a row for a plain English reason.",
+    body: "Next Steps is for settling your immediate concerns, from stock that is about to run out to supply worries raised by the latest world news, which Market signals scans for you. Press Why? on a row for a plain English reason.",
     next: "Next",
   },
   {

@@ -20,7 +20,7 @@ import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { computeSkuAnalytics } from "../mock/analytics";
 import Modal, { ModalBtn } from "../components/Modal";
 import BulkEdit from "../components/BulkEdit";
-import OrderRequestsCard from "../components/OrderRequestsCard";
+import InventoryCharts from "../components/InventoryCharts";
 
 const HEALTH_STATUSES = ["All", "RED", "ORANGE", "YELLOW", "GREEN"];
 const MOVEMENT_CLASSES = ["All", "Fast Moving", "Normal", "Slow Moving", "Idle"];
@@ -277,10 +277,6 @@ export default function Inventory() {
   const [orderError, setOrderError] = useState(null);
   const [orderDone, setOrderDone] = useState(false);
 
-  // The requests card loads its own list. Raising a request bumps this so the new one shows at once;
-  // no SKU row needs refreshing because a request changes no stock.
-  const [requestsVersion, setRequestsVersion] = useState(0);
-
   // Reorder Loop step 7: the Control Tower raises a request to the buyer. It
   // records intent for a manager to act on; it does NOT change stock. Stock
   // only moves on the warehouse floor, so there is no replaceSku here.
@@ -300,8 +296,10 @@ export default function Inventory() {
         quantity: qty,
         reason: orderReason.trim() || null,
       });
+      // The requests card moved to Action Items (22 Sep), a different page, so there is
+      // no card on THIS page left to bump; whoever opens Action Items next gets a fresh
+      // fetch on mount regardless.
       setOrderDone(true);
-      setRequestsVersion((v) => v + 1); // the new request shows in the requests card
     } catch (err) {
       setOrderError(err.message || "Failed to raise the request");
     } finally {
@@ -382,6 +380,11 @@ export default function Inventory() {
         </div>
       </div>
 
+      {/* ── Charts (22 Sep): total stock vs the illustrative buffer rule, and
+          on-hand stock by country of origin. Both read figures the engines
+          already compute; see InventoryCharts.jsx's own comment. ── */}
+      <InventoryCharts skus={skus} />
+
       {/* ── Filters ── */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ position: "relative", flex: "1 1 220px" }}>
@@ -396,9 +399,6 @@ export default function Inventory() {
         <Select value={movementFilter} onChange={setMovementFilter} options={MOVEMENT_CLASSES} placeholder="Movement" />
         <Select value={originFilter}   onChange={setOriginFilter}   options={ORIGINS}          placeholder="Origin" />
       </div>
-
-      {/* Requests waiting for the buyer, with each one's timeline. Owns its own data. */}
-      <OrderRequestsCard refreshKey={requestsVersion} />
 
       {/* ── Table ── */}
       <div

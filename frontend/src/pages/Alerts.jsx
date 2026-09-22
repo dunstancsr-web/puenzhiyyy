@@ -324,8 +324,8 @@ export default function Alerts() {
           {/* ColHint renders the icon trigger ONLY: its label is the aria label, not visible text, so the h1
               carries the words itself. */}
           <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}>
-            Alerts
-            <ColHint label="Alerts and history" what={PAGE_HELP.what} how={PAGE_HELP.how} />
+            Actions Needed
+            <ColHint label="Actions Needed and history" what={PAGE_HELP.what} how={PAGE_HELP.how} />
           </h1>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginTop: 4 }}>{subtitle}</p>
         </div>
@@ -341,7 +341,7 @@ export default function Alerts() {
       {/* ── Which view, and which product ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <SegmentedTabs
-          ariaLabel="Alerts views" panelId="alerts-panel" value={view}
+          ariaLabel="Actions Needed views" panelId="alerts-panel" value={view}
           onChange={(id) => setParams({ view: id === "history" ? "history" : null })}
           tabs={[
             { id: "needs", label: "Needs action", Icon: Bell, badge: alerts.length },

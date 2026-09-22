@@ -69,7 +69,7 @@ function Btn({ label, onClick, primary, disabled }) {
 }
 
 // refreshKey: the page bumps it after raising a request, so a new one appears without a reload.
-export default function OrderRequestsCard({ refreshKey }) {
+export default function OrderRequestsCard({ refreshKey, roleTag }) {
   const [requests, setRequests] = useState([]);
   const [busyId, setBusyId] = useState(null);
   const [openId, setOpenId] = useState(null);       // whose timeline is expanded
@@ -110,8 +110,15 @@ export default function OrderRequestsCard({ refreshKey }) {
 
   return (
     <div className="card" style={{ padding: "14px 16px", marginBottom: 16 }}>
-      <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 4 }}>
-        Requests waiting for the buyer
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+        <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+          Requests waiting for the buyer
+        </div>
+        {/* Optional, set by ActionItems.jsx's role filter (22 Sep). Rendered inside this
+            card's own header, only reached when there IS a card to attach it to (see the
+            `requests.length === 0` guard above), so a role pill can never float above an
+            empty space when this card renders nothing. */}
+        {roleTag}
       </div>
       <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: 12 }}>
         In this demo you play each role. Every step says who would do it. Stock does not change until the delivery is received at Goods In, which also closes the request. Finished ones stay for a week.

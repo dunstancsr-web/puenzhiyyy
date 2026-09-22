@@ -235,7 +235,16 @@ export const api = {
   getMarketSignals: () => request("/market-signals"),
   replaySignal: (fixture_id) => request("/market-signals/replay", { method: "POST", body: { fixture_id } }),
   decideSignal: (id, decision) => request(`/market-signals/${id}/decision`, { method: "POST", body: { decision } }),
-  scanSignals: (days) => request("/market-signals/scan", { method: "POST", body: { days } }),
+  // `tier` (22 Sep): "cloud" reads on Claude Sonnet instead of the free local model,
+  // capped far lower per scan than the free tier (see routes/signals.js), and needs
+  // `pass` (the same demo-unlock pass Why?/Ask use) or the server refuses it before
+  // any cost, same shape as explainAlert/askDatabase above.
+  scanSignals: (days, { tier, pass } = {}) =>
+    request("/market-signals/scan", {
+      method: "POST",
+      headers: pass ? { "X-Demo-Unlock": pass } : undefined,
+      body: { days, tier },
+    }),
   correctSignal: (id, body) => request(`/market-signals/${id}`, { method: "PATCH", body }),
 
   // Audit log (TASK-31) - every state change the API made, newest first.

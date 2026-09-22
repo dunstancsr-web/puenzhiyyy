@@ -240,7 +240,7 @@ export default function SettingsMenu({ align = "up", compact = false }) {
               numbers. The second sentence exists to rule that out explicitly,
               since it is the single most likely misreading of this control. */}
           <Section title="Explanations" note={
-            <>Who writes the <Em>Why?</Em> explanations in the <Em>Alerts</Em> tab.
+            <>Who writes the <Em>Why?</Em> explanations in the <Em>Actions Needed</Em> tab.
             The figures are the same in all 3 options, only the wording changes.</>
           } />
           <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 14 }}>

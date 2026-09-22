@@ -67,6 +67,12 @@ const EVENTS = Object.freeze({
   // A person accepting, dismissing or withdrawing a market signal. Accepting
   // changes the risk buffer the reorder point uses, so it is a decision.
   SIGNAL_DECIDED: "SIGNAL_DECIDED",
+  // One row per news scan (22 Sep). Unlike SIGNAL_DECIDED this is not a person's
+  // decision, it is the system's own: what the fixed queries and the local
+  // model's own follow-up rounds searched for, with the model's stated reason
+  // for each round, and what each round found. Observability for the one step
+  // in the app where a model chooses what to look at, not just what it means.
+  SIGNAL_SCAN: "SIGNAL_SCAN",
 });
 
 // JSON.stringify can throw (circular refs) and can return undefined (for a bare
