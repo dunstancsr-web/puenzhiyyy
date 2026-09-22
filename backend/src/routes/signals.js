@@ -28,14 +28,26 @@ const crypto = require("crypto");
 const { sandboxOnlyWhenPublic } = require("../middleware/sandboxGuard");
 const { buildQueries, fetchHeadlines } = require("../signals/feed");
 const { contextFrom, readHeadline } = require("../signals/reader");
+const { planQueries, MAX_ROUNDS } = require("../signals/planner");
 const { findSameStory, MAX_DAYS_APART } = require("../signals/twins");
-const { chat, resolveTier } = require("../llm/provider");
+const { MAX_CORRECTIONS } = require("../signals/reader");
+const { readEvents } = require("../db/audit");
+const { chat, resolveTier, friendlyModel } = require("../llm/provider");
+const demoAccess = require("../llm/demoAccess");
 
 // A separate, scoped model choice, like ASK_DATABASE_MODEL: this is a classification
 // task and is tuned on its own, not shared with the Why? button's benchmarked model.
 const SIGNAL_READER_MODEL = process.env.SIGNAL_READER_MODEL || "llama3.1:8b";
 const SCAN_COOLDOWN_MS = 45_000;   // a public server must not let a button hammer a news site and a model
-const MAX_MODEL_READS = 16;        // per scan (about 20 seconds on the local model); the rest wait for the next one
+const MAX_MODEL_READS = 16;        // per scan on the FREE local model (about 20 seconds); the rest wait for the next one
+// PAID (22 Sep): the reader may run on Claude Sonnet instead, gated by the same demo
+// PIN as Why?/Ask (see the scan route below). A cloud read costs real credit, so this
+// cap is far smaller: a full 16 reads plus the agent's own extra headlines could be
+// 20-30 paid calls in ONE press, a large slice of the shared LLM_DAILY_CALL_LIMIT for
+// one click. The search planner (proposeQueries) is a separate decision and always
+// stays on the free local model regardless of this, whatever the reader does; see
+// planner.js, which never accepts a tier argument at all.
+const MAX_MODEL_READS_CLOUD = 5;
 const SCAN_BUDGET_MS = 75_000;
 // How far back a scan may look, in whole days. The page reads these limits from the server (see the
 // payload below), so there is one owner. A month is the ceiling because a scan reads at most
@@ -55,6 +67,21 @@ const toRow = (r) => ({
   also_reported_by: parseList(r.also_reported_by) || [],
 });
 const round1 = (n) => Math.round(n * 10) / 10;
+
+// The system's own memory of the reader's past mistakes (22 Sep): every time a
+// person uses the "Read as" menus to fix a misread, that is already logged as a
+// SIGNAL_DECIDED "edit" event (see the PATCH route below). This just reads the
+// last few back out and hands them to reader.js as reminders, so the model does
+// not have to make the same mistake on a similar headline every single scan.
+// Reads more rows than MAX_CORRECTIONS from the log because not every
+// SIGNAL_DECIDED event is an edit (approve, dismiss, withdraw, reopen also use
+// it); filtering happens here, not in the query.
+function recentCorrections() {
+  return readEvents({ eventType: EVENTS.SIGNAL_DECIDED, limit: 50 })
+    .filter((e) => e.input_data && e.input_data.decision === "edit")
+    .slice(0, MAX_CORRECTIONS)
+    .map((e) => ({ headline: e.input_data.headline, before: e.input_data.before, after: e.input_data.after }));
+}
 
 function listSignals(db) {
   const { skus } = buildAnalytics(db);
@@ -125,15 +152,31 @@ router.post("/market-signals/replay", sandboxOnlyWhenPublic, (req, res) => {
 
 // POST /api/market-signals/scan
 //   Fetch recent rice headlines, keep the ones that look relevant, read each into the
-//   fixed shape (a LOCAL model, else a wordlist), and add what survives as PENDING live
-//   signals. Nothing is accepted and nothing is ordered here. The paid tier is
-//   unreachable from this route (see signals/reader.js).
+//   fixed shape (a LOCAL model by default, else a wordlist), and add what survives as
+//   PENDING live signals. Nothing is accepted and nothing is ordered here.
+//   Body may include { tier: "cloud" } (22 Sep) to read on Claude Sonnet instead of the
+//   free local model, which needs the SAME demo PIN pass as Why?/Ask (X-Demo-Unlock
+//   header), checked below exactly the way inventory.js's routes check it, and comes
+//   with a far smaller per-scan read cap (see MAX_MODEL_READS_CLOUD above). The search
+//   planner's own extra rounds always stay on the free local model regardless.
 router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
   // Checked first, so a bad request neither starts a scan nor uses up the cooldown.
   const days = req.body?.days == null ? SCAN_DAYS.default : Number(req.body.days);
   if (!Number.isInteger(days) || days < SCAN_DAYS.min || days > SCAN_DAYS.max) {
     return res.status(400).json({ success: false, message: `Choose a whole number of days from ${SCAN_DAYS.min} to ${SCAN_DAYS.max}.` });
   }
+  const wantsCloud = req.body?.tier === "cloud";
+  if (wantsCloud && !demoAccess.passValid(req.get("X-Demo-Unlock"))) {
+    const gate = demoAccess.gateStatus();
+    return res.json({
+      success: false,
+      locked: gate.ok,
+      message: gate.ok ? "Paid scanning is locked. Enter the demo PIN in Settings to unlock it." : gate.reason,
+    });
+  }
+  const readerTier = wantsCloud ? "cloud" : "local";
+  const maxModelReads = wantsCloud ? MAX_MODEL_READS_CLOUD : MAX_MODEL_READS;
+
   const wait = SCAN_COOLDOWN_MS - (Date.now() - lastScanAt);
   if (scanning) return res.status(409).json({ success: false, message: "A scan is already running." });
   if (wait > 0) return res.status(429).json({ success: false, message: `Scanned a moment ago. Try again in ${Math.ceil(wait / 1000)} seconds.` });
@@ -148,7 +191,8 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
       return res.status(400).json({ success: false, message: "Add products first: the scan looks for news about the countries you buy from." });
     }
 
-    const { items, errors } = await fetchHeadlines(buildQueries(ctx.origins, days), { maxAgeDays: days + 7 });
+    const fixedQueries = buildQueries(ctx.origins, days);
+    const { items, errors } = await fetchHeadlines(fixedQueries, { maxAgeDays: days + 7 });
     const hash = (it) => crypto.createHash("sha1").update(it.link).digest("hex").slice(0, 16);
     const seenStmt = db.prepare(`SELECT 1 FROM signal_seen WHERE url_hash = ?`);
     const markSeen = db.prepare(`INSERT OR IGNORE INTO signal_seen (url_hash, verdict) VALUES (?, ?)`);
@@ -169,61 +213,129 @@ router.post("/market-signals/scan", sandboxOnlyWhenPublic, async (req, res) => {
     const recentLive = db.prepare(`
       SELECT id, headline, also_reported_by, country_of_origin, published_at FROM market_signals
        WHERE origin = 'live' AND ABS(julianday(published_at) - julianday(?)) <= ${MAX_DAYS_APART}`);
-    const tally = { fetched: items.length, already_read: 0, not_relevant: 0, merged: 0, added: 0, by_model: 0, by_rules: 0, waiting: 0, errors };
+    const tally = { fetched: items.length, agent_fetched: 0, already_read: 0, not_relevant: 0, merged: 0, added: 0, by_model: 0, by_rules: 0, waiting: 0, agent_queries: [], agent_rounds: [], errors };
     let modelReads = 0;
-    const deps = { chatFn: chat, resolveTierFn: resolveTier, model: SIGNAL_READER_MODEL };
+    let budgetExhausted = false;
+    // Computed once per scan, not once per headline: the reminder list only
+    // changes when a person corrects something, never mid-scan.
+    const corrections = recentCorrections();
+    const readerModel = wantsCloud ? (process.env.LLM_GATEWAY_MODEL || "claude-sonnet-4-5") : SIGNAL_READER_MODEL;
+    // Two SEPARATE deps objects on purpose: readerDeps may carry tier "cloud" and a
+    // cloud model id; plannerDeps never does, since planQueries's own chatFn call
+    // hardcodes tier "local" regardless of what it is given, and passing a Sonnet
+    // model id through as a local Ollama model override would just fail every local
+    // call this scan, silently (planQueries swallows the error and returns no
+    // queries, same as any other local-model-unavailable case, but for the wrong
+    // reason). Keeping the objects separate avoids that mistake being possible.
+    const readerDeps = { chatFn: chat, resolveTierFn: resolveTier, model: readerModel, corrections, tier: readerTier };
+    const plannerDeps = { chatFn: chat, resolveTierFn: resolveTier, model: SIGNAL_READER_MODEL };
 
-    for (const it of items) {
-      const h = hash(it);
-      if (seenStmt.get(h)) { tally.already_read++; continue; }
-      if (Date.now() - started > SCAN_BUDGET_MS) { tally.waiting++; continue; }
+    // Reads one batch of headlines, mutating the shared tally and modelReads. Used
+    // for both the fixed per-origin queries and, after them, the agent's own
+    // queries, so the same caps (maxModelReads, SCAN_BUDGET_MS) bound both.
+    async function readBatch(batch) {
+      for (const it of batch) {
+        const h = hash(it);
+        if (seenStmt.get(h)) { tally.already_read++; continue; }
+        if (Date.now() - started > SCAN_BUDGET_MS) { tally.waiting++; budgetExhausted = true; continue; }
 
-      const r = await readHeadline(it, ctx, deps);
-      if (r.by && String(r.by).startsWith("model")) modelReads++;
-      if (r.status === "signal") {
-        // The same story reported by several outlets is ONE signal with several
-        // sources, not several cards asking the same question.
-        // Same story first, by the text of the headline (see signals/twins.js), then the older test by the
-        // reader's reading. The text test comes first because the reader is not consistent: it can read one
-        // headline two ways, and the reading test alone would then keep both.
-        const sameStory = findSameStory(
-          { title: it.title, published_at: it.published_at, country_of_origin: r.read.country_of_origin },
-          recentLive.all(it.published_at).map((x) => ({ ...x, also_reported_by: parseList(x.also_reported_by) || [] })),
-        );
-        const twin = sameStory || findTwin.get(r.read.country_of_origin, r.read.event_type, r.read.direction, it.published_at);
-        if (twin) {
-          const also = parseList(twin.also_reported_by) || [];
-          if (also.length < 6) also.push({ title: it.title, source: it.source, url: it.link });
-          db.prepare(`UPDATE market_signals SET also_reported_by = ? WHERE id = ?`).run(JSON.stringify(also), twin.id);
-          tally.merged++;
-          markSeen.run(h, "merged");
-          continue;
+        const r = await readHeadline(it, ctx, readerDeps);
+        if (r.by && String(r.by).startsWith("model")) modelReads++;
+        if (r.status === "signal") {
+          // The same story reported by several outlets is ONE signal with several
+          // sources, not several cards asking the same question.
+          // Same story first, by the text of the headline (see signals/twins.js), then the older test by the
+          // reader's reading. The text test comes first because the reader is not consistent: it can read one
+          // headline two ways, and the reading test alone would then keep both.
+          const sameStory = findSameStory(
+            { title: it.title, published_at: it.published_at, country_of_origin: r.read.country_of_origin },
+            recentLive.all(it.published_at).map((x) => ({ ...x, also_reported_by: parseList(x.also_reported_by) || [] })),
+          );
+          const twin = sameStory || findTwin.get(r.read.country_of_origin, r.read.event_type, r.read.direction, it.published_at);
+          if (twin) {
+            const also = parseList(twin.also_reported_by) || [];
+            if (also.length < 6) also.push({ title: it.title, source: it.source, url: it.link });
+            db.prepare(`UPDATE market_signals SET also_reported_by = ? WHERE id = ?`).run(JSON.stringify(also), twin.id);
+            tally.merged++;
+            markSeen.run(h, "merged");
+            continue;
+          }
+          insert.run({
+            headline: it.title, source_name: it.source, source_url: it.link, published_at: it.published_at,
+            country_of_origin: r.read.country_of_origin, event_type: r.read.event_type, severity: r.read.severity,
+            direction: r.read.direction,
+            affects_varieties: r.read.affects_varieties ? JSON.stringify(r.read.affects_varieties) : null,
+            extracted_by: r.by, fixture_id: `live:${h}`,
+          });
+          tally.added++;
+          if (String(r.by).startsWith("model")) tally.by_model++; else tally.by_rules++;
+          markSeen.run(h, "signal");
+        } else {
+          tally.not_relevant++;
+          markSeen.run(h, r.status);
         }
-        insert.run({
-          headline: it.title, source_name: it.source, source_url: it.link, published_at: it.published_at,
-          country_of_origin: r.read.country_of_origin, event_type: r.read.event_type, severity: r.read.severity,
-          direction: r.read.direction,
-          affects_varieties: r.read.affects_varieties ? JSON.stringify(r.read.affects_varieties) : null,
-          extracted_by: r.by, fixture_id: `live:${h}`,
-        });
-        tally.added++;
-        if (String(r.by).startsWith("model")) tally.by_model++; else tally.by_rules++;
-        markSeen.run(h, "signal");
-      } else {
-        tally.not_relevant++;
-        markSeen.run(h, r.status);
-      }
-      // Bound the slow part. Anything past the cap is left unread, not marked seen,
-      // so the next scan picks it up.
-      if (modelReads >= MAX_MODEL_READS) {
-        const rest = items.slice(items.indexOf(it) + 1).filter((x) => !seenStmt.get(hash(x)));
-        tally.waiting += rest.length;
-        break;
+        // Bound the slow part. Anything past the cap is left unread, not marked seen,
+        // so the next scan picks it up.
+        if (modelReads >= maxModelReads) {
+          const rest = batch.slice(batch.indexOf(it) + 1).filter((x) => !seenStmt.get(hash(x)));
+          tally.waiting += rest.length;
+          budgetExhausted = true;
+          break;
+        }
       }
     }
 
+    await readBatch(items);
+
+    // The agentic step: up to MAX_ROUNDS rounds, each seeing what every earlier
+    // round (fixed or agent) found and searched for, and each free to decide there
+    // is nothing left worth searching for by returning an empty list, which ends
+    // the loop early. Every round's queries and their yield are reported on the
+    // tally, so a scan is never silently different from what the fixed query list
+    // alone would have done.
+    const knownLinks = new Set(items.map((it) => it.link));
+    const askedQueries = [...fixedQueries];
+    for (let round = 1; round <= MAX_ROUNDS && !budgetExhausted; round++) {
+      const recentSignals = db.prepare(`
+        SELECT country_of_origin, event_type, severity, headline FROM market_signals
+         WHERE origin = 'live' ORDER BY id DESC LIMIT 8`).all();
+      const agentQueries = await planQueries(ctx, recentSignals, plannerDeps, askedQueries);
+      if (!agentQueries.length) break; // the model itself decided this scan is done
+      askedQueries.push(...agentQueries.map((e) => e.query));
+      const more = await fetchHeadlines(agentQueries.map((e) => e.query), { maxAgeDays: days + 7 });
+      tally.errors.push(...more.errors);
+      const fresh = more.items.filter((it) => !knownLinks.has(it.link));
+      fresh.forEach((it) => knownLinks.add(it.link));
+      await readBatch(fresh);
+      // queries here are {query, reason} pairs: the reason is the model's own
+      // words for why it asked, kept so a person reading this later sees the
+      // thinking, not just the search string.
+      tally.agent_rounds.push({ round, queries: agentQueries, fetched: fresh.length });
+    }
+    tally.agent_queries = tally.agent_rounds.flatMap((r) => r.queries);
+    tally.agent_fetched = tally.agent_rounds.reduce((n, r) => n + r.fetched, 0);
+
     tally.seconds = Math.round((Date.now() - started) / 100) / 10;
-    tally.reader = resolveTier("local") === "local" ? `model ${SIGNAL_READER_MODEL} on this machine` : "wordlist only (no local model on this server)";
+    tally.reader = wantsCloud
+      ? `${friendlyModel(readerModel)}, paid, capped at ${MAX_MODEL_READS_CLOUD} reads this scan`
+      : resolveTier("local") === "local" ? `model ${SIGNAL_READER_MODEL} on this machine` : "wordlist only (no local model on this server)";
+    tally.corrections_used = corrections.length;
+
+    // Best-effort observability for the one step where a model chooses what to
+    // look at. Logged even when the agent contributed nothing (agent_rounds is
+    // empty), so "the agent looked and found nothing more" is as visible as
+    // "the agent found three more leads".
+    logEvent(EVENTS.SIGNAL_SCAN, {
+      input: { days, fixed_queries: fixedQueries, corrections_used: corrections, reader_tier: readerTier },
+      output: {
+        fetched: tally.fetched, added: tally.added, by_model: tally.by_model, by_rules: tally.by_rules,
+        agent_rounds: tally.agent_rounds, agent_fetched: tally.agent_fetched, seconds: tally.seconds,
+        // paid_reads is the actual count of model calls this scan spent, when on the
+        // cloud tier: the one figure the spend ledger needs, since chat()'s own paid
+        // call counter is not otherwise attributable back to which feature spent it.
+        paid_reads: wantsCloud ? tally.by_model : 0,
+      },
+    });
     res.json({ success: true, data: { ...listSignals(db), scan: tally } });
   } catch (err) {
     console.error(err);

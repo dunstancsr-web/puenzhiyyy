@@ -3,6 +3,7 @@ import { Newspaper, ExternalLink, History, ChevronRight, ChevronDown, ChevronUp 
 import { api } from "../api/inventory";
 import ColHint from "./ColHint";
 import WorkingNote from "./WorkingNote";
+import UnlockAI, { useAiAvailability } from "./UnlockAI";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARKET SIGNALS (Action Items)
@@ -555,7 +556,15 @@ export default function MarketSignals() {
   const [pick, setPick] = useState("");
   const [needsDemo, setNeedsDemo] = useState(false);
   const [scanNote, setScanNote] = useState(null);
+  const [agentRounds, setAgentRounds] = useState([]);
   const [scanning, setScanning] = useState(false);
+  // Deliberately its own choice, not tied to lib/llmTier.js's general tier
+  // preference: unlocking the PIN once for a Why? explanation should not
+  // silently make every future scan paid too, since one scan can cost far
+  // more than one Why? press (routes/signals.js's MAX_MODEL_READS_CLOUD).
+  // Unchecked by default, every time; never persisted.
+  const [useCloud, setUseCloud] = useState(false);
+  const ai = useAiAvailability();
   const [mode, setMode] = useState("live");
   const [windowChoice, setWindowChoice] = useState("14"); // a preset's value, or "custom"
   const [customDays, setCustomDays] = useState("10");
@@ -634,7 +643,8 @@ export default function MarketSignals() {
     setBusy(true); setScanning(true); setError(null); setNeedsDemo(false); setScanNote(null);
     try {
       const before = signals;
-      const d = await api.scanSignals(days);
+      const onCloud = useCloud && ai.available && !ai.locked;
+      const d = await api.scanSignals(days, onCloud ? { tier: "cloud", pass: ai.pass } : {});
       setData(d);
       reveal(before, d);
       const s = d.scan;
@@ -643,6 +653,7 @@ export default function MarketSignals() {
         `${s.not_relevant} not relevant${s.already_read ? `, ${s.already_read} already read` : ""}` +
         `${s.waiting ? `, ${s.waiting} older ones waiting for the next scan` : ""}. Read by ${s.reader}.`
       );
+      setAgentRounds(s.agent_rounds || []);
     } catch (e) { setError(e.message); setNeedsDemo(!!e.needsDemo); } finally { setBusy(false); setScanning(false); }
   };
 
@@ -735,6 +746,24 @@ export default function MarketSignals() {
                     Enter a whole number of days from {limits.min} to {limits.max}.
                   </div>
                 )}
+                {ai.available && (
+                  ai.locked ? (
+                    <div style={{ marginTop: 10 }}>
+                      <UnlockAI variant="inline" />
+                    </div>
+                  ) : (
+                    <label style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "flex-start", cursor: busy ? "default" : "pointer", maxWidth: 640 }}>
+                      <input type="checkbox" checked={useCloud} onChange={(e) => setUseCloud(e.target.checked)} disabled={busy}
+                        style={{ marginTop: 3, width: 16, height: 16, flexShrink: 0 }} />
+                      <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                        Read with Claude Sonnet instead of the free local model
+                        <Help label="paid scanning"
+                          what="Claude Sonnet 4.5 through the hackathon gateway reads each headline instead of the free model on this machine. It reads the same fixed shape and never changes what a headline can mean, only how well it reads one."
+                          how="Capped at 5 headlines per scan on Sonnet, versus about 16 on the free model, since a paid read costs real shared credit. Roughly $0.006 each, so about $0.03 for a full scan. The search planner's own extra rounds always stay on the free model, whichever you choose here." />
+                      </span>
+                    </label>
+                  )
+                )}
                 {daysOk && days > 14 && !scanning && (
                   <div style={{ marginTop: 8, fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.5, maxWidth: 640 }}>
                     A longer look back finds more headlines, but one scan reads about 16 of them. If some are left over, scan again to read the rest.
@@ -769,6 +798,28 @@ export default function MarketSignals() {
             )}
           </div>
           {mode === "live" && scanNote && <div style={{ marginTop: 10, fontSize: "var(--text-xs)", color: "var(--text-secondary)", lineHeight: 1.5 }}>{scanNote}</div>}
+          {mode === "live" && agentRounds.length > 0 && (
+            <details style={{ marginTop: 10 }}>
+              <summary className="ms-summary" style={{ cursor: "pointer", fontSize: "var(--text-xs)", color: "var(--text-secondary)", fontWeight: 600 }}>
+                This scan also searched on its own ({plural(agentRounds.length, "extra round")})
+                <Help label="the search planner"
+                  what="After reading the usual headlines, a small AI model looks at what was found and can propose its own follow-up searches, in up to three rounds. It decides for itself when there is nothing more worth chasing."
+                  how="Every search it runs, and the reason it gave for running it, is shown here and kept in History. It only chooses what to look for; a fixed table still decides what any event found this way costs, the same as every other signal." />
+              </summary>
+              <ol style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: "var(--text-xs)", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                {agentRounds.map((r) => (
+                  <li key={r.round} style={{ marginBottom: 8 }}>
+                    {r.queries.map((q, i) => (
+                      <div key={i}>
+                        <strong style={{ color: "var(--text-primary)" }}>&ldquo;{q.query}&rdquo;</strong>: {q.reason}
+                      </div>
+                    ))}
+                    <div style={{ color: "var(--text-muted)" }}>{plural(r.fetched, "new headline")} found this round.</div>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
 
           {signals.length === 0 ? (
             <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
