@@ -77,10 +77,13 @@ backend/scripts/
   check-deploy.js   checks a live deployment, never calls the model
   rehearse-deploy.sh  runs the app like the container on a Mac, then runs check-deploy.js
 frontend/src/
-  pages/       Home, Dashboard, Action Items, Forecast, Inventory, Alerts, Table (the Control
-               Tower - order is Sidebar.jsx's own; Alerts holds Needs action and History, and History
-               is components/ActivityFeed.jsx, the old Activity page; Action Items and Table, both
-               19 Sep, are additive)
+  pages/       Home, Dashboard, Table, Inventory, Forecast, Actions Needed, Next Steps (the Control
+               Tower - order and indenting are Sidebar.jsx's own; file names still read ActionItems.jsx
+               and Alerts.jsx, renamed on screen only, 23 Sep, to Next Steps and Actions Needed - the
+               page decides nothing, so it lists what to do next, and the other is the one place a
+               decision actually gets recorded. Actions Needed holds Needs action and History, and
+               History is components/ActivityFeed.jsx, the old Activity page; Next Steps and Table,
+               both 19 Sep, are additive)
   warehouse/   Goods In, Goods Out and operator PIN sign-in (the handheld)
   lib/explain.js    the rule-based Why? explanation, four plain-English steps
 frontend/tuners/    Stan's design tuners: sliders over real components, he pastes back CSS
@@ -111,7 +114,7 @@ removed by rule (`tone.js`) rather than retried. **The full design, file by file
 `node backend/scripts/bench-models.js llama3 --repeat 4 --scenario reorder` and compare.** One run of
 16 is noise; four passes is the number to trust. Record the result in the devlog entry.
 
-**Action Items' "Ask about your data" (19 Sep) is a second, separate model feature**, past the
+**Next Steps' "Ask about your data" (19 Sep) is a second, separate model feature**, past the
 Why?-button tier above: an open-ended question, answered by a model that can call a small set of
 read-only tools (`llm/tools.js`) to fetch facts it wasn't pre-loaded with - the domain spec's Step 14
 tier. It reuses the placeholder guarantee (`slots.js`) but not the alert-specific semantic verifier,
@@ -122,11 +125,13 @@ and changing it to help one feature would have silently regressed the other. If 
 feature's model or prompt, check the other still matches its own benchmark before assuming a shared
 change is safe.
 
-**Action Items' "Market signals" (19 Sep)** turns a news event into what it does to each SKU's stock and
+**Next Steps' "Market signals" (19 Sep)** turns a news event into what it does to each SKU's stock and
 what to order, with the days an event costs read from a visible table, never from a model. It is built on the
-replay of real past events and a live news scan (Google News RSS, read by a local model, else a keyword list, never the paid tier; editable by a person). Formulas, matching and
+replay of real past events and an RSS News Feed scan (Google News RSS, read by a local model, else a keyword list, never the paid tier by default; editable by a person). Since 22 Sep it also has an agentic multi-round
+search planner (local-model only), source reputation, corroboration count and confidence signals, and an
+optional Sonnet (cloud) read behind the demo PIN with a smaller cost cap. Formulas, matching and
 the open question about a seeded risk event: `design.md`, "Market Signals". Check with
-`node backend/scripts/test-signals.js`.
+`node backend/scripts/test-signals.js`, `test-signal-reader.js` and `test-signal-planner.js`.
 
 **Order requests (20 Sep)** run the whole loop: request, acknowledge, purchase order, manager approval (which creates the order Goods In receives), then receipt at Goods In, which closes the request. Check with `node backend/scripts/test-order-loop.js`, which uses a throwaway database.
 
@@ -147,6 +152,7 @@ the open question about a seeded risk event: `design.md`, "Market Signals". Chec
 | 15 Sep | none | Formula check in CI (26 checks). Stan's formula decisions: fulfilled sales only, Slow Moving by cover, the 30 day average as the one demand rate app-wide |
 | 15 Sep | none | Deploy rehearsal without Docker; README rewritten; goods movements shown on Activity; features guide with screenshots and PDF; Inventory table fitted to laptop widths; urgency and leaked names removed from model wording by rule |
 | 19 Sep | none | Opening-balance step and a receipts-realism seed fix; two new additive tabs (Table, Action Items); the Forecast page's default-vs-4-models story made visible before a forecast is run; a second model feature, Ask about your data (tool-calling, Step 14 of the domain spec), with its own scoped local model; chosen problem statement added to project-context.md as an explicit north star |
+| 20 to 23 Sep | none | Order requests (the full loop, see above); Market Signals' agentic search planner, injection hardening, Sonnet parity and its UI toggle, three tabs, and three free accuracy signals; the order-requests card moved from Inventory to Action Items with role pills and a filter; two new charts on Inventory (buffer rule vs surplus, origin); Action Items renamed to Next Steps and Alerts renamed to Actions Needed, sidebar reordered and indented (Table under Dashboard, Forecast under Inventory); the features guide's screenshots and text caught up to all of it. See DEVLOG.md's 22 and 23 Sep entries for the full detail. |
 
 ## Decisions already made
 
@@ -196,13 +202,24 @@ away rather than waiting to be asked twice:
    there. Newest entry at the bottom is what a fresh agent reads first (see "Reading order" above).
 2. If status, next steps or a decision changed, update the **submission tracker**, not this file.
 3. If a paid model call was made, add it to the **spend ledger**.
-4. Update this file only if something it describes changed: the architecture, a rule, the reading
+4. **If a screen changed** (a rename, a moved section, a restructured tab, a new chart or card), check
+   `docs/Guide/FEATURES GUIDE.md` and its screenshots in `docs/Guide/images/` for anything that screen's
+   change made stale, fix both together, and rebuild the PDF (`python3 docs/Guide/build-pdf.py`). This
+   guide can drift silently for days behind a UI change (23 Sep: it still showed a page's old name and a
+   card in its old location) with nothing else catching it, so it needs its own explicit check here, not
+   just a fix when someone happens to notice. **Three copies, always updated in the same pass, never one
+   without the others:** the `.md` source, the PDF (a copy for sharing, never committed), and the
+   claude.ai artifact Stan reads it from (link in `docs/DIRECTORY.md`'s row for the guide) - republish
+   that artifact from the current `.md` whenever it changes. Found 23 Sep: the `.md` was fixed and the
+   PDF rebuilt while the artifact sat unchanged for a full extra round, because nothing said it was a
+   third copy of the same document.
+5. Update this file only if something it describes changed: the architecture, a rule, the reading
    order, or where a fact lives.
-5. Run `git status`. If there is meaningful uncommitted work, say so plainly and ask whether to commit
+6. Run `git status`. If there is meaningful uncommitted work, say so plainly and ask whether to commit
    it now, don't commit or push on your own initiative (rules.md, "Working rules": commit only when
    asked). If the branch is ahead of `origin`, mention that too: a new session on a different machine or
    a cloud session only sees what's pushed.
-6. Close with a short, plain-English summary in chat: what changed, what's next, what (if anything) is
+7. Close with a short, plain-English summary in chat: what changed, what's next, what (if anything) is
    blocked or waiting on a decision. This is for the human as much as the next agent; don't skip it just
    because the documents above already say the same thing.
 

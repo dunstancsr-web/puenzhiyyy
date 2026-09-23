@@ -16,7 +16,7 @@
 // handed, because there is no digit it is allowed to write. Good enough for
 // a first version; a semantic layer can follow once real answers get read.
 //
-// Voice is deliberately different from Alerts' prose paragraphs (Stan's ask,
+// Voice is deliberately different from Actions Needed's prose paragraphs (Stan's ask,
 // 19 Sep): ELI18, short sentences, point form. That's why this is its own
 // system prompt rather than a tweak to explain.js's SYSTEM/SLOT_SYSTEM -
 // those were benchmarked against "plain English prose, no bullets" and
@@ -202,7 +202,7 @@ async function explainActionItem({ kind, sku, item, tier }) {
   }
 
   // Urgency stays allowed only for a real stockout, same URGENT_OK gate
-  // tone.js already applies to Alerts - a data gap should never sound urgent.
+  // tone.js already applies to Actions Needed - a data gap should never sound urgent.
   rendered = calmTone(stripPreamble(rendered), { alert_type: kind === "stockout" ? "STOCKOUT_RISK" : "BLIND_SPOT" }, slots).text;
   if (timingGap(kind, sku, item) != null) rendered = dropTimingPromises(rendered);
   if (opening) rendered = rendered ? `${opening}\n\n${rendered}` : opening;

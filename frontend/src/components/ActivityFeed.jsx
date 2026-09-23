@@ -12,7 +12,7 @@ import { useLiveRefresh } from "../hooks/useLiveRefresh";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ACTIVITY FEED (TASK-31) - the read side of the audit log. Since 20 Sep this is the
-// "History" view inside the Alerts tab (pages/Alerts.jsx), not a page of its own: Stan
+// "History" view inside the Actions Needed tab (renamed from Alerts, 23 Sep; still pages/Alerts.jsx), not a page of its own: Stan
 // asked for the two to share a tab so an alert and what happened to it can be read side
 // by side. The list stays a separate list on purpose (a to-do list and a record are
 // different things), and the tab links them at the item.

@@ -309,7 +309,7 @@ function renderSlots(raw, slots) {
   return out.trim();
 }
 
-// Shared by all three model features (moved here from askDatabase.js, 20 Sep, so Why? and Action Items get it too).
+// Shared by all three model features (moved here from askDatabase.js, 20 Sep, so Why? and Next Steps get it too).
 // Caught live (19 Sep): by far the dominant failure across repeated runs
 // against real llama3/llama3.1 was "{one_days_of_cover} days" - the model
 // adding a unit word after a placeholder whose value already reads "12

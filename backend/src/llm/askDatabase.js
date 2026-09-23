@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ASK DATABASE (19 Sep) - open-ended follow-up questions, the tier past
-// Action Items' fixed "Why?" button. That button works because the question
+// Next Steps' (renamed from Action Items, 23 Sep) fixed "Why?" button. That button works because the question
 // is always known in advance (why THIS row), so every fact it might need can
 // be pre-loaded and named as a placeholder before the model ever runs. A
 // free-form question ("why is BM-5KG different from JP-5KG?") isn't known in

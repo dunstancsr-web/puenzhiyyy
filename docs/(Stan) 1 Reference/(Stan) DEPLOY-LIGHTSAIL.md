@@ -144,7 +144,7 @@ provisions the HTTPS certificate.
 
    It does submit one wrong PIN, which uses one of five tries for your address for 15 minutes.
 
-3. **By hand, once:** open the site → **Action Items** → **Why?** on a row → type the PIN in the
+3. **By hand, once:** open the site → **Next Steps** (renamed from Action Items, 23 Sep) → **Why?** on a row → type the PIN in the
    **"Want it in plainer words?"** field → **Unlock**. It unlocks the tab and writes the answer at once
    (Settings → AWS Bedrock still works too). An answer ending "Written by Claude Sonnet 4.5" means the
    gateway works. It is one paid call: add it to the spend ledger. If you see an orange DEMO MODE strip,

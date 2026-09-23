@@ -2279,7 +2279,7 @@ router.post("/action-items/explain", async (req, res) => {
 
 // POST /api/ask-database  { question, tier? }
 //
-// The tier past Action Items' fixed "Why?" (19 Sep): an open-ended question,
+// The tier past Next Steps' (renamed from Action Items, 23 Sep) fixed "Why?" (19 Sep): an open-ended question,
 // answered by a model that can call a small set of read-only tools
 // (backend/src/llm/tools.js) to fetch facts it wasn't pre-loaded with -
 // never raw SQL, never a write. See askDatabase.js for the full reasoning.

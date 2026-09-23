@@ -70,8 +70,8 @@ creates the purchase order (`PO-REQ-000N`, quantity from the request, arrival fr
 time) and stores its number on the request, so the warehouse never sees an order nobody approved. When an
 operator receives that order at Goods In, the same transaction adds a `received` step and closes the
 request, with no click from the office. Stock moves only at that receipt. Each step is a row in
-`order_request_events` (who, when, optional note), shown on the Inventory page's "Requests waiting for the
-buyer" card (finished requests stay a week) and as a line on the History view. There is no login, so one
+`order_request_events` (who, when, optional note), shown on the Next Steps page's "Requests waiting for the
+buyer" card (moved there from Inventory, 22 Sep; finished requests stay a week) and as a line on the History view. There is no login, so one
 person plays every role in the demo; the server fixes the actor from the step.
 Code: `backend/src/routes/inventory.js` (`REQUEST_TRANSITIONS`, `REQUEST_ACTORS`, the PATCH handler),
 `backend/src/routes/warehouse.js` (the receive route), `backend/src/db/requestEvents.js`,
@@ -81,7 +81,7 @@ request).
 
 A market signal can also start a request: "Ask the buyer to order" on a live signal's product row, quantity
 prefilled from the low end of the advice and editable, refused when a request for that product is
-already open. Past events (practice) never offer it.
+already open. Replay (practice) never offer it.
 
 **Still open questions.** Is a partial receipt its own step ("part received") or does one receipt close the
 request, as the warehouse endpoint does today (one receipt closes it)? Should approval depend on a spend
@@ -109,7 +109,7 @@ screen once there is a login, instead of a button on the card?
 | Alerts and Activity in one tab (20 Sep) | one Alerts tab with two views, Needs action and History; two lists, joined at the item; dismissing an alert can be undone | Stan asked for one tab so an alert and its history can be read together. Industry keeps the to-do list and the record separate and links them at the item, so the lists were not interleaved; design.md, "Alerts tab" |
 | Ageing bands (20 Sep) | scaled to each product's own holding limit: At Risk from 90% of it (day 243 at the default 270, day 162 for a 180 day product). The fixed day bands in the old REQ-08 are gone | short-life products should warn earlier; design.md, "Supporting Formulas" |
 | Seeded India export event (20 Sep) | scoped to non-basmati, like the real 2023 ban, so it no longer buffers basmati SKUs | the risk buffer for the India basmati SKUs is now 0; design.md, "Market Signals" |
-| Past events are practice (20 Sep) | a replayed past event can be acknowledged but never adds a buffer, and never offers "Ask the buyer" | a buffer must only come from news a person believes is happening now; the server refuses it, not just the button |
+| Replay is practice (20 Sep) | a replayed past event can be acknowledged but never adds a buffer, and never offers "Ask the buyer" | a buffer must only come from news a person believes is happening now; the server refuses it, not just the button |
 | Market signal to order request (20 Sep) | yes: "Ask the buyer to order" prefilled and editable; the person still sends and nothing is ordered until the buyer acts | one click from advice to the buyer's list, with a duplicate guard |
 | Market signals opens on the RSS News Feed tab (20 Sep, tab renamed 22 Sep) | RSS News Feed first, Replay second, Deep Search third (disabled) | the real use comes first; the demo path is one tab away |
 | Demo banner's Exit stays offset from the entry button (20 Sep) | not pinned to the far right | a little offset avoids an accidental double click entering and exiting |

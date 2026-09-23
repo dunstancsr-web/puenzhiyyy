@@ -185,7 +185,7 @@ function buildNeedsAttention(skus) {
       // Reads the engine's suggested_order_qty rather than recomputing
       // target_stock - available_qty here. That proxy ignores everything
       // consumed while the order is in transit, and this row used to print a
-      // different quantity from the Alerts page for the same SKU.
+      // different quantity from the Actions Needed page for the same SKU.
       // See the orderQty note in backend/src/engines/alerts.js.
       const qty = Math.max(s.min_order_qty, Math.round(s.suggested_order_qty));
       actions.push({
@@ -241,7 +241,7 @@ function buildNeedsAttention(skus) {
   // (TASK-95): inventory position (available plus inbound) at or below the
   // approved reorder point, not already a stockout, not idle. This row used to
   // apply its own test, available stock with no inbound and only when cover was
-  // already below band, so the Alerts page and this table could disagree about
+  // already below band, so the Actions Needed page and this table could disagree about
   // whether the same SKU needed reordering.
   skus
     .filter((s) => s.stockout_gap_days === 0 && s.inventory_position <= s.reorder_point_policy && s.movement_class !== "Idle")

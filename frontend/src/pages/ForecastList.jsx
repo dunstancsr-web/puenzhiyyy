@@ -8,7 +8,7 @@ import { api } from "../api/inventory";
 
 // One header, one explanation, so a reader never gets a different answer for
 // the same column on two different visits. "Current -> Suggested" (not
-// "Approved -> Suggested") on purpose: Alerts and the rest of the app already
+// "Approved -> Suggested") on purpose: Actions Needed and the rest of the app already
 // say "approved" for the reorder point a manager has signed off on, but this
 // table pairs it against a number that isn't approved yet, and "current vs
 // suggested" reads as a comparison, not two states of the same approval.
@@ -27,7 +27,7 @@ const COLUMN_TIPS = {
   },
   gap: {
     what: "How far Suggested is from Current, as a percentage of Current: the same reorder-point pair shown just to the left, not a separate measurement.",
-    how: "0% means the two already match. A gap large enough matters is what raises a policy-change suggestion on Alerts. This is not forecast accuracy, that's WMAPE, two columns over.",
+    how: "0% means the two already match. A gap large enough matters is what raises a policy-change suggestion on Actions Needed. This is not forecast accuracy, that's WMAPE, two columns over.",
   },
   stale: {
     what: "How long ago this SKU's active forecast was generated. Shown as a dash when no forecast has been run yet.",

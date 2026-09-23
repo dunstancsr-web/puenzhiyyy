@@ -14,9 +14,9 @@ import { useEffect, useState } from "react";
 //                                       lingers on a shared demo laptop after
 //                                       the person who typed the PIN has left.
 //
-// Settings writes both; Alerts reads both. They stay in step through one
+// Settings writes both; Actions Needed reads both. They stay in step through one
 // window event, because both can be on screen at once (Settings is in the
-// sidebar beside the Alerts page) and a storage event only fires in OTHER tabs.
+// sidebar beside the Actions Needed page) and a storage event only fires in OTHER tabs.
 //
 // Every storage access is wrapped: private windows, blocked site data and
 // some embedded browsers throw on access, and a thrown read must degrade to

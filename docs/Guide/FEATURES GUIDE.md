@@ -4,10 +4,18 @@ What the app does, screen by screen, organised by **who uses it** and **what the
 for anyone meeting StockSense for the first time: judges, new teammates, and the people who will run
 the warehouse.
 
+> **This document is exported from the repository, in two forms: a PDF and a claude.ai page.** The
+> editable source, with every screenshot, is `docs/Guide/FEATURES GUIDE.md` in the StockSense repo
+> (`python3 docs/Guide/build-pdf.py` rebuilds the PDF from it; the claude.ai page is republished from
+> it separately). Edit the source, never one of these two copies.
+
 > Screenshots come from the seeded demo data for the fictional client 四海米行 / Four Seas Rice
-> Trading, captured on 20 and 21 Sep 2026, in light theme, against the seeded demo data. They are a snapshot: figures in them will differ from what the app
-> shows on another day. Where a screenshot shows an AI answer, its caption says which model wrote it. How each figure is calculated is in
-> [design.md](../../.kiro/specs/mvp1-inventory-visibility/design.md).
+> Trading, captured between 20 Sep and 23 Sep 2026 (most recaptured 23 Sep, after Action Items and Alerts
+> were renamed to Next Steps and Actions Needed), in light theme, against the seeded demo data. They are a
+> snapshot: figures in them will differ from what the app shows on another day. Some in the Market signals
+> section are a single real scan kept deliberately unedited, predating that rename; that section says so
+> where it matters. Where a screenshot shows an AI answer, its caption says which model wrote it. How each
+> figure is calculated is in [design.md](../../.kiro/specs/mvp1-inventory-visibility/design.md).
 
 **Contents**
 
@@ -17,10 +25,10 @@ the warehouse.
 2. [Receiver: taking in a delivery (Goods In)](#2-receiver-taking-in-a-delivery-goods-in)
 3. [Dispatcher: sending out an order (Goods Out)](#3-dispatcher-sending-out-an-order-goods-out)
 4. [Manager: the daily review (Dashboard)](#4-manager-the-daily-review-dashboard)
-5. [Manager: acting on alerts (Alerts)](#5-manager-acting-on-alerts-alerts)
-6. [Manager: what to do first (Action Items)](#6-manager-what-to-do-first-action-items)
+5. [Manager: acting on alerts (Actions Needed)](#5-manager-acting-on-alerts-actions-needed)
+6. [Manager: what to do first (Next Steps)](#6-manager-what-to-do-first-next-steps)
 7. [Manager: keeping product settings right (Inventory)](#7-manager-keeping-product-settings-right-inventory)
-8. [Manager: checking what happened (Alerts, History)](#8-manager-checking-what-happened-alerts-history)
+8. [Manager: checking what happened (Actions Needed, History)](#8-manager-checking-what-happened-actions-needed-history)
 9. [Anyone: settings](#9-anyone-settings)
 10. [Manager: planning ahead (Forecast)](#10-manager-planning-ahead-forecast)
 11. [Setting up a new client (Onboarding)](#11-setting-up-a-new-client-onboarding)
@@ -47,10 +55,10 @@ news that no rule could read.
 
 | Feature | Where | What it does | Which model |
 |---|---|---|---|
-| **Why? on an alert** | Alerts | Explains in plain English why an alert was raised and what to do, above four rule-based steps | Claude or a local model, else none |
-| **Why? on Action Items** | Action Items | Explains the nearest stockout or a blind spot in short bullet points, after a sentence the engines wrote | Claude or a local model, else none |
-| **Ask about your data** | Action Items | Answers an open question ("How is TJ-25KG doing?") by looking facts up with read-only tools | A local model (development only) |
-| **Market signals** | Action Items | Reads rice-supply news, works out what it means for each product, and waits for a person to decide (section 6) | A local model, else a keyword list |
+| **Why? on an alert** | Actions Needed | Explains in plain English why an alert was raised and what to do, above four rule-based steps | Claude or a local model, else none |
+| **Why? on Next Steps** | Next Steps | Explains the nearest stockout or a blind spot in short bullet points, after a sentence the engines wrote | Claude or a local model, else none |
+| **Ask about your data** | Next Steps | Answers an open question ("How is TJ-25KG doing?") by looking facts up with read-only tools | A local model (development only) |
+| **Market signals** | Next Steps | Reads rice-supply news, works out what it means for each product, and waits for a person to decide (section 6) | A local model, else a keyword list |
 
 Why? and Market signals have a fallback that needs no model, so the app is complete without the AI. Ask
 says plainly that it cannot answer, instead of guessing. The AI makes the app easier to read; it does not
@@ -84,23 +92,23 @@ The paid model (Claude Sonnet 4.5 on Amazon Bedrock) spends shared AWS credit, s
 a **demo PIN**. **Without the PIN, every screen works and every explanation is still there** in its
 rule-based form; only the model's wording is missing.
 
-![Action Items with the AI explanations banner and a PIN field at the top](images/28-action-items.jpg)
+![Next Steps with the AI explanations banner and a PIN field at the top](images/28-action-items.jpg)
 
 The prompt appears where you would want the AI, so there is nothing to hunt for:
 
-- **A banner at the top** of Alerts and Action Items says "AI explanations are off" and takes the PIN.
+- **A banner at the top** of Actions Needed and Next Steps says "AI explanations are off" and takes the PIN.
 - **Inside a Why? box,** a "Want it in plainer words?" field does the same and writes the answer as soon
   as the PIN is accepted.
 - **Settings** (section 9) has the same unlock, and lets you choose the tier.
 
-![The Action Items Why? box with no PIN: the rule-based sentence, and the field to unlock the AI](images/42-ai-action-why-locked.jpg)
+![The Next Steps Why? box with no PIN: the rule-based sentence, and the field to unlock the AI](images/42-ai-action-why-locked.jpg)
 
 *Without a PIN, the Why? box still explains the row: this sentence is computed by the engines from the
 row's own figures, with no model involved. The field below it is the way in to the AI.*
 
-![The Alerts Why? box with no PIN: four rule-based steps, and the field to unlock the AI](images/44-ai-alerts-why-locked.jpg)
+![The Actions Needed Why? box with no PIN: four rule-based steps, and the field to unlock the AI](images/44-ai-alerts-why-locked.jpg)
 
-*On Alerts, the four rule-based steps are always there. The PIN adds a written summary above them.*
+*On Actions Needed, the four rule-based steps are always there. The PIN adds a written summary above them.*
 
 What the PIN does and does not do:
 
@@ -220,7 +228,7 @@ damaged in transit, short shipped by the supplier, partial delivery, or a counti
 
 Stock updates for everyone immediately. The receipt gets a document number (a goods received note,
 GRN), the purchase order is closed, and the shortfall goes on record so purchasing can settle it with
-the supplier. If the delivery came from an order request the office approved (section 7), receiving it
+the supplier. If the delivery came from an order request the office approved (section 6), receiving it
 closes that request as well, with no click from the office. The movement also appears in the manager's
 History view (section 8).
 
@@ -319,15 +327,15 @@ Clicking a bar, a colour or a cell filters Needs Attention to those products.
 
 ---
 
-## 5. Manager: acting on alerts (Alerts)
+## 5. Manager: acting on alerts (Actions Needed)
 
-**Who:** the inventory manager. **Where:** Control Tower, Alerts, the **Needs action** view (the other view, **History**, is section 8). **Goal:** make a decision on each
+**Who:** the inventory manager. **Where:** Control Tower, Actions Needed, the **Needs action** view (the other view, **History**, is section 8). **Goal:** make a decision on each
 problem the system found, with the reasoning in front of you. **Nothing happens without a person
 deciding.**
 
 ### The alert list
 
-![Alerts, Needs action view: one card per problem, grouped by severity, with the decision buttons](images/15-alerts.jpg)
+![Actions Needed, Needs action view: one card per problem, grouped by severity, with the decision buttons](images/15-alerts.jpg)
 
 Counts across the top show how many alerts there are of each of the seven types (the Needs action and
 History views, and a Product menu that narrows both to one product, sit above them):
@@ -377,12 +385,12 @@ an alert dismissed by mistake can be brought back later with **Reopen alert** fr
 
 ---
 
-## 6. Manager: what to do first (Action Items)
+## 6. Manager: what to do first (Next Steps)
 
-**Who:** the inventory manager or buyer. **Where:** Control Tower, Action Items. **Goal:** see what is
+**Who:** the inventory manager or buyer. **Where:** Control Tower, Next Steps. **Goal:** see what is
 most urgent for supply, ask a question in plain words, and check news that could delay stock.
 
-![Action Items: Ask about your data, the nearest stockout, and Market signals](images/28-action-items.jpg)
+![Next Steps: Ask about your data, the nearest stockout, and Market signals](images/28-action-items.jpg)
 
 - **An AI explanations banner** at the top says whether the paid model is switched on. Without the demo
   PIN it offers a field to enter it; with it, the banner disappears.
@@ -408,6 +416,37 @@ products it would leave short and by when an order must go, propose the action, 
 the most agent-like part of StockSense, and it is built to be agent-like without being autonomous: it
 senses, reads, reasons and proposes, but never acts on its own.
 
+> **A note on the screenshots below.** They are a real, historical scan, kept deliberately unedited (see
+> "Left in on purpose" further down) - so their sidebar still reads "Action Items" and "Alerts" (since
+> renamed to **Next Steps** and **Actions Needed**), and their tab bar still reads "Live news" and "Past
+> events" (since renamed and expanded to the three tabs described below). The scan result itself, and
+> everything it demonstrates, is unchanged and still accurate.
+
+**Three tabs, not one scan.** **RSS News Feed** runs the loop below on demand. **Replay** (described
+further down) runs the same loop against a real past event instead of today's news, for practice.
+**Deep Search** is visible but switched off (a "Soon" chip): it would fetch the full article behind each
+headline rather than just its title, a larger job - resolving redirect links, extracting text from
+arbitrary sites, a bigger untrusted-text surface - that is scoped but not built. A Help icon beside every
+tab explains how it works, or why it waits.
+
+**Three free signals for how much to trust a reading**, shown on every card: whether the outlet is a
+recognised wire service or major publication, how many other outlets reported the same story, and the
+model's own rating of how sure it is. None of them decide anything for you; like the projection figures
+above, they are surfaced so a person can weigh a reading, not so the system can quietly discount one.
+
+**The agent can search again, on its own.** After reading the usual headlines, a small model can look at
+what it found so far and propose up to three rounds of its own follow-up searches, each with a one-line
+reason, stopping itself once nothing more seems worth chasing (a small fixed limit is the real backstop,
+since it does not always choose to stop on its own). A collapsible panel on the scan result shows exactly
+what it searched for, why, and what it found in each round - the reasoning is visible, not just the answer.
+
+**Reading with Claude Sonnet instead of the free local model** is available behind the same demo PIN as
+the rest of the app, as a checkbox on the scan screen, unchecked every time rather than remembered: a scan
+can read far more headlines than a single Why? press, so a visitor should not start spending on every
+future scan just because they once unlocked the PIN elsewhere. Capped far lower than the free tier (5
+headlines against 16) for the same reason. The follow-up search rounds above always stay on the free
+local model regardless of this choice.
+
 **The loop, end to end**
 
 ```
@@ -426,9 +465,9 @@ senses, reads, reasons and proposes, but never acts on its own.
         ▼
   6. A PERSON decides        add a safety buffer, ask the buyer to order, or dismiss;  edit the reading first
         ▼
-  7. The rest of the app     buffer raises reorder points; request follows the order loop (section 7)
+  7. The rest of the app     buffer raises reorder points; request follows the order loop (section 6)
         ▼
-  Decisions and corrections are written to the audit trail (Alerts, History); each scan reports what it did on screen
+  Decisions and corrections are written to the audit trail (Actions Needed, History); each scan reports what it did on screen
 ```
 
 **Where a model is used, and where it is not.** This is the point of the design: the model reads a
@@ -504,19 +543,20 @@ and **Decided** (folded, with the count of active buffers).
 ![The request is sent, and it is followed on Inventory](images/38-signals-request-sent.jpg)
 
   It checks first for a request already open for that product, so a second click cannot send a duplicate.
-  From here it follows the ordinary order loop (section 7): acknowledged, purchase order, manager
+  From here it follows the ordinary order loop (section 6): acknowledged, purchase order, manager
   approval, then the warehouse receiving it.
 - **Dismiss,** or **Acknowledge** for news that eases pressure. Dismissing can be undone.
 
-**Past events are practice.** The second tab replays real 2022 to 2024 events (India's export bans, the
-price spillover to Thailand and Vietnam) against today's stock. It shows what the advice would have been
-and can never add a buffer or offer to order, so a rehearsal cannot change a real reorder point.
+**Past events are practice.** The Replay tab runs the same loop against a real 2022 to 2024 event (India's
+export bans, the price spillover to Thailand and Vietnam) instead of today's news. It shows what the
+advice would have been and can never add a buffer or offer to order, so a rehearsal cannot change a real
+reorder point.
 
 **Every decision is on the record.**
 
 ![The audit trail for market signals: what the system saw, and what it did](images/41-signals-audit-trail.jpg)
 
-Alerts, History, filtered to market signals with the Type menu: the approval, its buffer of 10.5 days
+Actions Needed, History, filtered to market signals with the Type menu: the approval, its buffer of 10.5 days
 and the risk event it created, the dismissal, who decided, and whether the signal was live or a replay.
 A correction to a reading is recorded too.
 
@@ -556,29 +596,16 @@ supplier-specific news queries, and the news feed is an unofficial route whose t
 have not been checked. Those are the natural next steps toward a watcher that runs by itself, and each
 would still end at the same place: a proposal that waits for a person.
 
----
-
-## 7. Manager: keeping product settings right (Inventory)
-
-**Who:** the inventory manager. **Where:** Control Tower, Inventory. **Goal:** see every product's
-position and keep each one's settings (minimum, maximum, reorder point, lead time and so on) correct,
-because every alert is judged against them.
-
-### The product list
-
-![Inventory: every product with its stock position](images/11-inventory.jpg)
-
-Each row shows the product's health, its **stock position** as a gauge (available stock against the
-reorder point and the maximum, with a note such as "142 MT below reorder point"), how long stock will
-last against the supplier lead time, and how fast it sells. Search and the filters narrow the list by
-health, movement or origin. **Request order** asks the buyer to order more (below); **Add SKU** creates a new product. Stock is never
-added from the office: it rises only when a delivery is received on the handheld.
-
 ### Requests waiting for the buyer
 
-A request to the buyer, from **Request order** here or **Ask the buyer to order** in Market signals,
-appears in a card above the table and moves along a short timeline. Each step says who would do it in a
-real business (there is no login, so in the demo one person plays every role):
+![A request waiting for the buyer to acknowledge, and one waiting for the manager to approve](images/50-requests-next-steps.jpg)
+
+A request to the buyer, from **Request order** on Inventory (section 7) or **Ask the buyer to order**
+above, appears here in a card and moves along a short timeline. This card carries **For: Buyer, Buyer's
+manager** rather than Manager: it spans two different steps in the loop below, and this is the one
+section on this page a plain inventory manager would not need to act on themselves (there is no login in
+this demo, so one person plays every role - the role filter beside the page title, or "All", shows which
+role each section is really for). Each step says who would do it in a real business:
 
 1. **Buyer acknowledges** the request.
 2. **Buyer raises the purchase order** and sends it for approval.
@@ -589,6 +616,36 @@ real business (there is no login, so in the demo one person plays every role):
 
 A request can be cancelled before it ends. Finished requests stay on the card for a week, and every
 step is also in the History view. **Timeline** shows who did what and when.
+
+---
+
+## 7. Manager: keeping product settings right (Inventory)
+
+**Who:** the inventory manager. **Where:** Control Tower, Inventory. **Goal:** see every product's
+position and keep each one's settings (minimum, maximum, reorder point, lead time and so on) correct,
+because every alert is judged against them.
+
+### Two charts, before the product list
+
+![Inventory: the buffer-rule chart, the origin chart, then every product with its stock position](images/11-inventory.jpg)
+
+**Total stock vs the buffer rule** is a monthly bar chart: total MT on hand, split into what the
+illustrative Singapore rice-stockpile buffer rule calls for (the darker blue) and the surplus above it
+(the lighter blue), with a legend, a checkmark or exclamation on each bar, and a one-line verdict ("Met
+every month" or how many months fell short). A 6M / YTD / 12M / ALL selector changes the window; 6M is
+the default. **On hand by country of origin** is a donut chart of the same total, by country; hovering a
+slice gives the exact MT and percentage. Neither is a new figure: both are built from what the engines
+already compute (the same Compliance Position formula the Dashboard's own card uses, and the per-product
+`country_of_origin` and on-hand quantity the table below already has).
+
+### The product list
+
+Each row shows the product's health, its **stock position** as a gauge (available stock against the
+reorder point and the maximum, with a note such as "142 MT below reorder point"), how long stock will
+last against the supplier lead time, and how fast it sells. Search and the filters narrow the list by
+health, movement or origin. **Request order** asks the buyer to order more, tracked on Next Steps
+(section 6), not here; **Add SKU** creates a new product. Stock is never added from the office: it rises
+only when a delivery is received on the handheld.
 
 ### A product's overview
 
@@ -631,9 +688,9 @@ formulas, so an empty cell is a finding and nothing in it is estimated in the br
 
 ---
 
-## 8. Manager: checking what happened (Alerts, History)
+## 8. Manager: checking what happened (Actions Needed, History)
 
-**Who:** the manager, or anyone auditing. **Where:** Control Tower, Alerts, History view (this was the Activity page, which now redirects here). **Goal:** see everything
+**Who:** the manager, or anyone auditing. **Where:** Control Tower, Actions Needed, History view (this was the Activity page, which now redirects here). **Goal:** see everything
 the system did and every decision people made, in order, with the evidence.
 
 ![History view: the audit trail as a timeline](images/18-activity.jpg)
@@ -660,7 +717,7 @@ between the two quantities:
 
 ![Settings: explanation source and theme](images/19-settings.jpg)
 
-**Explanations** chooses who writes the summary under **Why?** on Alerts and on Action Items, and who
+**Explanations** chooses who writes the summary under **Why?** on Actions Needed and on Next Steps, and who
 answers **Ask about your data**. The figures are the same in all three; only the wording changes.
 
 | Option | What it is | Cost |
@@ -671,7 +728,7 @@ answers **Ask about your data**. The figures are the same in all three; only the
 
 AWS Bedrock asks for the **demo PIN** first, because it spends shared credit. A correct PIN unlocks it
 for that browser tab for 2 hours; wrong guesses are limited. Judges receive the PIN with the
-submission. The same PIN field also appears in a banner on Alerts and Action Items and inside every
+submission. The same PIN field also appears in a banner on Actions Needed and Next Steps and inside every
 **Why?** box, so it can be entered where the AI is wanted instead of here.
 
 **Theme** switches between Auto (follows the device), Light and Dark.
@@ -709,7 +766,7 @@ good as what was saved for the product. Below it:
   buffer) and a **simulation** of how stock would move over time.
 
 None of this is generative: the models are ordinary statistics, checked to give the same answer twice, and
-the page says so. Nothing here changes a reorder point. A suggestion becomes a decision only on the Alerts
+the page says so. Nothing here changes a reorder point. A suggestion becomes a decision only on the Actions Needed
 page, as a **Policy suggestion** the manager approves, modifies or rejects.
 
 ---
@@ -771,12 +828,12 @@ The page dims, one real control is lit, and a small card says what it is. There 
 1. **Home:** "Your data is in. Start here." lights the Control Tower.
 2. **Dashboard:** "This is the health of your stock today." lights Key Metrics, and says every figure comes
    from fixed rules, never from AI.
-3. **Action Items:** "What can't wait." It explains that this page settles immediate concerns, from stock that
+3. **Next Steps:** "What can't wait." It explains that this page settles immediate concerns, from stock that
    is about to run out to supply worries raised by the latest world news, which Market signals scans for you.
-4. **Alerts:** "Nothing happens without you." lights Approve, Modify and Reject.
+4. **Actions Needed:** "Nothing happens without you." lights Approve, Modify and Reject.
 5. **Finish:** "You've seen the loop", with links to Forecast, Inventory and Goods In on a handheld.
 
-![Step 3 of the tour on Action Items: the Nearest stockout card is lit](images/47-tour-action-items.jpg)
+![Step 3 of the tour on Next Steps: the Nearest stockout card is lit](images/47-tour-action-items.jpg)
 
 The card always carries three ways out, so it is easy to leave: the **X** at the top right, **Skip tour** at
 the bottom left, and the **Esc** key. **Back** and **Next** sit at the bottom right, with Next as the one
@@ -802,14 +859,14 @@ Receiver confirms a delivery (Goods In)
 The engines recalculate every figure
         │   cover, health, alerts; for example, a big delivery can raise an overstock alert
         ▼
-Manager reviews the Dashboard, Alerts and Action Items
+Manager reviews the Dashboard, Actions Needed and Next Steps
         │   asks Why?, then approves, modifies or rejects, with a reason,
         │   or asks the buyer to order (request, purchase order, manager approval)
         ▼
 The approved order arrives, and the receiver confirms it in Goods In
         │   stock rises, and the request closes with no click from the office
         ▼
-Everything is in the Alerts tab, History view
+Everything is in the Actions Needed tab, History view
             the delivery, the alert, the explanation, the decision and what it overrode
 ```
 

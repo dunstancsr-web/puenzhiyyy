@@ -89,8 +89,8 @@ function RoleFilter({ value, onChange }) {
 const roleVisible = (filter, roles) => filter === "all" || (roles || []).includes(filter);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ACTION ITEMS (19 Sep) - additive, not a replacement. Alerts and Activity are
-// untouched: Alerts stays the one place a policy value gets approved, Activity
+// NEXT STEPS (19 Sep, renamed from Action Items 23 Sep) - additive, not a replacement. Actions Needed
+// and Activity are untouched: Actions Needed stays the one place a policy value gets approved, Activity
 // stays the record to consult. This page answers a narrower question, from a
 // user interview run as an SME inventory-manager role-play: "once I've
 // uploaded my data, what's urgent, right now, today" - a short, sorted list,

@@ -69,7 +69,7 @@ groups on the dashboard.
                     ▼
          decision recorded, stock and
          policy updated, everything
-         written to the audit log ──────────►  Alerts, History view
+         written to the audit log ──────────►  Actions Needed, History view
 ```
 
 Every arrow in that diagram writes a row to `audit_log`.
@@ -85,8 +85,8 @@ rather than one navigation:
   expected, five short, damaged in transit" rather than "someone typed a number".
 - **Goods Out**, on the same handheld: pick a customer order, verify the SKU, count what leaves and
   confirm. Shipping more than is on hand is refused, and a short pick must carry a reason.
-- **The Control Tower**, on a desktop, for the manager: Dashboard, Action Items, Forecast, Inventory,
-  Alerts (with a Needs action view and a History view, the audit trail) and Table.
+- **The Control Tower**, on a desktop, for the manager: Dashboard, Table, Inventory, Forecast, Actions
+  Needed (with a Needs action view and a History view, the audit trail) and Next Steps.
 
 Floor operators sign in with a four digit PIN, because a shared rugged terminal on a charging cradle is
 used by whoever picks it up, and every movement still has to be attributed to a named person. Every
@@ -126,7 +126,7 @@ backend/src/
   routes/          the Control Tower API and the warehouse floor API
 
 frontend/src/
-  pages/           Home, Dashboard, Action Items, Forecast, Inventory, Alerts, Table
+  pages/           Home, Dashboard, Table, Inventory, Forecast, Actions Needed, Next Steps
   warehouse/       Goods In and operator sign-in, for the handheld
   components/      StockPositionBar (bullet graph), StatCard, HoverHint, ...
   api/             fetch client
@@ -182,11 +182,11 @@ scored by weighted absolute percentage error, and that score is shown next to th
 feeds the safety stock calculation and the reorder point, and the Forecast page lets a manager move the
 inputs and watch the suggestion change, through the same engines, never a second formula in the browser.
 None of it is generative: the backtest is checked to give the same answer twice, and the page says so
-in plain words. A suggested reorder point still ends on the Alerts page as approve, modify or reject.
+in plain words. A suggested reorder point still ends on the Actions Needed page as approve, modify or reject.
 
 ### Market signals: news, checked against your own stock
 
-A supply shock reaches a rice importer first as a headline. **Action Items, Market signals** turns one
+A supply shock reaches a rice importer first as a headline. **Next Steps, Market signals** turns one
 into what it does to each product and what to order, by a route that keeps the model away from every
 number. A signal is a fixed shape: country, kind of event, severity, whether it tightens or eases supply.
 How many days of supply an event costs is read from a visible table, not from the article. What those
@@ -198,20 +198,25 @@ which gives the latest day to order and a suggested quantity.
 *A real 2023 event run against today's stock. The table under the heading, not the article or a model,
 supplies "7 to 14 days".*
 
-There are two ways in, shown one at a time. **Live news** scans recent rice-supply headlines for the
-countries the business buys from, over a look-back window the manager chooses; a model running on the
-same machine reads each headline into the fixed shape (where there is no such model, a coarser keyword
-list does, and the paid tier is never used for this), and a person can correct the reading. The same story from several outlets is merged into one
+There are three tabs, one scan shown at a time. **RSS News Feed** scans recent rice-supply headlines for
+the countries the business buys from, over a look-back window the manager chooses; a model running on
+the same machine reads each headline into the fixed shape (where there is no such model, a coarser
+keyword list does, and the paid tier is never used unless the manager opts into it behind a demo PIN),
+and a person can correct the reading. A small model can also propose its own follow-up searches, up to
+three rounds, visible in a panel with its reasons. The same story from several outlets is merged into one
 signal by comparing the headline text, with guards so that "bans exports" is never merged with "lifts the
-ban". **Past events** replays real 2022 to 2024 events, such as India's non-basmati export ban, against
-today's stock. That is practice: it can never change a reorder point. On a live signal a person can add
-a safety buffer, which makes the reorder point ask for stock earlier, or ask the buyer to order.
+ban", and each card also shows how reputable the source is, how many outlets corroborate it, and the
+model's own confidence. **Replay** runs the same loop against a real 2022 to 2024 event, such as India's
+non-basmati export ban, instead of today's news. That is practice: it can never change a reorder point.
+**Deep Search** (reading the full article behind a headline, not just its title) is scoped but
+deliberately not built yet. On a live signal a person can add a safety buffer, which makes the reorder
+point ask for stock earlier, or ask the buyer to order.
 
 ### Order requests, from advice to a delivery
 
 A request to order is a short, audited chain, and only one link moves stock:
 
-1. **The office asks.** From Inventory or from a market signal, prefilled and editable.
+1. **The office asks.** From Inventory's Request order button, or from a market signal, prefilled and editable.
 2. **The buyer acknowledges, then raises a purchase order.**
 3. **The buyer's manager approves or rejects** (a rejection needs a reason). Approving creates the
    purchase order the warehouse can receive against, so the dock never sees an order nobody approved.
@@ -222,13 +227,13 @@ Each step is stored with who did it and when, and the actor is fixed by the step
 timeline cannot be rewritten from the screen. A check walks the whole chain on a throwaway database and
 fails if an unapproved order ever reaches the dock.
 
-![Requests waiting for the buyer: each request with its next step, above the inventory table.](images/order-requests.jpg)
+![Requests waiting for the buyer: each request with its next step, on Next Steps.](images/order-requests.jpg)
 
 *A request moves along its timeline; each step says who would do it in a real business.*
 
 ### Ask about your data
 
-On Action Items a manager can ask an open question in plain language ("why is one product's cover so
+On Next Steps a manager can ask an open question in plain language ("why is one product's cover so
 different from another's?"). A local model answers by calling a small set of read-only tools that fetch
 facts from the database. It reuses the placeholder guarantee from section 4: figures are inserted by the
 system, so the model cannot state one it did not fetch. It has no tool that writes. It needs that local
@@ -382,7 +387,7 @@ can be undone at once, or reopened later from History. The same shape holds else
 signal only adds a buffer when a person says so, and an order request moves one step at a time, each
 step recorded against a named role.
 
-![The Alerts page. Each alert states the measured value and the threshold it breached, names the decision the buttons act on, and terminates at approve, modify or reject.](images/alerts-human-in-the-loop.jpg)
+![The Actions Needed page. Each alert states the measured value and the threshold it breached, names the decision the buttons act on, and terminates at approve, modify or reject.](images/alerts-human-in-the-loop.jpg)
 
 *Every recommendation terminates at a human decision, and the primary button states what approving will
 record. Severity is carried by the left stripe, type by the icon and chip, so the card encodes each fact
@@ -407,7 +412,7 @@ Four details make this an audit trail rather than a log file:
 fill with no-op rows.
 
 **`ALERT_TRIGGERED` fires on first materialisation only.** It is written inside the deduplication guard,
-so it means "this condition first became true" and not "somebody loaded the Alerts page". Without that
+so it means "this condition first became true" and not "somebody loaded the Actions Needed page". Without that
 distinction the event is noise.
 
 **`DECISION_RECORDED` stores the proposal next to the action,** plus the delta between the two
@@ -420,7 +425,7 @@ is read from this table, not estimated, and a PIN lockout on the paid tier is re
 Logging is best-effort by design: a failed audit insert is swallowed and reported to the server log
 only. An audit trail that can fail the restock it is recording is worse than no audit trail.
 
-The History view (in the Alerts tab) renders the whole trail as a chronological list of plain-English sentences, filterable by kind and by product, with the
+The History view (in the Actions Needed tab) renders the whole trail as a chronological list of plain-English sentences, filterable by kind and by product, with the
 exact stored payload one click away, and a line about an alert links straight back to the alert. Raw JSON is not observability either; it is a prerequisite for it.
 
 ![The History view with one record expanded, showing the stored input and output payloads side by side.](images/activity-audit-record.jpg)
