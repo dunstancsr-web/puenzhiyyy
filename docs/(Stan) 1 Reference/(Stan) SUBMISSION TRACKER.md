@@ -13,13 +13,13 @@ Four deliverables. Status as of 20 Sep.
 | # | Deliverable | Status | Next step, and who |
 |---|---|---|---|
 | 1 | GitHub repo | done, kept current | nothing |
-| 2 | Deployment URL | image built, tested and published by GitHub Actions; **Lightsail service not created yet** | Deploy now (Stan, 15 Sep: the lease can be extended, so there is no reason to wait): follow `(Stan) DEPLOY-LIGHTSAIL.md` in this folder |
+| 2 | Deployment URL | **live**, redeployed 23 Sep to the latest `main` (`sha-148916f`), every `check-deploy.js` check passing | Optional: press Why? once on the live site with the demo PIN to confirm the gateway key end to end (~USD 0.006), then log it in the spend ledger |
 | 3 | YouTube demo video | script below, updated 15 Sep; `npm run demo:reset` checks the app is ready | Stan records, near the end, with the final paid check |
 | 4 | PDF write-up | `docs/Submission/WRITEUP.md` refreshed 20 Sep for forecasting, market signals, the order loop, Ask about your data and the merged Alerts tab; the three blanks (URL, PIN, spend) are still empty | fill in the URL, PIN and spend figure **in the PDF only**, then export (re-check the figures against a fresh seed first) |
 
 ## Before submitting, in this order
 
-1. **Deployed 20 Sep** to Lightsail (`container-service-1`, Nano x1, Singapore); every `check-deploy.js` check passed. **Redeploy needed** to pick up the inline PIN unlock (PR #20, main `2ec3481`): Lightsail, `container-service-1`, Deployments, Modify your deployment, change the image tag to `sha-2ec3481` (after its Actions run is green), retype `DEMO_PIN` and `LLM_GATEWAY_API_KEY` (the form does not keep them), Save and deploy, then `check-deploy.js <url>` and one Why? press (about USD 0.006). The console session expires after about an hour, so have both values ready.
+1. **Deployed 20 Sep, redeployed several times since, most recently 23 Sep** to Lightsail (`container-service-1`, Nano x1, Singapore), now running the latest `main` (`sha-148916f`); every `check-deploy.js` check passed. **Still to do:** one Why? press on the live site with the demo PIN, to confirm the gateway key end to end (about USD 0.006), then log it in the spend ledger.
 2. **Final paid check: done 20 Sep** (`sonnet-check.js --confirm-spend --features`, USD 0.0452, in the spend ledger). It found four wording problems, all fixed by rule and covered by `test-llm-sonnet.js`. A second paid run is only worth it if the model layer changes again; then rehearse free first (`--dry-run --features`).
 3. **Record the video**, following the recording checklist below.
 4. **Fill in the three PDF blanks** (URL, demo PIN, spend total) and export `docs/Submission/WRITEUP.md`.
