@@ -7,7 +7,7 @@
 //   node scripts/sonnet-check.js --dry-run         the exact same run on free local llama3.
 //   node scripts/sonnet-check.js --confirm-spend   the real thing, on the paid gateway.
 //   add --only REORDER                             one alert type instead of all six.
-//   add --features                                 ALSO check Action Items "Why?" (stockout and blind spot)
+//   add --features                                 ALSO check Next Steps "Why?" (stockout and blind spot)
 //                                                  and two "Ask about your data" questions, through the
 //                                  running server's own routes, so the PIN gate and error paths are exercised.
 //
@@ -43,7 +43,7 @@ const USD_PER_CALL = 0.0055;
 const CALLS_PER_EXPLANATION = 1.06;
 
 
-// Action Items "Why?" and "Ask about your data", through the running server. Going through HTTP on purpose:
+// Next Steps "Why?" (renamed from Action Items, 23 Sep) and "Ask about your data", through the running server. Going through HTTP on purpose:
 // it is the path a visitor takes, so the tier, the PIN gate, the cache and the "never a 500" contract are all
 // exercised, which calling the functions directly would skip.
 async function checkFeatures(tier, skus) {
@@ -59,7 +59,7 @@ async function checkFeatures(tier, skus) {
       unlocked = r && r.ok ? (await r.json()).data?.pass : null;
     }
     if (!unlocked) {
-      console.log(`## Action Items and Ask ... not run: could not unlock the paid tier on ${BASE} (is the server running, and DEMO_PIN set in backend/.env?). Nothing was spent on them.\n`);
+      console.log(`## Next Steps and Ask ... not run: could not unlock the paid tier on ${BASE} (is the server running, and DEMO_PIN set in backend/.env?). Nothing was spent on them.\n`);
       return;
     }
     headers["X-Demo-Unlock"] = unlocked;
@@ -78,11 +78,11 @@ async function checkFeatures(tier, skus) {
     for (const s of skus) {
       const r = await post("/api/action-items/explain", { sku_id: s.sku_id, kind });
       if (r.status === 404) continue; // nothing to explain for this SKU
-      show(`Action Items ${kind} ${s.sku_id}`, r);
+      show(`Next Steps ${kind} ${s.sku_id}`, r);
       done = true;
       break;
     }
-    if (!done) console.log(`## Action Items ${kind} ... no SKU in this database has one, so not checked\n`);
+    if (!done) console.log(`## Next Steps ${kind} ... no SKU in this database has one, so not checked\n`);
   }
   const ids = skus.map((s) => s.sku_id);
   const questions = [
@@ -109,7 +109,7 @@ async function checkFeatures(tier, skus) {
   if (FEATURES) {
     // Two action item explanations (about one call each) and two Ask questions (a lookup then an answer, up to
     // five calls each in the worst case, each carrying a longer prompt than an alert explanation).
-    console.log(`With --features: + 2 Action Items Why? and 2 Ask questions, about USD 0.05 more (worst case about USD 0.15).`);
+    console.log(`With --features: + 2 Next Steps Why? and 2 Ask questions, about USD 0.05 more (worst case about USD 0.15).`);
   }
 
   if (!CONFIRM && !DRY) {

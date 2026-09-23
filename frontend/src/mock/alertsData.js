@@ -1,6 +1,6 @@
 // Mock alerts - one of each type so every UI state is visible during validation.
 // severity: critical | warning | info
-// alert_type maps to filter tabs on the Alerts page.
+// alert_type maps to filter tabs on the Actions Needed page.
 
 export const mockAlerts = [
   {

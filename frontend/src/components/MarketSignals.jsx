@@ -6,7 +6,7 @@ import WorkingNote from "./WorkingNote";
 import UnlockAI, { useAiAvailability } from "./UnlockAI";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MARKET SIGNALS (Action Items)
+// MARKET SIGNALS (Next Steps)
 //
 // News that could delay or tighten supply, checked against YOUR stock. Every
 // figure on this card comes from engines/signals.js: the days an event costs are
@@ -385,7 +385,7 @@ function SignalCard({ s, busy, onDecide, onCorrect, meta, onCollapse }) {
         <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontWeight: 600 }}>
           {s.published_at} · {EVENT_LABEL[s.event_type] || s.event_type} · {s.country_of_origin || s.supplier}
           {s.origin === "replay" && <span style={{ marginLeft: 8, color: "var(--purple-text)" }}>Past event, replayed</span>}
-          {s.origin === "live" && <span style={{ marginLeft: 8, color: "var(--blue-text)" }}>Live news</span>}
+          {s.origin === "live" && <span style={{ marginLeft: 8, color: "var(--blue-text)" }}>RSS News Feed</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {decided && (
@@ -905,7 +905,7 @@ export default function MarketSignals({ roleTag }) {
                 ? "You have not run a past event yet. Choose one above to see what the advice would have been."
                 : "No live signals yet. Scan the news to check today's headlines."}
               {waiting[mode === "past" ? "live" : "past"] > 0 && (
-                <> {waiting[mode === "past" ? "live" : "past"]} in {mode === "past" ? "Live news" : "Past events"} still {waiting[mode === "past" ? "live" : "past"] === 1 ? "waits" : "wait"} for your decision.</>
+                <> {waiting[mode === "past" ? "live" : "past"]} in {mode === "past" ? "RSS News Feed" : "Replay"} still {waiting[mode === "past" ? "live" : "past"] === 1 ? "waits" : "wait"} for your decision.</>
               )}
             </div>
           ) : (

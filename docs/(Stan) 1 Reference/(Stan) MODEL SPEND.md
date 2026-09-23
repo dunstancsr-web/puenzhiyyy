@@ -23,7 +23,7 @@ Measured from the calls below, Claude Sonnet 4.5 through the organizers' gateway
 
 - **One explanation, first attempt accepted:** about 860 input and 190 output tokens, **about USD 0.0055**.
 - **Worst case, three attempts:** about **USD 0.017**.
-- **An Action Items Why?:** about 550 input and 50 to 120 output tokens, **about USD 0.002 to 0.003**.
+- **A Next Steps Why?** (renamed from Action Items, 23 Sep): about 550 input and 50 to 120 output tokens, **about USD 0.002 to 0.003**.
 - **An Ask question** (one lookup, one answer): **about USD 0.004 to 0.010**.
 - **A repeated Why? on the same alert with unchanged stock:** served from cache, **free**.
 - **The daily cap** (200 paid calls by default) bounds a bad day at about **USD 1.20**.

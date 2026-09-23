@@ -175,12 +175,15 @@ Read before making UI changes.
 
 - **Home**: the screen at `/` with the three workspaces (`frontend/src/pages/Home.jsx`). Briefly
   called the Launchpad; Stan renamed it because everyone already knows what Home means.
-- **The Control Tower**: the desktop side. The sidebar's own order (`Sidebar.jsx`): Dashboard, Action
-  Items, Forecast, Inventory, Alerts, Table. The only part with the sidebar. Alerts is one tab with two
-  views, **Needs action** and **History** (20 Sep, Stan's call: being in one tab makes an alert and what
-  happened to it easier to link). History is what used to be the Activity page; `/activity` redirects to
-  it. They stay two lists on purpose, joined at the item. Action Items and Table (both 19 Sep) are
-  additive.
+- **The Control Tower**: the desktop side. The sidebar's own order (`Sidebar.jsx`, reordered and
+  indented 23 Sep): Dashboard, then Table indented under it, Inventory, then Forecast indented under it,
+  Actions Needed, Next Steps. The only part with the sidebar. **Actions Needed** (renamed from Alerts, 23
+  Sep - this is the one page a decision actually gets recorded on) is one tab with two views, **Needs
+  action** and **History** (20 Sep, Stan's call: being in one tab makes an alert and what happened to it
+  easier to link). History is what used to be the Activity page; `/activity` redirects to it. They stay
+  two lists on purpose, joined at the item. **Next Steps** (renamed from Action Items, 23 Sep - the page
+  decides nothing, it lists what to do next) and Table (both 19 Sep) are additive. Both renamed pages'
+  files are still `ActionItems.jsx` and `Alerts.jsx` - only the on-screen label and icon changed.
 - **Goods In** and **Goods Out**: the handheld warehouse floor flows. Industry terms: inbound / goods
   receipt, outbound / goods issue.
 - **Key Metrics**: the top card on the Dashboard (hero value, baseline comparison, the Service &
@@ -219,6 +222,12 @@ Read before making UI changes.
 - **UI changes are checked with the UI/UX audit skill** (`.claude/skills/ui-ux-audit/`, or `#ui-ux-audit` in
   Kiro; `npm run ux:audit`). It is the shared procedure for both tools and holds no rules of its own: the
   rules it enforces (type scale, no dashes, one primary action, contrast tokens) are in this file.
+- **A UI change that renames, moves or restructures a screen also updates the features guide**
+  (`docs/Guide/FEATURES GUIDE.md` and its screenshots), in the same pass, not as a later cleanup - see
+  `handoff.md`, "Keeping this in sync", step 4. It has three copies (the `.md`, its PDF, and a claude.ai
+  artifact - link in `docs/DIRECTORY.md`), and all three are updated together, never one without the
+  others: rebuild the PDF (`python3 docs/Guide/build-pdf.py`) and republish the artifact whenever the
+  `.md` changes.
 - A second shared check, same pattern: `.kiro/hooks/branch-check.sh`, run as a Claude Code
   `SessionStart` hook and a Kiro `PostTaskExecution` hook. It only reminds; it never blocks. The
   actual enforcement of the branch workflow (see "Working rules") is `.githooks/pre-commit` and

@@ -32,9 +32,10 @@ Anything directly in this folder is waiting for you. Decided documents move to `
 
 | Document | What is in it | Open it when |
 |---|---|---|
-| [Guide/FEATURES GUIDE.md](<Guide/FEATURES GUIDE.md>) | Every screen with screenshots, by role and task: Home, the receiver's Goods In flow, Goods Out, the manager's Dashboard, Alerts, Inventory and Activity, and settings | You want to see what the app does, or show someone |
+| [Guide/FEATURES GUIDE.md](<Guide/FEATURES GUIDE.md>) | Every screen with screenshots, by role and task: Home, the receiver's Goods In flow, Goods Out, the manager's Dashboard, Actions Needed, Next Steps (incl. Market signals and requests waiting for the buyer), Inventory (incl. its two charts), settings, Forecast, Onboarding, and how the roles connect | You want to see what the app does, or show someone |
 | every file in `docs/Guide/images/` | The guide's screenshots | Recapturing a screen after the app changes |
 | `docs/Guide/build-pdf.py` | Rebuilds the guide's PDF into `~/Downloads` (`python3 docs/Guide/build-pdf.py`). The PDF is a copy and is never committed | After editing the guide or recapturing a screenshot |
+| [claude.ai artifact copy](https://claude.ai/artifact/VtbeekJo3tW9xaMuN1FfSp) | A third copy of the same guide, the one Stan reads it from day to day | Republish it from the current `.md` whenever the `.md` or its screenshots change - see rules.md, "Tooling" |
 
 ## For the judges
 

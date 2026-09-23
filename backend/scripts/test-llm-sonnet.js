@@ -1,6 +1,6 @@
 // Checks the model layer against how Claude Sonnet actually behaves, WITHOUT calling it. Nothing here spends
 // credit: the wire layer is tested against tiny fake servers standing in for Ollama and the gateway, and the
-// three pipelines (Why? on an alert, Action Items, Ask about your data) are fed scripted answers written the
+// three pipelines (Why? on an alert, Next Steps, Ask about your data) are fed scripted answers written the
 // way Sonnet writes: markdown, backticks, em dashes, bullet glyphs, a lead-in, an answer that stops mid-sentence.
 //   node backend/scripts/test-llm-sonnet.js
 // Uses a throwaway database, never data/stocksense.db.
@@ -204,7 +204,7 @@ const reply = (res, content, extra = {}) => {
   const { explainActionItem } = require("../src/llm/explainActionItem");
   const item = { nearest: { days: 12 }, isStockout: true };
   const AI_SLOTS = ["product", "days_left"]; // discovered below rather than assumed
-  console.log("\nAction Items Why? (explainActionItem)");
+  console.log("\nNext Steps Why? (explainActionItem)");
   let actionSlot;
   await check("the slot menu the action item pipeline offers can be read from its own prompt", async () => {
     script("- placeholder probe.");

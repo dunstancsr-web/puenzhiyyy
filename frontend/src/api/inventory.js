@@ -193,7 +193,7 @@ export const api = {
       body: { sku_id: skuId, alert_type: alertType, tier },
     }),
 
-  // Action Items' own "Why?" (19 Sep) - same shape as explainAlert above,
+  // Next Steps' own "Why?" (19 Sep, renamed from Action Items 23 Sep) - same shape as explainAlert above,
   // separate endpoint because it explains a different kind of thing
   // (nearest-stockout / blind-spot rows, not the six alert types).
   explainActionItem: (skuId, kind, { tier, pass } = {}) =>

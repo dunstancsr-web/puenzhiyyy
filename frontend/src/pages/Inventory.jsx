@@ -296,8 +296,8 @@ export default function Inventory() {
         quantity: qty,
         reason: orderReason.trim() || null,
       });
-      // The requests card moved to Action Items (22 Sep), a different page, so there is
-      // no card on THIS page left to bump; whoever opens Action Items next gets a fresh
+      // The requests card moved to Next Steps (22 Sep, renamed from Action Items 23 Sep), a different
+      // page, so there is no card on THIS page left to bump; whoever opens Next Steps next gets a fresh
       // fetch on mount regardless.
       setOrderDone(true);
     } catch (err) {

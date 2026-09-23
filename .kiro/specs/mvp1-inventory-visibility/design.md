@@ -581,7 +581,7 @@ efficient replenishment; C+idle: low-priority discontinuation/clearance). Built 
 
 News that could delay or tighten supply, assessed against the stock. Code: `engines/signals.js`,
 `routes/signals.js`, table `market_signals`, replay events in `db/replayEvents.js`, screen: the "Market
-signals" card on Action Items.
+signals" card on Next Steps (renamed from Action Items, 23 Sep - see rules.md, "Names we use").
 
 **Principle.** The model is never the source of a figure. A signal is a fixed shape (country or supplier,
 event type, severity, direction, optional variety scope). How many days it costs is read from a table, not
@@ -636,11 +636,12 @@ an order.
 
 **Decided 20 Sep (Stan): scoped.** The seeded event "India non-basmati export restriction (2023-style)" now carries `affects_varieties = ["non-basmati"]`, so it no longer buffers the India basmati SKUs (their risk buffer is 0, and their displayed reorder points dropped by it). `check-formulas.js` applies the same scope in its own copy of the rule.
 
-**Past events are practice, and a signal can start an order request (20 Sep, Stan).** The decision route refuses `approve` on a signal whose origin is `replay` (400: "A past event is practice"), and the card offers only Acknowledge, with a line saying so, so a replay can never add a buffer to the real reorder points. On a live signal that tightens supply, each product row that is not just "Monitor" offers "Ask the buyer to order": the quantity is the low end of the suggested order (editable), the reason names the signal and the advice, and it calls the ordinary `POST /api/order-requests`. Before sending it looks for a request already open for that product and says so instead of sending a second. Nothing is ordered; the buyer's list on Inventory is where it goes on (`OrderRequestsCard`).
+**Past events are practice, and a signal can start an order request (20 Sep, Stan).** The decision route refuses `approve` on a signal whose origin is `replay` (400: "A past event is practice"), and the card offers only Acknowledge, with a line saying so, so a replay can never add a buffer to the real reorder points. On a live signal that tightens supply, each product row that is not just "Monitor" offers "Ask the buyer to order": the quantity is the low end of the suggested order (editable), the reason names the signal and the advice, and it calls the ordinary `POST /api/order-requests`. Before sending it looks for a request already open for that product and says so instead of sending a second. Nothing is ordered; the buyer's list is where it goes (`OrderRequestsCard`, on Next Steps since 22 Sep, moved there from Inventory).
 
-**Live news (built 19 Sep).** `POST /api/market-signals/scan` fetches recent headlines and reads each into the
-fixed shape. Files: `signals/feed.js`, `signals/reader.js`, tests `test-signal-reader.js`, measurement
-`bench-signal-reader.js`.
+**RSS News Feed (built 19 Sep, renamed from "Live news" 22 Sep - accurate about what it reads, a Google
+News RSS search, not open web browsing).** `POST /api/market-signals/scan` fetches recent headlines and
+reads each into the fixed shape. Files: `signals/feed.js`, `signals/reader.js`, tests
+`test-signal-reader.js`, measurement `bench-signal-reader.js`.
 
 - **Feed:** Google News RSS search, one query per origin bought from plus one general query, spaced,
   deduplicated. The look-back is chosen per scan as a whole number of days, 1 to 30, default 14
@@ -692,6 +693,63 @@ right about three times in four cannot be the last word, every reading is shown,
 **Not built yet:** severity is still the model's judgement and is not calibrated against outcomes; no
 scheduled background scan (a person presses the button); no supplier-specific news queries.
 Tests: `node backend/scripts/test-signals.js` (hand-worked figures, proven able to fail).
+
+**Three tabs (22 Sep).** RSS News Feed runs the scan above. **Replay** is the historical-events walkthrough
+described below, unchanged, renamed from "Past events" for consistency with the new naming (it was always
+the right name; "Live news" briefly considered "Replay" for itself first, which would have collided).
+**Deep Search** is a disabled, scaffolded-only fourth mode (a "Soon" chip): reading the full article behind
+each headline rather than just its title. Not built: resolving Google's redirect links, extracting article
+text from arbitrary sites (a materially larger untrusted-text surface than a headline), and a cost that
+needs benchmarking before committing to it.
+
+**Three free accuracy signals (22 Sep), all in `reader.js`/`feed.js`, no new model or network call:**
+- `source_reputable` (`feed.js`'s `REPUTABLE_SOURCES`, a fixed allow-list of wire services and major
+  outlets across the portfolio's origins): reputable headlines are read FIRST within a scan's model-read
+  budget (stable sort in `routes/signals.js`); an unrecognised source is flagged on the card, never
+  rejected, same "surface it, do not decide for the person" principle as `country_inferred` below.
+- `corroboration_count` (`routes/signals.js`'s `toRow`, `1 + also_reported_by.length`): the merge step
+  above already tracked this; it just was not shown as a trust signal before.
+- `confidence` (`reader.js`): an OPTIONAL field in the reader's own model output, its self-rated
+  certainty, distinct from the event's severity. Deliberately soft in `validateRead`: missing or invalid
+  falls back to a coarse default ("medium") rather than failing the whole reading. `rulesRead` (the
+  keyword fallback) always reports that same default. A replayed historical event is "high" by
+  definition (a person verified it).
+
+**Injection hardening (22 Sep), on top of the quoting and validation above:** `neutralize()` (`reader.js`,
+exported) strips a literal `"""` sequence and collapses newlines/tabs in every piece of untrusted text
+before it enters a prompt (a headline, a corrected headline, and - in `planner.js` - prior queries and
+recent signal headlines fed back into a later round). `countryInferred()` (`reader.js`): true when the
+model's claimed country is never literally named in the headline text; surfaced as `country_inferred`, not
+auto-corrected (a legitimate "large buyer's import surge" case IS meant to infer past the literal text).
+Known limit, documented in code: an injection that spells out its own target country in the headline text
+defeats this literal-presence check, so it is one layer among several, not the only one. In `planner.js`,
+`REASON_ACTION_WORDS` replaces a persuasive or action-directed "reason" wholesale (mirrors `tone.js`'s "a
+rule applied afterwards beats more prompt text" precedent), since a reason is display-only and must never
+be able to instruct whoever reads it.
+
+**A multi-round search planner (22 Sep), local-model only.** `signals/planner.js`: after the fixed
+per-origin queries above, a small local model can see everything found and asked so far and propose its
+own follow-up queries, up to `MAX_ROUNDS` (3) rounds, each with a `MAX_QUERY_LENGTH` (80) query and a
+`MAX_REASON_LENGTH` (160) one-sentence reason. An empty list from the model is a valid, final answer (it
+deciding it is done). Measured (`bench-signal-planner.js`): the model reliably proposes sensible,
+non-repeating follow-ups but does not reliably choose to stop on its own when nothing new remains, so
+`MAX_ROUNDS` is the real backstop, not the model's judgement. Every scan's rounds, queries and reasons are
+shown in a collapsible panel on the screen and logged in a `SIGNAL_SCAN` audit event.
+
+**Corrections reminder (22 Sep).** `recentCorrections()` (`routes/signals.js`) reads the last 50
+`SIGNAL_DECIDED` audit rows where `decision === "edit"` (the same PATCH corrections above), keeps the most
+recent `MAX_CORRECTIONS` (5, `reader.js`), and hands them to the reader as worked examples ("headline X
+was read as A/B/C/D, a person corrected it to E/F/G/H"), explicitly framed as a reminder, not a rule
+(the local model has no memory between calls; this is the system remembering, not the model learning).
+
+**Sonnet (cloud) parity for the reader only (22 Sep), gated properly.** `modelRead()` (`reader.js`) accepts
+a `tier`, defaulting to `"local"`; the caller must explicitly pass `"cloud"`. `routes/signals.js`'s scan
+route accepts `{tier: "cloud"}`, gated by the same demo PIN as Why?/Ask (`demoAccess.passValid`), with a
+far smaller cloud-specific cap, `MAX_MODEL_READS_CLOUD` (5, versus 16 free), since one scan can otherwise
+call the model 20 to 30 times - well beyond a single Why? press's cost. The search planner (query
+proposal) stays local-only regardless of this choice, Stan's call over full parity. A UI checkbox on the
+scan screen is its own on/off choice each time, never persisted to the general tier preference Why?/Ask
+set on unlock, since a scan can cost far more than a single press.
 
 ### Supporting Formulas (written down 15 Sep 2026; until then these existed only in code)
 
@@ -1031,7 +1089,7 @@ model calls and the issues found, failed explanations included. `llm/spend.js` p
 list price; `backend/scripts/spend.js` prints them for the spend ledger.
 
 ### Wording habits of a stronger model (20 Sep)
-Every model answer, on all three features (Why? on an alert, Action Items Why?, Ask about your data), passes
+Every model answer, on all three features (Why? on an alert, Next Steps Why?, Ask about your data), passes
 the same rule-based clean-up before it is checked, because the project rule is that wording is fixed by a
 rule applied afterwards and not by more prompt text. `tone.js` `cleanFormatting` removes markdown (bold,
 italics, backticks, headings, "•" and "*" bullets, code fences) and replaces em and en dashes; a placeholder

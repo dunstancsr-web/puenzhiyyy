@@ -3,8 +3,9 @@
 //
 // Five stops right after onboarding, so a first-time visitor is walked through the loop the app is built
 // around: data in, the engines flag what matters, a person decides. The copy for step 3 is Stan's (21 Sep):
-// Action Items settles immediate concerns, from stock running out to supply worries raised by the latest
-// world news. The tour never mentions the demo PIN: the banner and the Why? box already ask for it.
+// Next Steps (renamed from Action Items, 23 Sep) settles immediate concerns, from stock running out to
+// supply worries raised by the latest world news. The tour never mentions the demo PIN: the banner and
+// the Why? box already ask for it.
 //
 // STATE has two parts. What was asked for, or how the last tour ended, is one word in localStorage (per browser):
 //   "start-demo"  onboarding just finished: begin, but only if this browser is in the demo sandbox

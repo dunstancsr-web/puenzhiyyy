@@ -50,10 +50,10 @@ This is the cycle the app implements, and the one the audit trail records:
                     ▼
          decision recorded, stock and
          policy updated, everything
-         written to the audit log ──────────►  Alerts, History view
+         written to the audit log ──────────►  Actions Needed, History view
 ```
 
-Every arrow in that diagram writes a row to `audit_log`. The History view of the Alerts tab renders that table as a
+Every arrow in that diagram writes a row to `audit_log`. The History view of the Actions Needed tab renders that table as a
 plain-English timeline, with the exact input and output of each step one click away.
 
 ---
@@ -75,11 +75,16 @@ Three workspaces share one database, because the people doing the work are in di
     stock), Needs Attention, cover against lead time, health by value, and value by movement.
   - **Inventory.** Every SKU with a bullet-graph stock gauge, a 90-day projected stock curve, editable
     policy thresholds with a live preview before saving, and bulk edit by CSV.
-  - **Alerts.** Six alert types (stockout risk, reorder, overstock, slow moving, idle, ageing), each with
+  - **Actions Needed** (renamed from Alerts, 23 Sep). Six alert types (stockout risk, reorder, overstock, slow moving, idle, ageing), each with
     the measured value, the threshold it breached and a recommended action. Approve, modify or reject,
     with a reason. **Why?** shows the reasoning.
-  - **Alerts, History view.** The audit trail: every alert raised, policy changed, stock movement, model call and
+  - **Actions Needed, History view.** The audit trail: every alert raised, policy changed, stock movement, model call and
     manager decision, with what the system had proposed.
+  - **Next Steps** (renamed from Action Items, 23 Sep). The nearest projected stockout, an open-ended
+    question answered by a local model, and Market signals (news checked against the stock).
+  - **Forecast.** Four statistical models compete per product, the most accurate on its own past chosen
+    automatically, with a what-if simulation through the same engines.
+  - **Table.** One row per SKU beside the top-5 formulas' own output, to check onboarding's columns.
 
 ---
 
@@ -124,7 +129,7 @@ backend/src/
   db/         schema, deterministic seed, audit log
 backend/scripts/   formula check, demo reset, deploy rehearsal and check, model benchmark
 frontend/src/
-  pages/      Home, Dashboard, Inventory, Alerts (Needs action and History)
+  pages/      Home, Dashboard, Table, Inventory, Forecast, Actions Needed (Needs action and History), Next Steps
   warehouse/  Goods In, Goods Out and operator sign-in
   index.css   the design system: plain CSS custom properties, a six step type scale, light and dark
 ```

@@ -39,7 +39,7 @@ const fmt$ = (n) => {
 //
 // The two disagreed badly. On TJ-25KG the proxy said 340 MT while the SKU's own
 // suggested_order_qty said 597 MT: a 257 MT gap, about $347K of purchase order,
-// with the Inventory page showing one number and the Alerts page pre-filling
+// with the Inventory page showing one number and the Actions Needed page pre-filling
 // the other into the approval modal. Same disease as the reorder-point policy
 // versus suggested bug: one question, two answers, no way for a manager to tell
 // which one the system means.

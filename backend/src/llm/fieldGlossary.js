@@ -13,7 +13,7 @@
 // from. That's rules.md's "one source of truth" problem, just in prose
 // instead of code.
 //
-// This file is that one source, for the fields Action Items' explanations
+// This file is that one source, for the fields Next Steps' (renamed from Action Items, 23 Sep) explanations
 // need. It does NOT touch explain.js's existing, already-benchmarked labels
 // for Alerts - rewriting those from a generic map risks changing exact
 // wording that was tuned against real model failures (see explain.js's own
