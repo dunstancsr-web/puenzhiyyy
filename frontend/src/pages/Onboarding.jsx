@@ -578,7 +578,7 @@ export default function Onboarding() {
               </p>
 
               <div style={{
-                fontFamily: "ui-monospace, Menlo, monospace", fontSize: "var(--text-xs)", background: "var(--surface-2)",
+                fontFamily: "'IBM Plex Mono', ui-monospace, Menlo, monospace", fontSize: "var(--text-xs)", background: "var(--surface-2)",
                 border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "12px 14px",
                 marginBottom: 26, color: "var(--text-secondary)", overflowX: "auto", lineHeight: 1.7, whiteSpace: "pre",
               }}>
@@ -1042,7 +1042,7 @@ function SuccessBanner({ text, detail }) {
 
 function Code({ children }) {
   return (
-    <code style={{ fontFamily: "ui-monospace, Menlo, monospace", background: "var(--surface-2)", borderRadius: 4, padding: "1px 5px", color: "var(--text-secondary)" }}>
+    <code style={{ fontFamily: "'IBM Plex Mono', ui-monospace, Menlo, monospace", background: "var(--surface-2)", borderRadius: 4, padding: "1px 5px", color: "var(--text-secondary)" }}>
       {children}
     </code>
   );

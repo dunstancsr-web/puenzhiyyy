@@ -28,7 +28,7 @@ function mulberry32(seed) {
 // ── SKU master + scenario parameters ────────────────────────────────────────
 const SKUS = [
   {
-    sku_id: "TJ-25KG", product_name: "Thai Jasmine 25KG", rice_variety: "Thai Hom Mali", grade: "Grade A",
+    sku_id: "TJ-25KG", product_name: "Thailand Thai Hom Mali 25 KG", rice_variety: "Thai Hom Mali", grade: "Grade A",
     country_of_origin: "Thailand", brand: "Golden Elephant", packaging_size: "25KG", supplier: "Supplier ABC Thailand",
     min_order_qty: 20, reorder_point_policy: 302, min_stock: 280, target_stock: 500, max_stock: 700,
     lead_time_days: 45, lead_time_std_days: 5, target_service_level: 0.98, demand_cv: 0.18,
@@ -46,7 +46,7 @@ const SKUS = [
     demoReceiptFactor: 1.06,
   },
   {
-    sku_id: "VF-10KG", product_name: "Vietnam Fragrant 10KG", rice_variety: "Vietnamese Fragrant", grade: "Grade B",
+    sku_id: "VF-10KG", product_name: "Vietnam Vietnamese Fragrant 10 KG", rice_variety: "Vietnamese Fragrant", grade: "Grade B",
     country_of_origin: "Vietnam", brand: "Mekong Gold", packaging_size: "10KG", supplier: "Supplier DEF Vietnam",
     min_order_qty: 10, reorder_point_policy: 120, min_stock: 100, target_stock: 280, max_stock: 400,
     lead_time_days: 32, lead_time_std_days: 4, target_service_level: 0.95, demand_cv: 0.22,
@@ -55,7 +55,7 @@ const SKUS = [
     sales: { s30: 95, s60: 178, s90: 265, lost_30d: 0 }, po: { qty: 200, eta_days: 12 },
   },
   {
-    sku_id: "BM-5KG", product_name: "Basmati Premium 5KG", rice_variety: "Basmati", grade: "Premium",
+    sku_id: "BM-5KG", product_name: "India Basmati 5 KG", rice_variety: "Basmati", grade: "Premium",
     country_of_origin: "India", brand: "Royal Basmati", packaging_size: "5KG", supplier: "Supplier GHI India",
     min_order_qty: 5, reorder_point_policy: 85, min_stock: 70, target_stock: 150, max_stock: 220,
     lead_time_days: 52, lead_time_std_days: 6, target_service_level: 0.92, demand_cv: 0.55,
@@ -73,7 +73,7 @@ const SKUS = [
     demoReceiptFactor: 1.06,
   },
   {
-    sku_id: "JP-5KG", product_name: "Japonica Short Grain 5KG", rice_variety: "Japonica", grade: "Grade A",
+    sku_id: "JP-5KG", product_name: "Japan Japonica 5 KG", rice_variety: "Japonica", grade: "Grade A",
     country_of_origin: "Japan", brand: "Sakura Rice", packaging_size: "5KG", supplier: "Supplier JKL Japan",
     min_order_qty: 2, reorder_point_policy: 20, min_stock: 15, target_stock: 40, max_stock: 60,
     lead_time_days: 35, lead_time_std_days: 4, target_service_level: 0.90, demand_cv: 1.2,
@@ -82,7 +82,7 @@ const SKUS = [
     sales: { s30: 0, s60: 0, s90: 0, lost_30d: 0, idleSaleDaysAgo: 96, idleSaleQty: 3 }, po: null,
   },
   {
-    sku_id: "TJ-10KG", product_name: "Thai Jasmine 10KG", rice_variety: "Thai Hom Mali", grade: "Grade A",
+    sku_id: "TJ-10KG", product_name: "Thailand Thai Hom Mali 10 KG", rice_variety: "Thai Hom Mali", grade: "Grade A",
     country_of_origin: "Thailand", brand: "Golden Elephant", packaging_size: "10KG", supplier: "Supplier ABC Thailand",
     min_order_qty: 10, reorder_point_policy: 140, min_stock: 120, target_stock: 280, max_stock: 380,
     lead_time_days: 45, lead_time_std_days: 5, target_service_level: 0.98, demand_cv: 0.28,
@@ -91,7 +91,7 @@ const SKUS = [
     sales: { s30: 142, s60: 270, s90: 395, lost_30d: 2 }, po: { qty: 300, eta_days: 20 },
   },
   {
-    sku_id: "VF-25KG", product_name: "Vietnam Fragrant 25KG", rice_variety: "Vietnamese Fragrant", grade: "Grade A",
+    sku_id: "VF-25KG", product_name: "Vietnam Vietnamese Fragrant 25 KG", rice_variety: "Vietnamese Fragrant", grade: "Grade A",
     country_of_origin: "Vietnam", brand: "Mekong Gold", packaging_size: "25KG", supplier: "Supplier DEF Vietnam",
     min_order_qty: 20, reorder_point_policy: 190, min_stock: 160, target_stock: 360, max_stock: 500,
     lead_time_days: 32, lead_time_std_days: 4, target_service_level: 0.97, demand_cv: 0.16,
@@ -100,7 +100,7 @@ const SKUS = [
     sales: { s30: 168, s60: 325, s90: 490, lost_30d: 3 }, po: { qty: 250, eta_days: 15 },
   },
   {
-    sku_id: "BM-25KG", product_name: "Basmati Bulk 25KG", rice_variety: "Basmati", grade: "Grade B",
+    sku_id: "BM-25KG", product_name: "India Basmati 25 KG", rice_variety: "Basmati", grade: "Grade B",
     country_of_origin: "India", brand: "Royal Basmati", packaging_size: "25KG", supplier: "Supplier GHI India",
     min_order_qty: 20, reorder_point_policy: 160, min_stock: 140, target_stock: 300, max_stock: 420,
     lead_time_days: 52, lead_time_std_days: 6, target_service_level: 0.93, demand_cv: 0.48,
@@ -109,7 +109,7 @@ const SKUS = [
     sales: { s30: 32, s60: 72, s90: 105, lost_30d: 0 }, po: null,
   },
   {
-    sku_id: "TW-25KG", product_name: "Thai White Rice 25KG", rice_variety: "Thai White", grade: "Grade B",
+    sku_id: "TW-25KG", product_name: "Thailand Thai White 25 KG", rice_variety: "Thai White", grade: "Grade B",
     country_of_origin: "Thailand", brand: "White Pearl", packaging_size: "25KG", supplier: "Supplier ABC Thailand",
     min_order_qty: 25, reorder_point_policy: 250, min_stock: 220, target_stock: 480, max_stock: 650,
     lead_time_days: 45, lead_time_std_days: 5, target_service_level: 0.97, demand_cv: 0.20,
@@ -118,7 +118,7 @@ const SKUS = [
     sales: { s30: 138, s60: 265, s90: 392, lost_30d: 5 }, po: null,
   },
   {
-    sku_id: "PH-25KG", product_name: "Philippine Sinandomeng 25KG", rice_variety: "Sinandomeng", grade: "Grade A",
+    sku_id: "PH-25KG", product_name: "Philippines Sinandomeng 25 KG", rice_variety: "Sinandomeng", grade: "Grade A",
     country_of_origin: "Philippines", brand: "Harvest Moon", packaging_size: "25KG", supplier: "Supplier MNO Philippines",
     min_order_qty: 15, reorder_point_policy: 130, min_stock: 110, target_stock: 260, max_stock: 360,
     lead_time_days: 28, lead_time_std_days: 3, target_service_level: 0.96, demand_cv: 0.24,
@@ -127,7 +127,7 @@ const SKUS = [
     sales: { s30: 112, s60: 215, s90: 320, lost_30d: 1 }, po: { qty: 150, eta_days: 9 },
   },
   {
-    sku_id: "BR-10KG", product_name: "Brown Rice Organic 10KG", rice_variety: "Brown Rice", grade: "Organic",
+    sku_id: "BR-10KG", product_name: "Thailand Brown Rice 10 KG", rice_variety: "Brown Rice", grade: "Organic",
     country_of_origin: "Thailand", brand: "NatureFarm", packaging_size: "10KG", supplier: "Supplier ABC Thailand",
     min_order_qty: 5, reorder_point_policy: 45, min_stock: 35, target_stock: 90, max_stock: 130,
     lead_time_days: 45, lead_time_std_days: 5, target_service_level: 0.90, demand_cv: 0.60,

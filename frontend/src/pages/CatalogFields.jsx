@@ -154,7 +154,7 @@ function FieldRow({ f, required }) {
     <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)", display: "flex", gap: 16, alignItems: "flex-start" }}>
       <div style={{ width: 200, maxWidth: "42%", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <code style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-primary)" }}>
+          <code style={{ fontFamily: "'IBM Plex Mono', ui-monospace, Menlo, monospace", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--text-primary)" }}>
             {f.field}
           </code>
           {f.unit && (
@@ -185,7 +185,7 @@ function FieldRow({ f, required }) {
           </span>
           {f.example != null && (
             <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-              {" \u00b7 "}Example: <code style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>{f.example}{f.unit ? ` ${f.unit}` : ""}</code>
+              {" \u00b7 "}Example: <code style={{ fontFamily: "'IBM Plex Mono', ui-monospace, Menlo, monospace" }}>{f.example}{f.unit ? ` ${f.unit}` : ""}</code>
             </span>
           )}
         </div>

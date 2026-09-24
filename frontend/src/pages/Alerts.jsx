@@ -41,7 +41,7 @@ function useModalEscape(onClose) {
 const TYPE_META = {
   STOCKOUT_RISK: { icon: XCircle,       color: "var(--red-text)",    bg: "var(--red-light)",    label: "Stockout Risk" },
   REORDER:       { icon: AlertTriangle, color: "var(--yellow-text)", bg: "var(--yellow-light)", label: "Reorder" },
-  OVERSTOCK:     { icon: TrendingUp,    color: "var(--purple-text)", bg: "var(--purple-light)", label: "Overstock" },
+  OVERSTOCK:     { icon: TrendingUp,    color: "var(--yellow-text)", bg: "var(--yellow-light)", label: "Overstock" },
   SLOW_MOVING:   { icon: TrendingDown,  color: "var(--yellow-text)", bg: "var(--yellow-light)", label: "Slow Moving" },
   IDLE:          { icon: Clock,         color: "var(--red-text)",    bg: "var(--red-light)",    label: "Idle Stock" },
   AGEING:        { icon: AlertTriangle, color: "var(--yellow-text)", bg: "var(--yellow-light)", label: "Ageing" },
@@ -539,7 +539,11 @@ function AlertHistory({ id }) {
 // a type-coloured icon, a type chip AND a severity chip, on top of a tile row
 // above that already groups by type. Severity moved to the stripe so one chip
 // could go.
-const SEVERITY_STRIPE = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--blue)" };
+// info uses a neutral slate stripe, not the accent: on the brand --red and
+// --blue both resolve to terracotta, so critical and info would otherwise share
+// the card's only severity cue. A muted stripe also reads correctly as the
+// least urgent of the three.
+const SEVERITY_STRIPE = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--text-muted)" };
 
 // Unit for each alert type's triggered_value - see backend/src/engines/alerts.js
 const VALUE_UNIT = {
@@ -614,7 +618,7 @@ function AlertCard({ alert, onDismiss, onAskAI, onApprove, highlight = false }) 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}>{alert.sku_name}</span>
-            <span style={{ fontSize: "var(--text-xs)", fontFamily: "monospace", color: "var(--text-muted)" }}>{alert.sku_id}</span>
+            <span style={{ fontSize: "var(--text-xs)", fontFamily: "'IBM Plex Mono', ui-monospace, monospace", color: "var(--text-muted)" }}>{alert.sku_id}</span>
             <Badge type={alert.alert_type} label={meta.label} />
           </div>
 

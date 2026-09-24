@@ -144,7 +144,7 @@ export default function Inbound() {
               <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
                 GOODS RECEIVED NOTE
               </span>
-              <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, fontFamily: "monospace" }}>
+              <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>
                 {receipt.movement_no}
               </span>
             </div>
@@ -156,7 +156,7 @@ export default function Inbound() {
                 <Fact
                   label={short ? "Short by" : "Over by"}
                   value={`${fmt(Math.abs(receipt.variance_qty))} MT`}
-                  tone={short ? "var(--red)" : "var(--purple)"}
+                  tone={short ? "var(--red)" : "var(--yellow)"}
                   strong
                 />
               )}
@@ -231,7 +231,7 @@ export default function Inbound() {
                 style={{ padding: "13px 15px", textAlign: "left", display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                    <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
                       {d.po_number}
                     </span>
                   </div>
@@ -410,7 +410,7 @@ export default function Inbound() {
             <Fact
               label={variance < 0 ? "Short by" : "Over by"}
               value={`${fmt(Math.abs(variance))} MT`}
-              tone={variance < 0 ? "var(--red)" : "var(--purple)"}
+              tone={variance < 0 ? "var(--red)" : "var(--yellow)"}
               strong
             />
           )}

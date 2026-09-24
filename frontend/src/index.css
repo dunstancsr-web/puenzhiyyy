@@ -1,3 +1,10 @@
+/* ── Puenzhiy brand webfonts ─────────────────────────────────────────────────
+   Instrument Serif (display headings + hero figures), Space Grotesk (body, UI,
+   labels, buttons) and IBM Plex Mono (tabular figures, IDs, timestamps). All
+   three are real Google Fonts, no visual substitution. @import must lead the
+   file, before any other rule. */
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -14,102 +21,137 @@
   --demo-banner-height: 0px;
 }
 
-/* ── DEFAULT (Light) theme ───────────────────────────────────────────────── */
+/* ── DEFAULT (Light) theme ───────────────────────────────────────────────────
+   Re-mapped to the Puenzhiy painted palette (2026-09-24): warm paper grounds
+   instead of cool white/grey, terracotta as the accent, and the four brand
+   colours carrying the health scale. The token NAMES are unchanged so the whole
+   app re-skins from this one block; only the VALUES move onto the brand. Ink
+   #1D2B2A / Terracotta #C0472F / Saffron #E0872F / Jade #2E6F5E; grounds Paper
+   #F4EFE6, Card #FFFDF9, Linen #EDE6D9, Rule #E3D9C6, Slate #5A5F5A.
+   WCAG AA (4.5:1) was preserved for every token carrying text. */
 :root {
-  --bg:             #f0f2f5;
-  --surface:        #ffffff;
-  --surface-2:      #f8f9fb;
-  --border:         #e2e6ea;
-  --text-primary:   #1a202c;
-  /* Darkened 2026-09-13: --text-muted was #94a3b8, which measures ~3.6:1 on
-     white and fails WCAG AA's 4.5:1 for normal-size text. It carries a lot of
-     real content here (KPI sub-lines, chart axis labels, table captions), so
-     it has to be legible. Both steps moved down one shade to keep the
-     primary/secondary/muted hierarchy intact while clearing AA. */
-  --text-secondary: #475569;
-  --text-muted:     #5a6a80;   /* was #64748b: 4.24:1 on the page background, now 4.92 */
+  --bg:             #f4efe6;   /* Paper: the default page ground */
+  --surface:        #fffdf9;   /* Card */
+  --surface-2:      #ede6d9;   /* Linen: sunken / hover wash */
+  --border:         #e3d9c6;   /* Rule: every hairline */
+  --text-primary:   #1d2b2a;   /* Ink */
+  /* Secondary/muted keep the Ink → Slate hierarchy. Slate #5A5F5A is the
+     brand's secondary-text colour and measures ~5.9:1 on Paper, clearing AA;
+     it does double duty for both steps here (the brand names only one). */
+  --text-secondary: #3c4a48;   /* darkened Ink, ~8:1 on Paper */
+  --text-muted:     #5a5f5a;   /* Slate, ~5.9:1 on Paper */
 
-  --blue:           #2563eb;   /* was #3b82f6: 3.7:1 as text; 4.75 on its own tint now */
-  --blue-light:     #eff6ff;
-  /* A second DATA shade of blue, for the lighter half of a stacked bar.
-     --blue-light is a surface tint (used behind pressed buttons and active
-     chips) and is far too pale to read as a filled bar against a white card,
-     so it cannot do this job. Deliberately not redefined in the dark block:
-     unlike the -light tints, which are backgrounds and must flip, this is ink
-     on a chart and reads on both the white and the #1e293b card ground. */
-  --blue-soft:      #93c5fd;
-  --green:          #22c55e;
-  --green-light:    #f0fdf4;
-  --yellow:         #f59e0b;
-  --yellow-light:   #fffbeb;
-  --yellow-text:    #b45309;   /* amber as WORDS: 4.84 on its tint; the fill stays --yellow */
-  /* The health taxonomy has four levels (RED / ORANGE / YELLOW / GREEN) and
-     only three had tokens, which is why HEALTH_COLORS in Dashboard.jsx still
-     carries a raw #f97316. Anything that derives a background by appending
-     "-light" to a colour token needs the pair to exist. */
-  --orange:         #f97316;
-  --orange-light:   #fff7ed;
-  --red:            #c62828;   /* was #ef4444: 3.4:1 on its own tint as text, now 5.1 */
-  --red-light:      #fef2f2;
-  --purple:         #7c3aed;   /* was #8b5cf6: 3.9:1 on its own tint */
-  /* Text-safe variants. The accents above are right for fills, icons and chart marks
-     but fail 4.5:1 as small text on a light surface (white on --blue is 3.7:1, --green
-     on white 2.3:1). Use these wherever an accent colour carries WORDS or sits behind
-     white text. The dark theme overrides them back to the bright accents, which read
-     well on a dark surface. */
-  --blue-strong:    #2563eb;   /* FILL behind white text */
-  --blue-text:      #2563eb;   /* blue as WORDS (dark theme lightens this one) */
-  --green-text:     #15803d;
-  --orange-text:    #c2410c;
-  --red-text:       #b91c1c;
-  --purple-text:    #6d28d9;
-  --purple-light:   #f5f3ff;
+  /* The app's accent tokens are re-pointed onto the brand. "blue" was the old
+     primary/link colour app-wide; it now resolves to Terracotta so links,
+     primary buttons and active chips pick up the brand accent without touching
+     every call site. The fill/text split is kept (rules.md): the *-text tokens
+     stay AA-safe as words, the bare tokens are for fills and marks. */
+  --blue:           #c0472f;   /* Terracotta: accent / primary / links */
+  --blue-light:     #f5e6e1;   /* terracotta wash for active chips / pressed */
+  --blue-soft:      #e9c4ba;   /* terracotta-300: lighter half of a stacked bar */
+  --green:          #2e6f5e;   /* Jade: positive / healthy */
+  --green-light:    #e4efeb;
+  --yellow:         #e0872f;   /* Saffron: attention / warning fill */
+  --yellow-light:   #f9ecda;
+  --yellow-text:    #9a5a12;   /* saffron as WORDS: AA on its tint; fill stays --yellow */
+  /* Health taxonomy is four brand steps: Critical terracotta · Action saffron
+     · Watch ink · Healthy jade. "orange" was the fourth health hue; on the
+     brand the Action step is Saffron, so orange now resolves to Saffron too. */
+  --orange:         #e0872f;   /* Saffron (Action step) */
+  --orange-light:   #f9ecda;
+  --red:            #c0472f;   /* Terracotta (Critical step) */
+  --red-light:      #f5e6e1;
+  /* No brand purple. It was a distinct fifth hue (overstock zone, the AI/model
+     accent, the statistical-forecast tag), so mapping it onto Jade would make
+     overstock read as healthy. Map it onto Ink instead: a neutral structural
+     colour that stays distinct from all four health hues. */
+  --purple:         #1d2b2a;   /* Ink */
+  /* Text-safe variants. The bare accents above are for fills, icons and chart
+     marks; these carry WORDS or sit behind white text and are darkened to clear
+     4.5:1 on a light (Paper/Card) surface. The dark theme overrides them back
+     to brighter values that read on the ink ground. */
+  --blue-strong:    #9e3826;   /* terracotta-700: FILL behind white text (white on this ~5.6:1) */
+  --blue-text:      #9e3826;   /* terracotta as WORDS */
+  --green-text:     #235749;   /* jade-700 as WORDS */
+  --orange-text:    #9a5a12;   /* saffron as WORDS */
+  --red-text:       #9e3826;   /* terracotta-700 as WORDS */
+  --purple-text:    #1d2b2a;   /* Ink as words (neutral fifth accent) */
+  --purple-light:   #eae7df;   /* faint ink-on-paper wash, distinct from the jade tint */
 
-  --sidebar-bg:     #ffffff;
-  --seal:           #b3271e;  /* 印泥 cinnabar, the client mark */
-  --sidebar-border: #e2e6ea;
-  --card-bg:        #ffffff;
-  --table-head-bg:  #f8f9fb;
+  /* Sidebar stays on a light Card ground with a Rule hairline, not the Ink
+     rail. Light-first is a repo rule, and the sidebar's labels are styled with
+     the dark --text-* tokens via inline styles; an ink rail would render them
+     dark-on-dark. The active item's terracotta wash carries the accent. */
+  --sidebar-bg:     #fffdf9;   /* Card */
+  --seal:           #c0472f;   /* client mark: onto Terracotta */
+  --sidebar-border: #e3d9c6;   /* Rule */
+  --card-bg:        #fffdf9;   /* Card */
+  --table-head-bg:  #ede6d9;   /* Linen */
 
-  --radius:         10px;
-  --radius-lg:      16px;
-  --shadow:         0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md:      0 4px 12px rgba(0,0,0,0.08);
+  /* Radii onto the brand: 4px on nearly everything, a slightly larger step for
+     big containers (the brand tops out at 8px on cards). */
+  --radius:         4px;
+  --radius-lg:      8px;
+  /* Borders before shadows is the house rule; shadows stay shallow and
+     ink-tinted, reserved for things that genuinely float. */
+  --shadow:         0 1px 2px rgba(29,43,42,0.06);
+  --shadow-md:      0 4px 14px rgba(29,43,42,0.08);
 
-  /* Small-screen floating top bar only (see .app-topbar-glass below) - a
-     one-off frosted-glass treatment for that one component, not a site-wide
-     theme. Works the same way under Light and Dark. */
-  --glass-bar-bg: rgba(255,255,255,0.6);
+  /* Small-screen floating top bar only (see .app-topbar-glass below). */
+  --glass-bar-bg: rgba(255,253,249,0.7);
+
+  /* ── Brand chart series ────────────────────────────────────────────────────
+     The brand's fixed order is saffron → terracotta → jade → ink. For a
+     categorical chart with up to six slices (origin pie), the four base hues
+     alone repeat and adjacent slices read as the same colour, which is the
+     "colours too close" problem. These six are chosen to alternate warm/cool
+     and dark/light so no two neighbours look alike, all drawn from the brand
+     family (base four plus the terracotta-700 and jade-300 steps). */
+  --chart-1: #e0872f;   /* saffron */
+  --chart-2: #2e6f5e;   /* jade */
+  --chart-3: #c0472f;   /* terracotta */
+  --chart-4: #1d2b2a;   /* ink */
+  --chart-5: #9e3826;   /* terracotta-700 (deep) */
+  --chart-6: #bedcd3;   /* jade-300 (pale) */
 }
 
 /* ── DARK theme ──────────────────────────────────────────────────────────── */
+/* Dark theme. Puenzhiy has no dark mode, but the app ships one and light-first
+   is the priority, so this is kept working on an Ink-family dark ground with
+   the brand accents brightened to read on it (the guide's own move: bright
+   accents belong on dark surfaces). Grounds are Ink and its steps rather than
+   the old cool slate. */
 [data-theme="dark"] {
-  --red: #f87171; --blue: #3b82f6; --purple: #a78bfa; --yellow-text: #fbbf24; --blue-strong: #2563eb; --blue-text: #60a5fa;
-  --green-text: #4ade80; --orange-text: #fb923c; --red-text: #f87171; --purple-text: #a78bfa;
-  --bg:             #0f172a;
-  --surface:        #1e293b;
-  --surface-2:      #263148;
-  --border:         #334155;
-  --text-primary:   #f1f5f9;
-  /* Same AA fix on the dark side: #64748b muted on the #1e293b card ground
-     measures ~3.3:1. Both steps moved up one shade. */
-  --text-secondary: #cbd5e1;
-  --text-muted:     #94a3b8;
+  --red: #d05f46; --blue: #d05f46; --purple: #c9c4b6; --yellow-text: #f0b060; --blue-strong: #c0472f; --blue-text: #e59a86;
+  --green-text: #7fc2ae; --orange-text: #f0b060; --red-text: #e59a86; --purple-text: #c9c4b6;
+  --bg:             #14201f;   /* ink-700 */
+  --surface:        #1d2b2a;   /* Ink */
+  --surface-2:      #2a3c3a;   /* ink-500 */
+  --border:         #3a4d4b;
+  --text-primary:   #f4efe6;   /* Paper */
+  --text-secondary: #d8d3c6;
+  --text-muted:     #c9c4b6;   /* Chalk */
 
-  --blue-light:     #1e3a5f;
-  --green-light:    #052e16;
-  --yellow-light:   #2d1f00;
-  --orange-light:   #2d1500;
-  --red-light:      #2d0a0a;
-  --purple-light:   #2d1b69;
+  --blue:           #d05f46;   /* terracotta-500, brighter for dark */
+  --blue-soft:      #e9c4ba;
+  --green:          #5fae97;
+  --yellow:         #e0872f;
+  --orange:         #e0872f;
 
-  --sidebar-bg:     #1e293b;
-  --seal:           #d6453a;
-  --sidebar-border: #334155;
-  --card-bg:        #1e293b;
-  --table-head-bg:  #263148;
+  --blue-light:     #3a2118;
+  --green-light:    #123027;
+  --yellow-light:   #33260f;
+  --orange-light:   #33260f;
+  --red-light:      #3a2118;
+  --purple-light:   #2a3c3a;
 
-  --glass-bar-bg: rgba(30,41,59,0.6);
+  --sidebar-bg:     #1d2b2a;
+  --seal:           #d05f46;
+  --sidebar-border: #3a4d4b;
+  --card-bg:        #1d2b2a;
+  --table-head-bg:  #2a3c3a;
+
+  --glass-bar-bg: rgba(29,43,42,0.7);
 }
 
 /* ── Design system foundation (visual overhaul, 2026-09) ─────────────────────
@@ -317,7 +359,9 @@
 }
 
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Space Grotesk is the Puenzhiy interface face: body, labels, buttons,
+     tables, everything not a display heading. Inter kept as a fallback. */
+  font-family: "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--text-primary);
   font-size: var(--text-base); /* the scale is the single source, not a literal */
@@ -325,6 +369,22 @@ body {
   padding-top: var(--demo-banner-height); /* shifts content below the fixed top banner; see :root above */
   -webkit-font-smoothing: antialiased;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ── Puenzhiy type roles ─────────────────────────────────────────────────────
+   Instrument Serif does the display work: the page title on each screen. It is
+   opt-in via .pz-display so we only reach the true page <h1>s and never body
+   copy or UI labels (the brand forbids the serif there). IBM Plex Mono carries
+   tabular figures where a component asks for it via .pz-figure. Both are
+   additive utility classes, so no existing element changes unless it opts in. */
+.pz-display {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+.pz-figure {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 a { text-decoration: none; color: inherit; }
@@ -374,8 +434,8 @@ input, select, textarea {
 }
 
 /* ── Modal surface — opaque enough to host a form in every theme ──────────── */
-:root                { --modal-bg: #ffffff; }
-[data-theme="dark"]  { --modal-bg: #1e293b; }
+:root                { --modal-bg: #fffdf9; }  /* Card */
+[data-theme="dark"]  { --modal-bg: #1d2b2a; }  /* Ink */
 
 /* ── Inventory table ─────────────────────────────────────────────────────── */
 .inv-table tbody tr:hover { background: var(--surface-2); }

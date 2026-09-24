@@ -78,7 +78,7 @@ export function ImportPreview({ preview }) {
                   display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
                   fontSize: "var(--text-xs)", color: "var(--text-secondary)", marginTop: 3,
                 }}>
-                  <code style={{ fontFamily: "ui-monospace, Menlo, monospace", color: "var(--text-muted)" }}>{field}</code>
+                  <code style={{ fontFamily: "'IBM Plex Mono', ui-monospace, Menlo, monospace", color: "var(--text-muted)" }}>{field}</code>
                   <span style={{ textDecoration: "line-through", opacity: 0.7 }}>{String(d.from) || "empty"}</span>
                   <ChevronRight size={12} style={{ color: "var(--text-muted)" }} />
                   <b style={{ color: "var(--blue-text)" }}>{String(d.to)}</b>
