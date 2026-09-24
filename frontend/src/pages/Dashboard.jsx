@@ -41,12 +41,19 @@ function delta(cur, prev, { higherIsBetter = true, unit = "", pp = false } = {})
   return { dir, good, text, diff };
 }
 
-const HEALTH_COLORS = { GREEN: "#22c55e", YELLOW: "#f59e0b", ORANGE: "#f97316", RED: "#dc2626" };
+// Brand health scale (worst first): Critical terracotta, Action saffron,
+// Watch ink, Healthy jade. Resolved hex because Recharts needs a value, not a
+// CSS var. Kept in step with HEALTH_TOKEN below.
+const HEALTH_COLORS = { GREEN: "#2e6f5e", YELLOW: "#1d2b2a", ORANGE: "#e0872f", RED: "#c0472f" };
 const HEALTH_LABEL = { RED: "Critical", ORANGE: "Action", YELLOW: "Watch", GREEN: "Healthy" };
 // The same four colours as tokens. HEALTH_COLORS feeds Recharts, which needs a
 // resolved value; this feeds the tag pills in Needs Attention, which derive
 // their background by appending "-light" and therefore need the token form.
-const HEALTH_TOKEN = { RED: "var(--red)", ORANGE: "var(--orange-text)", YELLOW: "var(--yellow-text)", GREEN: "var(--green-text)" };
+// Kept in step with HEALTH_COLORS above so the pill and the health stack agree:
+// Critical terracotta, Action saffron, Watch ink, Healthy jade. YELLOW (Watch)
+// points at the ink text token, not saffron, so it is not identical to ORANGE
+// (Action) now that --yellow-text and --orange-text share one hex on the brand.
+const HEALTH_TOKEN = { RED: "var(--red-text)", ORANGE: "var(--orange-text)", YELLOW: "var(--text-primary)", GREEN: "var(--green-text)" };
 
 // Movement axis of the ABC x movement matrix. Must mirror MOVEMENT_COLS in
 // backend/src/engines/segmentation.js - the cell keys are built from these.
@@ -233,7 +240,7 @@ function buildNeedsAttention(skus) {
         value: s.overstock_carrying_cost,
         valueLabel: "carrying cost / yr",
         tag: "OVERSTOCK",
-        tagColor: "var(--purple)",
+        tagColor: "var(--yellow-text)",
       });
     });
 
@@ -914,7 +921,7 @@ export default function Dashboard() {
           first: clicking a colour here scrolls its own effect out of view. The
           filter chip at the top of the table is what makes that recoverable. */}
       <div className="dash-row dash-row--even" style={{ marginBottom: "var(--space-5)" }}>
-        <Section title="Cover vs Lead + Safety" subtitle="Worst gap first - click a row to filter" hint={HINTS.coverage}
+        <Section title="Cover against lead time and safety stock" subtitle="Worst gap first - click a row to filter" hint={HINTS.coverage}
           collapsible storageKey="coverage" defaultOpen>
           <CoverageBullets data={coverageData} selected={filter?.type === "sku" ? filter.value : null}
             onSelect={(skuId) => toggleFilter(setFilter, "sku", skuId)} />
@@ -928,7 +935,7 @@ export default function Dashboard() {
       </div>
 
       <div className="dash-row dash-row--full" style={{ marginBottom: "var(--space-5)" }}>
-        <Section title="Value × Movement" subtitle="Economic value tier × how fast it sells - click a cell to filter" hint={HINTS.abcMovement}
+        <Section title="Value tier and movement" subtitle="Economic value tier by how fast it sells - click a cell to filter" hint={HINTS.abcMovement}
           collapsible storageKey="abcxyz" defaultOpen>
           <AbcMovementMatrix matrix={s.abcMovementMatrix} selected={filter?.type === "segment" ? filter.value : null}
             onSelect={(key) => toggleFilter(setFilter, "segment", key)} />
@@ -1149,7 +1156,10 @@ function HealthStack({ data, selected, onSelect }) {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 opacity: selected && selected !== d.status ? 0.55 : 1,
               }}>
-              {d.pct > 12 && <span style={{ color: d.status === "RED" ? "#fff" : "#1f2937", fontSize: "var(--text-xs)", fontWeight: 700 }}>{d.pct}%</span>}
+              {/* Brand health scale: Critical terracotta, Watch ink and Healthy
+                  jade are dark grounds and need a paper-coloured label; only
+                  Action saffron is light enough for ink text. */}
+              {d.pct > 12 && <span style={{ color: d.status === "ORANGE" ? "#1d2b2a" : "#fffdf9", fontSize: "var(--text-xs)", fontWeight: 700 }}>{d.pct}%</span>}
             </button>
           </HoverHint>
         ))}
@@ -1206,7 +1216,7 @@ function AbcMovementMatrix({ matrix, selected, onSelect }) {
                   <button type="button" disabled={!clickable} onClick={() => onSelect(key)}
                     aria-label={clickable ? `${name}: ${cell.count} SKUs, ${fmt$(cell.value)}` : `${name}: no SKUs`}
                     style={{
-                      background: cell.value > 0 ? `rgba(59,130,246,${0.08 + intensity * 0.32})` : "var(--surface-2)",
+                      background: cell.value > 0 ? `rgba(192,71,47,${0.08 + intensity * 0.32})` : "var(--surface-2)",
                       borderRadius: 6, padding: "var(--space-3) 4px", textAlign: "center", font: "inherit",
                       border: isSel ? "2px solid var(--blue)" : "2px solid transparent",
                       cursor: clickable ? "pointer" : "default",
@@ -1224,12 +1234,12 @@ function AbcMovementMatrix({ matrix, selected, onSelect }) {
         ))}
       </div>
       {/* The cell tint encodes inventory value, which was nowhere stated -
-          readers had no way to know the blue meant anything at all. */}
+          readers had no way to know the shade meant anything at all. */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: "var(--space-3)", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
         <span>Shade = inventory value</span>
         <span style={{ display: "flex", flex: 1, maxWidth: 120, height: 7, borderRadius: 99, overflow: "hidden" }}>
           {[0.08, 0.16, 0.24, 0.32, 0.4].map((a) => (
-            <span key={a} style={{ flex: 1, background: `rgba(59,130,246,${a})` }} />
+            <span key={a} style={{ flex: 1, background: `rgba(192,71,47,${a})` }} />
           ))}
         </span>
         <span>less → more</span>
@@ -1307,7 +1317,7 @@ function KpiGroup({ label, note }) {
 function PageHeader({ title, subtitle }) {
   return (
     <div style={{ marginBottom: "var(--space-5)" }}>
-      <h1 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--text-primary)" }}>{title}</h1>
+      <h1 className="pz-display" style={{ fontSize: "var(--text-xl)", color: "var(--text-primary)" }}>{title}</h1>
       <p style={{ fontSize: "var(--text-base)", color: "var(--text-secondary)", marginTop: 4 }}>{subtitle}</p>
     </div>
   );

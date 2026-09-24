@@ -19,7 +19,7 @@ import { computeSkuAnalytics, computePortfolioAnalytics, DEFAULT_EXTRAS } from "
 export const mockSkus = [
   {
     sku_id: "TJ-25KG",
-    product_name: "Thai Jasmine 25KG",
+    product_name: "Thailand Thai Hom Mali 25 KG",
     rice_variety: "Thai Hom Mali",
     grade: "Grade A",
     country_of_origin: "Thailand",
@@ -62,7 +62,7 @@ export const mockSkus = [
   },
   {
     sku_id: "VF-10KG",
-    product_name: "Vietnam Fragrant 10KG",
+    product_name: "Vietnam Vietnamese Fragrant 10 KG",
     rice_variety: "Vietnamese Fragrant",
     grade: "Grade B",
     country_of_origin: "Vietnam",
@@ -101,7 +101,7 @@ export const mockSkus = [
   },
   {
     sku_id: "BM-5KG",
-    product_name: "Basmati Premium 5KG",
+    product_name: "India Basmati 5 KG",
     rice_variety: "Basmati",
     grade: "Premium",
     country_of_origin: "India",
@@ -140,7 +140,7 @@ export const mockSkus = [
   },
   {
     sku_id: "JP-5KG",
-    product_name: "Japonica Short Grain 5KG",
+    product_name: "Japan Japonica 5 KG",
     rice_variety: "Japonica",
     grade: "Grade A",
     country_of_origin: "Japan",
@@ -179,7 +179,7 @@ export const mockSkus = [
   },
   {
     sku_id: "TJ-10KG",
-    product_name: "Thai Jasmine 10KG",
+    product_name: "Thailand Thai Hom Mali 10 KG",
     rice_variety: "Thai Hom Mali",
     grade: "Grade A",
     country_of_origin: "Thailand",
@@ -218,7 +218,7 @@ export const mockSkus = [
   },
   {
     sku_id: "VF-25KG",
-    product_name: "Vietnam Fragrant 25KG",
+    product_name: "Vietnam Vietnamese Fragrant 25 KG",
     rice_variety: "Vietnamese Fragrant",
     grade: "Grade A",
     country_of_origin: "Vietnam",
@@ -257,7 +257,7 @@ export const mockSkus = [
   },
   {
     sku_id: "BM-25KG",
-    product_name: "Basmati Bulk 25KG",
+    product_name: "India Basmati 25 KG",
     rice_variety: "Basmati",
     grade: "Grade B",
     country_of_origin: "India",
@@ -296,7 +296,7 @@ export const mockSkus = [
   },
   {
     sku_id: "TW-25KG",
-    product_name: "Thai White Rice 25KG",
+    product_name: "Thailand Thai White 25 KG",
     rice_variety: "Thai White",
     grade: "Grade B",
     country_of_origin: "Thailand",
@@ -335,7 +335,7 @@ export const mockSkus = [
   },
   {
     sku_id: "PH-25KG",
-    product_name: "Philippine Sinandomeng 25KG",
+    product_name: "Philippines Sinandomeng 25 KG",
     rice_variety: "Sinandomeng",
     grade: "Grade A",
     country_of_origin: "Philippines",
@@ -374,7 +374,7 @@ export const mockSkus = [
   },
   {
     sku_id: "BR-10KG",
-    product_name: "Brown Rice Organic 10KG",
+    product_name: "Thailand Brown Rice 10 KG",
     rice_variety: "Brown Rice",
     grade: "Organic",
     country_of_origin: "Thailand",

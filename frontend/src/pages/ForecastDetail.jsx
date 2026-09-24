@@ -31,9 +31,11 @@ import { api } from "../api/inventory";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MODEL_ORDER = ["naive_seasonal", "linear_trend", "holt_winters", "holt_damped_seasonal"];
+// Four forecast models, four distinct brand chart-series colours (saffron,
+// terracotta, jade, ink) so no two lines or chips read as the same hue.
 const MODEL_COLOR = {
-  naive_seasonal: "var(--blue)", linear_trend: "var(--orange)", holt_winters: "var(--green)",
-  holt_damped_seasonal: "var(--purple)",
+  naive_seasonal: "var(--chart-1)", linear_trend: "var(--chart-3)", holt_winters: "var(--chart-2)",
+  holt_damped_seasonal: "var(--chart-4)",
 };
 const TIER_SERVICE_LEVEL = { A: 98, B: 95, C: 90 }; // midpoints of proposed ABC-tier default bands
 const DAY_MS = 86_400_000;

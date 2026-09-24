@@ -141,7 +141,7 @@ export default function Outbound() {
               <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.05em", color: "var(--text-muted)" }}>
                 DELIVERY NOTE
               </span>
-              <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, fontFamily: "monospace" }}>
+              <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>
                 {note.movement_no}
               </span>
             </div>
@@ -222,7 +222,7 @@ export default function Outbound() {
                 onClick={() => { setOrder(o); setScan(""); setError(null); setStep(2); }}
                 style={{ padding: "13px 15px", textAlign: "left", display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                  <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
                     {o.so_number}
                   </span>
                   <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, marginTop: 2 }}>{o.product_name}</div>

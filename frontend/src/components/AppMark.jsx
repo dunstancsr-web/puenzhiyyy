@@ -21,7 +21,10 @@ import React from "react";
 // so the header tile has to belong to that system.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const MARK_BLUE = "#1d4ed8";
+// The StockSense product mark. On the Puenzhiy brand the structural colour is
+// Ink, so the tile is Ink rather than a tech blue. Name kept as MARK_BLUE to
+// avoid churn at its import sites; the value is what carries the brand.
+export const MARK_BLUE = "#1d2b2a";
 
 // Sizes are set to the measured height of the text block each mark sits beside,
 // so the tile is exactly as tall as the name plus its sub-line rather than
