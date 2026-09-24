@@ -17,6 +17,13 @@ the warehouse.
 > where it matters. Where a screenshot shows an AI answer, its caption says which model wrote it. How each
 > figure is calculated is in [design.md](../../.kiro/specs/mvp1-inventory-visibility/design.md).
 
+> **Note (24 Sep 2026):** the images below still show the earlier visual style, captured before the
+> Puenzhiy brand re-skin (warm paper grounds, terracotta accent, the four-colour health scale, serif
+> headings) landed on the `feature/ui-changes` branch. The prose and the section names on this page are
+> current; the screenshots are due a recapture once that branch is merged. Product names also read in the
+> earlier form in a few captions (for example the preserved real Sonnet capture); the live app now shows
+> them as "Country Variety Weight", such as "India Basmati 25 KG".
+
 **Contents**
 
 **Start here if you cannot open the app:** [The AI features at a glance](#the-ai-features-at-a-glance)
@@ -311,17 +318,17 @@ ranked by urgency and then by money at stake, with the recommended action and th
 line. It shows the most urgent rows first; **Show more** expands the list, and **All SKUs** switches to
 every product, including healthy ones.
 
-### Cover vs Lead + Safety, Inventory Health, and Value × Movement
+### Cover against lead time and safety stock, Inventory Health, and Value tier and movement
 
 ![Cover against lead time, health by value, and the value by movement matrix](images/10-charts.jpg)
 
-- **Cover vs Lead + Safety:** for each product, how many days current stock will last (the bar),
-  against how long a new order takes to arrive plus a safety buffer (the tick). The colour follows the
-  product's health, so red is the one to look at first.
+- **Cover against lead time and safety stock:** for each product, how many days current stock will last
+  (the bar), against how long a new order takes to arrive plus a safety buffer (the tick). The colour
+  follows the product's health, so red is the one to look at first.
 - **Inventory Health:** how much of the money in stock is critical, needs action, needs watching, or is
   healthy.
-- **Value × Movement:** products grouped by how valuable they are (A, B, C) and how fast they sell (fast,
-  normal, slow, idle). High value that is not selling is the expensive corner.
+- **Value tier and movement:** products grouped by how valuable they are (A, B, C) and how fast they sell
+  (fast, normal, slow, idle). High value that is not selling is the expensive corner.
 
 Clicking a bar, a colour or a cell filters Needs Attention to those products.
 

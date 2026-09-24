@@ -1083,7 +1083,7 @@ function AddSkuForm({ onSave, onCancel }) {
     <form onSubmit={submit}>
       <FormSection title="Identity">
         <TextField half label="SKU ID" required value={form.sku_id} onChange={set("sku_id")} placeholder="e.g. TJ-25KG" />
-        <TextField half label="Product name" required value={form.product_name} onChange={set("product_name")} placeholder="e.g. Thai Jasmine 25KG" />
+        <TextField half label="Product name" required value={form.product_name} onChange={set("product_name")} placeholder="e.g. Thailand Thai Hom Mali 25 KG" />
         <TextField half label="Rice variety" value={form.rice_variety} onChange={set("rice_variety")} placeholder="e.g. Thai Hom Mali" />
         <TextField half label="Grade" value={form.grade} onChange={set("grade")} placeholder="e.g. Grade A" />
         <TextField half label="Country of origin" value={form.country_of_origin} onChange={set("country_of_origin")} placeholder="e.g. Thailand" />

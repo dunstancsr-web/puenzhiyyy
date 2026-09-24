@@ -105,7 +105,7 @@ export default function DemoModeBadge({ compact = false, bannerOnly = false }) {
       <div ref={bannerRef} role="status" style={{
         position: "fixed", top: 0, left: 0, right: 0, minHeight: BANNER_MIN_HEIGHT, zIndex: 300,
         display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "4px 12px",
-        background: "var(--yellow)", color: "#3d2c00",
+        background: "var(--yellow)", color: "#1d2b2a",
         fontSize: "var(--text-sm)", fontWeight: 700, letterSpacing: "0.01em",
         boxShadow: "var(--shadow-md)",
       }}>
@@ -120,7 +120,7 @@ export default function DemoModeBadge({ compact = false, bannerOnly = false }) {
         )}
         <button onClick={exit} disabled={busy} className="hit-44" style={{
           display: "flex", alignItems: "center", gap: 5, marginLeft: 8, padding: "4px 11px", borderRadius: 99,
-          border: "1px solid #3d2c00", background: "transparent", color: "#3d2c00",
+          border: "1px solid #1d2b2a", background: "transparent", color: "#1d2b2a",
           fontSize: "var(--text-xs)", fontWeight: 700, cursor: busy ? "default" : "pointer",
         }}>
           <LogOut size={13} /> {busy ? "Exiting…" : "Exit"}

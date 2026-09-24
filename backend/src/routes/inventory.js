@@ -959,7 +959,7 @@ const MINIMAL_TEMPLATE_COLUMNS = ["sku_id", "product_name", "lead_time_days", "r
 const EXAMPLE_ROW_SKU_ID = "EXAMPLE-DELETE-ME";
 const EXAMPLE_ROW = {
   sku_id: EXAMPLE_ROW_SKU_ID,
-  product_name: "Delete this row — Thai Jasmine 25KG shown as an example",
+  product_name: "Delete this row, Thailand Thai Hom Mali 25 KG shown as an example",
   lead_time_days: 45, reorder_point_policy: 300, target_stock: 500,
 };
 

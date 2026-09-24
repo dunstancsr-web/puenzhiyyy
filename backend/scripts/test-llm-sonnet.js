@@ -268,7 +268,7 @@ const reply = (res, content, extra = {}) => {
     assert.strictEqual(out.toolCalls.length, 1);
     assert.ok(out.toolCalls[0].ok);
     noMarkup(out.text);
-    assert.ok(/Thai Jasmine/.test(out.text));
+    assert.ok(/Thailand Thai Hom Mali/.test(out.text));
   });
   await check("a final answer that is cut off is retried, not shown", async () => {
     script("CALL: sku_facts(TJ-25KG)", "{one_product} has {one_available} on hand and the", "{one_product} has {one_available} on hand.");
@@ -278,13 +278,13 @@ const reply = (res, content, extra = {}) => {
   await check("a heading, a blank line and bullets keep their line breaks all the way through (real Sonnet shape)", async () => {
     script("CALL: compare_skus(TJ-25KG, VF-10KG)", "**{one_a_product} vs {one_b_product} Comparison:**\n\n- {one_a_product} is {one_a_health} health.\n\n- {one_b_product} is {one_b_health} health.");
     const out = await ask("compare TJ-25KG and VF-10KG");
-    assert.ok(/Comparison:\n\n- Thai Jasmine 25KG is RED health\.\n\n- Vietnam Fragrant 10KG is ORANGE health\./.test(out.text), JSON.stringify(out.text));
+    assert.ok(/Comparison:\n\n- Thailand Thai Hom Mali 25 KG is RED health\.\n\n- Vietnam Vietnamese Fragrant 10 KG is ORANGE health\./.test(out.text), JSON.stringify(out.text));
   });
   await check("a model narrating its own progress before the answer is not shown that opening paragraph", async () => {
     script("CALL: sku_facts(TJ-25KG)", "Looking at the facts, I have comprehensive data for this product. I can now provide a complete answer.\n\n- {one_product} is {one_health} health.");
     const out = await ask("how is TJ-25KG doing?");
     assert.ok(!/Looking at the facts|I can now provide/.test(out.text), out.text);
-    assert.ok(/Thai Jasmine 25KG is RED health/.test(out.text));
+    assert.ok(/Thailand Thai Hom Mali 25 KG is RED health/.test(out.text));
   });
   await check("the overstock alert is not offered the value of ALL the stock, which a model reads as the value of the excess", async () => {
     const over = analytics.alerts.find((a) => a.alert_type === "OVERSTOCK");

@@ -42,8 +42,10 @@ const monthLabel = (period) => {
 };
 
 // A fixed palette, not derived from a count, so a country keeps the same
-// colour across a re-render or a filter change rather than reshuffling.
-const COUNTRY_COLORS = ["var(--blue)", "var(--purple)", "var(--green)", "var(--orange)", "var(--yellow)", "var(--red)"];
+// colour across a re-render or a filter change rather than reshuffling. Uses
+// the brand chart-series tokens (index.css), ordered so adjacent slices
+// alternate warm/cool and dark/light and never read as the same colour.
+const COUNTRY_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--chart-6)"];
 
 // The exact same four windows Dashboard's own history chart already offers
 // (same keys, same slicing, same 6M default), so a person who has learned
@@ -122,13 +124,13 @@ function StockBufferChart() {
           `short` flag every bar and tooltip already use, not a separate count. */}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginBottom: 10, fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--blue)", flexShrink: 0 }} /> Meets the buffer rule
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--green)", flexShrink: 0 }} /> Meets the buffer rule
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--blue-soft)", flexShrink: 0 }} /> Surplus above it
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--chart-6)", flexShrink: 0 }} /> Surplus above it
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--red)", flexShrink: 0 }} /> Short of the buffer
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--yellow)", flexShrink: 0 }} /> Short of the buffer
         </span>
         <span style={{ marginLeft: "auto", fontWeight: 700, color: allMet ? "var(--green-text)" : "var(--red-text)" }}>
           {wholeMonths.length === 0 ? null : allMet
@@ -181,7 +183,7 @@ function StockBufferChart() {
                   );
                 }} />
               {rows.map((d, i) => (
-                <Cell key={i} fill={d.short ? "var(--red)" : "var(--blue)"} radius={d.short ? [3, 3, 0, 0] : 0}
+                <Cell key={i} fill={d.short ? "var(--yellow)" : "var(--green)"} radius={d.short ? [3, 3, 0, 0] : 0}
                   fillOpacity={d.partial ? 0.55 : 1} />
               ))}
             </Bar>
@@ -193,7 +195,7 @@ function StockBufferChart() {
                     {fmtMt(rows[index].closing_qty_mt)}
                   </text>
                 )} />
-              {rows.map((d, i) => <Cell key={i} fill="var(--blue-soft)" fillOpacity={d.partial ? 0.55 : 1} />)}
+              {rows.map((d, i) => <Cell key={i} fill="var(--chart-6)" fillOpacity={d.partial ? 0.55 : 1} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

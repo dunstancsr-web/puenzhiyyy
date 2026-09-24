@@ -131,7 +131,7 @@ export default function Login({ onSignedIn, purpose, duty }) {
                   fontSize: "var(--text-xs)", color: "var(--text-secondary)",
                 }}>
                 <span>{o.name}<span style={{ color: "var(--text-muted)" }}> · {o.role}</span></span>
-                <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--text-primary)" }}>{o.pin}</span>
+                <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontWeight: 700, color: "var(--text-primary)" }}>{o.pin}</span>
               </button>
             ))}
           </div>

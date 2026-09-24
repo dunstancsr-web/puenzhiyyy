@@ -926,16 +926,16 @@ conflict, what Stan chose and why, and the definition now in force above. Newest
 
 | SKU ID     | Product                  | Variety           | Origin    | Supplier          |
 |------------|--------------------------|-------------------|-----------|-------------------|
-| TJ-25KG    | Thai Jasmine 25KG        | Thai Hom Mali     | Thailand  | Supplier ABC TH   |
-| TJ-10KG    | Thai Jasmine 10KG        | Thai Hom Mali     | Thailand  | Supplier ABC TH   |
-| VF-25KG    | Vietnam Fragrant 25KG    | Vietnamese Fragrant | Vietnam | Supplier DEF VN   |
-| VF-10KG    | Vietnam Fragrant 10KG    | Vietnamese Fragrant | Vietnam | Supplier DEF VN   |
-| BM-5KG     | Basmati Premium 5KG      | Basmati           | India     | Supplier GHI IN   |
-| BM-25KG    | Basmati Bulk 25KG        | Basmati           | India     | Supplier GHI IN   |
-| JP-5KG     | Japonica Short Grain 5KG | Japonica          | Japan     | Supplier JKL JP   |
-| TW-25KG    | Thai White Rice 25KG     | Thai White        | Thailand  | Supplier ABC TH   |
-| PH-25KG    | Philippine Sinandomeng   | Sinandomeng       | Philippines | Supplier MNO PH |
-| BR-10KG    | Brown Rice Organic 10KG  | Brown             | Thailand  | Supplier ABC TH   |
+| TJ-25KG    | Thailand Thai Hom Mali 25 KG      | Thai Hom Mali     | Thailand  | Supplier ABC TH   |
+| TJ-10KG    | Thailand Thai Hom Mali 10 KG      | Thai Hom Mali     | Thailand  | Supplier ABC TH   |
+| VF-25KG    | Vietnam Vietnamese Fragrant 25 KG | Vietnamese Fragrant | Vietnam | Supplier DEF VN   |
+| VF-10KG    | Vietnam Vietnamese Fragrant 10 KG | Vietnamese Fragrant | Vietnam | Supplier DEF VN   |
+| BM-5KG     | India Basmati 5 KG                | Basmati           | India     | Supplier GHI IN   |
+| BM-25KG    | India Basmati 25 KG               | Basmati           | India     | Supplier GHI IN   |
+| JP-5KG     | Japan Japonica 5 KG               | Japonica          | Japan     | Supplier JKL JP   |
+| TW-25KG    | Thailand Thai White 25 KG         | Thai White        | Thailand  | Supplier ABC TH   |
+| PH-25KG    | Philippines Sinandomeng 25 KG     | Sinandomeng       | Philippines | Supplier MNO PH |
+| BR-10KG    | Thailand Brown Rice 10 KG         | Brown             | Thailand  | Supplier ABC TH   |
 
 Seed data includes (deterministic, safe to rerun with `npm run seed`):
 - about 180 days of sales transactions (varying volumes to create velocity patterns), open purchase
